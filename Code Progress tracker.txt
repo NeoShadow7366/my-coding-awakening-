@@ -1,0 +1,25 @@
+Code Progress Tracker - Links Awakening Project
+=================================================
+
+Session: March 11, 2026
+------------------------
+
+Actions Taken:
+
+1. Created hello.py
+   - Simple one-line script that prints the classic Zelda quote:
+     "It's dangerous to go alone! Take this."
+
+2. Created zelda_greeting.py
+   - Zelda-themed greeting script with user input
+   - Prompts the user for their name
+   - Prints a personalized adventure message with emoji sword
+   - Includes encouraging lines: "Your adventure begins now.", 
+     "Good luck, hero!", "May the Triforce be with you!"
+
+3. Ran zelda_greeting.py successfully
+   - Entered name "Erin" when prompted
+   - Script output confirmed working correctly with personalized greeting
+
+4. Created Code Progress tracker.txt
+   - This file, to track all session activity
