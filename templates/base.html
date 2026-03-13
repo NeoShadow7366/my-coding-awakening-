@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Local AI Model Interface — interact with generative and discriminative AI models in your browser." />
+  <title>Local AI — {% block title %}{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🤖</text></svg>" />
+</head>
+<body data-theme="light">
+
+  <!-- Skip-to-content link for keyboard / screen-reader users -->
+  <a class="skip-link" href="#main-content">Skip to main content</a>
+
+  <header class="site-header" role="banner">
+    <div class="header-inner">
+      <span class="logo" aria-label="Local AI home">🤖 Local AI</span>
+
+      <nav class="tab-nav" role="navigation" aria-label="Model type">
+        <a href="#" class="tab-btn {% block nav_gen %}{% endblock %}" id="nav-generative"
+           role="tab" aria-controls="panel-generative">Generative</a>
+        <a href="#" class="tab-btn {% block nav_disc %}{% endblock %}" id="nav-discriminative"
+           role="tab" aria-controls="panel-discriminative">Classify</a>
+      </nav>
+
+      <div class="header-actions">
+        <!-- Status badge -->
+        <span class="status-badge" id="status-badge" aria-live="polite" aria-label="System status">
+          <span class="status-dot" id="status-dot"></span>
+          <span id="status-text">Checking…</span>
+        </span>
+        <!-- Dark/light mode toggle -->
+        <button class="icon-btn" id="theme-toggle" aria-label="Toggle dark mode" title="Toggle dark / light mode">
+          <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main id="main-content" class="site-main">
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="site-footer" role="contentinfo">
+    <p>Running locally · <a href="https://ollama.com" target="_blank" rel="noopener noreferrer">Ollama</a> for generative models · <a href="https://huggingface.co" target="_blank" rel="noopener noreferrer">Hugging Face</a> for classification</p>
+  </footer>
+
+  <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>
