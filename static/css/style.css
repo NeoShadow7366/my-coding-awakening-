@@ -576,6 +576,8 @@ textarea {
 .queue-policy-wrap {
   display: inline-flex;
   align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: var(--sp-xs);
 }
 

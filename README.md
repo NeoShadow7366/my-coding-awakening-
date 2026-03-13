@@ -13,6 +13,7 @@ Everything runs on your own machine.
 - Image generation controls: checkpoint, sampler, seed, steps, CFG, denoise, width/height, batch
 - Img2img upload flow
 - Queue status panel
+- Queue controls: failed-only filter, auto-retry policy, and clear failed items
 - Local history and gallery persistence
 - Dark and light themes
 

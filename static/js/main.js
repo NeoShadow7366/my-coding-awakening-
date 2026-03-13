@@ -53,6 +53,7 @@ const queueSummary = document.getElementById('queue-summary');
 const queueList = document.getElementById('queue-list');
 const autoRetryPolicy = document.getElementById('auto-retry-policy');
 const failedOnlyToggle = document.getElementById('failed-only-toggle');
+const clearFailedQueueBtn = document.getElementById('clear-failed-queue');
 const refreshGalleryBtn = document.getElementById('refresh-gallery');
 const galleryGrid = document.getElementById('gallery-grid');
 const imagePresetButtons = document.querySelectorAll('[data-image-preset]');
@@ -547,6 +548,10 @@ function renderQueueStatus(running, pending, donePromptIds = new Set()) {
 	}
 
 	const failedCount = Array.from(queueJobMeta.values()).filter((m) => m.status === 'failed').length;
+	if (clearFailedQueueBtn) {
+		clearFailedQueueBtn.disabled = failedCount === 0;
+		clearFailedQueueBtn.textContent = failedCount > 0 ? `Clear failed (${failedCount})` : 'Clear failed';
+	}
 	const visibleLabel = queueFilterFailedOnly ? 'Showing: Failed only' : 'Showing: All';
 	queueSummary.textContent = `Running: ${runningIds.size}  Pending: ${pendingIds.size}  Tracked: ${trackedPromptIds.size}  Failed: ${failedCount}  ${visibleLabel}`;
 
@@ -583,6 +588,32 @@ function renderQueueStatus(running, pending, donePromptIds = new Set()) {
 		});
 
 	queueList.innerHTML = rows.length ? rows.join('') : '<li class="history-item"><span class="history-text">No queue items match this filter.</span></li>';
+}
+
+async function clearFailedQueueItems() {
+	let cleared = 0;
+	for (const [promptId, meta] of Array.from(queueJobMeta.entries())) {
+		if (meta.status !== 'failed') continue;
+		queueJobMeta.delete(promptId);
+		trackedPromptIds.delete(promptId);
+		pendingImageJobs.delete(promptId);
+		queueActionInFlight.delete(`cancel:${promptId}`);
+		queueActionInFlight.delete(`retry:${promptId}`);
+		cleared += 1;
+	}
+
+	if (!cleared) {
+		queueSummary.textContent = 'No failed queue items to clear.';
+		renderQueueStatus([], [], new Set());
+		return;
+	}
+
+	queueSummary.textContent = `Cleared ${cleared} failed queue item${cleared === 1 ? '' : 's'}.`;
+	if (trackedPromptIds.size) {
+		await pollQueue();
+		return;
+	}
+	renderQueueStatus([], [], new Set());
 }
 
 async function cancelImageJob(promptId) {
@@ -720,6 +751,13 @@ queueList.addEventListener('click', async (e) => {
 		await retryImageJob(promptId);
 	}
 });
+
+if (clearFailedQueueBtn) {
+	clearFailedQueueBtn.addEventListener('click', async () => {
+		clearFailedQueueBtn.disabled = true;
+		await clearFailedQueueItems();
+	});
+}
 
 async function saveHistoryEntry(entry) {
 	try {
