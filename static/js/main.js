@@ -54,6 +54,12 @@ const queueList = document.getElementById('queue-list');
 const autoRetryPolicy = document.getElementById('auto-retry-policy');
 const failedOnlyToggle = document.getElementById('failed-only-toggle');
 const clearFailedQueueBtn = document.getElementById('clear-failed-queue');
+const clearCompletedQueueBtn = document.getElementById('clear-completed-queue');
+const toastContainer = document.getElementById('toast-container');
+
+if (queueSummary) {
+	queueSummary.setAttribute('aria-live', 'polite');
+}
 const refreshGalleryBtn = document.getElementById('refresh-gallery');
 const galleryGrid = document.getElementById('gallery-grid');
 const imagePresetButtons = document.querySelectorAll('[data-image-preset]');
@@ -89,6 +95,38 @@ if (failedOnlyToggle) {
 const imageState = {
 	currentPromptId: '',
 };
+
+/* --------------------------------------------------------------------------
+	 Toast notifications
+	 -------------------------------------------------------------------------- */
+function showToast(msg, type = '') {
+	if (!toastContainer) return;
+	const el = document.createElement('div');
+	el.className = `toast${type ? ` toast-${type}` : ''}`;
+	el.textContent = msg;
+	el.setAttribute('role', type === 'neg' ? 'alert' : 'status');
+	el.setAttribute('aria-live', type === 'neg' ? 'assertive' : 'polite');
+	el.setAttribute('tabindex', '0');
+	toastContainer.appendChild(el);
+	let dismissed = false;
+	const dismissToast = () => {
+		if (dismissed) return;
+		dismissed = true;
+		el.classList.add('toast-out');
+		el.addEventListener('animationend', () => el.remove(), { once: true });
+	};
+	const timer = setTimeout(dismissToast, 3500);
+	el.addEventListener('click', () => {
+		clearTimeout(timer);
+		dismissToast();
+	});
+	el.addEventListener('keydown', (event) => {
+		if (event.key !== 'Enter' && event.key !== ' ' && event.key !== 'Escape') return;
+		event.preventDefault();
+		clearTimeout(timer);
+		dismissToast();
+	});
+}
 
 /* --------------------------------------------------------------------------
 	 Theme
@@ -164,6 +202,26 @@ function escHtml(str) {
 		.replace(/</g, '&lt;')
 		.replace(/>/g, '&gt;')
 		.replace(/"/g, '&quot;');
+}
+
+function getFocusedQueueAction() {
+	const active = document.activeElement;
+	if (!(active instanceof HTMLElement)) return null;
+	if (!active.classList.contains('queue-action')) return null;
+	const action = active.getAttribute('data-action');
+	const promptId = active.getAttribute('data-prompt-id');
+	if (!action || !promptId) return null;
+	return { action, promptId };
+}
+
+function restoreQueueActionFocus(snapshot) {
+	if (!snapshot || !queueList) return;
+	const buttons = queueList.querySelectorAll(`.queue-action[data-action="${snapshot.action}"]`);
+	for (const button of buttons) {
+		if (button.getAttribute('data-prompt-id') !== snapshot.promptId) continue;
+		button.focus();
+		return;
+	}
 }
 
 function randomSeed() {
@@ -508,6 +566,7 @@ imagePresetButtons.forEach((btn) => {
 });
 
 function renderQueueStatus(running, pending, donePromptIds = new Set()) {
+	const focusedQueueAction = getFocusedQueueAction();
 	const runningIds = new Set();
 	const pendingIds = new Set();
 
@@ -548,18 +607,24 @@ function renderQueueStatus(running, pending, donePromptIds = new Set()) {
 	}
 
 	const failedCount = Array.from(queueJobMeta.values()).filter((m) => m.status === 'failed').length;
+	const completedCount = Array.from(queueJobMeta.values()).filter((m) => m.status === 'completed').length;
 	if (clearFailedQueueBtn) {
 		clearFailedQueueBtn.disabled = failedCount === 0;
 		clearFailedQueueBtn.textContent = failedCount > 0 ? `Clear failed (${failedCount})` : 'Clear failed';
 	}
+	if (clearCompletedQueueBtn) {
+		clearCompletedQueueBtn.disabled = completedCount === 0;
+		clearCompletedQueueBtn.textContent = completedCount > 0 ? `Clear done (${completedCount})` : 'Clear done';
+	}
 	const visibleLabel = queueFilterFailedOnly ? 'Showing: Failed only' : 'Showing: All';
-	queueSummary.textContent = `Running: ${runningIds.size}  Pending: ${pendingIds.size}  Tracked: ${trackedPromptIds.size}  Failed: ${failedCount}  ${visibleLabel}`;
+	queueSummary.textContent = `Running: ${runningIds.size}  Pending: ${pendingIds.size}  Tracked: ${trackedPromptIds.size}  Failed: ${failedCount}  Done: ${completedCount}  ${visibleLabel}`;
 
 	const rows = Array.from(queueJobMeta.entries())
 		.filter(([, meta]) => (queueFilterFailedOnly ? meta.status === 'failed' : true))
 		.sort((a, b) => (b[1].updatedAt || 0) - (a[1].updatedAt || 0))
 		.map(([promptId, meta]) => {
 			const status = meta.status || 'queued';
+			const promptLabel = escHtml(promptId);
 			const badge =
 				status === 'running' ? '<span class="history-badge positive">RUN</span>' :
 				status === 'queued' ? '<span class="history-badge">WAIT</span>' :
@@ -574,8 +639,8 @@ function renderQueueStatus(running, pending, donePromptIds = new Set()) {
 			const retryBusy = queueActionInFlight.has(`retry:${promptId}`);
 			const reason = meta.failReason ? `<span class="queue-reason">${escHtml(meta.failReason)}</span>` : '';
 			const actions = [
-				canCancel ? `<button class="btn btn-ghost btn-xs queue-action" data-action="cancel" data-prompt-id="${escHtml(promptId)}" ${cancelBusy ? 'disabled' : ''}>${cancelBusy ? 'Canceling...' : 'Cancel'}</button>` : '',
-				canRetry ? `<button class="btn btn-ghost btn-xs queue-action" data-action="retry" data-prompt-id="${escHtml(promptId)}" ${retryBusy ? 'disabled' : ''}>${retryBusy ? 'Retrying...' : 'Retry'}</button>` : '',
+				canCancel ? `<button class="btn btn-ghost btn-xs queue-action" data-action="cancel" data-prompt-id="${promptLabel}" aria-label="Cancel job ${promptLabel}" title="Cancel ${promptLabel}" ${cancelBusy ? 'disabled' : ''}>${cancelBusy ? 'Canceling...' : 'Cancel'}</button>` : '',
+				canRetry ? `<button class="btn btn-ghost btn-xs queue-action" data-action="retry" data-prompt-id="${promptLabel}" aria-label="Retry job ${promptLabel}" title="Retry ${promptLabel}" ${retryBusy ? 'disabled' : ''}>${retryBusy ? 'Retrying...' : 'Retry'}</button>` : '',
 			].join('');
 
 			return `
@@ -588,12 +653,13 @@ function renderQueueStatus(running, pending, donePromptIds = new Set()) {
 		});
 
 	queueList.innerHTML = rows.length ? rows.join('') : '<li class="history-item"><span class="history-text">No queue items match this filter.</span></li>';
+	restoreQueueActionFocus(focusedQueueAction);
 }
 
-async function clearFailedQueueItems() {
+function _clearQueueByStatus(status) {
 	let cleared = 0;
 	for (const [promptId, meta] of Array.from(queueJobMeta.entries())) {
-		if (meta.status !== 'failed') continue;
+		if (meta.status !== status) continue;
 		queueJobMeta.delete(promptId);
 		trackedPromptIds.delete(promptId);
 		pendingImageJobs.delete(promptId);
@@ -601,14 +667,32 @@ async function clearFailedQueueItems() {
 		queueActionInFlight.delete(`retry:${promptId}`);
 		cleared += 1;
 	}
+	return cleared;
+}
 
+async function clearFailedQueueItems() {
+	const cleared = _clearQueueByStatus('failed');
 	if (!cleared) {
-		queueSummary.textContent = 'No failed queue items to clear.';
+		showToast('No failed items to clear.');
 		renderQueueStatus([], [], new Set());
 		return;
 	}
+	showToast(`Cleared ${cleared} failed item${cleared === 1 ? '' : 's'}.`, 'pos');
+	if (trackedPromptIds.size) {
+		await pollQueue();
+		return;
+	}
+	renderQueueStatus([], [], new Set());
+}
 
-	queueSummary.textContent = `Cleared ${cleared} failed queue item${cleared === 1 ? '' : 's'}.`;
+async function clearCompletedQueueItems() {
+	const cleared = _clearQueueByStatus('completed');
+	if (!cleared) {
+		showToast('No completed items to clear.');
+		renderQueueStatus([], [], new Set());
+		return;
+	}
+	showToast(`Cleared ${cleared} completed item${cleared === 1 ? '' : 's'}.`, 'pos');
 	if (trackedPromptIds.size) {
 		await pollQueue();
 		return;
@@ -626,7 +710,7 @@ async function cancelImageJob(promptId) {
 		});
 		const data = await res.json().catch(() => ({}));
 		if (!res.ok) {
-			queueSummary.textContent = `Cancel failed: ${data.error || 'Unknown error'}`;
+			showToast(`Cancel failed: ${data.error || 'Unknown error'}`, 'neg');
 			return;
 		}
 		trackedPromptIds.delete(promptId);
@@ -636,9 +720,10 @@ async function cancelImageJob(promptId) {
 		meta.failReason = 'Canceled by user.';
 		meta.updatedAt = Date.now();
 		queueJobMeta.set(promptId, meta);
+		showToast('Job canceled.');
 		await pollQueue();
 	} catch (err) {
-		queueSummary.textContent = `Cancel failed: ${err.message}`;
+		showToast(`Cancel failed: ${err.message}`, 'neg');
 	} finally {
 		queueActionInFlight.delete(`cancel:${promptId}`);
 	}
@@ -654,7 +739,7 @@ async function retryImageJob(promptId, isAuto = false) {
 	queueActionInFlight.add(`retry:${promptId}`);
 	const snapshot = pendingImageJobs.get(promptId) || (queueJobMeta.get(promptId) || {}).snapshot;
 	if (!snapshot) {
-		queueSummary.textContent = 'Retry unavailable: no job snapshot found.';
+		showToast('Retry unavailable: no job snapshot found.', 'neg');
 		queueActionInFlight.delete(`retry:${promptId}`);
 		return;
 	}
@@ -670,7 +755,7 @@ async function retryImageJob(promptId, isAuto = false) {
 			failedMeta.failReason = 'Retry requires re-uploading img2img source image.';
 			queueJobMeta.set(promptId, failedMeta);
 			if (!isAuto) {
-				queueSummary.textContent = 'Retry for img2img currently requires re-uploading source image.';
+				showToast('Retry for img2img requires re-uploading source image.', 'neg');
 			}
 			queueActionInFlight.delete(`retry:${promptId}`);
 			return;
@@ -683,7 +768,7 @@ async function retryImageJob(promptId, isAuto = false) {
 		});
 		const data = await res.json();
 		if (!res.ok) {
-			queueSummary.textContent = `Retry failed: ${data.error || 'Unknown error'}`;
+			showToast(`Retry failed: ${data.error || 'Unknown error'}`, 'neg');
 			return;
 		}
 
@@ -703,10 +788,10 @@ async function retryImageJob(promptId, isAuto = false) {
 			snapshot: { ...snapshot, ...(data.meta || {}) },
 		});
 		ensureQueuePolling();
-		queueSummary.textContent = `Retry submitted: ${newPromptId}`;
+		if (!isAuto) showToast('Retry submitted.', 'pos');
 		await pollQueue();
 	} catch (err) {
-		queueSummary.textContent = `Retry failed: ${err.message}`;
+		showToast(`Retry failed: ${err.message}`, 'neg');
 		const meta = queueJobMeta.get(promptId) || {};
 		meta.status = 'failed';
 		meta.retryCount = (meta.retryCount || 0) + 1;
@@ -756,6 +841,13 @@ if (clearFailedQueueBtn) {
 	clearFailedQueueBtn.addEventListener('click', async () => {
 		clearFailedQueueBtn.disabled = true;
 		await clearFailedQueueItems();
+	});
+}
+
+if (clearCompletedQueueBtn) {
+	clearCompletedQueueBtn.addEventListener('click', async () => {
+		clearCompletedQueueBtn.disabled = true;
+		await clearCompletedQueueItems();
 	});
 }
 

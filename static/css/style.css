@@ -606,6 +606,47 @@ textarea {
   margin-top: 2px;
 }
 
+/* --------------------------------------------------------------------------
+   Toast notifications
+   -------------------------------------------------------------------------- */
+.toast-container {
+  position: fixed;
+  bottom: var(--sp-lg);
+  right: var(--sp-lg);
+  z-index: 500;
+  display: flex;
+  flex-direction: column-reverse;
+  gap: var(--sp-xs);
+  pointer-events: none;
+}
+
+.toast {
+  background: var(--clr-surface);
+  border: 1px solid var(--clr-border);
+  color: var(--clr-text);
+  font-size: var(--fs-sm);
+  padding: var(--sp-sm) var(--sp-md);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-md);
+  pointer-events: auto;
+  cursor: pointer;
+  max-width: 320px;
+  word-break: break-word;
+  animation: toast-in 200ms ease forwards;
+}
+.toast.toast-pos { border-left: 3px solid var(--clr-accent-pos); }
+.toast.toast-neg { border-left: 3px solid var(--clr-accent-neg); }
+.toast.toast-out { animation: toast-out 300ms ease forwards; }
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes toast-out {
+  from { opacity: 1; transform: translateY(0); }
+  to   { opacity: 0; transform: translateY(8px); }
+}
+
 .gallery-wrap {
   display: flex;
   flex-direction: column;
