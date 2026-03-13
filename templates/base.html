@@ -20,8 +20,8 @@
       <nav class="tab-nav" role="navigation" aria-label="Model type">
         <a href="#" class="tab-btn {% block nav_gen %}{% endblock %}" id="nav-generative"
            role="tab" aria-controls="panel-generative">Generative</a>
-        <a href="#" class="tab-btn {% block nav_disc %}{% endblock %}" id="nav-discriminative"
-           role="tab" aria-controls="panel-discriminative">Classify</a>
+        <a href="#" class="tab-btn {% block nav_disc %}{% endblock %}" id="nav-image"
+          role="tab" aria-controls="panel-image">Image</a>
       </nav>
 
       <div class="header-actions">
@@ -45,7 +45,7 @@
   </main>
 
   <footer class="site-footer" role="contentinfo">
-    <p>Running locally · <a href="https://ollama.com" target="_blank" rel="noopener noreferrer">Ollama</a> for generative models · <a href="https://huggingface.co" target="_blank" rel="noopener noreferrer">Hugging Face</a> for classification</p>
+    <p>Running locally · <a href="https://ollama.com" target="_blank" rel="noopener noreferrer">Ollama</a> for text models · <a href="https://github.com/comfyanonymous/ComfyUI" target="_blank" rel="noopener noreferrer">ComfyUI</a> for image generation</p>
   </footer>
 
   <script src="{{ url_for('static', filename='js/main.js') }}"></script>

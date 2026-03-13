@@ -37,6 +37,45 @@
     </div>
 
     <div class="sidebar-section">
+      <p class="field-label">Inference</p>
+      <div class="inline-field-row">
+        <label for="text-seed" class="inline-label">Seed</label>
+        <input id="text-seed" type="number" class="compact-input" placeholder="Random" />
+        <button class="btn btn-ghost btn-xs" id="text-random-seed" type="button">Random</button>
+      </div>
+
+      <div class="slider-group">
+        <label for="text-temperature" class="inline-label">Temperature <span id="text-temperature-val">0.70</span></label>
+        <input id="text-temperature" type="range" min="0" max="2" step="0.01" value="0.7" />
+      </div>
+
+      <div class="slider-group">
+        <label for="text-top-p" class="inline-label">Top P <span id="text-top-p-val">0.90</span></label>
+        <input id="text-top-p" type="range" min="0" max="1" step="0.01" value="0.9" />
+      </div>
+
+      <div class="inline-field-row">
+        <label for="text-top-k" class="inline-label">Top K</label>
+        <input id="text-top-k" type="number" class="compact-input" min="1" max="1000" value="40" />
+      </div>
+
+      <div class="inline-field-row">
+        <label for="text-num-predict" class="inline-label">Max tokens</label>
+        <input id="text-num-predict" type="number" class="compact-input" min="1" max="4096" value="512" />
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <label for="text-negative-prompt" class="field-label">Negative prompt <span class="optional">(optional)</span></label>
+      <textarea
+        id="text-negative-prompt"
+        rows="3"
+        placeholder="Avoid specific style, tone, or topics."
+        aria-label="Negative prompt for text generation"
+      ></textarea>
+    </div>
+
+    <div class="sidebar-section">
       <button class="btn btn-ghost btn-full" id="clear-chat" type="button">
         Clear conversation
       </button>
@@ -83,72 +122,150 @@
 </section>
 
 <!-- =====================================================================
-     DISCRIMINATIVE AI PANEL
+     IMAGE INFERENCE PANEL
      ===================================================================== -->
-<section id="panel-discriminative" class="panel" role="tabpanel" aria-labelledby="nav-discriminative" hidden>
+<section id="panel-image" class="panel" role="tabpanel" aria-labelledby="nav-image" hidden>
 
-  <aside class="sidebar" aria-label="Classification settings">
+  <aside class="sidebar" aria-label="Image generation settings">
     <div class="sidebar-section">
-      <p class="field-label">Active model</p>
-      <p class="model-name-static">{{ classifier_model }}</p>
-      <p class="hint">Sentiment analysis (POSITIVE / NEGATIVE)</p>
-    </div>
-
-    <div class="sidebar-section" id="disc-status-section">
-      <p class="field-label">Status</p>
-      <p id="disc-model-status" class="hint">Loading…</p>
-    </div>
-
-    <!-- Educational callout -->
-    <details class="info-details">
-      <summary>What is a Discriminative model?</summary>
-      <div class="info-body">
-        <p>Discriminative models <strong>classify or label</strong> existing data rather than generating new content.</p>
-        <p>Examples: spam filters, image classifiers, sentiment analysers. They learn the boundary between categories.</p>
-        <p>DistilBERT is a smaller, faster version of BERT trained to distinguish positive from negative sentiment in text.</p>
+      <label for="image-model-select" class="field-label">Checkpoint</label>
+      <div class="select-wrapper">
+        <select id="image-model-select" aria-describedby="image-model-hint">
+          <option value="">- loading checkpoints -</option>
+        </select>
       </div>
-    </details>
+      <p id="image-model-hint" class="hint">Loaded from ComfyUI CheckpointLoaderSimple</p>
+    </div>
+
+    <div class="sidebar-section">
+      <label for="image-sampler-select" class="field-label">Sampler</label>
+      <div class="select-wrapper">
+        <select id="image-sampler-select">
+          <option value="euler">euler</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <p class="field-label">Seed and Presets</p>
+      <div class="inline-field-row">
+        <label for="image-seed" class="inline-label">Seed</label>
+        <input id="image-seed" type="number" class="compact-input" placeholder="Random" />
+        <button class="btn btn-ghost btn-xs" id="image-random-seed" type="button">Random</button>
+      </div>
+      <div class="preset-row" role="group" aria-label="Image presets">
+        <button class="btn btn-ghost btn-xs" type="button" data-image-preset="fast">Fast</button>
+        <button class="btn btn-ghost btn-xs" type="button" data-image-preset="quality">Quality</button>
+        <button class="btn btn-ghost btn-xs" type="button" data-image-preset="creative">Creative</button>
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="slider-group">
+        <label for="image-steps" class="inline-label">Steps <span id="image-steps-val">30</span></label>
+        <input id="image-steps" type="range" min="1" max="150" step="1" value="30" />
+      </div>
+      <div class="slider-group">
+        <label for="image-cfg" class="inline-label">CFG <span id="image-cfg-val">7.0</span></label>
+        <input id="image-cfg" type="range" min="1" max="30" step="0.1" value="7" />
+      </div>
+      <div class="slider-group">
+        <label for="image-denoise" class="inline-label">Denoise <span id="image-denoise-val">0.75</span></label>
+        <input id="image-denoise" type="range" min="0.05" max="1" step="0.01" value="0.75" />
+      </div>
+    </div>
+
+    <div class="sidebar-section" id="image-status-wrap">
+      <p class="field-label">Image Engine Status</p>
+      <p id="image-engine-status" class="hint">Checking ComfyUI...</p>
+    </div>
   </aside>
 
-  <!-- Classify area -->
-  <div class="classify-container">
-    <h2 class="section-heading">Sentiment Analysis</h2>
-    <p class="section-desc">Enter a sentence or paragraph to classify its sentiment as <strong>positive</strong> or <strong>negative</strong>.</p>
+  <div class="image-container">
+    <section class="image-form-wrap" aria-label="Image generation form">
+      <h2 class="section-heading">Image Inference</h2>
+      <p class="section-desc">Create images from text prompts, or upload a source image for img2img.</p>
 
-    <form id="classify-form" aria-label="Text classification form">
-      <div class="form-field">
-        <label for="classify-input" class="field-label">Text to classify</label>
-        <textarea
-          id="classify-input"
-          rows="5"
-          maxlength="512"
-          placeholder="e.g. The new update is really impressive and easy to use!"
-          aria-describedby="classify-char-count"
-          required
-        ></textarea>
-        <span id="classify-char-count" class="char-count" aria-live="polite">0 / 512</span>
-      </div>
-
-      <button class="btn btn-primary" type="submit" id="classify-btn">
-        Classify
-      </button>
-    </form>
-
-    <!-- Result card (hidden until a result is available) -->
-    <div id="classify-result" class="result-card" aria-live="polite" hidden>
-      <div class="result-inner">
-        <span id="result-label" class="result-label"></span>
-        <div class="result-bar-container" aria-hidden="true">
-          <div id="result-bar" class="result-bar"></div>
+      <form id="image-form">
+        <div class="form-field">
+          <label for="image-prompt" class="field-label">Prompt</label>
+          <textarea id="image-prompt" rows="4" placeholder="A cinematic forest temple, volumetric light, detailed illustration" required></textarea>
         </div>
-        <span id="result-score" class="result-score"></span>
-      </div>
-    </div>
 
-    <!-- History of past classifications -->
-    <section id="classify-history" class="classify-history" aria-label="Classification history" hidden>
-      <h3 class="history-heading">History</h3>
-      <ul id="history-list" class="history-list"></ul>
+        <div class="form-field">
+          <label for="image-negative-prompt" class="field-label">Negative prompt</label>
+          <textarea id="image-negative-prompt" rows="3" placeholder="blurry, low quality, watermark, text"></textarea>
+        </div>
+
+        <div class="inline-grid two-up">
+          <div class="form-field">
+            <label for="image-width" class="field-label">Width</label>
+            <input id="image-width" type="number" min="256" max="2048" step="64" value="1024" />
+          </div>
+          <div class="form-field">
+            <label for="image-height" class="field-label">Height</label>
+            <input id="image-height" type="number" min="256" max="2048" step="64" value="1024" />
+          </div>
+        </div>
+
+        <div class="inline-grid two-up">
+          <div class="form-field">
+            <label for="image-batch-size" class="field-label">Batch</label>
+            <input id="image-batch-size" type="number" min="1" max="8" value="1" />
+          </div>
+          <div class="form-field">
+            <label for="image-upload" class="field-label">Img2img source <span class="optional">(optional)</span></label>
+            <input id="image-upload" type="file" accept="image/*" />
+          </div>
+        </div>
+
+        <div class="image-actions">
+          <button class="btn btn-primary" id="image-generate-btn" type="submit">Generate Image</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="queue-wrap" aria-label="Queue status">
+      <div class="gallery-head">
+        <h3 class="history-heading">Queue</h3>
+        <div class="queue-policy-wrap">
+          <label for="auto-retry-policy" class="hint">Auto retry</label>
+          <select id="auto-retry-policy" class="queue-policy-select">
+            <option value="0">Off</option>
+            <option value="1">1 retry</option>
+            <option value="2">2 retries</option>
+          </select>
+          <label for="failed-only-toggle" class="hint queue-toggle-label">
+            <input id="failed-only-toggle" type="checkbox" />
+            Failed only
+          </label>
+        </div>
+      </div>
+      <p id="queue-summary" class="hint">No jobs submitted yet.</p>
+      <ul id="queue-list" class="history-list"></ul>
+    </section>
+
+    <section class="preview-wrap" aria-label="Live preview">
+      <div class="gallery-head">
+        <h3 class="history-heading">Live Preview</h3>
+        <span id="preview-updated" class="hint">Waiting for output...</span>
+      </div>
+      <div class="preview-card">
+        <div id="preview-empty" class="empty-gallery">No completed outputs yet.</div>
+        <img id="preview-image" src="" alt="Newest generated image" hidden />
+        <div id="preview-meta" class="gallery-meta" hidden>
+          <p id="preview-prompt" class="gallery-prompt"></p>
+          <p id="preview-chip-row" class="gallery-chip-row"></p>
+        </div>
+      </div>
+    </section>
+
+    <section class="gallery-wrap" aria-label="Generation gallery">
+      <div class="gallery-head">
+        <h3 class="history-heading">Gallery</h3>
+        <button class="btn btn-ghost btn-xs" id="refresh-gallery" type="button">Refresh</button>
+      </div>
+      <div id="gallery-grid" class="gallery-grid"></div>
     </section>
   </div>
 </section>
