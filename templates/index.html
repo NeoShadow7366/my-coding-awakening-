@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+
+{% block title %}AI Interface{% endblock %}
+
+{# The active tab class is set via JS, so both nav items start plain #}
+{% block nav_gen %}active{% endblock %}
+
+{% block content %}
+
+<!-- =====================================================================
+     GENERATIVE AI PANEL
+     ===================================================================== -->
+<section id="panel-generative" class="panel active" role="tabpanel" aria-labelledby="nav-generative">
+
+  <!-- Sidebar: model selector + system prompt -->
+  <aside class="sidebar" aria-label="Generative model settings">
+    <div class="sidebar-section">
+      <label for="gen-model-select" class="field-label">Model</label>
+      <div class="select-wrapper">
+        <select id="gen-model-select" aria-describedby="gen-model-hint">
+          <option value="">— loading models —</option>
+        </select>
+      </div>
+      <p id="gen-model-hint" class="hint">
+        Install models with <code>ollama pull &lt;name&gt;</code>
+      </p>
+    </div>
+
+    <div class="sidebar-section">
+      <label for="system-prompt" class="field-label">System prompt <span class="optional">(optional)</span></label>
+      <textarea
+        id="system-prompt"
+        rows="5"
+        placeholder="e.g. You are a helpful and concise assistant."
+        aria-label="System prompt for the generative model"
+      ></textarea>
+    </div>
+
+    <div class="sidebar-section">
+      <button class="btn btn-ghost btn-full" id="clear-chat" type="button">
+        Clear conversation
+      </button>
+    </div>
+
+    <!-- Educational callout -->
+    <details class="info-details">
+      <summary>What is a Generative AI model?</summary>
+      <div class="info-body">
+        <p>Generative models <strong>produce new content</strong> (text, images, etc.) based on patterns learned from training data.</p>
+        <p>Examples: GPT, Llama, Mistral. They predict the next token in a sequence to generate a coherent response.</p>
+        <p>Ollama lets you run these models entirely on your own computer — no internet required after the model is downloaded.</p>
+      </div>
+    </details>
+  </aside>
+
+  <!-- Chat area -->
+  <div class="chat-container">
+    <div id="chat-messages" class="chat-messages" role="log" aria-live="polite" aria-label="Conversation">
+      <!-- Welcome message -->
+      <div class="message message-system">
+        <p>Welcome! Select a model in the sidebar and start chatting. If no models appear, make sure <strong>Ollama</strong> is installed and running (<code>ollama serve</code>).</p>
+      </div>
+    </div>
+
+    <form class="chat-form" id="chat-form" aria-label="Send a message">
+      <textarea
+        id="chat-input"
+        class="chat-input"
+        rows="1"
+        placeholder="Type a message… (Enter to send, Shift+Enter for newline)"
+        aria-label="Message input"
+        required
+      ></textarea>
+      <button class="btn btn-primary" type="submit" id="send-btn" aria-label="Send message">
+        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <line x1="22" y1="2" x2="11" y2="13"/>
+          <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+        </svg>
+        <span class="btn-label">Send</span>
+      </button>
+    </form>
+  </div>
+</section>
+
+<!-- =====================================================================
+     DISCRIMINATIVE AI PANEL
+     ===================================================================== -->
+<section id="panel-discriminative" class="panel" role="tabpanel" aria-labelledby="nav-discriminative" hidden>
+
+  <aside class="sidebar" aria-label="Classification settings">
+    <div class="sidebar-section">
+      <p class="field-label">Active model</p>
+      <p class="model-name-static">{{ classifier_model }}</p>
+      <p class="hint">Sentiment analysis (POSITIVE / NEGATIVE)</p>
+    </div>
+
+    <div class="sidebar-section" id="disc-status-section">
+      <p class="field-label">Status</p>
+      <p id="disc-model-status" class="hint">Loading…</p>
+    </div>
+
+    <!-- Educational callout -->
+    <details class="info-details">
+      <summary>What is a Discriminative model?</summary>
+      <div class="info-body">
+        <p>Discriminative models <strong>classify or label</strong> existing data rather than generating new content.</p>
+        <p>Examples: spam filters, image classifiers, sentiment analysers. They learn the boundary between categories.</p>
+        <p>DistilBERT is a smaller, faster version of BERT trained to distinguish positive from negative sentiment in text.</p>
+      </div>
+    </details>
+  </aside>
+
+  <!-- Classify area -->
+  <div class="classify-container">
+    <h2 class="section-heading">Sentiment Analysis</h2>
+    <p class="section-desc">Enter a sentence or paragraph to classify its sentiment as <strong>positive</strong> or <strong>negative</strong>.</p>
+
+    <form id="classify-form" aria-label="Text classification form">
+      <div class="form-field">
+        <label for="classify-input" class="field-label">Text to classify</label>
+        <textarea
+          id="classify-input"
+          rows="5"
+          maxlength="512"
+          placeholder="e.g. The new update is really impressive and easy to use!"
+          aria-describedby="classify-char-count"
+          required
+        ></textarea>
+        <span id="classify-char-count" class="char-count" aria-live="polite">0 / 512</span>
+      </div>
+
+      <button class="btn btn-primary" type="submit" id="classify-btn">
+        Classify
+      </button>
+    </form>
+
+    <!-- Result card (hidden until a result is available) -->
+    <div id="classify-result" class="result-card" aria-live="polite" hidden>
+      <div class="result-inner">
+        <span id="result-label" class="result-label"></span>
+        <div class="result-bar-container" aria-hidden="true">
+          <div id="result-bar" class="result-bar"></div>
+        </div>
+        <span id="result-score" class="result-score"></span>
+      </div>
+    </div>
+
+    <!-- History of past classifications -->
+    <section id="classify-history" class="classify-history" aria-label="Classification history" hidden>
+      <h3 class="history-heading">History</h3>
+      <ul id="history-list" class="history-list"></ul>
+    </section>
+  </div>
+</section>
+
+{% endblock %}
