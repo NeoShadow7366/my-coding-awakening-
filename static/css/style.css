@@ -599,6 +599,14 @@ textarea {
   font-size: 0.75rem;
 }
 
+.queue-telemetry-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-sm);
+  flex-wrap: wrap;
+}
+
 .queue-reason {
   display: block;
   font-size: 0.72rem;

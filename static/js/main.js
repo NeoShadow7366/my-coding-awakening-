@@ -54,6 +54,8 @@ const imageHeight = document.getElementById('image-height');
 const imageBatchSize = document.getElementById('image-batch-size');
 const imageUpload = document.getElementById('image-upload');
 const imageGenerateBtn = document.getElementById('image-generate-btn');
+const queueTelemetry = document.getElementById('queue-telemetry');
+const queueTelemetryResetBtn = document.getElementById('queue-telemetry-reset');
 const queueSummary = document.getElementById('queue-summary');
 const queueList = document.getElementById('queue-list');
 const diagnosticsRunBtn = document.getElementById('diagnostics-run-btn');
@@ -97,6 +99,45 @@ const queueActionInFlight = new Set();
 let queueFilterFailedOnly = localStorage.getItem('queueFilterFailedOnly') === '1';
 const IMAGE_PROFILE_STORAGE_KEY = 'imagePresetProfilesV1';
 const IMAGE_PROFILE_SELECTED_KEY = 'imagePresetProfilesSelectedV1';
+const QUEUE_TELEMETRY_KEY = 'queueTelemetryV1';
+
+function getQueueTelemetryState() {
+	try {
+		const parsed = JSON.parse(sessionStorage.getItem(QUEUE_TELEMETRY_KEY) || '{}');
+		return {
+			submitted: Number(parsed.submitted || 0),
+			canceled: Number(parsed.canceled || 0),
+			retried: Number(parsed.retried || 0),
+			failed: Number(parsed.failed || 0),
+		};
+	} catch {
+		return { submitted: 0, canceled: 0, retried: 0, failed: 0 };
+	}
+}
+
+let queueTelemetryState = getQueueTelemetryState();
+
+function persistQueueTelemetryState() {
+	sessionStorage.setItem(QUEUE_TELEMETRY_KEY, JSON.stringify(queueTelemetryState));
+}
+
+function renderQueueTelemetry() {
+	if (!queueTelemetry) return;
+	queueTelemetry.textContent = `Session: submitted ${queueTelemetryState.submitted} | canceled ${queueTelemetryState.canceled} | retried ${queueTelemetryState.retried} | failed ${queueTelemetryState.failed}`;
+}
+
+function incrementQueueTelemetry(metric, delta = 1) {
+	if (!Object.prototype.hasOwnProperty.call(queueTelemetryState, metric)) return;
+	queueTelemetryState[metric] += delta;
+	persistQueueTelemetryState();
+	renderQueueTelemetry();
+}
+
+function resetQueueTelemetry() {
+	queueTelemetryState = { submitted: 0, canceled: 0, retried: 0, failed: 0 };
+	persistQueueTelemetryState();
+	renderQueueTelemetry();
+}
 
 if (failedOnlyToggle) {
 	failedOnlyToggle.checked = queueFilterFailedOnly;
@@ -104,6 +145,15 @@ if (failedOnlyToggle) {
 		queueFilterFailedOnly = failedOnlyToggle.checked;
 		localStorage.setItem('queueFilterFailedOnly', queueFilterFailedOnly ? '1' : '0');
 		renderQueueStatus([], [], new Set());
+	});
+}
+
+renderQueueTelemetry();
+
+if (queueTelemetryResetBtn) {
+	queueTelemetryResetBtn.addEventListener('click', () => {
+		resetQueueTelemetry();
+		showToast('Queue counters reset.', 'pos');
 	});
 }
 
@@ -875,6 +925,7 @@ function renderQueueStatus(running, pending, donePromptIds = new Set()) {
 
 	for (const promptId of trackedPromptIds) {
 		const meta = queueJobMeta.get(promptId) || {};
+		const prevStatus = meta.status || '';
 		if (runningIds.has(promptId)) {
 			meta.status = 'running';
 			meta.missCount = 0;
@@ -888,6 +939,9 @@ function renderQueueStatus(running, pending, donePromptIds = new Set()) {
 			meta.missCount = (meta.missCount || 0) + 1;
 			if (meta.missCount >= JOB_MISS_THRESHOLD) {
 				meta.status = 'failed';
+				if (prevStatus !== 'failed') {
+					incrementQueueTelemetry('failed');
+				}
 				if (!meta.failReason) {
 					meta.failReason = `No queue updates for ${JOB_MISS_THRESHOLD} polls.`;
 				}
@@ -1016,6 +1070,7 @@ async function cancelImageJob(promptId) {
 		meta.failReason = 'Canceled by user.';
 		meta.updatedAt = Date.now();
 		queueJobMeta.set(promptId, meta);
+		incrementQueueTelemetry('canceled');
 		showToast('Job canceled.');
 		await pollQueue();
 	} catch (err) {
@@ -1083,16 +1138,21 @@ async function retryImageJob(promptId, isAuto = false) {
 			updatedAt: Date.now(),
 			snapshot: { ...snapshot, ...(data.meta || {}) },
 		});
+		incrementQueueTelemetry('retried');
 		ensureQueuePolling();
 		if (!isAuto) showToast('Retry submitted.', 'pos');
 		await pollQueue();
 	} catch (err) {
 		showToast(`Retry failed: ${err.message}`, 'neg');
 		const meta = queueJobMeta.get(promptId) || {};
+		const prevStatus = meta.status || '';
 		meta.status = 'failed';
 		meta.retryCount = (meta.retryCount || 0) + 1;
 		meta.failReason = `Retry failed: ${err.message}`;
 		queueJobMeta.set(promptId, meta);
+		if (prevStatus !== 'failed') {
+			incrementQueueTelemetry('failed');
+		}
 	} finally {
 		queueActionInFlight.delete(`retry:${promptId}`);
 	}
@@ -1436,6 +1496,7 @@ imageForm.addEventListener('submit', async (e) => {
 		const promptId = data.prompt_id;
 		imageState.currentPromptId = promptId;
 		trackedPromptIds.add(promptId);
+		incrementQueueTelemetry('submitted');
 		const snapshot = {
 			prompt: common.prompt,
 			negative_prompt: common.negative_prompt,
