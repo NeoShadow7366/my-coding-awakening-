@@ -57,6 +57,7 @@ const imageDenoiseVal = document.getElementById('image-denoise-val');
 const imageEngineStatus = document.getElementById('image-engine-status');
 const imageForm = document.getElementById('image-form');
 const imagePrompt = document.getElementById('image-prompt');
+const promptRandomizeBtn = document.getElementById('prompt-randomize-btn');
 const normalPromptWrap = document.getElementById('normal-prompt-wrap');
 const promptModeHint = document.getElementById('prompt-mode-hint');
 const enhancedPromptToggle = document.getElementById('enhanced-prompt-toggle');
@@ -100,6 +101,12 @@ const configFlaskRestartBtn = document.getElementById('config-flask-restart');
 const configOllamaStatus = document.getElementById('config-ollama-status');
 const configComfyStatus = document.getElementById('config-comfy-status');
 const configFlaskStatus = document.getElementById('config-flask-status');
+const tagCategorySelect = document.getElementById('tag-category-select');
+const tagNewInput = document.getElementById('tag-new-input');
+const tagAddBtn = document.getElementById('tag-add-btn');
+const tagEditorList = document.getElementById('tag-editor-list');
+const tagManagerStatus = document.getElementById('tag-manager-status');
+const tagResetDefaultsBtn = document.getElementById('tag-reset-defaults-btn');
 const diagnosticsRunBtn = document.getElementById('diagnostics-run-btn');
 const diagnosticsSummary = document.getElementById('diagnostics-summary');
 const diagnosticsHint = document.getElementById('diagnostics-hint');
@@ -163,6 +170,65 @@ const BACKGROUND_POLL_LEASE_MS = 10_000;
 const BACKGROUND_POLL_HEARTBEAT_MS = 3_000;
 const tabInstanceId = `tab-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 let hasBackgroundPollingOwnership = false;
+const SUGGESTION_TAG_STORAGE_KEY = 'imageSuggestionTagsV1';
+const TAG_CATEGORY_LABELS = {
+	'enhanced-subject': 'Subject',
+	'enhanced-setting': 'Setting/Environment',
+	'enhanced-composition': 'Composition & Framing',
+	'enhanced-lighting': 'Lighting',
+	'enhanced-style': 'Style/Medium',
+	'image-negative-prompt': 'Negative Prompt',
+};
+const DEFAULT_SUGGESTION_TAGS = {
+	'enhanced-subject': [
+		'portrait', 'full body', 'character design', 'creature concept', 'mech pilot', 'ancient warrior', 'cyberpunk detective', 'forest spirit',
+		'samurai', 'astronaut', 'witch', 'dragon', 'fox familiar', 'robot companion', 'old sailor', 'elven ranger',
+		'desert nomad', 'knight armor', 'street vendor', 'masked assassin', 'scholar alchemist', 'giant golem', 'mermaid', 'time traveler',
+		'musician', 'dancer', 'child adventurer', 'elderly monk', 'pirate captain', 'bounty hunter', 'shapeshifter', 'royal queen',
+		'royal king', 'blacksmith', 'beekeeper', 'falconer', 'explorer', 'scientist', 'chef', 'bard',
+	],
+	'enhanced-setting': [
+		'misty forest', 'neon city alley', 'abandoned temple', 'floating islands', 'ancient ruins', 'underwater palace', 'desert canyon', 'snowy mountain pass',
+		'volcanic crater', 'moon base', 'starship bridge', 'steampunk workshop', 'medieval tavern', 'rainy rooftop', 'haunted mansion', 'cyber lab',
+		'bamboo grove', 'coral reef', 'arctic tundra', 'crystal cave', 'market street', 'cathedral interior', 'throne room', 'battlefield at dawn',
+		'hidden village', 'tropical beach', 'frozen lake', 'overgrown greenhouse', 'canyon overlook', 'lighthouse cliff', 'subway station', 'wasteland highway',
+		'enchanted library', 'observatory dome', 'waterfall grotto', 'cloud kingdom', 'swamp marsh', 'harbor dock', 'festival plaza', 'palace garden',
+	],
+	'enhanced-composition': [
+		"close-up portrait", 'medium shot', 'wide shot', 'full body shot', 'extreme close-up', 'over-the-shoulder', 'low angle', 'high angle',
+		"bird's-eye view", "worm's-eye view", 'dutch angle', 'centered composition', 'rule of thirds', 'symmetrical framing', 'leading lines', 'negative space',
+		'cinematic framing', 'dynamic perspective', 'depth layering', 'foreground framing', 'silhouette composition', 'profile view', 'three-quarter view', 'back view',
+		'action freeze frame', 'motion blur framing', 'macro detail shot', 'panoramic view', 'isometric view', 'top-down layout', 'diagonal composition', 'shallow depth of field',
+		'deep focus', 'bokeh foreground', 'off-center subject', 'portrait orientation', 'landscape orientation', 'split framing', 'environmental portrait', 'establishing shot',
+	],
+	'enhanced-lighting': [
+		'golden hour', 'blue hour', 'soft diffused light', 'hard sunlight', 'overcast light', 'dramatic rim light', 'backlit subject', 'volumetric god rays',
+		'neon glow', 'moonlit scene', 'candlelight', 'firelight', 'studio key light', 'three-point lighting', 'low key lighting', 'high key lighting',
+		'chiaroscuro', 'bioluminescent glow', 'underlighting', 'sidelighting', 'top lighting', 'practical lights', 'color gel lighting', 'warm color temperature',
+		'cool color temperature', 'flickering light', 'fog light beams', 'storm lightning flashes', 'sunset gradient light', 'sunrise haze', 'reflected bounce light', 'ambient occlusion emphasis',
+		'HDR lighting', 'global illumination', 'subsurface glow', 'silhouette backlight', 'lens flare highlights', 'softbox portrait light', 'rim and fill balance', 'mixed lighting sources',
+	],
+	'enhanced-style': [
+		'cinematic photography', 'concept art', 'matte painting', 'digital painting', 'oil painting', 'watercolor', 'ink illustration', 'pencil sketch',
+		'charcoal drawing', 'anime style', 'manga screentone', 'comic book style', 'pixel art', 'low poly 3d', 'photorealistic render', 'stylized 3d render',
+		'clay render', 'voxel art', 'art nouveau', 'art deco', 'baroque painting', 'impressionist brushwork', 'surrealism', 'vaporwave aesthetic',
+		'synthwave palette', 'minimalism', 'maximalism', 'brutalist graphic style', 'ukiyo-e print', 'noir style', 'fantasy realism', 'sci-fi realism',
+		'dark fantasy', "children's book illustration", 'poster design', 'blueprint technical art', 'collage mixed media', 'glitch art', 'line art', 'cel shading',
+	],
+	'image-negative-prompt': [
+		'lowres', 'worst quality', 'low quality', 'normal quality', 'jpeg artifacts', 'blurry', 'out of focus', 'soft focus', 'motion blur', 'gaussian blur',
+		'noise', 'grainy', 'pixelated', 'aliased edges', 'banding', 'washed out colors', 'overexposed', 'underexposed', 'bad contrast', 'oversaturated',
+		'undersaturated', 'color bleeding', 'chromatic aberration', 'lens distortion', 'vignette', 'watermark', 'signature', 'text', 'logo', 'frame',
+		'border', 'cropped', 'out of frame', 'cut off', 'duplicate', 'cloned face', 'extra limbs', 'extra arms', 'extra legs', 'extra fingers',
+		'fused fingers', 'missing fingers', 'malformed hands', 'bad hands', 'mutated hands', 'long neck', 'deformed anatomy', 'bad anatomy', 'disfigured', 'distorted face',
+		'asymmetrical eyes', 'cross-eye', 'lazy eye', 'bad proportions', 'unrealistic proportions', 'floating limbs', 'detached limbs', 'twisted torso', 'unnatural pose', 'bad perspective',
+		'incorrect shadows', 'inconsistent lighting', 'flat lighting', 'low detail', 'lack of texture', 'muddy details', 'messy background', 'cluttered composition', 'artifacts', 'compression artifacts',
+		'posterization', 'moire pattern', 'tiling', 'repeating patterns', 'double pupils', 'uneven pupils', 'skin blemishes', 'acne', 'blotchy skin', 'plastic skin',
+		'waxy skin', 'over-sharpened', 'haloing', 'ghosting', 'duplicate body', 'extra head', 'missing ears', 'malformed ears', 'bad teeth', 'distorted mouth',
+		'nsfw', 'nude', 'censored', 'blood', 'gore', 'violent', 'scary face', 'creepy smile', 'unfinished', 'draft',
+	],
+};
+let suggestionTagStore = {};
 
 function getQueueTelemetryState() {
 	try {
@@ -1292,6 +1358,82 @@ if (configFlaskRestartBtn) {
 	configFlaskRestartBtn.addEventListener('click', restartFlaskApp);
 }
 
+if (tagCategorySelect) {
+	renderTagCategoryOptions();
+	tagCategorySelect.value = 'enhanced-subject';
+	renderTagManagerUi();
+	tagCategorySelect.addEventListener('change', () => {
+		renderTagManagerUi();
+	});
+}
+
+if (tagAddBtn && tagNewInput) {
+	tagAddBtn.addEventListener('click', () => {
+		const category = getCurrentTagCategory();
+		const ok = addTagToCategory(category, tagNewInput.value);
+		if (!ok) {
+			updateTagManagerStatus('Tag is empty or already exists.', 'error');
+			return;
+		}
+		tagNewInput.value = '';
+		saveSuggestionTagStore();
+		renderEnhancedTagSuggestions();
+		renderTagManagerUi();
+		updateTagManagerStatus('Tag added.', 'ok');
+	});
+
+	tagNewInput.addEventListener('keydown', (event) => {
+		if (event.key !== 'Enter') return;
+		event.preventDefault();
+		tagAddBtn.click();
+	});
+}
+
+if (tagEditorList) {
+	tagEditorList.addEventListener('click', (event) => {
+		const target = event.target;
+		if (!(target instanceof HTMLElement)) return;
+		const category = getCurrentTagCategory();
+
+		const saveIdx = target.getAttribute('data-tag-save');
+		if (saveIdx !== null) {
+			const index = Number(saveIdx);
+			const input = tagEditorList.querySelector(`[data-tag-input="${index}"]`);
+			if (!(input instanceof HTMLInputElement)) return;
+			const ok = setTagAtIndex(category, index, input.value);
+			if (!ok) {
+				updateTagManagerStatus('Save failed: empty or duplicate tag.', 'error');
+				return;
+			}
+			saveSuggestionTagStore();
+			renderEnhancedTagSuggestions();
+			renderTagManagerUi();
+			updateTagManagerStatus('Tag updated.', 'ok');
+			return;
+		}
+
+		const deleteIdx = target.getAttribute('data-tag-delete');
+		if (deleteIdx !== null) {
+			const index = Number(deleteIdx);
+			deleteTagAtIndex(category, index);
+			saveSuggestionTagStore();
+			renderEnhancedTagSuggestions();
+			renderTagManagerUi();
+			updateTagManagerStatus('Tag deleted.', 'ok');
+		}
+	});
+}
+
+if (tagResetDefaultsBtn) {
+	tagResetDefaultsBtn.addEventListener('click', () => {
+		suggestionTagStore = cloneDefaultSuggestionTags();
+		saveSuggestionTagStore();
+		renderEnhancedTagSuggestions();
+		renderTagManagerUi();
+		updateTagManagerStatus('Suggestion tags reset to defaults.', 'ok');
+	});
+}
+
 /* --------------------------------------------------------------------------
 	 Text inference controls and chat
 	 -------------------------------------------------------------------------- */
@@ -2253,6 +2395,200 @@ function collectEnhancedPromptBreakdown() {
 	};
 }
 
+function cloneDefaultSuggestionTags() {
+	return JSON.parse(JSON.stringify(DEFAULT_SUGGESTION_TAGS));
+}
+
+function normalizeSuggestionTagStore(raw) {
+	const next = cloneDefaultSuggestionTags();
+	if (!raw || typeof raw !== 'object') return next;
+
+	Object.keys(next).forEach((key) => {
+		const incoming = raw[key];
+		if (!Array.isArray(incoming)) return;
+		const cleaned = [];
+		const seen = new Set();
+		incoming.forEach((tag) => {
+			const value = String(tag || '').trim();
+			if (!value) return;
+			const k = value.toLowerCase();
+			if (seen.has(k)) return;
+			seen.add(k);
+			cleaned.push(value);
+		});
+		if (cleaned.length) {
+			next[key] = cleaned;
+		}
+	});
+	return next;
+}
+
+function saveSuggestionTagStore() {
+	localStorage.setItem(SUGGESTION_TAG_STORAGE_KEY, JSON.stringify(suggestionTagStore));
+}
+
+function loadSuggestionTagStore() {
+	try {
+		const raw = JSON.parse(localStorage.getItem(SUGGESTION_TAG_STORAGE_KEY) || '{}');
+		suggestionTagStore = normalizeSuggestionTagStore(raw);
+	} catch {
+		suggestionTagStore = cloneDefaultSuggestionTags();
+	}
+}
+
+function appendEnhancedTagToField(textareaEl, tag) {
+	if (!textareaEl || !tag) return;
+	const current = (textareaEl.value || '').trim();
+	const lowerCurrent = current.toLowerCase();
+	if (lowerCurrent.includes(tag.toLowerCase())) {
+		textareaEl.focus();
+		return;
+	}
+	textareaEl.value = current ? `${current}, ${tag}` : tag;
+	textareaEl.focus();
+	textareaEl.dispatchEvent(new Event('input', { bubbles: true }));
+}
+
+function renderEnhancedTagSuggestions() {
+	const clouds = document.querySelectorAll('.enhanced-tag-cloud[data-target]');
+	if (!clouds.length) return;
+
+	clouds.forEach((cloud) => {
+		const targetId = cloud.getAttribute('data-target') || '';
+		const targetField = document.getElementById(targetId);
+		const tags = suggestionTagStore[targetId] || [];
+		cloud.innerHTML = '';
+		if (!targetField || !tags.length) return;
+
+		tags.forEach((tag) => {
+			const btn = document.createElement('button');
+			btn.type = 'button';
+			btn.className = 'tag-suggestion-btn';
+			btn.textContent = `+ ${tag}`;
+			btn.setAttribute('aria-label', `Add tag ${tag}`);
+			btn.addEventListener('click', () => appendEnhancedTagToField(targetField, tag));
+			cloud.appendChild(btn);
+		});
+	});
+}
+
+function getCurrentTagCategory() {
+	const category = tagCategorySelect?.value || '';
+	if (!category || !Object.prototype.hasOwnProperty.call(TAG_CATEGORY_LABELS, category)) {
+		return 'enhanced-subject';
+	}
+	return category;
+}
+
+function updateTagManagerStatus(text, level = '') {
+	if (!tagManagerStatus) return;
+	tagManagerStatus.textContent = text;
+	tagManagerStatus.style.color = level === 'error'
+		? 'var(--clr-accent-neg)'
+		: (level === 'ok' ? 'var(--clr-accent-pos)' : 'var(--clr-text-muted)');
+}
+
+function renderTagCategoryOptions() {
+	if (!tagCategorySelect) return;
+	tagCategorySelect.innerHTML = Object.entries(TAG_CATEGORY_LABELS)
+		.map(([value, label]) => `<option value="${escHtml(value)}">${escHtml(label)}</option>`)
+		.join('');
+}
+
+function setTagAtIndex(category, index, value) {
+	const tags = suggestionTagStore[category] || [];
+	if (index < 0 || index >= tags.length) return false;
+	const cleaned = String(value || '').trim();
+	if (!cleaned) return false;
+
+	const already = tags.findIndex((t) => t.toLowerCase() === cleaned.toLowerCase());
+	if (already >= 0 && already !== index) return false;
+	const next = [...tags];
+	next[index] = cleaned;
+	suggestionTagStore[category] = next;
+	return true;
+}
+
+function deleteTagAtIndex(category, index) {
+	const tags = suggestionTagStore[category] || [];
+	if (index < 0 || index >= tags.length) return;
+	suggestionTagStore[category] = tags.filter((_, i) => i !== index);
+}
+
+function addTagToCategory(category, value) {
+	const cleaned = String(value || '').trim();
+	if (!cleaned) return false;
+	const tags = suggestionTagStore[category] || [];
+	if (tags.some((tag) => tag.toLowerCase() === cleaned.toLowerCase())) {
+		return false;
+	}
+	suggestionTagStore[category] = [...tags, cleaned];
+	return true;
+}
+
+function renderTagEditorList() {
+	if (!tagEditorList) return;
+	const category = getCurrentTagCategory();
+	const tags = suggestionTagStore[category] || [];
+	if (!tags.length) {
+		tagEditorList.innerHTML = '<p class="hint">No tags yet for this category.</p>';
+		return;
+	}
+
+	tagEditorList.innerHTML = tags
+		.map((tag, index) => {
+			return `
+				<div class="tag-editor-row" data-tag-row="${index}">
+					<input type="text" value="${escHtml(tag)}" data-tag-input="${index}" aria-label="Tag ${index + 1}" />
+					<button class="btn btn-ghost btn-xs" type="button" data-tag-save="${index}">Save</button>
+					<button class="btn btn-ghost btn-xs" type="button" data-tag-delete="${index}">Delete</button>
+				</div>
+			`;
+		})
+		.join('');
+}
+
+function renderTagManagerUi() {
+	renderTagEditorList();
+	const category = getCurrentTagCategory();
+	updateTagManagerStatus(`${TAG_CATEGORY_LABELS[category]} tags: ${(suggestionTagStore[category] || []).length}`);
+}
+
+function bindSuggestionTagCollapsers() {
+	const toggles = document.querySelectorAll('[data-suggest-toggle]');
+	toggles.forEach((btn) => {
+		const targetId = btn.getAttribute('data-suggest-toggle');
+		if (!targetId) return;
+		const target = document.getElementById(targetId);
+		if (!target) return;
+		btn.addEventListener('click', () => {
+			target.hidden = !target.hidden;
+			btn.textContent = target.hidden ? 'Show' : 'Hide';
+			btn.setAttribute('aria-expanded', target.hidden ? 'false' : 'true');
+		});
+		btn.setAttribute('aria-controls', targetId);
+		btn.setAttribute('aria-expanded', target.hidden ? 'false' : 'true');
+	});
+}
+
+function buildRandomPromptFromTags() {
+	const pick = (key, fallback) => {
+		const pool = suggestionTagStore[key] || [];
+		if (!pool.length) return fallback;
+		return pool[Math.floor(Math.random() * pool.length)];
+	};
+
+	const subject = pick('enhanced-subject', 'mysterious traveler');
+	const setting = pick('enhanced-setting', 'misty forest');
+	const composition = pick('enhanced-composition', 'cinematic framing');
+	const lighting = pick('enhanced-lighting', 'soft diffused light');
+	const style = pick('enhanced-style', 'concept art');
+	const quality = ['high detail', 'ultra detailed', '8k texture', 'sharp focus', 'epic atmosphere'];
+	const qualityTag = quality[Math.floor(Math.random() * quality.length)];
+
+	return `${subject}, ${setting}, ${composition}, ${lighting}, ${style}, ${qualityTag}`;
+}
+
 function renderEnhancedPromptSuggestions(suggestions) {
 	enhancedPromptSuggestions = Array.isArray(suggestions) ? suggestions.filter(Boolean) : [];
 	if (!enhancedPromptSuggestionsOutput || !enhancedPromptUseBtn || !enhancedPromptSelect) return;
@@ -2364,6 +2700,21 @@ if (enhancedPromptToggle) {
 	});
 	const saved = localStorage.getItem('enhancedPromptBreakdownEnabled') === '1';
 	setEnhancedPromptBreakdownVisible(saved);
+}
+
+loadSuggestionTagStore();
+renderEnhancedTagSuggestions();
+if (tagCategorySelect) {
+	renderTagManagerUi();
+}
+bindSuggestionTagCollapsers();
+
+if (promptRandomizeBtn) {
+	promptRandomizeBtn.addEventListener('click', () => {
+		imagePrompt.value = buildRandomPromptFromTags();
+		imagePrompt.focus();
+		showToast('Random prompt added.', 'pos');
+	});
 }
 
 if (enhancedPromptSuggestBtn) {

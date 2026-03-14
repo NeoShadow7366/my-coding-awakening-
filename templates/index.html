@@ -228,37 +228,57 @@
         </div>
         <p id="prompt-mode-hint" class="hint prompt-mode-hint" aria-live="polite">Standard prompt mode is active.</p>
 
-        <div id="normal-prompt-wrap" class="form-field">
-          <label for="image-prompt" class="field-label">Prompt</label>
-          <textarea id="image-prompt" rows="4" placeholder="A cinematic forest temple, volumetric light, detailed illustration"></textarea>
-        </div>
-
         <section id="enhanced-prompt-fields" class="enhanced-prompt-fields" hidden aria-label="Enhanced prompt breakdown fields">
           <p class="hint">Fill out the details and generate offline Ollama prompt suggestions.</p>
 
           <div class="form-field">
             <label for="enhanced-subject" class="field-label">Subject</label>
             <textarea id="enhanced-subject" rows="2" placeholder="Define the main focus clearly (e.g., a weathered fisherman, a vintage brass compass)."></textarea>
+            <div class="enhanced-tag-head">
+              <p class="hint enhanced-tag-hint">+Suggestion tags</p>
+              <button class="btn btn-ghost btn-xs" type="button" data-suggest-toggle="enhanced-subject-tags">Hide</button>
+            </div>
+            <div id="enhanced-subject-tags" class="enhanced-tag-cloud" data-target="enhanced-subject" aria-label="Subject suggestion tags"></div>
           </div>
 
           <div class="form-field">
             <label for="enhanced-setting" class="field-label">Setting/Environment</label>
             <textarea id="enhanced-setting" rows="2" placeholder="Specify location, background, and atmosphere (e.g., on a storm-tossed deck, surrounded by dense fog)."></textarea>
+            <div class="enhanced-tag-head">
+              <p class="hint enhanced-tag-hint">+Suggestion tags</p>
+              <button class="btn btn-ghost btn-xs" type="button" data-suggest-toggle="enhanced-setting-tags">Hide</button>
+            </div>
+            <div id="enhanced-setting-tags" class="enhanced-tag-cloud" data-target="enhanced-setting" aria-label="Setting suggestion tags"></div>
           </div>
 
           <div class="form-field">
             <label for="enhanced-composition" class="field-label">Composition &amp; Framing</label>
             <textarea id="enhanced-composition" rows="2" placeholder="Describe angle and perspective (e.g., close-up portrait, wide-angle lens, bird's-eye view)."></textarea>
+            <div class="enhanced-tag-head">
+              <p class="hint enhanced-tag-hint">+Suggestion tags</p>
+              <button class="btn btn-ghost btn-xs" type="button" data-suggest-toggle="enhanced-composition-tags">Hide</button>
+            </div>
+            <div id="enhanced-composition-tags" class="enhanced-tag-cloud" data-target="enhanced-composition" aria-label="Composition suggestion tags"></div>
           </div>
 
           <div class="form-field">
             <label for="enhanced-lighting" class="field-label">Lighting</label>
             <textarea id="enhanced-lighting" rows="2" placeholder="Use terms like golden hour, dramatic rim lighting, or soft diffused window light."></textarea>
+            <div class="enhanced-tag-head">
+              <p class="hint enhanced-tag-hint">+Suggestion tags</p>
+              <button class="btn btn-ghost btn-xs" type="button" data-suggest-toggle="enhanced-lighting-tags">Hide</button>
+            </div>
+            <div id="enhanced-lighting-tags" class="enhanced-tag-cloud" data-target="enhanced-lighting" aria-label="Lighting suggestion tags"></div>
           </div>
 
           <div class="form-field">
             <label for="enhanced-style" class="field-label">Style/Medium</label>
             <textarea id="enhanced-style" rows="2" placeholder="State the aesthetic (e.g., cinematic photography, oil painting, 3D render, minimalist graphic design)."></textarea>
+            <div class="enhanced-tag-head">
+              <p class="hint enhanced-tag-hint">+Suggestion tags</p>
+              <button class="btn btn-ghost btn-xs" type="button" data-suggest-toggle="enhanced-style-tags">Hide</button>
+            </div>
+            <div id="enhanced-style-tags" class="enhanced-tag-cloud" data-target="enhanced-style" aria-label="Style suggestion tags"></div>
           </div>
 
           <div class="enhanced-actions">
@@ -286,9 +306,22 @@
           </div>
         </section>
 
+        <div id="normal-prompt-wrap" class="form-field">
+          <div class="field-label-inline-row">
+            <label for="image-prompt" class="field-label">Prompt</label>
+            <button class="btn btn-ghost btn-xs" id="prompt-randomize-btn" type="button">Randomize</button>
+          </div>
+          <textarea id="image-prompt" rows="4" placeholder="A cinematic forest temple, volumetric light, detailed illustration"></textarea>
+        </div>
+
         <div class="form-field">
           <label for="image-negative-prompt" class="field-label">Negative prompt</label>
           <textarea id="image-negative-prompt" rows="3" placeholder="blurry, low quality, watermark, text"></textarea>
+          <div class="enhanced-tag-head">
+            <p class="hint enhanced-tag-hint">+Suggestion tags</p>
+            <button class="btn btn-ghost btn-xs" type="button" data-suggest-toggle="negative-prompt-tags">Hide</button>
+          </div>
+          <div id="negative-prompt-tags" class="enhanced-tag-cloud" data-target="image-negative-prompt" aria-label="Negative prompt suggestion tags"></div>
         </div>
 
         <div class="inline-grid two-up">
@@ -454,6 +487,29 @@
         <button class="btn btn-ghost" id="config-flask-restart" type="button">Restart Flask</button>
       </div>
       <p id="config-flask-status" class="hint">Awaiting action.</p>
+    </section>
+
+    <section class="config-card" aria-label="Suggestion tags manager">
+      <h2 class="section-heading">Suggestion Tag Manager</h2>
+      <p class="section-desc">Add, edit, and delete suggestion tags by category. Changes update the image form immediately.</p>
+      <div class="form-field">
+        <label for="tag-category-select" class="field-label">Tag Category</label>
+        <div class="select-wrapper">
+          <select id="tag-category-select"></select>
+        </div>
+      </div>
+      <div class="form-field">
+        <label for="tag-new-input" class="field-label">Add Tag</label>
+        <div class="config-actions-row">
+          <input id="tag-new-input" type="text" placeholder="Enter new tag text" />
+          <button class="btn btn-ghost btn-xs" id="tag-add-btn" type="button">Add</button>
+        </div>
+      </div>
+      <p id="tag-manager-status" class="hint">Select a category to edit tags.</p>
+      <div id="tag-editor-list" class="tag-editor-list" aria-live="polite"></div>
+      <div class="config-actions-row">
+        <button class="btn btn-ghost btn-xs" id="tag-reset-defaults-btn" type="button">Reset Defaults</button>
+      </div>
     </section>
   </div>
 </section>
