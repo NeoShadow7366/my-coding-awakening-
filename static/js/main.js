@@ -2807,6 +2807,8 @@ async function loadLivePreview() {
 let comfyWs = null;
 let comfyWsPreviewUrl = null;
 let comfyWsReconnectTimer = null;
+let comfyWsFailCount = 0;
+const COMFY_WS_MAX_RETRIES = 4;
 const comfyWsProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
 const comfyWsHost = window.location.hostname || 'localhost';
 const COMFY_WS_URL = `${comfyWsProtocol}://${comfyWsHost}:8188/ws?clientId=${tabInstanceId}`;
@@ -2830,6 +2832,7 @@ function _showComfyStepPreview(blobUrl) {
 
 function connectComfyWebSocket() {
 	if (comfyWs && (comfyWs.readyState === WebSocket.OPEN || comfyWs.readyState === WebSocket.CONNECTING)) return;
+	if (comfyWsFailCount >= COMFY_WS_MAX_RETRIES) return; // gave up; reset on tab focus
 	if (comfyWsReconnectTimer) {
 		window.clearTimeout(comfyWsReconnectTimer);
 		comfyWsReconnectTimer = null;
@@ -2872,12 +2875,19 @@ function connectComfyWebSocket() {
 			}
 		};
 
+		comfyWs.onopen = () => { comfyWsFailCount = 0; };
 		comfyWs.onerror = () => { /* errors handled in onclose */ };
 		comfyWs.onclose = () => {
 			comfyWs = null;
-			// Reconnect with backoff if page is still visible
+			comfyWsFailCount++;
+			if (comfyWsFailCount >= COMFY_WS_MAX_RETRIES) {
+				// ComfyUI WS unavailable (likely cross-origin 403); HTTP polling covers live preview
+				return;
+			}
+			// Reconnect with exponential backoff if page is still visible
 			if (!document.hidden) {
-				comfyWsReconnectTimer = window.setTimeout(connectComfyWebSocket, 5000);
+				const delay = Math.min(5000 * Math.pow(2, comfyWsFailCount - 1), 60000);
+				comfyWsReconnectTimer = window.setTimeout(connectComfyWebSocket, delay);
 			}
 		};
 	} catch { /* WebSocket unavailable — polling will cover this */ }
@@ -2885,6 +2895,8 @@ function connectComfyWebSocket() {
 
 document.addEventListener('visibilitychange', () => {
 	if (!document.hidden && !comfyWs) {
+		// Reset failure count on tab re-focus so it can retry after a long pause
+		comfyWsFailCount = 0;
 		connectComfyWebSocket();
 	}
 });
