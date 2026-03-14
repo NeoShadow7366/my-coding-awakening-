@@ -2267,6 +2267,11 @@ async function exportGalleryImage(payload, format, keepMetadata = false) {
 	const imgUrl = imageProxyUrl(payload.imageRef);
 	const extension = format === 'jpeg' ? 'jpg' : format;
 	const filename = `${payload.baseName || 'generated-image'}.${extension}`;
+	const formatLabel = {
+		png: 'PNG',
+		jpeg: 'JPEG',
+		webp: 'WebP',
+	}[format] || String(format || '').toUpperCase();
 
 	if (keepMetadata && format === 'png') {
 		const link = document.createElement('a');
@@ -2275,7 +2280,7 @@ async function exportGalleryImage(payload, format, keepMetadata = false) {
 		document.body.appendChild(link);
 		link.click();
 		link.remove();
-		showToast('Exported PNG with source metadata.', 'pos');
+		showToast(`Exported ${formatLabel} (metadata preserved): ${filename}`, 'pos');
 		return;
 	}
 
@@ -2306,7 +2311,7 @@ async function exportGalleryImage(payload, format, keepMetadata = false) {
 		throw new Error('Image export failed');
 	}
 	saveBlobAs(exportedBlob, filename);
-	showToast(`Exported ${format.toUpperCase()}.`, 'pos');
+	showToast(`Exported ${formatLabel}: ${filename}`, 'pos');
 }
 
 async function handleGalleryContextAction(action) {
