@@ -68,6 +68,7 @@ const enhancedComposition = document.getElementById('enhanced-composition');
 const enhancedLighting = document.getElementById('enhanced-lighting');
 const enhancedStyle = document.getElementById('enhanced-style');
 const enhancedPromptSuggestBtn = document.getElementById('enhanced-prompt-suggest-btn');
+const enhancedPromptBuildBtn = document.getElementById('enhanced-prompt-build-btn');
 const enhancedPromptRandomBtn = document.getElementById('enhanced-prompt-random-btn');
 const enhancedPromptUseBtn = document.getElementById('enhanced-prompt-use-btn');
 const enhancedPromptSelect = document.getElementById('enhanced-prompt-select');
@@ -138,6 +139,13 @@ const galleryLightbox = document.getElementById('gallery-lightbox');
 const galleryLightboxImage = document.getElementById('gallery-lightbox-image');
 const galleryLightboxCaption = document.getElementById('gallery-lightbox-caption');
 const galleryLightboxCloseBtn = document.getElementById('gallery-lightbox-close');
+const galleryContextMenu = document.getElementById('gallery-context-menu');
+const gallerySearch = document.getElementById('gallery-search');
+const galleryViewToggle = document.getElementById('gallery-view-toggle');
+const galleryFilterHint = document.getElementById('gallery-filter-hint');
+const galleryLightboxPrev = document.getElementById('gallery-lightbox-prev');
+const galleryLightboxNext = document.getElementById('gallery-lightbox-next');
+const galleryLightboxCounter = document.getElementById('gallery-lightbox-counter');
 const imagePresetButtons = document.querySelectorAll('[data-image-preset]');
 const previewUpdated = document.getElementById('preview-updated');
 const previewEmpty = document.getElementById('preview-empty');
@@ -171,6 +179,16 @@ const BACKGROUND_POLL_HEARTBEAT_MS = 3_000;
 const tabInstanceId = `tab-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 let hasBackgroundPollingOwnership = false;
 const SUGGESTION_TAG_STORAGE_KEY = 'imageSuggestionTagsV1';
+let galleryContextPayload = null;
+let previewZoomScale = 1;
+const PREVIEW_ZOOM_MIN = 0.7;
+const PREVIEW_ZOOM_MAX = 3;
+const PREVIEW_ZOOM_STEP = 0.12;
+let currentGalleryImages = [];
+let currentFullHistory = [];
+let galleryViewMode = localStorage.getItem('galleryViewMode') || 'list';
+let gallerySearchQuery = '';
+let lightboxCurrentIndex = 0;
 const TAG_CATEGORY_LABELS = {
 	'enhanced-subject': 'Subject',
 	'enhanced-setting': 'Setting/Environment',
@@ -282,13 +300,37 @@ function getDiagnosticsStatusSnapshotText() {
 	return `${summary} | text=${text} image=${image} checkpoints=${checkpoints} samplers=${samplers}`;
 }
 
+async function appendServiceDiagnosticLogs(service = 'comfyui') {
+	try {
+		const res = await fetch('/api/diagnostics/service-logs');
+		const data = await res.json();
+		if (!res.ok) {
+			appendDiagnosticsConsoleLine('Could not fetch service diagnostics logs.', 'warn');
+			return;
+		}
+
+		const errorText = data?.errors?.[service] || '';
+		const logText = data?.logs?.[service] || '';
+		if (errorText) {
+			appendDiagnosticsConsoleLine(`${service} error: ${errorText}`, 'error');
+		}
+		if (logText) {
+			appendDiagnosticsConsoleLine(`${service} log tail:\n${logText}`, errorText ? 'error' : 'warn');
+		} else if (!errorText) {
+			appendDiagnosticsConsoleLine(`${service} log tail: <no output yet>`);
+		}
+	} catch {
+		appendDiagnosticsConsoleLine('Could not fetch service diagnostics logs.', 'warn');
+	}
+}
+
 async function runDiagnosticsConsoleCommand(rawInput) {
 	const command = rawInput.trim().toLowerCase();
 	if (!command) return;
 	appendDiagnosticsConsoleLine(`$ ${rawInput}`, 'command');
 
 	if (command === 'help') {
-		appendDiagnosticsConsoleLine('Commands: help, status, checks, queue, poll, clear');
+		appendDiagnosticsConsoleLine('Commands: help, status, checks, logs, queue, poll, clear');
 		return;
 	}
 	if (command === 'status') {
@@ -312,6 +354,11 @@ async function runDiagnosticsConsoleCommand(rawInput) {
 		appendDiagnosticsConsoleLine('Running diagnostics checks...');
 		await runDiagnosticsChecks(true);
 		appendDiagnosticsConsoleLine(getDiagnosticsStatusSnapshotText());
+		return;
+	}
+	if (command === 'logs') {
+		appendDiagnosticsConsoleLine('Fetching ComfyUI logs...');
+		await appendServiceDiagnosticLogs('comfyui');
 		return;
 	}
 
@@ -866,6 +913,10 @@ async function runDiagnosticsChecks(manual = false) {
 		if (manual) {
 			showToast(textOk && imageOk ? 'Diagnostics complete: services online.' : 'Diagnostics complete: issues found.', textOk && imageOk ? 'pos' : 'neg');
 		}
+
+		if (!imageOk) {
+			await appendServiceDiagnosticLogs('comfyui');
+		}
 	} catch {
 		renderDiagnosticsSnapshot({
 			textOk: false,
@@ -1067,6 +1118,32 @@ async function controlService(service, action, statusNode, buttonGroup = []) {
 		showToast(`${service} ${action}: ${statusTextValue}`, isOk ? 'pos' : '');
 
 		await checkStatus();
+
+		// Service launch can take a few seconds; poll health so UI shows a clear outcome.
+		if ((action === 'start' || action === 'restart') && (statusTextValue === 'started' || statusTextValue === 'already-running')) {
+			const healthKey = service === 'ollama' ? 'text' : 'image';
+			let reachable = false;
+			for (let i = 0; i < 12; i++) {
+				await new Promise((resolve) => window.setTimeout(resolve, 1000));
+				try {
+					const healthRes = await fetch('/api/status');
+					const healthData = await healthRes.json();
+					reachable = Boolean(healthData?.[healthKey]?.available);
+					if (reachable) break;
+				} catch {
+					// non-fatal while polling startup readiness
+				}
+			}
+
+			if (reachable) {
+				setConfigStatusLine(statusNode, `${service}: online`, 'ok');
+			} else {
+				setConfigStatusLine(statusNode, `${service}: started but not reachable on expected port`, 'error');
+				showToast(`${service} started but is still unreachable. Verify launcher/runtime environment.`, 'neg');
+				await appendServiceDiagnosticLogs(service);
+			}
+		}
+
 		if (service === 'ollama') {
 			await loadTextModels();
 		} else {
@@ -1208,6 +1285,7 @@ async function checkStatus() {
 			imageEngineStatus.style.color = 'var(--clr-accent-pos)';
 			await loadImageModels();
 			await loadImageSamplers();
+			connectComfyWebSocket();
 		} else {
 			imageEngineStatus.textContent = 'ComfyUI offline - start server at localhost:8188';
 			imageEngineStatus.style.color = 'var(--clr-accent-neg)';
@@ -1714,6 +1792,7 @@ function renderQueueStatus(running, pending, donePromptIds = new Set()) {
 		.map(([promptId, meta]) => {
 			const status = meta.status || 'queued';
 			const promptLabel = escHtml(promptId);
+			const snap = meta.snapshot || {};
 			const badge =
 				status === 'running' ? '<span class="history-badge positive">RUN</span>' :
 				status === 'queued' ? '<span class="history-badge">WAIT</span>' :
@@ -1724,19 +1803,35 @@ function renderQueueStatus(running, pending, donePromptIds = new Set()) {
 
 			const canCancel = status === 'queued' || status === 'running' || status === 'processing';
 			const canRetry = status === 'failed' || status === 'canceled';
+			const canRerun = status === 'completed' && snap.mode !== 'img2img';
 			const cancelBusy = queueActionInFlight.has(`cancel:${promptId}`);
 			const retryBusy = queueActionInFlight.has(`retry:${promptId}`);
+			const rerunBusy = queueActionInFlight.has(`rerun:${promptId}`);
 			const reason = meta.failReason ? `<span class="queue-reason">${escHtml(meta.failReason)}</span>` : '';
+			const promptDisplay = escHtml((snap.prompt || promptId).slice(0, 72));
 			const actions = [
 				canCancel ? `<button class="btn btn-ghost btn-xs queue-action" data-action="cancel" data-prompt-id="${promptLabel}" aria-label="Cancel job ${promptLabel}" title="Cancel ${promptLabel}" ${cancelBusy ? 'disabled' : ''}>${cancelBusy ? 'Canceling...' : 'Cancel'}</button>` : '',
 				canRetry ? `<button class="btn btn-ghost btn-xs queue-action" data-action="retry" data-prompt-id="${promptLabel}" aria-label="Retry job ${promptLabel}" title="Retry ${promptLabel}" ${retryBusy ? 'disabled' : ''}>${retryBusy ? 'Retrying...' : 'Retry'}</button>` : '',
+				canRerun ? `<button class="btn btn-ghost btn-xs queue-action" data-action="rerun" data-prompt-id="${promptLabel}" aria-label="Re-run job ${promptLabel}" title="Re-run ${promptLabel}" ${rerunBusy ? 'disabled' : ''}>${rerunBusy ? 'Queuing...' : 'Re-run'}</button>` : '',
 			].join('');
 
+			const chips = [
+				snap.model ? `<span class="chip">${escHtml(String(snap.model).split('/').pop().split('\\').pop())}</span>` : '',
+				snap.seed != null ? `<span class="chip">seed ${escHtml(String(snap.seed))}</span>` : '',
+				snap.steps ? `<span class="chip">${escHtml(String(snap.steps))} steps</span>` : '',
+				snap.cfg ? `<span class="chip">cfg ${escHtml(String(snap.cfg))}</span>` : '',
+				snap.width && snap.height ? `<span class="chip">${snap.width}×${snap.height}</span>` : '',
+			].filter(Boolean).join('');
+
 			return `
-				<li class="history-item">
-					${badge}
-					<span class="history-text" title="${escHtml(promptId)}">${escHtml(promptId)}${reason}</span>
-					<span class="queue-actions">${actions}</span>
+				<li class="history-item queue-item">
+					<div class="queue-item-top">
+						${badge}
+						<span class="history-text" title="${escHtml(snap.prompt || promptId)}">${promptDisplay}</span>
+						<span class="queue-actions">${actions}</span>
+					</div>
+					${chips ? `<div class="queue-item-chips">${chips}</div>` : ''}
+					${reason}
 				</li>
 			`;
 		});
@@ -1754,6 +1849,7 @@ function _clearQueueByStatus(status) {
 		pendingImageJobs.delete(promptId);
 		queueActionInFlight.delete(`cancel:${promptId}`);
 		queueActionInFlight.delete(`retry:${promptId}`);
+		queueActionInFlight.delete(`rerun:${promptId}`);
 		cleared += 1;
 	}
 	return cleared;
@@ -1897,6 +1993,48 @@ async function retryImageJob(promptId, isAuto = false) {
 	}
 }
 
+async function rerunImageJob(promptId) {
+	const snapshot = (queueJobMeta.get(promptId) || {}).snapshot;
+	if (!snapshot) {
+		showToast('Re-run unavailable: no job snapshot found.', 'neg');
+		return;
+	}
+	if (snapshot.mode === 'img2img') {
+		showToast('Re-run requires re-uploading the img2img source image.', 'neg');
+		return;
+	}
+	queueActionInFlight.add(`rerun:${promptId}`);
+	try {
+		const res = await fetch('/api/image/generate', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify(snapshot),
+		});
+		const data = await res.json();
+		if (!res.ok) {
+			showToast(`Re-run failed: ${data.error || 'Unknown error'}`, 'neg');
+			return;
+		}
+		const newPromptId = data.prompt_id;
+		trackedPromptIds.add(newPromptId);
+		pendingImageJobs.set(newPromptId, { ...snapshot, ...(data.meta || {}) });
+		queueJobMeta.set(newPromptId, {
+			status: 'queued',
+			missCount: 0,
+			updatedAt: Date.now(),
+			snapshot: { ...snapshot, ...(data.meta || {}) },
+		});
+		incrementQueueTelemetry('submitted');
+		ensureQueuePolling();
+		showToast('Re-run submitted.', 'pos');
+		await pollQueue();
+	} catch (err) {
+		showToast(`Re-run failed: ${err.message}`, 'neg');
+	} finally {
+		queueActionInFlight.delete(`rerun:${promptId}`);
+	}
+}
+
 async function processAutoRetries() {
 	const limit = getAutoRetryLimit();
 	if (limit <= 0) return;
@@ -1929,6 +2067,12 @@ queueList.addEventListener('click', async (e) => {
 		if (queueActionInFlight.has(`retry:${promptId}`)) return;
 		target.setAttribute('disabled', 'disabled');
 		await retryImageJob(promptId);
+		return;
+	}
+	if (action === 'rerun') {
+		if (queueActionInFlight.has(`rerun:${promptId}`)) return;
+		target.setAttribute('disabled', 'disabled');
+		await rerunImageJob(promptId);
 	}
 });
 
@@ -1998,8 +2142,248 @@ function parseGalleryPreviewPayload(raw) {
 	}
 }
 
+function parseImageRefPayload(raw) {
+	if (!raw) return null;
+	try {
+		const decoded = decodeURIComponent(raw);
+		const parsed = JSON.parse(decoded);
+		if (!parsed || typeof parsed !== 'object') return null;
+		if (!parsed.filename) return null;
+		return {
+			filename: String(parsed.filename || ''),
+			subfolder: String(parsed.subfolder || ''),
+			type: String(parsed.type || 'output'),
+		};
+	} catch {
+		return null;
+	}
+}
+
+function buildGalleryExportBaseName(entry, imageRef) {
+	const ts = Number(entry.created_at || 0);
+	const stamp = ts ? new Date(ts * 1000).toISOString().replace(/[:.]/g, '-').replace('T', '_').replace('Z', '') : 'image';
+	const rawPrompt = String(entry.prompt || 'generated-image').toLowerCase();
+	const promptStem = rawPrompt
+		.replace(/[^a-z0-9\s_-]/g, '')
+		.trim()
+		.replace(/\s+/g, '-')
+		.slice(0, 48) || 'generated-image';
+	const fileStem = String(imageRef.filename || '').replace(/\.[^.]+$/, '').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 24);
+	return [promptStem, fileStem, stamp].filter(Boolean).join('_');
+}
+
+function clampPreviewZoom(scale) {
+	return Math.max(PREVIEW_ZOOM_MIN, Math.min(PREVIEW_ZOOM_MAX, scale));
+}
+
+function applyPreviewZoom(scale) {
+	if (!previewImage || previewImage.hidden) return;
+	previewZoomScale = clampPreviewZoom(scale);
+	previewImage.style.transform = `scale(${previewZoomScale.toFixed(3)})`;
+}
+
+function resetPreviewZoom() {
+	previewZoomScale = 1;
+	if (!previewImage) return;
+	previewImage.style.transform = 'scale(1)';
+}
+
+function closeGalleryContextMenu() {
+	if (!galleryContextMenu) return;
+	galleryContextMenu.hidden = true;
+	galleryContextPayload = null;
+}
+
+function openGalleryContextMenu(payload, x, y) {
+	if (!galleryContextMenu) return;
+	galleryContextPayload = payload;
+	galleryContextMenu.hidden = false;
+
+	const viewportW = window.innerWidth;
+	const viewportH = window.innerHeight;
+	const menuRect = galleryContextMenu.getBoundingClientRect();
+	const nextLeft = Math.max(6, Math.min(x, viewportW - menuRect.width - 6));
+	const nextTop = Math.max(6, Math.min(y, viewportH - menuRect.height - 6));
+	galleryContextMenu.style.left = `${nextLeft}px`;
+	galleryContextMenu.style.top = `${nextTop}px`;
+}
+
+function buildImageRefFromElement(element) {
+	if (!(element instanceof HTMLElement)) return null;
+	const raw = element.dataset.imageRef;
+	return parseImageRefPayload(raw || '');
+}
+
+async function callGalleryImageApi(path, imageRef) {
+	const res = await fetch(path, {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify(imageRef),
+	});
+	const data = await res.json();
+	if (!res.ok) {
+		throw new Error(data.error || `Request failed (${res.status})`);
+	}
+	return data;
+}
+
+function saveBlobAs(blob, filename) {
+	const objectUrl = URL.createObjectURL(blob);
+	const link = document.createElement('a');
+	link.href = objectUrl;
+	link.download = filename;
+	document.body.appendChild(link);
+	link.click();
+	link.remove();
+	window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1800);
+}
+
+function loadImageFromBlob(blob) {
+	return new Promise((resolve, reject) => {
+		const objectUrl = URL.createObjectURL(blob);
+		const image = new Image();
+		image.onload = () => {
+			URL.revokeObjectURL(objectUrl);
+			resolve(image);
+		};
+		image.onerror = () => {
+			URL.revokeObjectURL(objectUrl);
+			reject(new Error('Could not decode image for export'));
+		};
+		image.src = objectUrl;
+	});
+}
+
+async function exportGalleryImage(payload, format, keepMetadata = false) {
+	if (!payload || !payload.imageRef) return;
+	const imgUrl = imageProxyUrl(payload.imageRef);
+	const extension = format === 'jpeg' ? 'jpg' : format;
+	const filename = `${payload.baseName || 'generated-image'}.${extension}`;
+
+	if (keepMetadata && format === 'png') {
+		const link = document.createElement('a');
+		link.href = imgUrl;
+		link.download = filename;
+		document.body.appendChild(link);
+		link.click();
+		link.remove();
+		showToast('Exported PNG with source metadata.', 'pos');
+		return;
+	}
+
+	const res = await fetch(imgUrl);
+	if (!res.ok) {
+		throw new Error('Could not fetch source image for export');
+	}
+	const sourceBlob = await res.blob();
+	const image = await loadImageFromBlob(sourceBlob);
+	const canvas = document.createElement('canvas');
+	canvas.width = image.naturalWidth || image.width;
+	canvas.height = image.naturalHeight || image.height;
+	const ctx = canvas.getContext('2d');
+	if (!ctx) {
+		throw new Error('Canvas export is unavailable in this browser');
+	}
+	ctx.drawImage(image, 0, 0);
+
+	const mime = {
+		png: 'image/png',
+		jpeg: 'image/jpeg',
+		webp: 'image/webp',
+	}[format] || 'image/png';
+
+	const quality = format === 'jpeg' || format === 'webp' ? 0.92 : undefined;
+	const exportedBlob = await new Promise((resolve) => canvas.toBlob(resolve, mime, quality));
+	if (!exportedBlob) {
+		throw new Error('Image export failed');
+	}
+	saveBlobAs(exportedBlob, filename);
+	showToast(`Exported ${format.toUpperCase()}.`, 'pos');
+}
+
+async function handleGalleryContextAction(action) {
+	if (!galleryContextPayload) return;
+	const payload = galleryContextPayload;
+	closeGalleryContextMenu();
+
+	try {
+		if (action === 'open-location') {
+			await callGalleryImageApi('/api/image/open-location', payload.imageRef);
+			showToast('Opened image location.', 'pos');
+			return;
+		}
+
+		if (action === 'delete-image') {
+			const confirmed = window.confirm('Delete this image file and remove it from local history?');
+			if (!confirmed) return;
+			await callGalleryImageApi('/api/image/delete', payload.imageRef);
+			showToast('Image deleted.', 'pos');
+			await loadGallery();
+			await loadLivePreview();
+			return;
+		}
+
+		if (action === 'export-png-meta') {
+			await exportGalleryImage(payload, 'png', true);
+			return;
+		}
+		if (action === 'export-png') {
+			await exportGalleryImage(payload, 'png');
+			return;
+		}
+		if (action === 'export-jpeg') {
+			await exportGalleryImage(payload, 'jpeg');
+			return;
+		}
+		if (action === 'export-webp') {
+			await exportGalleryImage(payload, 'webp');
+		}
+	} catch (err) {
+		showToast(`Action failed: ${err.message}`, 'neg');
+	}
+}
+
+function updateGalleryFilterHint(matching, total) {
+	if (!galleryFilterHint) return;
+	if (!gallerySearchQuery || !total) {
+		galleryFilterHint.hidden = true;
+		galleryFilterHint.textContent = '';
+		return;
+	}
+	galleryFilterHint.hidden = false;
+	galleryFilterHint.textContent = matching
+		? `Showing ${matching} of ${total} images matching "${gallerySearchQuery}"`
+		: `No images match "${gallerySearchQuery}"`;
+}
+
+function updateLightboxNav() {
+	const total = currentGalleryImages.length;
+	if (galleryLightboxPrev) galleryLightboxPrev.hidden = total <= 1;
+	if (galleryLightboxNext) galleryLightboxNext.hidden = total <= 1;
+	if (galleryLightboxCounter) {
+		galleryLightboxCounter.textContent = total > 1 ? `${lightboxCurrentIndex + 1} / ${total}` : '';
+	}
+}
+
+function navigateLightbox(delta) {
+	const total = currentGalleryImages.length;
+	if (total <= 1) return;
+	lightboxCurrentIndex = ((lightboxCurrentIndex + delta) % total + total) % total;
+	const entry = currentGalleryImages[lightboxCurrentIndex];
+	if (!entry) return;
+	const firstImage = entry.images?.[0];
+	if (!firstImage || !galleryLightboxImage) return;
+	galleryLightboxImage.src = imageProxyUrl(firstImage);
+	galleryLightboxImage.alt = 'Generated image';
+	if (galleryLightboxCaption) {
+		galleryLightboxCaption.textContent = entry.prompt || 'Untitled generation';
+	}
+	updateLightboxNav();
+}
+
 function updateLivePreviewFromGalleryPayload(payload) {
 	if (!payload || !payload.imgUrl) return;
+	resetPreviewZoom();
 	previewImage.src = payload.imgUrl;
 	previewImage.hidden = false;
 	previewEmpty.hidden = true;
@@ -2056,13 +2440,15 @@ function applyGalleryPayloadToImageForm(payload) {
 	syncImageControlLabels();
 }
 
-function openGalleryLightbox(imgSrc, imgAlt, caption = '') {
+function openGalleryLightbox(imgSrc, imgAlt, caption = '', index = 0) {
 	if (!galleryLightbox || !galleryLightboxImage) return;
+	lightboxCurrentIndex = index;
 	galleryLightboxImage.src = imgSrc;
 	galleryLightboxImage.alt = imgAlt || 'Generated image';
 	if (galleryLightboxCaption) {
 		galleryLightboxCaption.textContent = caption;
 	}
+	updateLightboxNav();
 	galleryLightbox.hidden = false;
 	galleryLightbox.setAttribute('aria-hidden', 'false');
 	document.body.classList.add('gallery-lightbox-open');
@@ -2084,9 +2470,13 @@ function closeGalleryLightbox() {
 }
 
 function renderGallery(history) {
+	currentFullHistory = history;
 	const images = history.filter((item) => item.type === 'image');
 	if (!images.length) {
 		galleryGrid.innerHTML = '<div class="empty-gallery">No image generations yet.</div>';
+		currentGalleryImages = [];
+		closeGalleryContextMenu();
+		updateGalleryFilterHint(0, 0);
 		return;
 	}
 
@@ -2094,19 +2484,41 @@ function renderGallery(history) {
 		.slice()
 		.sort((a, b) => (Number(b.created_at) || 0) - (Number(a.created_at) || 0));
 
-	galleryGrid.innerHTML = orderedImages
-		.map((entry) => {
+	const query = gallerySearchQuery.toLowerCase().trim();
+	const filteredImages = query
+		? orderedImages.filter((e) => (e.prompt || '').toLowerCase().includes(query))
+		: orderedImages;
+
+	updateGalleryFilterHint(filteredImages.length, orderedImages.length);
+
+	if (!filteredImages.length) {
+		galleryGrid.innerHTML = '<div class="empty-gallery">No images match that filter.</div>';
+		currentGalleryImages = [];
+		return;
+	}
+
+	currentGalleryImages = filteredImages;
+	galleryGrid.classList.toggle('is-grid-mode', galleryViewMode === 'grid');
+
+	galleryGrid.innerHTML = filteredImages
+		.map((entry, index) => {
 			const firstImage = entry.images?.[0];
 			if (!firstImage) return '';
 			const imgUrl = imageProxyUrl(firstImage);
 			const dragPayload = encodeURIComponent(JSON.stringify(buildGalleryPreviewPayload(entry, imgUrl)));
+			const imageRefPayload = encodeURIComponent(JSON.stringify({
+				filename: firstImage.filename || '',
+				subfolder: firstImage.subfolder || '',
+				type: firstImage.type || 'output',
+			}));
+			const exportBaseName = buildGalleryExportBaseName(entry, firstImage);
 			const prompt = escHtml(entry.prompt || 'Untitled generation');
 			const model = escHtml(entry.model || 'unknown model');
 			const sampler = escHtml(entry.params?.sampler || 'sampler');
-			const steps = escHtml(String(entry.params?.steps || '')); 
+			const steps = escHtml(String(entry.params?.steps || ''));
 			const cfg = escHtml(String(entry.params?.cfg || ''));
 			return `
-				<article class="gallery-card" draggable="true" data-preview-payload="${dragPayload}">
+				<article class="gallery-card" draggable="true" data-preview-payload="${dragPayload}" data-image-ref="${imageRefPayload}" data-export-base-name="${escHtml(exportBaseName)}" data-prompt="${prompt}" data-lightbox-index="${index}">
 					<img src="${imgUrl}" alt="Generated image" loading="eager" decoding="async" data-lightbox-src="${imgUrl}" data-lightbox-caption="${prompt}" draggable="false" />
 					<div class="gallery-meta">
 						<p class="gallery-prompt" title="${prompt}">${prompt}</p>
@@ -2148,9 +2560,31 @@ if (galleryGrid) {
 	galleryGrid.addEventListener('click', (event) => {
 		const target = event.target;
 		if (!(target instanceof HTMLImageElement)) return;
+		const card = target.closest('.gallery-card');
+		const index = card instanceof HTMLElement ? parseInt(card.dataset.lightboxIndex || '0', 10) : 0;
 		const src = target.getAttribute('data-lightbox-src') || target.src;
 		const caption = target.getAttribute('data-lightbox-caption') || '';
-		openGalleryLightbox(src, target.alt, caption);
+		openGalleryLightbox(src, target.alt, caption, index);
+	});
+
+	galleryGrid.addEventListener('contextmenu', (event) => {
+		const target = event.target;
+		if (!(target instanceof HTMLElement)) return;
+		const card = target.closest('.gallery-card');
+		if (!(card instanceof HTMLElement)) return;
+		const imageRef = buildImageRefFromElement(card);
+		if (!imageRef) return;
+
+		event.preventDefault();
+		openGalleryContextMenu(
+			{
+				imageRef,
+				baseName: card.dataset.exportBaseName || 'generated-image',
+				prompt: card.dataset.prompt || 'Generated image',
+			},
+			event.clientX,
+			event.clientY,
+		);
 	});
 }
 
@@ -2178,6 +2612,20 @@ if (previewCard) {
 		updateLivePreviewFromGalleryPayload(payload);
 		applyGalleryPayloadToImageForm(payload);
 	});
+
+	previewCard.addEventListener('wheel', (event) => {
+		if (!previewImage || previewImage.hidden) return;
+		event.preventDefault();
+		const direction = event.deltaY < 0 ? 1 : -1;
+		applyPreviewZoom(previewZoomScale + (direction * PREVIEW_ZOOM_STEP));
+	}, { passive: false });
+}
+
+if (previewImage) {
+	previewImage.addEventListener('dblclick', () => {
+		if (previewImage.hidden) return;
+		resetPreviewZoom();
+	});
 }
 
 if (galleryLightbox) {
@@ -2195,10 +2643,113 @@ if (galleryLightboxCloseBtn) {
 }
 
 document.addEventListener('keydown', (event) => {
-	if (event.key !== 'Escape') return;
+	const key = event.key;
+	if (key !== 'Escape' && key !== 'ArrowLeft' && key !== 'ArrowRight') return;
+
+	if (key === 'Escape') {
+		if (galleryContextMenu && !galleryContextMenu.hidden) {
+			closeGalleryContextMenu();
+			return;
+		}
+		if (!galleryLightbox || galleryLightbox.hidden) return;
+		closeGalleryLightbox();
+		return;
+	}
+
 	if (!galleryLightbox || galleryLightbox.hidden) return;
-	closeGalleryLightbox();
+	event.preventDefault();
+	if (key === 'ArrowLeft') navigateLightbox(-1);
+	if (key === 'ArrowRight') navigateLightbox(1);
 });
+
+if (galleryContextMenu) {
+	galleryContextMenu.addEventListener('click', (event) => {
+		const target = event.target;
+		if (!(target instanceof HTMLElement)) return;
+		const action = target.getAttribute('data-gallery-action');
+		if (!action) return;
+		handleGalleryContextAction(action);
+	});
+
+	document.addEventListener('click', (event) => {
+		if (galleryContextMenu.hidden) return;
+		if (!(event.target instanceof Node)) return;
+		if (galleryContextMenu.contains(event.target)) return;
+		closeGalleryContextMenu();
+	});
+
+	window.addEventListener('resize', closeGalleryContextMenu);
+	window.addEventListener('scroll', closeGalleryContextMenu, true);
+}
+
+if (gallerySearch) {
+	let searchDebounceTimer = null;
+	gallerySearch.addEventListener('input', () => {
+		clearTimeout(searchDebounceTimer);
+		searchDebounceTimer = window.setTimeout(() => {
+			gallerySearchQuery = gallerySearch.value || '';
+			renderGallery(currentFullHistory);
+		}, 220);
+	});
+	gallerySearch.addEventListener('keydown', (e) => {
+		if (e.key !== 'Escape') return;
+		e.stopPropagation();
+		gallerySearch.value = '';
+		gallerySearchQuery = '';
+		renderGallery(currentFullHistory);
+	});
+}
+
+if (galleryViewToggle) {
+	galleryViewToggle.addEventListener('click', () => {
+		galleryViewMode = galleryViewMode === 'grid' ? 'list' : 'grid';
+		localStorage.setItem('galleryViewMode', galleryViewMode);
+		galleryViewToggle.textContent = galleryViewMode === 'grid' ? 'List' : 'Grid';
+		galleryViewToggle.setAttribute('aria-pressed', String(galleryViewMode === 'grid'));
+		galleryGrid.classList.toggle('is-grid-mode', galleryViewMode === 'grid');
+	});
+	galleryViewToggle.textContent = galleryViewMode === 'grid' ? 'List' : 'Grid';
+	galleryViewToggle.setAttribute('aria-pressed', String(galleryViewMode === 'grid'));
+}
+
+if (galleryLightboxPrev) {
+	galleryLightboxPrev.addEventListener('click', () => navigateLightbox(-1));
+}
+
+if (galleryLightboxNext) {
+	galleryLightboxNext.addEventListener('click', () => navigateLightbox(1));
+}
+
+function updateLivePreviewFromActiveJob(payload) {
+	const imageRef = payload?.image;
+	if (!imageRef || !imageRef.filename) return false;
+
+	resetPreviewZoom();
+	previewImage.src = imageProxyUrl(imageRef);
+	previewImage.hidden = false;
+	previewEmpty.hidden = true;
+	previewMeta.hidden = false;
+	previewPrompt.textContent = payload.prompt || 'Rendering image...';
+	previewChipRow.innerHTML = payload.prompt_id ? `<span class="chip">job ${escHtml(payload.prompt_id)}</span>` : '';
+	previewUpdated.textContent = payload.status === 'running'
+		? 'Live preview from active generation'
+		: 'Preview from queued generation';
+	return true;
+}
+
+async function loadActiveLivePreview(promptIds) {
+	if (!promptIds || !promptIds.length) return false;
+	const query = encodeURIComponent(promptIds.join(','));
+	try {
+		const res = await fetch(`/api/image/live-preview?prompt_ids=${query}`);
+		if (!res.ok) return false;
+		const data = await res.json();
+		if (!data.preview) return false;
+		return updateLivePreviewFromActiveJob(data.preview);
+	} catch {
+		return false;
+	}
+}
 
 function formatPreviewTime(unixTs) {
 	if (!unixTs) return 'Waiting for output...';
@@ -2212,10 +2763,12 @@ function updateLivePreview(entry) {
 		previewImage.hidden = true;
 		previewMeta.hidden = true;
 		previewUpdated.textContent = 'Waiting for output...';
+		resetPreviewZoom();
 		return;
 	}
 
 	const firstImage = entry.images[0];
+	resetPreviewZoom();
 	previewImage.src = imageProxyUrl(firstImage);
 	previewImage.hidden = false;
 	previewEmpty.hidden = true;
@@ -2232,6 +2785,12 @@ function updateLivePreview(entry) {
 }
 
 async function loadLivePreview() {
+	const activePromptIds = Array.from(trackedPromptIds);
+	if (activePromptIds.length) {
+		const foundActivePreview = await loadActiveLivePreview(activePromptIds);
+		if (foundActivePreview) return;
+	}
+
 	try {
 		const res = await fetch('/api/history?type=image&limit=1');
 		const data = await res.json();
@@ -2241,6 +2800,94 @@ async function loadLivePreview() {
 		previewUpdated.textContent = 'Preview unavailable';
 	}
 }
+
+/* --------------------------------------------------------------------------
+	 ComfyUI WebSocket — real-time step preview
+	 -------------------------------------------------------------------------- */
+let comfyWs = null;
+let comfyWsPreviewUrl = null;
+let comfyWsReconnectTimer = null;
+const comfyWsProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+const comfyWsHost = window.location.hostname || 'localhost';
+const COMFY_WS_URL = `${comfyWsProtocol}://${comfyWsHost}:8188/ws?clientId=${tabInstanceId}`;
+
+function _revokeComfyPreviewUrl() {
+	if (comfyWsPreviewUrl) {
+		URL.revokeObjectURL(comfyWsPreviewUrl);
+		comfyWsPreviewUrl = null;
+	}
+}
+
+function _showComfyStepPreview(blobUrl) {
+	_revokeComfyPreviewUrl();
+	comfyWsPreviewUrl = blobUrl;
+	resetPreviewZoom();
+	previewImage.src = blobUrl;
+	previewImage.hidden = false;
+	previewEmpty.hidden = true;
+	previewMeta.hidden = false;
+}
+
+function connectComfyWebSocket() {
+	if (comfyWs && (comfyWs.readyState === WebSocket.OPEN || comfyWs.readyState === WebSocket.CONNECTING)) return;
+	if (comfyWsReconnectTimer) {
+		window.clearTimeout(comfyWsReconnectTimer);
+		comfyWsReconnectTimer = null;
+	}
+	try {
+		comfyWs = new WebSocket(COMFY_WS_URL);
+		comfyWs.binaryType = 'arraybuffer';
+
+		comfyWs.onmessage = (event) => {
+			if (event.data instanceof ArrayBuffer) {
+				if (!trackedPromptIds.size) return;
+				// Binary frame: first 4 bytes = event type (big-endian uint32)
+				// 1 = PREVIEW_IMAGE; remaining bytes are the JPEG image
+				const view = new DataView(event.data);
+				const eventType = view.getUint32(0);
+				if (eventType === 1) {
+					const imageBytes = event.data.slice(4);
+					const blob = new Blob([imageBytes], { type: 'image/jpeg' });
+					_showComfyStepPreview(URL.createObjectURL(blob));
+					previewUpdated.textContent = 'Live preview — generating…';
+					if (previewPrompt && !previewPrompt.textContent) {
+						previewPrompt.textContent = 'Rendering…';
+					}
+				}
+			} else {
+				try {
+					const msg = JSON.parse(event.data);
+					if (msg.type === 'progress' && msg.data) {
+						const { value, max } = msg.data;
+						if (trackedPromptIds.size) {
+							previewUpdated.textContent = `Generating… step ${value} / ${max}`;
+						}
+					} else if (msg.type === 'executed' && msg.data?.prompt_id) {
+						if (trackedPromptIds.has(msg.data.prompt_id)) {
+							// Final image is ready — refresh preview from history
+							setTimeout(() => { loadLivePreview(); loadGallery(); }, 400);
+						}
+					}
+				} catch { /* ignore malformed JSON */ }
+			}
+		};
+
+		comfyWs.onerror = () => { /* errors handled in onclose */ };
+		comfyWs.onclose = () => {
+			comfyWs = null;
+			// Reconnect with backoff if page is still visible
+			if (!document.hidden) {
+				comfyWsReconnectTimer = window.setTimeout(connectComfyWebSocket, 5000);
+			}
+		};
+	} catch { /* WebSocket unavailable — polling will cover this */ }
+}
+
+document.addEventListener('visibilitychange', () => {
+	if (!document.hidden && !comfyWs) {
+		connectComfyWebSocket();
+	}
+});
 
 function startLivePreviewAutoRefresh() {
 	if (!hasBackgroundPollingOwnership) return;
@@ -2280,6 +2927,7 @@ async function pollQueue() {
 		const doneItems = data.done || [];
 		const donePromptIds = new Set(doneItems.map((d) => d.prompt_id).filter(Boolean));
 		renderQueueStatus(running, pending, donePromptIds);
+		await loadActiveLivePreview(ids);
 		if (doneItems.length) {
 			for (const done of doneItems) {
 				const promptId = done.prompt_id;
@@ -2381,6 +3029,16 @@ function setEnhancedPromptBreakdownVisible(isVisible) {
 		promptModeHint.textContent = isVisible
 			? 'Enhanced prompt mode is active. Generate and apply a suggestion before submitting.'
 			: 'Standard prompt mode is active.';
+	}
+	if (isVisible) {
+		// Reset all tag clouds inside the breakdown to hidden so they start collapsed
+		enhancedPromptFields.querySelectorAll('.enhanced-tag-cloud').forEach((cloud) => {
+			cloud.hidden = true;
+		});
+		enhancedPromptFields.querySelectorAll('[data-suggest-toggle]').forEach((btn) => {
+			btn.textContent = 'Show';
+			btn.setAttribute('aria-expanded', 'false');
+		});
 	}
 	localStorage.setItem('enhancedPromptBreakdownEnabled', isVisible ? '1' : '0');
 }
@@ -2719,6 +3377,24 @@ if (promptRandomizeBtn) {
 
 if (enhancedPromptSuggestBtn) {
 	enhancedPromptSuggestBtn.addEventListener('click', suggestEnhancedPrompts);
+}
+
+if (enhancedPromptBuildBtn) {
+	enhancedPromptBuildBtn.addEventListener('click', () => {
+		const parts = [
+			enhancedSubject?.value.trim(),
+			enhancedSetting?.value.trim(),
+			enhancedComposition?.value.trim(),
+			enhancedLighting?.value.trim(),
+			enhancedStyle?.value.trim(),
+		].filter(Boolean);
+		if (!parts.length) {
+			showToast('Fill in at least one breakdown field first.', 'neg');
+			return;
+		}
+		applyEnhancedSuggestion(parts.join(', '));
+		showToast('Prompt built from breakdown fields.', 'pos');
+	});
 }
 
 if (enhancedPromptUseBtn) {

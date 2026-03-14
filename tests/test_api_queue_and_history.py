@@ -214,3 +214,90 @@ def test_history_duplicate_image_entry_upgrades_placeholder_metadata(client):
     assert history[0]["params"]["steps"] == 30
     assert history[0]["params"]["cfg"] == 7
     assert history[0]["params"]["sampler"] == "euler"
+
+
+def test_image_open_location_requires_resolvable_path(client, monkeypatch):
+    def fail_resolve(_):
+        raise ValueError("Set a ComfyUI path in Configurations")
+
+    monkeypatch.setattr(app_module, "_resolve_comfy_image_path", fail_resolve)
+
+    resp = client.post("/api/image/open-location", json={"filename": "x.png"})
+
+    assert resp.status_code == 400
+    assert "Set a ComfyUI path" in resp.get_json()["error"]
+
+
+def test_image_delete_removes_file_and_history_refs(client, monkeypatch, tmp_path):
+    image_path = tmp_path / "to-delete.png"
+    image_path.write_bytes(b"png")
+
+    monkeypatch.setattr(app_module, "_resolve_comfy_image_path", lambda image_ref: image_path)
+
+    image_entry = {
+        "type": "image",
+        "prompt": "img",
+        "negative_prompt": "",
+        "engine": "comfyui",
+        "model": "m1",
+        "params": {"steps": 20},
+        "images": [{"filename": "to-delete.png", "subfolder": "", "type": "output"}],
+    }
+    keep_entry = {
+        "type": "image",
+        "prompt": "keep",
+        "negative_prompt": "",
+        "engine": "comfyui",
+        "model": "m2",
+        "params": {"steps": 20},
+        "images": [{"filename": "keep.png", "subfolder": "", "type": "output"}],
+    }
+
+    assert client.post("/api/history", json=image_entry).status_code == 201
+    assert client.post("/api/history", json=keep_entry).status_code == 201
+
+    resp = client.post("/api/image/delete", json={"filename": "to-delete.png", "subfolder": "", "type": "output"})
+
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["ok"] is True
+    assert data["deleted"] is True
+    assert data["removed_history_refs"] == 1
+    assert data["removed_history_entries"] == 1
+    assert not image_path.exists()
+
+    history_resp = client.get("/api/history?type=image")
+    history = history_resp.get_json()["history"]
+    assert len(history) == 1
+    assert history[0]["prompt"] == "keep"
+
+
+def test_live_preview_returns_first_available_prompt_image(client, monkeypatch):
+    monkeypatch.setattr(app_module, "_comfy_available", lambda: True)
+
+    def fake_get(url, timeout=0, **kwargs):
+        assert url.endswith("/queue")
+        assert timeout == 10
+        return DummyResponse(
+            payload={
+                "queue_running": [[1, "pid-run"]],
+                "queue_pending": [[2, "pid-pending"]],
+            }
+        )
+
+    def fake_parse_prompt_images(prompt_id):
+        if prompt_id == "pid-run":
+            return [{"filename": "live.png", "subfolder": "", "type": "temp"}]
+        return []
+
+    monkeypatch.setattr(app_module.requests, "get", fake_get)
+    monkeypatch.setattr(app_module, "_parse_prompt_images", fake_parse_prompt_images)
+
+    resp = client.get("/api/image/live-preview?prompt_ids=pid-run,pid-pending")
+
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["ok"] is True
+    assert data["preview"]["prompt_id"] == "pid-run"
+    assert data["preview"]["status"] == "running"
+    assert data["preview"]["image"] == {"filename": "live.png", "subfolder": "", "type": "temp"}

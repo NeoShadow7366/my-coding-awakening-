@@ -46,6 +46,7 @@ MIN_CFG = 1.0
 DATA_DIR = Path(app.root_path) / "data"
 HISTORY_FILE = DATA_DIR / "history.json"
 SERVICE_CONFIG_FILE = DATA_DIR / "service_config.json"
+SERVICE_LOG_DIR = DATA_DIR / "service_logs"
 
 SERVICE_PORTS = {
     "ollama": 11434,
@@ -54,9 +55,14 @@ SERVICE_PORTS = {
 
 _history_lock = threading.Lock()
 _service_config_lock = threading.Lock()
+_service_log_lock = threading.Lock()
 _service_processes: dict[str, subprocess.Popen | None] = {
     "ollama": None,
     "comfyui": None,
+}
+_last_service_errors: dict[str, str] = {
+    "ollama": "",
+    "comfyui": "",
 }
 
 
@@ -127,11 +133,16 @@ def _extract_prompt_suggestions(raw_text: str) -> list[str]:
 
 def _comfy_available() -> bool:
     """Return True if ComfyUI is reachable."""
-    try:
-        resp = requests.get(f"{COMFYUI_BASE_URL}/system_stats", timeout=2)
-        return resp.status_code == 200
-    except requests.exceptions.RequestException:
-        return False
+    # Some ComfyUI builds expose /queue reliably even when /system_stats is missing.
+    health_paths = ["/system_stats", "/queue"]
+    for path in health_paths:
+        try:
+            resp = requests.get(f"{COMFYUI_BASE_URL}{path}", timeout=2)
+            if resp.status_code == 200:
+                return True
+        except requests.exceptions.RequestException:
+            continue
+    return False
 
 
 def _comfy_get_object_info(node_type: str) -> dict:
@@ -212,6 +223,28 @@ def _ensure_service_config_store() -> None:
         )
 
 
+def _service_log_path(service: str) -> Path:
+    SERVICE_LOG_DIR.mkdir(parents=True, exist_ok=True)
+    return SERVICE_LOG_DIR / f"{service}.log"
+
+
+def _append_service_log_marker(service: str, message: str) -> None:
+    with _service_log_lock:
+        path = _service_log_path(service)
+        stamp = datetime.now(timezone.utc).isoformat()
+        with path.open("a", encoding="utf-8", errors="replace") as fh:
+            fh.write(f"\n[{stamp}] {message}\n")
+
+
+def _read_service_log_tail(service: str, max_chars: int = 1800) -> str:
+    with _service_log_lock:
+        path = _service_log_path(service)
+        if not path.exists():
+            return ""
+        text = path.read_text(encoding="utf-8", errors="replace")
+    return text[-max_chars:].strip()
+
+
 def _load_service_config() -> dict:
     _ensure_service_config_store()
     with _service_config_lock:
@@ -268,21 +301,28 @@ def _resolve_ollama_launch(path_value: str) -> tuple[list[str], Path | None]:
 def _resolve_comfyui_launch(path_value: str) -> tuple[list[str], Path | None]:
     candidate = Path(path_value).expanduser()
     if candidate.is_dir():
-        main_py = candidate / "main.py"
-        if main_py.exists():
-            return [sys.executable, str(main_py)], candidate
-
+        # Prefer ComfyUI's bundled launch scripts so it runs in the intended env.
         bat_candidates = ["run_nvidia_gpu.bat", "run_cpu.bat", "run.bat"]
         for bat_name in bat_candidates:
             bat_path = candidate / bat_name
             if bat_path.exists():
                 return ["cmd", "/c", str(bat_path)], candidate
 
+        main_py = candidate / "main.py"
+        if main_py.exists():
+            portable_python = candidate.parent / "python_embeded" / "python.exe"
+            if os.name == "nt" and portable_python.exists():
+                return [str(portable_python), str(main_py)], candidate
+            return [sys.executable, str(main_py)], candidate
+
         raise ValueError("Configured ComfyUI directory must contain main.py or a run.bat script")
 
     if candidate.is_file():
         suffix = candidate.suffix.lower()
         if suffix == ".py":
+            portable_python = candidate.parent.parent / "python_embeded" / "python.exe"
+            if os.name == "nt" and portable_python.exists():
+                return [str(portable_python), str(candidate)], candidate.parent
             return [sys.executable, str(candidate)], candidate.parent
         if suffix in {".bat", ".cmd"}:
             return ["cmd", "/c", str(candidate)], candidate.parent
@@ -327,17 +367,23 @@ def _kill_process_on_port(port: int) -> bool:
         return False
 
 
-def _spawn_service_process(command: list[str], cwd: Path | None = None) -> subprocess.Popen:
+def _spawn_service_process(service: str, command: list[str], cwd: Path | None = None) -> subprocess.Popen:
+    log_path = _service_log_path(service)
+    log_fh = log_path.open("a", encoding="utf-8", errors="replace")
     kwargs = {
         "cwd": str(cwd) if cwd else None,
-        "stdout": subprocess.DEVNULL,
-        "stderr": subprocess.DEVNULL,
+        "stdout": log_fh,
+        "stderr": log_fh,
         "stdin": subprocess.DEVNULL,
         "start_new_session": True,
     }
     if os.name == "nt":
         kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
-    return subprocess.Popen(command, **kwargs)
+    try:
+        proc = subprocess.Popen(command, **kwargs)
+    finally:
+        log_fh.close()
+    return proc
 
 
 def _start_configured_service(service: str, config: dict) -> tuple[bool, str, int | None]:
@@ -352,8 +398,24 @@ def _start_configured_service(service: str, config: dict) -> tuple[bool, str, in
             raise ValueError("Set a ComfyUI install path in Configurations before launching.")
         command, cwd = _resolve_comfyui_launch(path_value)
 
-    proc = _spawn_service_process(command, cwd=cwd)
+    proc = _spawn_service_process(service, command, cwd=cwd)
     _service_processes[service] = proc
+    _append_service_log_marker(service, f"Launch command: {' '.join(command)}")
+    _last_service_errors[service] = ""
+
+    # If the process exits immediately, return a useful failure instead of a false "started" state.
+    time.sleep(0.9)
+    exit_code = proc.poll()
+    if exit_code is not None:
+        log_tail = _read_service_log_tail(service)
+        _last_service_errors[service] = (
+            f"{service} process exited immediately (code {exit_code})."
+            + (f" Recent log output: {log_tail}" if log_tail else "")
+        )
+        raise RuntimeError(
+            f"{service} process exited immediately (code {exit_code}). Verify configured path and runtime dependencies."
+        )
+
     return True, "started", proc.pid
 
 
@@ -632,6 +694,109 @@ def _parse_prompt_images(prompt_id: str) -> list[dict]:
     return images
 
 
+def _safe_child_path(base: Path, *parts: str) -> Path:
+    """Resolve a child path and reject traversal outside the base directory."""
+    base_resolved = base.resolve()
+    candidate = base_resolved.joinpath(*parts).resolve()
+    try:
+        candidate.relative_to(base_resolved)
+    except ValueError as exc:
+        raise ValueError("Invalid image path reference") from exc
+    return candidate
+
+
+def _resolve_comfy_root_dir() -> Path | None:
+    """Resolve a usable ComfyUI root directory from saved service config."""
+    config = _load_service_config()
+    raw_path = str(config.get("comfyui_path") or "").strip()
+    if not raw_path:
+        return None
+
+    candidate = Path(raw_path).expanduser()
+    if candidate.is_dir():
+        return candidate
+    if candidate.is_file():
+        return candidate.parent
+    return None
+
+
+def _normalize_image_ref(body: dict) -> dict:
+    """Extract a stable image reference payload from request JSON."""
+    return {
+        "filename": str(body.get("filename") or "").strip(),
+        "subfolder": str(body.get("subfolder") or "").strip(),
+        "type": str(body.get("type") or "output").strip(),
+    }
+
+
+def _resolve_comfy_image_path(image_ref: dict) -> Path:
+    """Resolve an image ref (filename/subfolder/type) into a local ComfyUI file path."""
+    filename = str(image_ref.get("filename") or "").strip()
+    subfolder = str(image_ref.get("subfolder") or "").strip().replace("\\", "/")
+    image_type = str(image_ref.get("type") or "output").strip().lower()
+
+    if not filename:
+        raise ValueError("filename is required")
+    if Path(filename).name != filename:
+        raise ValueError("filename must not include path separators")
+
+    type_dir = {
+        "output": "output",
+        "input": "input",
+        "temp": "temp",
+    }.get(image_type)
+    if not type_dir:
+        raise ValueError("type must be one of: output, input, temp")
+
+    comfy_root = _resolve_comfy_root_dir()
+    if comfy_root is None:
+        raise ValueError("Set a ComfyUI path in Configurations before using gallery file actions")
+
+    subfolder_parts = [part for part in subfolder.split("/") if part and part != "."]
+    return _safe_child_path(comfy_root, type_dir, *subfolder_parts, filename)
+
+
+def _image_ref_matches(item: dict, image_ref: dict) -> bool:
+    """Return True when history image reference equals the target image ref."""
+    return (
+        str(item.get("filename") or "").strip() == str(image_ref.get("filename") or "").strip()
+        and str(item.get("subfolder") or "").strip() == str(image_ref.get("subfolder") or "").strip()
+        and str(item.get("type") or "output").strip() == str(image_ref.get("type") or "output").strip()
+    )
+
+
+def _prune_history_image_references(image_ref: dict) -> tuple[int, int]:
+    """Remove image references from local history and drop empty image entries."""
+    entries = _load_history()
+    removed_refs = 0
+    removed_entries = 0
+    next_entries: list[dict] = []
+
+    for entry in entries:
+        if entry.get("type") != "image":
+            next_entries.append(entry)
+            continue
+
+        images = entry.get("images") if isinstance(entry.get("images"), list) else []
+        filtered_images = [img for img in images if not _image_ref_matches(img, image_ref)]
+        diff = len(images) - len(filtered_images)
+        if diff <= 0:
+            next_entries.append(entry)
+            continue
+
+        removed_refs += diff
+        if not filtered_images:
+            removed_entries += 1
+            continue
+
+        next_entries.append({**entry, "images": filtered_images})
+
+    if removed_refs:
+        _save_history(next_entries)
+
+    return removed_refs, removed_entries
+
+
 def _build_txt2img_workflow(body: dict) -> tuple[dict, dict]:
     """Create a minimal txt2img workflow for ComfyUI."""
     prompt = (body.get("prompt") or "").strip()
@@ -807,6 +972,27 @@ def api_status():
                 "available": _comfy_available(),
                 "url": COMFYUI_BASE_URL,
             },
+            "service_errors": {
+                "ollama": _last_service_errors.get("ollama", ""),
+                "comfyui": _last_service_errors.get("comfyui", ""),
+            },
+        }
+    )
+
+
+@app.route("/api/diagnostics/service-logs")
+def api_diagnostics_service_logs():
+    """Return tail output for managed service logs and last known launch errors."""
+    return jsonify(
+        {
+            "logs": {
+                "ollama": _read_service_log_tail("ollama"),
+                "comfyui": _read_service_log_tail("comfyui"),
+            },
+            "errors": {
+                "ollama": _last_service_errors.get("ollama", ""),
+                "comfyui": _last_service_errors.get("comfyui", ""),
+            },
         }
     )
 
@@ -866,8 +1052,10 @@ def api_service_control(service: str, action: str):
     try:
         if action_name == "start":
             if _service_available(service_name):
+                _last_service_errors[service_name] = ""
                 return jsonify({"ok": True, "service": service_name, "action": action_name, "status": "already-running"})
             ok, status, pid = _start_configured_service(service_name, config)
+            _last_service_errors[service_name] = ""
             return jsonify({"ok": ok, "service": service_name, "action": action_name, "status": status, "pid": pid})
 
         if action_name == "stop":
@@ -877,6 +1065,8 @@ def api_service_control(service: str, action: str):
                 if proc and proc.poll() is None:
                     proc.terminate()
                     stopped = True
+            if stopped:
+                _last_service_errors[service_name] = ""
             return jsonify({"ok": True, "service": service_name, "action": action_name, "status": "stopped" if stopped else "not-running"})
 
         # restart
@@ -885,10 +1075,13 @@ def api_service_control(service: str, action: str):
         if proc and proc.poll() is None:
             proc.terminate()
         ok, status, pid = _start_configured_service(service_name, config)
+        _last_service_errors[service_name] = ""
         return jsonify({"ok": ok, "service": service_name, "action": action_name, "status": status, "pid": pid})
     except ValueError as exc:
+        _last_service_errors[service_name] = str(exc)
         return jsonify({"error": str(exc)}), 400
     except Exception as exc:
+        _last_service_errors[service_name] = str(exc)
         logger.error("Service control failed for %s/%s: %s", service_name, action_name, exc)
         return jsonify({"error": str(exc)}), 500
 
@@ -1241,6 +1434,113 @@ def api_image_view():
     except requests.RequestException as exc:
         logger.error("ComfyUI image view failed: %s", exc)
         return jsonify({"error": str(exc)}), 502
+
+
+@app.route("/api/image/live-preview")
+def api_image_live_preview():
+    """Return the newest available image for active prompt IDs, if any."""
+    if not _comfy_available():
+        return jsonify({"ok": False, "preview": None, "error": "ComfyUI is not running"}), 503
+
+    prompt_ids_raw = (request.args.get("prompt_ids") or "").strip()
+    prompt_ids = [pid.strip() for pid in prompt_ids_raw.split(",") if pid.strip()]
+    if not prompt_ids:
+        return jsonify({"ok": True, "preview": None})
+
+    status_by_prompt_id: dict[str, str] = {}
+    try:
+        queue_resp = requests.get(f"{COMFYUI_BASE_URL}/queue", timeout=10)
+        queue_resp.raise_for_status()
+        queue_data = queue_resp.json() or {}
+        for row in queue_data.get("queue_running", []):
+            if isinstance(row, list) and len(row) > 1 and row[1]:
+                status_by_prompt_id[str(row[1])] = "running"
+        for row in queue_data.get("queue_pending", []):
+            if isinstance(row, list) and len(row) > 1 and row[1]:
+                status_by_prompt_id[str(row[1])] = "pending"
+    except requests.RequestException as exc:
+        logger.warning("ComfyUI queue fetch failed during live preview lookup: %s", exc)
+
+    for prompt_id in prompt_ids:
+        try:
+            images = _parse_prompt_images(prompt_id)
+        except requests.RequestException:
+            continue
+        if not images:
+            continue
+
+        return jsonify(
+            {
+                "ok": True,
+                "preview": {
+                    "prompt_id": prompt_id,
+                    "status": status_by_prompt_id.get(prompt_id, "unknown"),
+                    "image": images[0],
+                    "updated_at": int(time.time()),
+                },
+            }
+        )
+
+    return jsonify({"ok": True, "preview": None})
+
+
+@app.route("/api/image/open-location", methods=["POST"])
+def api_image_open_location():
+    """Open the generated file location in the OS file explorer."""
+    body = request.get_json(silent=True) or {}
+    image_ref = _normalize_image_ref(body)
+
+    try:
+        image_path = _resolve_comfy_image_path(image_ref)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+
+    if not image_path.exists():
+        return jsonify({"error": "Image file was not found on disk"}), 404
+
+    try:
+        if os.name == "nt":
+            subprocess.Popen(["explorer", f"/select,{image_path}"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        elif sys.platform == "darwin":
+            subprocess.Popen(["open", "-R", str(image_path)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        else:
+            subprocess.Popen(["xdg-open", str(image_path.parent)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except Exception as exc:
+        logger.error("Failed to open image location: %s", exc)
+        return jsonify({"error": str(exc)}), 500
+
+    return jsonify({"ok": True, "path": str(image_path)})
+
+
+@app.route("/api/image/delete", methods=["POST"])
+def api_image_delete():
+    """Delete a generated image file and remove matching references from local history."""
+    body = request.get_json(silent=True) or {}
+    image_ref = _normalize_image_ref(body)
+
+    try:
+        image_path = _resolve_comfy_image_path(image_ref)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+
+    if not image_path.exists():
+        return jsonify({"error": "Image file was not found on disk"}), 404
+
+    try:
+        image_path.unlink()
+    except OSError as exc:
+        logger.error("Failed deleting image file %s: %s", image_path, exc)
+        return jsonify({"error": str(exc)}), 500
+
+    removed_refs, removed_entries = _prune_history_image_references(image_ref)
+    return jsonify(
+        {
+            "ok": True,
+            "deleted": True,
+            "removed_history_refs": removed_refs,
+            "removed_history_entries": removed_entries,
+        }
+    )
 
 
 @app.route("/api/history", methods=["GET", "POST"])

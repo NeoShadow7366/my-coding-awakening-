@@ -236,9 +236,9 @@
             <textarea id="enhanced-subject" rows="2" placeholder="Define the main focus clearly (e.g., a weathered fisherman, a vintage brass compass)."></textarea>
             <div class="enhanced-tag-head">
               <p class="hint enhanced-tag-hint">+Suggestion tags</p>
-              <button class="btn btn-ghost btn-xs" type="button" data-suggest-toggle="enhanced-subject-tags">Hide</button>
+              <button class="btn btn-ghost btn-xs" type="button" data-suggest-toggle="enhanced-subject-tags" aria-expanded="false">Show</button>
             </div>
-            <div id="enhanced-subject-tags" class="enhanced-tag-cloud" data-target="enhanced-subject" aria-label="Subject suggestion tags"></div>
+            <div id="enhanced-subject-tags" class="enhanced-tag-cloud" data-target="enhanced-subject" aria-label="Subject suggestion tags" hidden></div>
           </div>
 
           <div class="form-field">
@@ -246,9 +246,9 @@
             <textarea id="enhanced-setting" rows="2" placeholder="Specify location, background, and atmosphere (e.g., on a storm-tossed deck, surrounded by dense fog)."></textarea>
             <div class="enhanced-tag-head">
               <p class="hint enhanced-tag-hint">+Suggestion tags</p>
-              <button class="btn btn-ghost btn-xs" type="button" data-suggest-toggle="enhanced-setting-tags">Hide</button>
+              <button class="btn btn-ghost btn-xs" type="button" data-suggest-toggle="enhanced-setting-tags" aria-expanded="false">Show</button>
             </div>
-            <div id="enhanced-setting-tags" class="enhanced-tag-cloud" data-target="enhanced-setting" aria-label="Setting suggestion tags"></div>
+            <div id="enhanced-setting-tags" class="enhanced-tag-cloud" data-target="enhanced-setting" aria-label="Setting suggestion tags" hidden></div>
           </div>
 
           <div class="form-field">
@@ -256,9 +256,9 @@
             <textarea id="enhanced-composition" rows="2" placeholder="Describe angle and perspective (e.g., close-up portrait, wide-angle lens, bird's-eye view)."></textarea>
             <div class="enhanced-tag-head">
               <p class="hint enhanced-tag-hint">+Suggestion tags</p>
-              <button class="btn btn-ghost btn-xs" type="button" data-suggest-toggle="enhanced-composition-tags">Hide</button>
+              <button class="btn btn-ghost btn-xs" type="button" data-suggest-toggle="enhanced-composition-tags" aria-expanded="false">Show</button>
             </div>
-            <div id="enhanced-composition-tags" class="enhanced-tag-cloud" data-target="enhanced-composition" aria-label="Composition suggestion tags"></div>
+            <div id="enhanced-composition-tags" class="enhanced-tag-cloud" data-target="enhanced-composition" aria-label="Composition suggestion tags" hidden></div>
           </div>
 
           <div class="form-field">
@@ -266,9 +266,9 @@
             <textarea id="enhanced-lighting" rows="2" placeholder="Use terms like golden hour, dramatic rim lighting, or soft diffused window light."></textarea>
             <div class="enhanced-tag-head">
               <p class="hint enhanced-tag-hint">+Suggestion tags</p>
-              <button class="btn btn-ghost btn-xs" type="button" data-suggest-toggle="enhanced-lighting-tags">Hide</button>
+              <button class="btn btn-ghost btn-xs" type="button" data-suggest-toggle="enhanced-lighting-tags" aria-expanded="false">Show</button>
             </div>
-            <div id="enhanced-lighting-tags" class="enhanced-tag-cloud" data-target="enhanced-lighting" aria-label="Lighting suggestion tags"></div>
+            <div id="enhanced-lighting-tags" class="enhanced-tag-cloud" data-target="enhanced-lighting" aria-label="Lighting suggestion tags" hidden></div>
           </div>
 
           <div class="form-field">
@@ -276,13 +276,14 @@
             <textarea id="enhanced-style" rows="2" placeholder="State the aesthetic (e.g., cinematic photography, oil painting, 3D render, minimalist graphic design)."></textarea>
             <div class="enhanced-tag-head">
               <p class="hint enhanced-tag-hint">+Suggestion tags</p>
-              <button class="btn btn-ghost btn-xs" type="button" data-suggest-toggle="enhanced-style-tags">Hide</button>
+              <button class="btn btn-ghost btn-xs" type="button" data-suggest-toggle="enhanced-style-tags" aria-expanded="false">Show</button>
             </div>
-            <div id="enhanced-style-tags" class="enhanced-tag-cloud" data-target="enhanced-style" aria-label="Style suggestion tags"></div>
+            <div id="enhanced-style-tags" class="enhanced-tag-cloud" data-target="enhanced-style" aria-label="Style suggestion tags" hidden></div>
           </div>
 
           <div class="enhanced-actions">
             <button class="btn btn-ghost" id="enhanced-prompt-suggest-btn" type="button">Suggest Enhanced Prompts</button>
+            <button class="btn btn-ghost" id="enhanced-prompt-build-btn" type="button">Build Prompt</button>
             <button class="btn btn-ghost" id="enhanced-prompt-random-btn" type="button" disabled>Use Random Suggestion</button>
             <button class="btn btn-ghost" id="enhanced-prompt-use-btn" type="button" disabled>Use First Suggestion</button>
           </div>
@@ -319,9 +320,9 @@
           <textarea id="image-negative-prompt" rows="3" placeholder="blurry, low quality, watermark, text"></textarea>
           <div class="enhanced-tag-head">
             <p class="hint enhanced-tag-hint">+Suggestion tags</p>
-            <button class="btn btn-ghost btn-xs" type="button" data-suggest-toggle="negative-prompt-tags">Hide</button>
+            <button class="btn btn-ghost btn-xs" type="button" data-suggest-toggle="negative-prompt-tags" aria-expanded="false">Show</button>
           </div>
-          <div id="negative-prompt-tags" class="enhanced-tag-cloud" data-target="image-negative-prompt" aria-label="Negative prompt suggestion tags"></div>
+          <div id="negative-prompt-tags" class="enhanced-tag-cloud" data-target="image-negative-prompt" aria-label="Negative prompt suggestion tags" hidden></div>
         </div>
 
         <div class="inline-grid two-up">
@@ -396,18 +397,40 @@
     <section class="gallery-wrap" aria-label="Generation gallery">
       <div class="gallery-head">
         <h3 class="history-heading">Gallery</h3>
-        <button class="btn btn-ghost btn-xs" id="refresh-gallery" type="button">Refresh</button>
+        <div class="gallery-controls">
+          <input id="gallery-search" type="search" class="gallery-search-input" placeholder="Filter by prompt…" aria-label="Filter gallery by prompt text" autocomplete="off" />
+          <button class="btn btn-ghost btn-xs" id="gallery-view-toggle" type="button" aria-pressed="false">Grid</button>
+          <button class="btn btn-ghost btn-xs" id="refresh-gallery" type="button">Refresh</button>
+        </div>
       </div>
+      <p id="gallery-filter-hint" class="hint" hidden></p>
       <div id="gallery-grid" class="gallery-grid"></div>
     </section>
 
     <div id="gallery-lightbox" class="gallery-lightbox" hidden aria-hidden="true" role="dialog" aria-label="Gallery image viewer">
       <div class="gallery-lightbox-backdrop" data-lightbox-close="backdrop"></div>
       <div class="gallery-lightbox-panel" role="document">
-        <button id="gallery-lightbox-close" class="btn btn-ghost btn-xs gallery-lightbox-close" type="button" aria-label="Close image viewer">Close</button>
-        <img id="gallery-lightbox-image" src="" alt="" />
+        <div class="gallery-lightbox-header">
+          <span id="gallery-lightbox-counter" class="hint gallery-lightbox-counter"></span>
+          <button id="gallery-lightbox-close" class="btn btn-ghost btn-xs gallery-lightbox-close" type="button" aria-label="Close image viewer">Close</button>
+        </div>
+        <div class="gallery-lightbox-image-wrap">
+          <button id="gallery-lightbox-prev" class="gallery-lightbox-nav-btn" type="button" aria-label="Previous image" hidden>&#8249;</button>
+          <img id="gallery-lightbox-image" src="" alt="" />
+          <button id="gallery-lightbox-next" class="gallery-lightbox-nav-btn" type="button" aria-label="Next image" hidden>&#8250;</button>
+        </div>
         <p id="gallery-lightbox-caption" class="hint gallery-lightbox-caption"></p>
       </div>
+    </div>
+
+    <div id="gallery-context-menu" class="gallery-context-menu" hidden role="menu" aria-label="Gallery actions">
+      <button type="button" role="menuitem" data-gallery-action="open-location">Open image location</button>
+      <button type="button" role="menuitem" data-gallery-action="delete-image">Delete image</button>
+      <div class="gallery-context-divider" role="separator" aria-hidden="true"></div>
+      <button type="button" role="menuitem" data-gallery-action="export-png-meta">Export PNG (with metadata)</button>
+      <button type="button" role="menuitem" data-gallery-action="export-png">Export PNG</button>
+      <button type="button" role="menuitem" data-gallery-action="export-jpeg">Export JPEG</button>
+      <button type="button" role="menuitem" data-gallery-action="export-webp">Export WebP</button>
     </div>
   </div>
 
