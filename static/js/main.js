@@ -608,6 +608,8 @@ function renderQueueStatus(running, pending, donePromptIds = new Set()) {
 
 	const failedCount = Array.from(queueJobMeta.values()).filter((m) => m.status === 'failed').length;
 	const completedCount = Array.from(queueJobMeta.values()).filter((m) => m.status === 'completed').length;
+	const runningCount = Array.from(queueJobMeta.entries()).filter(([promptId, meta]) => trackedPromptIds.has(promptId) && meta.status === 'running').length;
+	const pendingCount = Array.from(queueJobMeta.entries()).filter(([promptId, meta]) => trackedPromptIds.has(promptId) && (meta.status === 'queued' || meta.status === 'processing')).length;
 	if (clearFailedQueueBtn) {
 		clearFailedQueueBtn.disabled = failedCount === 0;
 		clearFailedQueueBtn.textContent = failedCount > 0 ? `Clear failed (${failedCount})` : 'Clear failed';
@@ -617,7 +619,7 @@ function renderQueueStatus(running, pending, donePromptIds = new Set()) {
 		clearCompletedQueueBtn.textContent = completedCount > 0 ? `Clear done (${completedCount})` : 'Clear done';
 	}
 	const visibleLabel = queueFilterFailedOnly ? 'Showing: Failed only' : 'Showing: All';
-	queueSummary.textContent = `Running: ${runningIds.size}  Pending: ${pendingIds.size}  Tracked: ${trackedPromptIds.size}  Failed: ${failedCount}  Done: ${completedCount}  ${visibleLabel}`;
+	queueSummary.textContent = `Running: ${runningCount}  Pending: ${pendingCount}  Tracked: ${trackedPromptIds.size}  Failed: ${failedCount}  Done: ${completedCount}  ${visibleLabel}`;
 
 	const rows = Array.from(queueJobMeta.entries())
 		.filter(([, meta]) => (queueFilterFailedOnly ? meta.status === 'failed' : true))
