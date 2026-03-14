@@ -42,3 +42,4 @@ htmlcov/
 
 # Runtime app data
 data/history.json
+data/service_config.json

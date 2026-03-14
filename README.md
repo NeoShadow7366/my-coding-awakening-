@@ -49,6 +49,30 @@ pip install -r requirements.txt
 python app.py
 ```
 
+On Windows PowerShell, you can use the startup helper to clear port 5000 listeners and launch the app with the project venv:
+
+```powershell
+./scripts/start_app.ps1
+```
+
+To run a quick readiness check for Ollama, ComfyUI, and Flask:
+
+```powershell
+./scripts/preflight.ps1
+```
+
+To run the same checks and launch the app only if Flask is down:
+
+```powershell
+./scripts/preflight.ps1 -StartApp
+```
+
+To emit machine-readable readiness output:
+
+```powershell
+./scripts/preflight.ps1 -Json
+```
+
 4. Open http://localhost:5000
 
 ## API endpoints
@@ -75,3 +99,8 @@ python app.py
 - If ComfyUI is down, image endpoints return 503 with helpful error messages.
 - If Ollama is down, text generation returns 503.
 - History is stored in data/history.json.
+- To deduplicate persisted image history rows, run:
+
+```powershell
+& ".venv/Scripts/python.exe" "./scripts/cleanup_history.py" --dry-run
+```
