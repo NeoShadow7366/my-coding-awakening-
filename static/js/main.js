@@ -2005,10 +2005,13 @@ async function rerunImageJob(promptId) {
 	}
 	queueActionInFlight.add(`rerun:${promptId}`);
 	try {
+		// Omit the seed so the backend generates a fresh one; reusing the same
+		// seed causes ComfyUI to return a cached result with no output images.
+		const { seed: _seed, ...rerunPayload } = snapshot;
 		const res = await fetch('/api/image/generate', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify(snapshot),
+			body: JSON.stringify(rerunPayload),
 		});
 		const data = await res.json();
 		if (!res.ok) {
