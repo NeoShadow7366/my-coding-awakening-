@@ -606,6 +606,54 @@ textarea {
   margin-top: 2px;
 }
 
+.diagnostics-panel {
+  border: 1px solid var(--clr-border);
+  border-radius: var(--radius);
+  padding: var(--sp-sm);
+  background: var(--clr-bg);
+}
+
+.diagnostics-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-sm);
+}
+
+.diagnostics-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin: 0;
+  padding: 0;
+}
+
+.diagnostics-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-sm);
+  font-size: var(--fs-sm);
+}
+
+.diagnostics-label {
+  color: var(--clr-text-muted);
+}
+
+.diagnostics-value {
+  font-weight: 700;
+  color: var(--clr-text);
+}
+
+.diagnostics-value.ok {
+  color: var(--clr-accent-pos);
+}
+
+.diagnostics-value.warn {
+  color: var(--clr-accent-neg);
+}
+
 /* --------------------------------------------------------------------------
    Toast notifications
    -------------------------------------------------------------------------- */

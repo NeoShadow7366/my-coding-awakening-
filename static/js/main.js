@@ -51,6 +51,14 @@ const imageUpload = document.getElementById('image-upload');
 const imageGenerateBtn = document.getElementById('image-generate-btn');
 const queueSummary = document.getElementById('queue-summary');
 const queueList = document.getElementById('queue-list');
+const diagnosticsRunBtn = document.getElementById('diagnostics-run-btn');
+const diagnosticsSummary = document.getElementById('diagnostics-summary');
+const diagnosticsHint = document.getElementById('diagnostics-hint');
+const diagTextStatus = document.getElementById('diag-text-status');
+const diagImageStatus = document.getElementById('diag-image-status');
+const diagCheckpoints = document.getElementById('diag-checkpoints');
+const diagSamplers = document.getElementById('diag-samplers');
+const diagLastRun = document.getElementById('diag-last-run');
 const autoRetryPolicy = document.getElementById('auto-retry-policy');
 const failedOnlyToggle = document.getElementById('failed-only-toggle');
 const clearFailedQueueBtn = document.getElementById('clear-failed-queue');
@@ -236,6 +244,96 @@ function setImageModelMessage(msg) {
 	imageModelSelect.innerHTML = `<option value="">${escHtml(msg)}</option>`;
 }
 
+function setDiagnosticValue(el, text, level = '') {
+	if (!el) return;
+	el.textContent = text;
+	el.classList.remove('ok', 'warn');
+	if (level) el.classList.add(level);
+}
+
+function getActiveSelectOptionCount(selectEl) {
+	if (!selectEl) return 0;
+	return Array.from(selectEl.options).filter((opt) => opt.value).length;
+}
+
+function renderDiagnosticsSnapshot(snapshot) {
+	if (!diagnosticsSummary) return;
+	setDiagnosticValue(diagTextStatus, snapshot.textStatusLabel, snapshot.textOk ? 'ok' : 'warn');
+	setDiagnosticValue(diagImageStatus, snapshot.imageStatusLabel, snapshot.imageOk ? 'ok' : 'warn');
+	setDiagnosticValue(diagCheckpoints, `${snapshot.checkpoints}`, snapshot.checkpoints > 0 ? 'ok' : 'warn');
+	setDiagnosticValue(diagSamplers, `${snapshot.samplers}`, snapshot.samplers > 0 ? 'ok' : 'warn');
+	setDiagnosticValue(diagLastRun, snapshot.lastRunLabel);
+	diagnosticsSummary.textContent = snapshot.summary;
+	if (diagnosticsHint) diagnosticsHint.textContent = snapshot.hint;
+}
+
+async function runDiagnosticsChecks(manual = false) {
+	if (!diagnosticsSummary) return;
+	if (diagnosticsRunBtn) diagnosticsRunBtn.disabled = true;
+	const lastRunLabel = new Date().toLocaleTimeString();
+	try {
+		const [statusRes, textModelRes, imageModelRes, samplerRes] = await Promise.all([
+			fetch('/api/status'),
+			fetch('/api/models'),
+			fetch('/api/image/models'),
+			fetch('/api/image/samplers'),
+		]);
+
+		const statusData = await statusRes.json().catch(() => ({}));
+		const textData = await textModelRes.json().catch(() => ({}));
+		const imageData = await imageModelRes.json().catch(() => ({}));
+		const samplerData = await samplerRes.json().catch(() => ({}));
+
+		const textOk = !!statusData.text?.available;
+		const imageOk = !!statusData.image?.available;
+		const checkpoints = (imageData.models || []).length;
+		const samplers = (samplerData.samplers || []).length;
+		const textModels = (textData.models || []).length;
+
+		let hint = 'All checks passed.';
+		if (!textOk && !imageOk) {
+			hint = 'Start Ollama (11434) and ComfyUI (8188), then run checks again.';
+		} else if (!textOk) {
+			hint = 'Start Ollama at localhost:11434.';
+		} else if (!imageOk) {
+			hint = 'Start ComfyUI at localhost:8188.';
+		} else if (checkpoints === 0) {
+			hint = 'ComfyUI is online, but no checkpoints are visible.';
+		}
+
+		renderDiagnosticsSnapshot({
+			textOk,
+			imageOk,
+			textStatusLabel: textOk ? `online (${textModels})` : 'offline',
+			imageStatusLabel: imageOk ? 'online' : 'offline',
+			checkpoints,
+			samplers,
+			lastRunLabel,
+			summary: textOk && imageOk ? 'Diagnostics OK' : 'Diagnostics detected issues',
+			hint,
+		});
+
+		if (manual) {
+			showToast(textOk && imageOk ? 'Diagnostics complete: services online.' : 'Diagnostics complete: issues found.', textOk && imageOk ? 'pos' : 'neg');
+		}
+	} catch {
+		renderDiagnosticsSnapshot({
+			textOk: false,
+			imageOk: false,
+			textStatusLabel: 'unknown',
+			imageStatusLabel: 'unknown',
+			checkpoints: '-',
+			samplers: '-',
+			lastRunLabel,
+			summary: 'Diagnostics request failed',
+			hint: 'Could not reach backend endpoints from the browser.',
+		});
+		if (manual) showToast('Diagnostics failed: could not reach backend.', 'neg');
+	} finally {
+		if (diagnosticsRunBtn) diagnosticsRunBtn.disabled = false;
+	}
+}
+
 function scrollToBottom() {
 	chatMessages.scrollTop = chatMessages.scrollHeight;
 }
@@ -369,11 +467,44 @@ async function checkStatus() {
 			imageEngineStatus.style.color = 'var(--clr-accent-neg)';
 			setImageModelMessage('ComfyUI unavailable');
 		}
+
+		renderDiagnosticsSnapshot({
+			textOk,
+			imageOk,
+			textStatusLabel: textOk ? `online (${getActiveSelectOptionCount(modelSelect)})` : 'offline',
+			imageStatusLabel: imageOk ? 'online' : 'offline',
+			checkpoints: getActiveSelectOptionCount(imageModelSelect),
+			samplers: getActiveSelectOptionCount(imageSamplerSelect),
+			lastRunLabel: new Date().toLocaleTimeString(),
+			summary: textOk && imageOk ? 'Diagnostics OK' : 'Diagnostics detected issues',
+			hint: textOk && imageOk
+				? 'Use Run checks for deeper endpoint verification.'
+				: (!textOk && !imageOk)
+					? 'Start Ollama (11434) and ComfyUI (8188), then run checks again.'
+					: (!textOk ? 'Start Ollama at localhost:11434.' : 'Start ComfyUI at localhost:8188.'),
+		});
 	} catch {
 		statusDot.className = 'status-dot offline';
 		statusText.textContent = 'Offline';
 		imageEngineStatus.textContent = 'Could not reach backend status endpoint';
+		renderDiagnosticsSnapshot({
+			textOk: false,
+			imageOk: false,
+			textStatusLabel: 'unknown',
+			imageStatusLabel: 'unknown',
+			checkpoints: '-',
+			samplers: '-',
+			lastRunLabel: new Date().toLocaleTimeString(),
+			summary: 'Diagnostics request failed',
+			hint: 'Could not reach backend status endpoint.',
+		});
 	}
+}
+
+if (diagnosticsRunBtn) {
+	diagnosticsRunBtn.addEventListener('click', async () => {
+		await runDiagnosticsChecks(true);
+	});
 }
 
 checkStatus();
