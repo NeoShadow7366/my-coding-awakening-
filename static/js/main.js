@@ -1,5 +1,12 @@
 'use strict';
 
+// Keep all tabs on one origin so lease-based polling coordination works reliably.
+if (window.location.hostname === 'localhost') {
+	const canonicalUrl = new URL(window.location.href);
+	canonicalUrl.hostname = '127.0.0.1';
+	window.location.replace(canonicalUrl.toString());
+}
+
 /* --------------------------------------------------------------------------
 	 DOM references
 	 -------------------------------------------------------------------------- */
@@ -8,8 +15,10 @@ const statusDot = document.getElementById('status-dot');
 const statusText = document.getElementById('status-text');
 const navGenerative = document.getElementById('nav-generative');
 const navImage = document.getElementById('nav-image');
+const navConfig = document.getElementById('nav-config');
 const panelGen = document.getElementById('panel-generative');
 const panelImage = document.getElementById('panel-image');
+const panelConfig = document.getElementById('panel-config');
 
 // Text panel
 const modelSelect = document.getElementById('gen-model-select');
@@ -48,6 +57,22 @@ const imageDenoiseVal = document.getElementById('image-denoise-val');
 const imageEngineStatus = document.getElementById('image-engine-status');
 const imageForm = document.getElementById('image-form');
 const imagePrompt = document.getElementById('image-prompt');
+const normalPromptWrap = document.getElementById('normal-prompt-wrap');
+const promptModeHint = document.getElementById('prompt-mode-hint');
+const enhancedPromptToggle = document.getElementById('enhanced-prompt-toggle');
+const enhancedPromptFields = document.getElementById('enhanced-prompt-fields');
+const enhancedSubject = document.getElementById('enhanced-subject');
+const enhancedSetting = document.getElementById('enhanced-setting');
+const enhancedComposition = document.getElementById('enhanced-composition');
+const enhancedLighting = document.getElementById('enhanced-lighting');
+const enhancedStyle = document.getElementById('enhanced-style');
+const enhancedPromptSuggestBtn = document.getElementById('enhanced-prompt-suggest-btn');
+const enhancedPromptRandomBtn = document.getElementById('enhanced-prompt-random-btn');
+const enhancedPromptUseBtn = document.getElementById('enhanced-prompt-use-btn');
+const enhancedPromptSelect = document.getElementById('enhanced-prompt-select');
+const enhancedPromptUseSelectedBtn = document.getElementById('enhanced-prompt-use-selected-btn');
+const enhancedPromptStatus = document.getElementById('enhanced-prompt-status');
+const enhancedPromptSuggestionsOutput = document.getElementById('enhanced-prompt-suggestions');
 const imageNegativePrompt = document.getElementById('image-negative-prompt');
 const imageWidth = document.getElementById('image-width');
 const imageHeight = document.getElementById('image-height');
@@ -58,6 +83,23 @@ const queueTelemetry = document.getElementById('queue-telemetry');
 const queueTelemetryResetBtn = document.getElementById('queue-telemetry-reset');
 const queueSummary = document.getElementById('queue-summary');
 const queueList = document.getElementById('queue-list');
+const configOllamaPath = document.getElementById('config-ollama-path');
+const configComfyuiPath = document.getElementById('config-comfyui-path');
+const configOllamaBrowseBtn = document.getElementById('config-ollama-browse');
+const configComfyuiBrowseBtn = document.getElementById('config-comfyui-browse');
+const configSaveBtn = document.getElementById('config-save-btn');
+const configSaveStatus = document.getElementById('config-save-status');
+const configLastSaved = document.getElementById('config-last-saved');
+const configOllamaStartBtn = document.getElementById('config-ollama-start');
+const configOllamaRestartBtn = document.getElementById('config-ollama-restart');
+const configOllamaStopBtn = document.getElementById('config-ollama-stop');
+const configComfyStartBtn = document.getElementById('config-comfy-start');
+const configComfyRestartBtn = document.getElementById('config-comfy-restart');
+const configComfyStopBtn = document.getElementById('config-comfy-stop');
+const configFlaskRestartBtn = document.getElementById('config-flask-restart');
+const configOllamaStatus = document.getElementById('config-ollama-status');
+const configComfyStatus = document.getElementById('config-comfy-status');
+const configFlaskStatus = document.getElementById('config-flask-status');
 const diagnosticsRunBtn = document.getElementById('diagnostics-run-btn');
 const diagnosticsSummary = document.getElementById('diagnostics-summary');
 const diagnosticsHint = document.getElementById('diagnostics-hint');
@@ -66,6 +108,14 @@ const diagImageStatus = document.getElementById('diag-image-status');
 const diagCheckpoints = document.getElementById('diag-checkpoints');
 const diagSamplers = document.getElementById('diag-samplers');
 const diagLastRun = document.getElementById('diag-last-run');
+const pollOwnerStatus = document.getElementById('poll-owner-status');
+const diagDrawer = document.getElementById('diag-drawer');
+const diagDrawerToggle = document.getElementById('diag-drawer-toggle');
+const diagStatusBadge = document.getElementById('diag-status-badge');
+const diagDrawerClose = document.getElementById('diag-drawer-close');
+const diagDrawerOutput = document.getElementById('diag-drawer-output');
+const diagDrawerCommandForm = document.getElementById('diag-drawer-command-form');
+const diagDrawerCommandInput = document.getElementById('diag-drawer-command');
 const autoRetryPolicy = document.getElementById('auto-retry-policy');
 const failedOnlyToggle = document.getElementById('failed-only-toggle');
 const clearFailedQueueBtn = document.getElementById('clear-failed-queue');
@@ -77,6 +127,10 @@ if (queueSummary) {
 }
 const refreshGalleryBtn = document.getElementById('refresh-gallery');
 const galleryGrid = document.getElementById('gallery-grid');
+const galleryLightbox = document.getElementById('gallery-lightbox');
+const galleryLightboxImage = document.getElementById('gallery-lightbox-image');
+const galleryLightboxCaption = document.getElementById('gallery-lightbox-caption');
+const galleryLightboxCloseBtn = document.getElementById('gallery-lightbox-close');
 const imagePresetButtons = document.querySelectorAll('[data-image-preset]');
 const previewUpdated = document.getElementById('preview-updated');
 const previewEmpty = document.getElementById('preview-empty');
@@ -84,6 +138,7 @@ const previewImage = document.getElementById('preview-image');
 const previewMeta = document.getElementById('preview-meta');
 const previewPrompt = document.getElementById('preview-prompt');
 const previewChipRow = document.getElementById('preview-chip-row');
+const previewCard = document.querySelector('.preview-card');
 
 /* --------------------------------------------------------------------------
 	 State
@@ -91,15 +146,23 @@ const previewChipRow = document.getElementById('preview-chip-row');
 let isGenerating = false;
 let queuePollTimer = null;
 let livePreviewTimer = null;
+let statusPollTimer = null;
+let pollLeaseTimer = null;
 const trackedPromptIds = new Set();
 const pendingImageJobs = new Map();
 const queueJobMeta = new Map();
+let enhancedPromptSuggestions = [];
 const JOB_MISS_THRESHOLD = 4;
 const queueActionInFlight = new Set();
 let queueFilterFailedOnly = localStorage.getItem('queueFilterFailedOnly') === '1';
 const IMAGE_PROFILE_STORAGE_KEY = 'imagePresetProfilesV1';
 const IMAGE_PROFILE_SELECTED_KEY = 'imagePresetProfilesSelectedV1';
 const QUEUE_TELEMETRY_KEY = 'queueTelemetryV1';
+const BACKGROUND_POLL_OWNER_KEY = 'backgroundPollOwnerV1';
+const BACKGROUND_POLL_LEASE_MS = 10_000;
+const BACKGROUND_POLL_HEARTBEAT_MS = 3_000;
+const tabInstanceId = `tab-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+let hasBackgroundPollingOwnership = false;
 
 function getQueueTelemetryState() {
 	try {
@@ -116,6 +179,78 @@ function getQueueTelemetryState() {
 }
 
 let queueTelemetryState = getQueueTelemetryState();
+let lastDiagnosticsLogKey = '';
+const diagHistory = [];
+let diagHistoryIndex = -1;
+let diagHistoryDraft = '';
+
+function appendDiagnosticsConsoleLine(text, level = 'info') {
+	if (!diagDrawerOutput) return;
+	const row = document.createElement('p');
+	row.className = `diag-line ${level}`.trim();
+	row.textContent = text;
+	diagDrawerOutput.appendChild(row);
+	while (diagDrawerOutput.childElementCount > 250) {
+		diagDrawerOutput.removeChild(diagDrawerOutput.firstChild);
+	}
+	diagDrawerOutput.scrollTop = diagDrawerOutput.scrollHeight;
+}
+
+function setDiagnosticsDrawerOpen(isOpen) {
+	if (!diagDrawer) return;
+	diagDrawer.hidden = !isOpen;
+	if (diagDrawerToggle) {
+		diagDrawerToggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+	}
+	if (isOpen && diagDrawerCommandInput) {
+		diagDrawerCommandInput.focus();
+	}
+}
+
+function getDiagnosticsStatusSnapshotText() {
+	const text = diagTextStatus?.textContent || 'unknown';
+	const image = diagImageStatus?.textContent || 'unknown';
+	const checkpoints = diagCheckpoints?.textContent || '-';
+	const samplers = diagSamplers?.textContent || '-';
+	const summary = diagnosticsSummary?.textContent || 'Diagnostics unavailable';
+	return `${summary} | text=${text} image=${image} checkpoints=${checkpoints} samplers=${samplers}`;
+}
+
+async function runDiagnosticsConsoleCommand(rawInput) {
+	const command = rawInput.trim().toLowerCase();
+	if (!command) return;
+	appendDiagnosticsConsoleLine(`$ ${rawInput}`, 'command');
+
+	if (command === 'help') {
+		appendDiagnosticsConsoleLine('Commands: help, status, checks, queue, poll, clear');
+		return;
+	}
+	if (command === 'status') {
+		appendDiagnosticsConsoleLine(getDiagnosticsStatusSnapshotText());
+		return;
+	}
+	if (command === 'queue') {
+		appendDiagnosticsConsoleLine(queueSummary?.textContent || 'Queue summary unavailable');
+		return;
+	}
+	if (command === 'poll') {
+		appendDiagnosticsConsoleLine(pollOwnerStatus?.textContent || 'Poll owner status unavailable');
+		return;
+	}
+	if (command === 'clear') {
+		if (diagDrawerOutput) diagDrawerOutput.innerHTML = '';
+		appendDiagnosticsConsoleLine('Console cleared.');
+		return;
+	}
+	if (command === 'checks') {
+		appendDiagnosticsConsoleLine('Running diagnostics checks...');
+		await runDiagnosticsChecks(true);
+		appendDiagnosticsConsoleLine(getDiagnosticsStatusSnapshotText());
+		return;
+	}
+
+	appendDiagnosticsConsoleLine(`Unknown command: ${command}`, 'warn');
+}
 
 function persistQueueTelemetryState() {
 	sessionStorage.setItem(QUEUE_TELEMETRY_KEY, JSON.stringify(queueTelemetryState));
@@ -225,21 +360,42 @@ function showPanel(panel) {
 	if (panel === 'generative') {
 		panelGen.classList.add('active');
 		panelImage.classList.remove('active');
+		if (panelConfig) panelConfig.classList.remove('active');
 		panelGen.hidden = false;
 		panelImage.hidden = true;
+		if (panelConfig) panelConfig.hidden = true;
 		navGenerative.classList.add('active');
 		navImage.classList.remove('active');
+		if (navConfig) navConfig.classList.remove('active');
 		navGenerative.setAttribute('aria-selected', 'true');
 		navImage.setAttribute('aria-selected', 'false');
-	} else {
+		if (navConfig) navConfig.setAttribute('aria-selected', 'false');
+	} else if (panel === 'image') {
 		panelImage.classList.add('active');
 		panelGen.classList.remove('active');
+		if (panelConfig) panelConfig.classList.remove('active');
 		panelImage.hidden = false;
 		panelGen.hidden = true;
+		if (panelConfig) panelConfig.hidden = true;
 		navImage.classList.add('active');
 		navGenerative.classList.remove('active');
+		if (navConfig) navConfig.classList.remove('active');
 		navImage.setAttribute('aria-selected', 'true');
 		navGenerative.setAttribute('aria-selected', 'false');
+		if (navConfig) navConfig.setAttribute('aria-selected', 'false');
+	} else {
+		if (panelConfig) panelConfig.classList.add('active');
+		panelGen.classList.remove('active');
+		panelImage.classList.remove('active');
+		if (panelConfig) panelConfig.hidden = false;
+		panelGen.hidden = true;
+		panelImage.hidden = true;
+		if (navConfig) navConfig.classList.add('active');
+		navGenerative.classList.remove('active');
+		navImage.classList.remove('active');
+		if (navConfig) navConfig.setAttribute('aria-selected', 'true');
+		navGenerative.setAttribute('aria-selected', 'false');
+		navImage.setAttribute('aria-selected', 'false');
 	}
 	localStorage.setItem('activePanel', panel);
 }
@@ -252,10 +408,20 @@ navImage.addEventListener('click', (e) => {
 	e.preventDefault();
 	showPanel('image');
 });
+if (navConfig) {
+	navConfig.addEventListener('click', (e) => {
+		e.preventDefault();
+		showPanel('config');
+	});
+}
 
 (function initPanel() {
 	const saved = localStorage.getItem('activePanel');
-	showPanel(saved === 'image' ? 'image' : 'generative');
+	if (saved === 'image' || saved === 'config') {
+		showPanel(saved);
+		return;
+	}
+	showPanel('generative');
 })();
 
 /* --------------------------------------------------------------------------
@@ -287,6 +453,127 @@ function restoreQueueActionFocus(snapshot) {
 		button.focus();
 		return;
 	}
+}
+
+function getPollOwnerState() {
+	try {
+		const raw = localStorage.getItem(BACKGROUND_POLL_OWNER_KEY);
+		if (!raw) return null;
+		const parsed = JSON.parse(raw);
+		if (!parsed || typeof parsed !== 'object') return null;
+		if (typeof parsed.id !== 'string' || typeof parsed.expiresAt !== 'number') return null;
+		return parsed;
+	} catch {
+		return null;
+	}
+}
+
+function setPollOwnerState(owner) {
+	if (!owner) {
+		localStorage.removeItem(BACKGROUND_POLL_OWNER_KEY);
+		return;
+	}
+	localStorage.setItem(BACKGROUND_POLL_OWNER_KEY, JSON.stringify(owner));
+}
+
+function isPollOwnerExpired(owner, now = Date.now()) {
+	return !owner || owner.expiresAt <= now;
+}
+
+function claimBackgroundPollingOwnership() {
+	if (document.hidden) return false;
+	const now = Date.now();
+	const owner = getPollOwnerState();
+	if (owner && owner.id !== tabInstanceId && !isPollOwnerExpired(owner, now)) {
+		return false;
+	}
+	setPollOwnerState({ id: tabInstanceId, expiresAt: now + BACKGROUND_POLL_LEASE_MS });
+	return true;
+}
+
+function refreshBackgroundPollingOwnership() {
+	const owner = getPollOwnerState();
+	if (!owner || owner.id !== tabInstanceId || document.hidden) return false;
+	setPollOwnerState({ id: tabInstanceId, expiresAt: Date.now() + BACKGROUND_POLL_LEASE_MS });
+	return true;
+}
+
+function releaseBackgroundPollingOwnership() {
+	const owner = getPollOwnerState();
+	if (!owner || owner.id !== tabInstanceId) return;
+	setPollOwnerState(null);
+}
+
+function startStatusPolling() {
+	if (statusPollTimer) return;
+	statusPollTimer = window.setInterval(checkStatus, 6000);
+}
+
+function stopStatusPolling() {
+	if (!statusPollTimer) return;
+	window.clearInterval(statusPollTimer);
+	statusPollTimer = null;
+}
+
+function stopLivePreviewAutoRefresh() {
+	if (!livePreviewTimer) return;
+	window.clearInterval(livePreviewTimer);
+	livePreviewTimer = null;
+}
+
+function renderPollOwnerStatus() {
+	if (!pollOwnerStatus) return;
+	pollOwnerStatus.classList.remove('owner', 'standby', 'hidden');
+
+	const shortId = tabInstanceId.split('-').slice(-1)[0];
+	if (document.hidden) {
+		pollOwnerStatus.textContent = `Polling tab: hidden (tab ${shortId})`;
+		pollOwnerStatus.classList.add('hidden');
+		return;
+	}
+
+	if (hasBackgroundPollingOwnership) {
+		pollOwnerStatus.textContent = `Polling tab: active owner (tab ${shortId})`;
+		pollOwnerStatus.classList.add('owner');
+		return;
+	}
+
+	pollOwnerStatus.textContent = `Polling tab: standby (tab ${shortId})`;
+	pollOwnerStatus.classList.add('standby');
+}
+
+function syncBackgroundPollingOwnership() {
+	const hadOwnership = hasBackgroundPollingOwnership;
+	hasBackgroundPollingOwnership = refreshBackgroundPollingOwnership() || claimBackgroundPollingOwnership();
+
+	if (!hasBackgroundPollingOwnership) {
+		stopStatusPolling();
+		stopLivePreviewAutoRefresh();
+		stopQueuePolling();
+		renderPollOwnerStatus();
+		return;
+	}
+
+	startStatusPolling();
+	startLivePreviewAutoRefresh();
+	if (trackedPromptIds.size) {
+		ensureQueuePolling();
+	}
+
+	if (!hadOwnership) {
+		checkStatus();
+		loadLivePreview();
+		if (trackedPromptIds.size) {
+			pollQueue();
+		}
+	}
+
+	renderPollOwnerStatus();
+}
+
+function startPollingLeaseHeartbeat() {
+	if (pollLeaseTimer) return;
+	pollLeaseTimer = window.setInterval(syncBackgroundPollingOwnership, BACKGROUND_POLL_HEARTBEAT_MS);
 }
 
 function randomSeed() {
@@ -450,6 +737,18 @@ function renderDiagnosticsSnapshot(snapshot) {
 	setDiagnosticValue(diagLastRun, snapshot.lastRunLabel);
 	diagnosticsSummary.textContent = snapshot.summary;
 	if (diagnosticsHint) diagnosticsHint.textContent = snapshot.hint;
+	if (diagStatusBadge) {
+		const status = snapshot.failed ? 'error' : (snapshot.textOk && snapshot.imageOk ? 'ok' : 'warn');
+		diagStatusBadge.dataset.status = status;
+		diagStatusBadge.title = snapshot.summary;
+	}
+
+	const key = [snapshot.lastRunLabel, snapshot.summary, snapshot.textStatusLabel, snapshot.imageStatusLabel, snapshot.checkpoints, snapshot.samplers].join('|');
+	if (key !== lastDiagnosticsLogKey) {
+		lastDiagnosticsLogKey = key;
+		const level = snapshot.textOk && snapshot.imageOk ? 'info' : 'warn';
+		appendDiagnosticsConsoleLine(`[${snapshot.lastRunLabel}] ${snapshot.summary} | text=${snapshot.textStatusLabel} image=${snapshot.imageStatusLabel} ckpt=${snapshot.checkpoints} samplers=${snapshot.samplers}`, level);
+	}
 }
 
 async function runDiagnosticsChecks(manual = false) {
@@ -512,6 +811,7 @@ async function runDiagnosticsChecks(manual = false) {
 			lastRunLabel,
 			summary: 'Diagnostics request failed',
 			hint: 'Could not reach backend endpoints from the browser.',
+			failed: true,
 		});
 		if (manual) showToast('Diagnostics failed: could not reach backend.', 'neg');
 	} finally {
@@ -571,6 +871,187 @@ async function loadTextModels() {
 	}
 }
 
+function setConfigStatusLine(element, text, level = '') {
+	if (!element) return;
+	element.textContent = text;
+	element.style.color = level === 'error'
+		? 'var(--clr-accent-neg)'
+		: (level === 'ok' ? 'var(--clr-accent-pos)' : 'var(--clr-text-muted)');
+}
+
+function setConfigSavedTimestamp(value) {
+	if (!configLastSaved) return;
+	if (!value) {
+		configLastSaved.textContent = 'Last saved: never';
+		return;
+	}
+	const parsed = new Date(value);
+	if (Number.isNaN(parsed.getTime())) {
+		configLastSaved.textContent = `Last saved: ${value}`;
+		return;
+	}
+	configLastSaved.textContent = `Last saved: ${parsed.toLocaleString()}`;
+}
+
+async function loadServiceConfig() {
+	if (!configOllamaPath || !configComfyuiPath) return;
+	try {
+		const res = await fetch('/api/config/services');
+		const data = await res.json();
+		if (!res.ok) {
+			setConfigStatusLine(configSaveStatus, data.error || 'Could not load saved paths.', 'error');
+			return;
+		}
+		configOllamaPath.value = data.ollama_path || '';
+		configComfyuiPath.value = data.comfyui_path || '';
+		setConfigSavedTimestamp(data.updated_at || '');
+		setConfigStatusLine(configSaveStatus, 'Saved paths loaded.');
+	} catch {
+		setConfigStatusLine(configSaveStatus, 'Could not load saved paths.', 'error');
+		setConfigSavedTimestamp('');
+	}
+}
+
+async function saveServiceConfig(options = {}) {
+	const { silentSuccess = false } = options;
+	if (!configOllamaPath || !configComfyuiPath) return;
+	const payload = {
+		ollama_path: configOllamaPath.value.trim(),
+		comfyui_path: configComfyuiPath.value.trim(),
+	};
+
+	try {
+		if (configSaveBtn) configSaveBtn.disabled = true;
+		const res = await fetch('/api/config/services', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify(payload),
+		});
+		const data = await res.json();
+		if (!res.ok) {
+			setConfigStatusLine(configSaveStatus, data.error || 'Could not save paths.', 'error');
+			showToast('Could not save configuration paths.', 'neg');
+			return;
+		}
+		setConfigSavedTimestamp(data.config?.updated_at || '');
+		setConfigStatusLine(configSaveStatus, 'Paths saved.', 'ok');
+		if (!silentSuccess) {
+			showToast('Configuration paths saved.', 'pos');
+		}
+	} catch {
+		setConfigStatusLine(configSaveStatus, 'Could not save paths.', 'error');
+		showToast('Could not save configuration paths.', 'neg');
+	} finally {
+		if (configSaveBtn) configSaveBtn.disabled = false;
+	}
+}
+
+async function browseServicePath(service) {
+	const input = service === 'ollama' ? configOllamaPath : configComfyuiPath;
+	const button = service === 'ollama' ? configOllamaBrowseBtn : configComfyuiBrowseBtn;
+	if (!input || !button) return;
+
+	button.disabled = true;
+	setConfigStatusLine(configSaveStatus, `Opening ${service} path picker...`);
+	try {
+		const res = await fetch('/api/config/pick-path', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ service, initial_path: input.value.trim() }),
+		});
+		const data = await res.json();
+		if (!res.ok) {
+			setConfigStatusLine(configSaveStatus, data.error || 'Could not open path picker.', 'error');
+			showToast(`Could not open ${service} path picker.`, 'neg');
+			return;
+		}
+		if (data.path) {
+			input.value = data.path;
+			setConfigStatusLine(configSaveStatus, `${service} path selected. Saving...`, 'ok');
+			showToast(`${service} path selected.`, 'pos');
+			await saveServiceConfig({ silentSuccess: true });
+		} else {
+			setConfigStatusLine(configSaveStatus, 'Path selection canceled.');
+		}
+	} catch {
+		setConfigStatusLine(configSaveStatus, 'Could not open path picker.', 'error');
+		showToast(`Could not open ${service} path picker.`, 'neg');
+	} finally {
+		button.disabled = false;
+	}
+}
+
+async function controlService(service, action, statusNode, buttonGroup = []) {
+	const controls = buttonGroup.filter(Boolean);
+	for (const btn of controls) btn.disabled = true;
+	setConfigStatusLine(statusNode, `${action} in progress...`);
+
+	try {
+		const res = await fetch(`/api/service/${service}/${action}`, { method: 'POST' });
+		const data = await res.json();
+		if (!res.ok) {
+			setConfigStatusLine(statusNode, data.error || `${action} failed.`, 'error');
+			showToast(`${service} ${action} failed.`, 'neg');
+			return;
+		}
+
+		const statusTextValue = data.status || 'ok';
+		const isOk = statusTextValue === 'started' || statusTextValue === 'stopped' || statusTextValue === 'already-running';
+		setConfigStatusLine(statusNode, `${service}: ${statusTextValue}${data.pid ? ` (pid ${data.pid})` : ''}`, isOk ? 'ok' : '');
+		showToast(`${service} ${action}: ${statusTextValue}`, isOk ? 'pos' : '');
+
+		await checkStatus();
+		if (service === 'ollama') {
+			await loadTextModels();
+		} else {
+			await loadImageModels();
+			await loadImageSamplers();
+		}
+	} catch {
+		setConfigStatusLine(statusNode, `${service} ${action} failed.`, 'error');
+		showToast(`${service} ${action} failed.`, 'neg');
+	} finally {
+		for (const btn of controls) btn.disabled = false;
+	}
+}
+
+async function restartFlaskApp() {
+	if (!configFlaskRestartBtn || !configFlaskStatus) return;
+	const confirmed = window.confirm('Restart Flask now? This will briefly interrupt the UI.');
+	if (!confirmed) {
+		setConfigStatusLine(configFlaskStatus, 'Restart canceled.');
+		return;
+	}
+
+	configFlaskRestartBtn.disabled = true;
+	setConfigStatusLine(configFlaskStatus, 'Restart requested...');
+
+	try {
+		const res = await fetch('/api/app/restart', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ port: 5000 }),
+		});
+		const data = await res.json().catch(() => ({}));
+		if (!res.ok) {
+			setConfigStatusLine(configFlaskStatus, data.error || 'Flask restart failed.', 'error');
+			showToast('Flask restart failed.', 'neg');
+			configFlaskRestartBtn.disabled = false;
+			return;
+		}
+
+		setConfigStatusLine(configFlaskStatus, 'Restarting Flask... reloading page shortly.', 'ok');
+		showToast('Flask restart triggered. Reloading page...', 'pos');
+		window.setTimeout(() => {
+			window.location.reload();
+		}, 2600);
+	} catch {
+		setConfigStatusLine(configFlaskStatus, 'Flask restart request failed.', 'error');
+		showToast('Flask restart request failed.', 'neg');
+		configFlaskRestartBtn.disabled = false;
+	}
+}
+
 async function loadImageModels() {
 	try {
 		const res = await fetch('/api/image/models');
@@ -584,12 +1065,26 @@ async function loadImageModels() {
 			setImageModelMessage('No checkpoints found in ComfyUI');
 			return;
 		}
+		const isUnsupportedFluxModel = (name) => /flux/i.test(name || '');
 		const current = imageModelSelect.value;
 		imageModelSelect.innerHTML = models
-			.map((name) => `<option value="${escHtml(name)}">${escHtml(name)}</option>`)
+			.map((name) => {
+				const unsupported = isUnsupportedFluxModel(name);
+				const optionLabel = unsupported ? `${name} (unsupported in current workflow)` : name;
+				return `<option value="${escHtml(name)}" ${unsupported ? 'disabled data-unsupported="true"' : ''}>${escHtml(optionLabel)}</option>`;
+			})
 			.join('');
-		if (current && [...imageModelSelect.options].some((o) => o.value === current)) {
+
+		const options = [...imageModelSelect.options];
+		const currentOption = options.find((o) => o.value === current);
+		if (currentOption && !currentOption.disabled) {
 			imageModelSelect.value = current;
+			return;
+		}
+
+		const firstSupported = options.find((o) => !o.disabled && o.value);
+		if (firstSupported) {
+			imageModelSelect.value = firstSupported.value;
 		}
 	} catch {
 		setImageModelMessage('Could not fetch checkpoints');
@@ -692,8 +1187,110 @@ if (diagnosticsRunBtn) {
 	});
 }
 
-checkStatus();
-setInterval(checkStatus, 6000);
+if (diagDrawerToggle) {
+	diagDrawerToggle.addEventListener('click', () => {
+		const open = diagDrawer ? diagDrawer.hidden : true;
+		setDiagnosticsDrawerOpen(open);
+	});
+}
+
+if (diagDrawerClose) {
+	diagDrawerClose.addEventListener('click', () => setDiagnosticsDrawerOpen(false));
+}
+
+if (diagDrawerCommandForm && diagDrawerCommandInput) {
+	diagDrawerCommandForm.addEventListener('submit', async (event) => {
+		event.preventDefault();
+		const raw = diagDrawerCommandInput.value;
+		diagDrawerCommandInput.value = '';
+		if (raw.trim()) {
+			diagHistory.push(raw);
+			if (diagHistory.length > 50) diagHistory.shift();
+		}
+		diagHistoryIndex = -1;
+		diagHistoryDraft = '';
+		await runDiagnosticsConsoleCommand(raw);
+	});
+
+	diagDrawerCommandInput.addEventListener('keydown', (event) => {
+		if (event.key === 'ArrowUp') {
+			event.preventDefault();
+			if (diagHistory.length === 0) return;
+			if (diagHistoryIndex === -1) diagHistoryDraft = diagDrawerCommandInput.value;
+			diagHistoryIndex = Math.min(diagHistoryIndex + 1, diagHistory.length - 1);
+			diagDrawerCommandInput.value = diagHistory[diagHistory.length - 1 - diagHistoryIndex];
+		} else if (event.key === 'ArrowDown') {
+			event.preventDefault();
+			if (diagHistoryIndex <= 0) {
+				diagHistoryIndex = -1;
+				diagDrawerCommandInput.value = diagHistoryDraft;
+			} else {
+				diagHistoryIndex--;
+				diagDrawerCommandInput.value = diagHistory[diagHistory.length - 1 - diagHistoryIndex];
+			}
+		}
+	});
+}
+
+if (diagDrawerOutput) {
+	appendDiagnosticsConsoleLine('Diagnostics console ready. Type help for commands.');
+}
+
+if (configSaveBtn) {
+	configSaveBtn.addEventListener('click', saveServiceConfig);
+}
+
+if (configOllamaBrowseBtn) {
+	configOllamaBrowseBtn.addEventListener('click', async () => {
+		await browseServicePath('ollama');
+	});
+}
+
+if (configComfyuiBrowseBtn) {
+	configComfyuiBrowseBtn.addEventListener('click', async () => {
+		await browseServicePath('comfyui');
+	});
+}
+
+if (configOllamaStartBtn) {
+	configOllamaStartBtn.addEventListener('click', async () => {
+		await controlService('ollama', 'start', configOllamaStatus, [configOllamaStartBtn, configOllamaRestartBtn, configOllamaStopBtn]);
+	});
+}
+
+if (configOllamaRestartBtn) {
+	configOllamaRestartBtn.addEventListener('click', async () => {
+		await controlService('ollama', 'restart', configOllamaStatus, [configOllamaStartBtn, configOllamaRestartBtn, configOllamaStopBtn]);
+	});
+}
+
+if (configOllamaStopBtn) {
+	configOllamaStopBtn.addEventListener('click', async () => {
+		await controlService('ollama', 'stop', configOllamaStatus, [configOllamaStartBtn, configOllamaRestartBtn, configOllamaStopBtn]);
+	});
+}
+
+if (configComfyStartBtn) {
+	configComfyStartBtn.addEventListener('click', async () => {
+		await controlService('comfyui', 'start', configComfyStatus, [configComfyStartBtn, configComfyRestartBtn, configComfyStopBtn]);
+	});
+}
+
+if (configComfyRestartBtn) {
+	configComfyRestartBtn.addEventListener('click', async () => {
+		await controlService('comfyui', 'restart', configComfyStatus, [configComfyStartBtn, configComfyRestartBtn, configComfyStopBtn]);
+	});
+}
+
+if (configComfyStopBtn) {
+	configComfyStopBtn.addEventListener('click', async () => {
+		await controlService('comfyui', 'stop', configComfyStatus, [configComfyStartBtn, configComfyRestartBtn, configComfyStopBtn]);
+	});
+}
+
+if (configFlaskRestartBtn) {
+	configFlaskRestartBtn.addEventListener('click', restartFlaskApp);
+}
 
 /* --------------------------------------------------------------------------
 	 Text inference controls and chat
@@ -1228,6 +1825,122 @@ function imageProxyUrl(image) {
 	return `/api/image/view?${params.toString()}`;
 }
 
+function buildGalleryPreviewPayload(entry, imgUrl) {
+	return {
+		prompt: entry.prompt || 'Image generation',
+		negative_prompt: entry.negative_prompt || '',
+		model: entry.model || '',
+		sampler: entry.params?.sampler || '',
+		seed: entry.params?.seed ?? null,
+		steps: entry.params?.steps ?? '',
+		cfg: entry.params?.cfg ?? '',
+		denoise: entry.params?.denoise ?? '',
+		width: entry.params?.width ?? '',
+		height: entry.params?.height ?? '',
+		batch_size: entry.params?.batch_size ?? '',
+		created_at: entry.created_at || null,
+		imgUrl,
+	};
+}
+
+function parseGalleryPreviewPayload(raw) {
+	if (!raw) return null;
+	try {
+		const decoded = decodeURIComponent(raw);
+		const parsed = JSON.parse(decoded);
+		if (!parsed || typeof parsed !== 'object') return null;
+		if (typeof parsed.imgUrl !== 'string' || !parsed.imgUrl) return null;
+		return parsed;
+	} catch {
+		return null;
+	}
+}
+
+function updateLivePreviewFromGalleryPayload(payload) {
+	if (!payload || !payload.imgUrl) return;
+	previewImage.src = payload.imgUrl;
+	previewImage.hidden = false;
+	previewEmpty.hidden = true;
+	previewMeta.hidden = false;
+	previewPrompt.textContent = payload.prompt || 'Image generation';
+
+	const chips = [];
+	if (payload.model) chips.push(`<span class="chip">${escHtml(payload.model)}</span>`);
+	if (payload.sampler) chips.push(`<span class="chip">${escHtml(payload.sampler)}</span>`);
+	if (payload.steps !== '' && payload.steps !== null) chips.push(`<span class="chip">steps ${escHtml(String(payload.steps))}</span>`);
+	if (payload.cfg !== '' && payload.cfg !== null) chips.push(`<span class="chip">cfg ${escHtml(String(payload.cfg))}</span>`);
+	previewChipRow.innerHTML = chips.join('');
+	previewUpdated.textContent = `Loaded from gallery • ${formatPreviewTime(payload.created_at)}`;
+}
+
+function setSelectValueIfOptionExists(selectEl, value) {
+	if (!selectEl || !value) return;
+	const hasOption = [...selectEl.options].some((option) => option.value === value);
+	if (!hasOption) {
+		const option = document.createElement('option');
+		option.value = value;
+		option.textContent = value;
+		selectEl.appendChild(option);
+	}
+	selectEl.value = value;
+}
+
+function setNumericInputIfFinite(inputEl, value) {
+	if (!inputEl) return;
+	const n = Number(value);
+	if (Number.isFinite(n)) {
+		inputEl.value = String(n);
+	}
+}
+
+function applyGalleryPayloadToImageForm(payload) {
+	if (!payload) return;
+
+	if (typeof payload.prompt === 'string') imagePrompt.value = payload.prompt;
+	if (typeof payload.negative_prompt === 'string') imageNegativePrompt.value = payload.negative_prompt;
+
+	setSelectValueIfOptionExists(imageModelSelect, payload.model);
+	setSelectValueIfOptionExists(imageSamplerSelect, payload.sampler);
+
+	if (payload.seed !== null && payload.seed !== undefined && payload.seed !== '') {
+		imageSeed.value = String(payload.seed);
+	}
+	setNumericInputIfFinite(imageSteps, payload.steps);
+	setNumericInputIfFinite(imageCfg, payload.cfg);
+	setNumericInputIfFinite(imageDenoise, payload.denoise);
+	setNumericInputIfFinite(imageWidth, payload.width);
+	setNumericInputIfFinite(imageHeight, payload.height);
+	setNumericInputIfFinite(imageBatchSize, payload.batch_size);
+	syncImageControlLabels();
+}
+
+function openGalleryLightbox(imgSrc, imgAlt, caption = '') {
+	if (!galleryLightbox || !galleryLightboxImage) return;
+	galleryLightboxImage.src = imgSrc;
+	galleryLightboxImage.alt = imgAlt || 'Generated image';
+	if (galleryLightboxCaption) {
+		galleryLightboxCaption.textContent = caption;
+	}
+	galleryLightbox.hidden = false;
+	galleryLightbox.setAttribute('aria-hidden', 'false');
+	document.body.classList.add('gallery-lightbox-open');
+	if (galleryLightboxCloseBtn) {
+		galleryLightboxCloseBtn.focus();
+	}
+}
+
+function closeGalleryLightbox() {
+	if (!galleryLightbox || !galleryLightboxImage) return;
+	galleryLightbox.hidden = true;
+	galleryLightbox.setAttribute('aria-hidden', 'true');
+	galleryLightboxImage.src = '';
+	galleryLightboxImage.alt = '';
+	if (galleryLightboxCaption) {
+		galleryLightboxCaption.textContent = '';
+	}
+	document.body.classList.remove('gallery-lightbox-open');
+}
+
 function renderGallery(history) {
 	const images = history.filter((item) => item.type === 'image');
 	if (!images.length) {
@@ -1235,19 +1948,24 @@ function renderGallery(history) {
 		return;
 	}
 
-	galleryGrid.innerHTML = images
+	const orderedImages = images
+		.slice()
+		.sort((a, b) => (Number(b.created_at) || 0) - (Number(a.created_at) || 0));
+
+	galleryGrid.innerHTML = orderedImages
 		.map((entry) => {
 			const firstImage = entry.images?.[0];
 			if (!firstImage) return '';
 			const imgUrl = imageProxyUrl(firstImage);
+			const dragPayload = encodeURIComponent(JSON.stringify(buildGalleryPreviewPayload(entry, imgUrl)));
 			const prompt = escHtml(entry.prompt || 'Untitled generation');
 			const model = escHtml(entry.model || 'unknown model');
 			const sampler = escHtml(entry.params?.sampler || 'sampler');
 			const steps = escHtml(String(entry.params?.steps || '')); 
 			const cfg = escHtml(String(entry.params?.cfg || ''));
 			return `
-				<article class="gallery-card">
-					<img src="${imgUrl}" alt="Generated image" loading="lazy" />
+				<article class="gallery-card" draggable="true" data-preview-payload="${dragPayload}">
+					<img src="${imgUrl}" alt="Generated image" loading="eager" decoding="async" data-lightbox-src="${imgUrl}" data-lightbox-caption="${prompt}" draggable="false" />
 					<div class="gallery-meta">
 						<p class="gallery-prompt" title="${prompt}">${prompt}</p>
 						<p class="gallery-chip-row">
@@ -1262,6 +1980,83 @@ function renderGallery(history) {
 		})
 		.join('');
 }
+
+if (galleryGrid) {
+	galleryGrid.addEventListener('dragstart', (event) => {
+		const target = event.target;
+		if (!(target instanceof HTMLElement)) return;
+		const card = target.closest('.gallery-card');
+		if (!(card instanceof HTMLElement)) return;
+		const payload = card.dataset.previewPayload;
+		if (!payload || !event.dataTransfer) return;
+		event.dataTransfer.effectAllowed = 'copy';
+		event.dataTransfer.setData('text/plain', payload);
+		card.classList.add('is-dragging');
+	});
+
+	galleryGrid.addEventListener('dragend', (event) => {
+		const target = event.target;
+		if (!(target instanceof HTMLElement)) return;
+		const card = target.closest('.gallery-card');
+		if (!(card instanceof HTMLElement)) return;
+		card.classList.remove('is-dragging');
+		if (previewCard) previewCard.classList.remove('is-drop-target');
+	});
+
+	galleryGrid.addEventListener('click', (event) => {
+		const target = event.target;
+		if (!(target instanceof HTMLImageElement)) return;
+		const src = target.getAttribute('data-lightbox-src') || target.src;
+		const caption = target.getAttribute('data-lightbox-caption') || '';
+		openGalleryLightbox(src, target.alt, caption);
+	});
+}
+
+if (previewCard) {
+	previewCard.addEventListener('dragover', (event) => {
+		event.preventDefault();
+		if (event.dataTransfer) {
+			event.dataTransfer.dropEffect = 'copy';
+		}
+		previewCard.classList.add('is-drop-target');
+	});
+
+	previewCard.addEventListener('dragleave', (event) => {
+		if (!(event.relatedTarget instanceof Node) || !previewCard.contains(event.relatedTarget)) {
+			previewCard.classList.remove('is-drop-target');
+		}
+	});
+
+	previewCard.addEventListener('drop', (event) => {
+		event.preventDefault();
+		previewCard.classList.remove('is-drop-target');
+		const rawPayload = event.dataTransfer?.getData('text/plain') || '';
+		const payload = parseGalleryPreviewPayload(rawPayload);
+		if (!payload) return;
+		updateLivePreviewFromGalleryPayload(payload);
+		applyGalleryPayloadToImageForm(payload);
+	});
+}
+
+if (galleryLightbox) {
+	galleryLightbox.addEventListener('click', (event) => {
+		const target = event.target;
+		if (!(target instanceof HTMLElement)) return;
+		if (target.dataset.lightboxClose === 'backdrop') {
+			closeGalleryLightbox();
+		}
+	});
+}
+
+if (galleryLightboxCloseBtn) {
+	galleryLightboxCloseBtn.addEventListener('click', closeGalleryLightbox);
+}
+
+document.addEventListener('keydown', (event) => {
+	if (event.key !== 'Escape') return;
+	if (!galleryLightbox || galleryLightbox.hidden) return;
+	closeGalleryLightbox();
+});
 
 function formatPreviewTime(unixTs) {
 	if (!unixTs) return 'Waiting for output...';
@@ -1306,6 +2101,7 @@ async function loadLivePreview() {
 }
 
 function startLivePreviewAutoRefresh() {
+	if (!hasBackgroundPollingOwnership) return;
 	if (livePreviewTimer) return;
 	livePreviewTimer = window.setInterval(loadLivePreview, 4000);
 }
@@ -1394,6 +2190,7 @@ async function pollQueue() {
 }
 
 function ensureQueuePolling() {
+	if (!hasBackgroundPollingOwnership) return;
 	if (queuePollTimer) return;
 	queuePollTimer = window.setInterval(pollQueue, 2500);
 }
@@ -1407,6 +2204,9 @@ function stopQueuePolling() {
 function validateImageInputs(common) {
 	if (!common.model) {
 		return 'Select a checkpoint model before generating.';
+	}
+	if (/flux/i.test(common.model)) {
+		return 'Selected model appears to be a FLUX checkpoint, which is not supported by the current workflow. Choose a non-FLUX checkpoint (SD/SDXL) for now.';
 	}
 	if (common.width < 256 || common.width > 2048 || common.height < 256 || common.height > 2048) {
 		return 'Width and height must be between 256 and 2048.';
@@ -1429,11 +2229,200 @@ function validateImageInputs(common) {
 	return '';
 }
 
+function setEnhancedPromptBreakdownVisible(isVisible) {
+	if (!enhancedPromptFields || !enhancedPromptToggle || !normalPromptWrap) return;
+	normalPromptWrap.hidden = isVisible;
+	enhancedPromptFields.hidden = !isVisible;
+	enhancedPromptToggle.checked = isVisible;
+	enhancedPromptToggle.setAttribute('aria-checked', isVisible ? 'true' : 'false');
+	if (promptModeHint) {
+		promptModeHint.textContent = isVisible
+			? 'Enhanced prompt mode is active. Generate and apply a suggestion before submitting.'
+			: 'Standard prompt mode is active.';
+	}
+	localStorage.setItem('enhancedPromptBreakdownEnabled', isVisible ? '1' : '0');
+}
+
+function collectEnhancedPromptBreakdown() {
+	return {
+		subject: enhancedSubject?.value.trim() || '',
+		setting: enhancedSetting?.value.trim() || '',
+		composition: enhancedComposition?.value.trim() || '',
+		lighting: enhancedLighting?.value.trim() || '',
+		style: enhancedStyle?.value.trim() || '',
+	};
+}
+
+function renderEnhancedPromptSuggestions(suggestions) {
+	enhancedPromptSuggestions = Array.isArray(suggestions) ? suggestions.filter(Boolean) : [];
+	if (!enhancedPromptSuggestionsOutput || !enhancedPromptUseBtn || !enhancedPromptSelect) return;
+	if (!enhancedPromptSuggestions.length) {
+		enhancedPromptSuggestionsOutput.value = '';
+		enhancedPromptSelect.innerHTML = '<option value="">No suggestions yet</option>';
+		enhancedPromptSelect.disabled = true;
+		if (enhancedPromptUseSelectedBtn) enhancedPromptUseSelectedBtn.disabled = true;
+		if (enhancedPromptRandomBtn) enhancedPromptRandomBtn.disabled = true;
+		enhancedPromptUseBtn.disabled = true;
+		return;
+	}
+	enhancedPromptSuggestionsOutput.value = enhancedPromptSuggestions
+		.map((line, index) => `${index + 1}. ${line}`)
+		.join('\n');
+	enhancedPromptSelect.innerHTML = enhancedPromptSuggestions
+		.map((line, index) => {
+			const preview = String(line).replace(/\s+/g, ' ').trim();
+			const clipped = preview.length > 72 ? `${preview.slice(0, 72)}...` : preview;
+			return `<option value="${index}">${escHtml(`Suggestion ${index + 1}: ${clipped}`)}</option>`;
+		})
+		.join('');
+	enhancedPromptSelect.disabled = false;
+	if (enhancedPromptUseSelectedBtn) enhancedPromptUseSelectedBtn.disabled = false;
+	if (enhancedPromptRandomBtn) enhancedPromptRandomBtn.disabled = false;
+	enhancedPromptUseBtn.disabled = false;
+}
+
+function resolvePromptForSubmission() {
+	let promptText = imagePrompt.value.trim();
+	if (promptText) return promptText;
+
+	if (!enhancedPromptToggle?.checked || !enhancedPromptSuggestions.length) {
+		return '';
+	}
+
+	let fallback = enhancedPromptSuggestions[0];
+	if (enhancedPromptSelect) {
+		const idx = Number(enhancedPromptSelect.value);
+		if (Number.isInteger(idx) && idx >= 0 && idx < enhancedPromptSuggestions.length) {
+			fallback = enhancedPromptSuggestions[idx];
+		}
+	}
+
+	if (!fallback) return '';
+	applyEnhancedSuggestion(fallback);
+	showToast('Applied enhanced suggestion for submission.', 'pos');
+	return String(fallback).trim();
+}
+
+function applyEnhancedSuggestion(text) {
+	if (!text) return;
+	imagePrompt.value = text;
+	imagePrompt.focus();
+}
+
+async function suggestEnhancedPrompts() {
+	if (!enhancedPromptSuggestBtn || !enhancedPromptStatus) return;
+	const payload = collectEnhancedPromptBreakdown();
+	const missing = Object.entries(payload)
+		.filter(([, value]) => !value)
+		.map(([key]) => key);
+
+	if (missing.length) {
+		enhancedPromptStatus.textContent = `Please fill all breakdown fields: ${missing.join(', ')}.`;
+		renderEnhancedPromptSuggestions([]);
+		showToast('Fill all enhanced prompt fields first.', 'neg');
+		return;
+	}
+
+	enhancedPromptSuggestBtn.disabled = true;
+	if (enhancedPromptUseBtn) enhancedPromptUseBtn.disabled = true;
+	if (enhancedPromptUseSelectedBtn) enhancedPromptUseSelectedBtn.disabled = true;
+	if (enhancedPromptRandomBtn) enhancedPromptRandomBtn.disabled = true;
+	enhancedPromptStatus.textContent = 'Generating suggestions from local Ollama...';
+
+	try {
+		const res = await fetch('/api/image/prompt-suggestions', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				...payload,
+				model: modelSelect?.value || '',
+			}),
+		});
+		const data = await res.json().catch(() => ({}));
+		if (!res.ok) {
+			enhancedPromptStatus.textContent = `Suggestion failed: ${data.error || 'Unknown error'}`;
+			renderEnhancedPromptSuggestions([]);
+			showToast('Enhanced prompt suggestion failed.', 'neg');
+			return;
+		}
+
+		renderEnhancedPromptSuggestions(data.suggestions || []);
+		enhancedPromptStatus.textContent = `Generated ${enhancedPromptSuggestions.length} suggestion${enhancedPromptSuggestions.length === 1 ? '' : 's'} using ${data.model || 'Ollama'}.`;
+		showToast('Enhanced prompt suggestions ready.', 'pos');
+	} catch (err) {
+		enhancedPromptStatus.textContent = `Suggestion failed: ${err.message}`;
+		renderEnhancedPromptSuggestions([]);
+		showToast('Enhanced prompt suggestion failed.', 'neg');
+	} finally {
+		enhancedPromptSuggestBtn.disabled = false;
+	}
+}
+
+if (enhancedPromptToggle) {
+	enhancedPromptToggle.addEventListener('change', () => {
+		setEnhancedPromptBreakdownVisible(enhancedPromptToggle.checked);
+	});
+	const saved = localStorage.getItem('enhancedPromptBreakdownEnabled') === '1';
+	setEnhancedPromptBreakdownVisible(saved);
+}
+
+if (enhancedPromptSuggestBtn) {
+	enhancedPromptSuggestBtn.addEventListener('click', suggestEnhancedPrompts);
+}
+
+if (enhancedPromptUseBtn) {
+	enhancedPromptUseBtn.addEventListener('click', () => {
+		if (!enhancedPromptSuggestions.length) {
+			showToast('No suggestion available yet.', 'neg');
+			return;
+		}
+		applyEnhancedSuggestion(enhancedPromptSuggestions[0]);
+		showToast('Applied first suggestion to Image Inference Text.', 'pos');
+	});
+}
+
+if (enhancedPromptRandomBtn) {
+	enhancedPromptRandomBtn.addEventListener('click', () => {
+		if (!enhancedPromptSuggestions.length) {
+			showToast('No suggestion available yet.', 'neg');
+			return;
+		}
+		const index = Math.floor(Math.random() * enhancedPromptSuggestions.length);
+		applyEnhancedSuggestion(enhancedPromptSuggestions[index]);
+		if (enhancedPromptSelect) enhancedPromptSelect.value = String(index);
+		showToast(`Applied random suggestion ${index + 1}.`, 'pos');
+	});
+}
+
+if (enhancedPromptUseSelectedBtn) {
+	enhancedPromptUseSelectedBtn.addEventListener('click', () => {
+		if (!enhancedPromptSuggestions.length || !enhancedPromptSelect) {
+			showToast('No suggestion available yet.', 'neg');
+			return;
+		}
+		const idx = Number(enhancedPromptSelect.value);
+		if (!Number.isInteger(idx) || idx < 0 || idx >= enhancedPromptSuggestions.length) {
+			showToast('Choose a suggestion first.', 'neg');
+			return;
+		}
+		applyEnhancedSuggestion(enhancedPromptSuggestions[idx]);
+		showToast(`Applied selected suggestion ${idx + 1}.`, 'pos');
+	});
+}
+
 imageForm.addEventListener('submit', async (e) => {
 	e.preventDefault();
 
-	const prompt = imagePrompt.value.trim();
-	if (!prompt) return;
+	const prompt = resolvePromptForSubmission();
+	if (!prompt) {
+		queueSummary.textContent = 'Enter a prompt or apply an enhanced suggestion first.';
+		if (enhancedPromptToggle?.checked) {
+			enhancedPromptSuggestBtn?.focus();
+		} else {
+			imagePrompt.focus();
+		}
+		return;
+	}
 
 	imageGenerateBtn.disabled = true;
 	imageGenerateBtn.textContent = 'Submitting...';
@@ -1533,4 +2522,30 @@ imageForm.addEventListener('submit', async (e) => {
 
 loadGallery();
 loadLivePreview();
-startLivePreviewAutoRefresh();
+loadServiceConfig();
+startPollingLeaseHeartbeat();
+syncBackgroundPollingOwnership();
+
+document.addEventListener('visibilitychange', () => {
+	if (document.hidden) {
+		releaseBackgroundPollingOwnership();
+	}
+	syncBackgroundPollingOwnership();
+});
+
+window.addEventListener('focus', () => {
+	syncBackgroundPollingOwnership();
+});
+
+window.addEventListener('blur', () => {
+	syncBackgroundPollingOwnership();
+});
+
+window.addEventListener('storage', (event) => {
+	if (event.key !== BACKGROUND_POLL_OWNER_KEY) return;
+	syncBackgroundPollingOwnership();
+});
+
+window.addEventListener('beforeunload', () => {
+	releaseBackgroundPollingOwnership();
+});

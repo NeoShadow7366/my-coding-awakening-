@@ -208,6 +208,7 @@
         <li><span class="diagnostics-label">Samplers</span><span id="diag-samplers" class="diagnostics-value">-</span></li>
         <li><span class="diagnostics-label">Last run</span><span id="diag-last-run" class="diagnostics-value">never</span></li>
       </ul>
+      <p id="poll-owner-status" class="hint poll-owner-status" aria-live="polite">Polling tab: checking lease...</p>
       <p id="diagnostics-hint" class="hint">Use Run checks for quick backend diagnostics.</p>
     </div>
   </aside>
@@ -218,10 +219,72 @@
       <p class="section-desc">Create images from text prompts, or upload a source image for img2img.</p>
 
       <form id="image-form">
-        <div class="form-field">
-          <label for="image-prompt" class="field-label">Prompt</label>
-          <textarea id="image-prompt" rows="4" placeholder="A cinematic forest temple, volumetric light, detailed illustration" required></textarea>
+        <div class="field-label-row">
+          <p class="field-label">Image Inference Text</p>
+          <label for="enhanced-prompt-toggle" class="toggle-label">
+            <input id="enhanced-prompt-toggle" type="checkbox" />
+            <span>Enhanced prompt breakdown</span>
+          </label>
         </div>
+        <p id="prompt-mode-hint" class="hint prompt-mode-hint" aria-live="polite">Standard prompt mode is active.</p>
+
+        <div id="normal-prompt-wrap" class="form-field">
+          <label for="image-prompt" class="field-label">Prompt</label>
+          <textarea id="image-prompt" rows="4" placeholder="A cinematic forest temple, volumetric light, detailed illustration"></textarea>
+        </div>
+
+        <section id="enhanced-prompt-fields" class="enhanced-prompt-fields" hidden aria-label="Enhanced prompt breakdown fields">
+          <p class="hint">Fill out the details and generate offline Ollama prompt suggestions.</p>
+
+          <div class="form-field">
+            <label for="enhanced-subject" class="field-label">Subject</label>
+            <textarea id="enhanced-subject" rows="2" placeholder="Define the main focus clearly (e.g., a weathered fisherman, a vintage brass compass)."></textarea>
+          </div>
+
+          <div class="form-field">
+            <label for="enhanced-setting" class="field-label">Setting/Environment</label>
+            <textarea id="enhanced-setting" rows="2" placeholder="Specify location, background, and atmosphere (e.g., on a storm-tossed deck, surrounded by dense fog)."></textarea>
+          </div>
+
+          <div class="form-field">
+            <label for="enhanced-composition" class="field-label">Composition &amp; Framing</label>
+            <textarea id="enhanced-composition" rows="2" placeholder="Describe angle and perspective (e.g., close-up portrait, wide-angle lens, bird's-eye view)."></textarea>
+          </div>
+
+          <div class="form-field">
+            <label for="enhanced-lighting" class="field-label">Lighting</label>
+            <textarea id="enhanced-lighting" rows="2" placeholder="Use terms like golden hour, dramatic rim lighting, or soft diffused window light."></textarea>
+          </div>
+
+          <div class="form-field">
+            <label for="enhanced-style" class="field-label">Style/Medium</label>
+            <textarea id="enhanced-style" rows="2" placeholder="State the aesthetic (e.g., cinematic photography, oil painting, 3D render, minimalist graphic design)."></textarea>
+          </div>
+
+          <div class="enhanced-actions">
+            <button class="btn btn-ghost" id="enhanced-prompt-suggest-btn" type="button">Suggest Enhanced Prompts</button>
+            <button class="btn btn-ghost" id="enhanced-prompt-random-btn" type="button" disabled>Use Random Suggestion</button>
+            <button class="btn btn-ghost" id="enhanced-prompt-use-btn" type="button" disabled>Use First Suggestion</button>
+          </div>
+          <p id="enhanced-prompt-status" class="hint" aria-live="polite">Add details, then click Suggest Enhanced Prompts.</p>
+
+          <div class="form-field">
+            <label for="enhanced-prompt-select" class="field-label">Choose Suggestion</label>
+            <div class="enhanced-select-row">
+              <div class="select-wrapper">
+                <select id="enhanced-prompt-select" disabled>
+                  <option value="">No suggestions yet</option>
+                </select>
+              </div>
+              <button class="btn btn-ghost" id="enhanced-prompt-use-selected-btn" type="button" disabled>Use Selected</button>
+            </div>
+          </div>
+
+          <div class="form-field">
+            <label for="enhanced-prompt-suggestions" class="field-label">Suggestion Output</label>
+            <textarea id="enhanced-prompt-suggestions" rows="5" placeholder="Ollama suggestions will appear here." readonly></textarea>
+          </div>
+        </section>
 
         <div class="form-field">
           <label for="image-negative-prompt" class="field-label">Negative prompt</label>
@@ -303,6 +366,94 @@
         <button class="btn btn-ghost btn-xs" id="refresh-gallery" type="button">Refresh</button>
       </div>
       <div id="gallery-grid" class="gallery-grid"></div>
+    </section>
+
+    <div id="gallery-lightbox" class="gallery-lightbox" hidden aria-hidden="true" role="dialog" aria-label="Gallery image viewer">
+      <div class="gallery-lightbox-backdrop" data-lightbox-close="backdrop"></div>
+      <div class="gallery-lightbox-panel" role="document">
+        <button id="gallery-lightbox-close" class="btn btn-ghost btn-xs gallery-lightbox-close" type="button" aria-label="Close image viewer">Close</button>
+        <img id="gallery-lightbox-image" src="" alt="" />
+        <p id="gallery-lightbox-caption" class="hint gallery-lightbox-caption"></p>
+      </div>
+    </div>
+  </div>
+
+  <button id="diag-drawer-toggle" class="diag-drawer-toggle" type="button" aria-expanded="false" aria-controls="diag-drawer">Diagnostics<span id="diag-status-badge" class="diag-status-badge" aria-hidden="true"></span></button>
+  <section id="diag-drawer" class="diag-drawer" hidden aria-label="Diagnostics console">
+    <div class="diag-drawer-head">
+      <h3 class="diag-drawer-title">Diagnostics Console</h3>
+      <button id="diag-drawer-close" class="btn btn-ghost btn-xs" type="button">Close</button>
+    </div>
+    <div id="diag-drawer-output" class="diag-drawer-output" role="log" aria-live="polite" aria-label="Diagnostics output"></div>
+    <form id="diag-drawer-command-form" class="diag-drawer-input-line" autocomplete="off">
+      <span class="diag-drawer-prompt">$</span>
+      <input id="diag-drawer-command" type="text" placeholder="help | status | checks | queue | clear" aria-label="Diagnostics command input" />
+    </form>
+  </section>
+</section>
+
+<section id="panel-config" class="panel" role="tabpanel" aria-labelledby="nav-config" hidden>
+  <aside class="sidebar" aria-label="Service path configuration">
+    <div class="sidebar-section">
+      <p class="field-label">Service Launch Paths</p>
+      <p class="hint">Set install locations so the app can start or restart local services directly.</p>
+    </div>
+
+    <div class="sidebar-section">
+      <label for="config-ollama-path" class="field-label">Ollama Path</label>
+      <div class="config-path-row">
+        <input id="config-ollama-path" type="text" placeholder="e.g. C:/Users/you/AppData/Local/Programs/Ollama/ollama.exe" />
+        <button class="btn btn-ghost btn-xs" id="config-ollama-browse" type="button">Browse</button>
+      </div>
+      <p class="hint">Accepts executable path, or a directory containing ollama.exe.</p>
+    </div>
+
+    <div class="sidebar-section">
+      <label for="config-comfyui-path" class="field-label">ComfyUI Path</label>
+      <div class="config-path-row">
+        <input id="config-comfyui-path" type="text" placeholder="e.g. D:/ComfyUI" />
+        <button class="btn btn-ghost btn-xs" id="config-comfyui-browse" type="button">Browse</button>
+      </div>
+      <p class="hint">Accepts a ComfyUI folder (main.py/run.bat), or a script path.</p>
+    </div>
+
+    <div class="sidebar-section">
+      <button class="btn btn-primary btn-full" id="config-save-btn" type="button">Save Paths</button>
+      <p id="config-save-status" class="hint">No saved changes yet.</p>
+      <p id="config-last-saved" class="hint">Last saved: never</p>
+    </div>
+  </aside>
+
+  <div class="config-container" aria-label="Service controls">
+    <section class="config-card" aria-label="Ollama service controls">
+      <h2 class="section-heading">Ollama Service</h2>
+      <p class="section-desc">Launch text inference backend using the configured path.</p>
+      <div class="config-actions-row">
+        <button class="btn btn-ghost" id="config-ollama-start" type="button">Start</button>
+        <button class="btn btn-ghost" id="config-ollama-restart" type="button">Restart</button>
+        <button class="btn btn-ghost" id="config-ollama-stop" type="button">Stop</button>
+      </div>
+      <p id="config-ollama-status" class="hint">Awaiting action.</p>
+    </section>
+
+    <section class="config-card" aria-label="ComfyUI service controls">
+      <h2 class="section-heading">ComfyUI Service</h2>
+      <p class="section-desc">Launch image backend using the configured path.</p>
+      <div class="config-actions-row">
+        <button class="btn btn-ghost" id="config-comfy-start" type="button">Start</button>
+        <button class="btn btn-ghost" id="config-comfy-restart" type="button">Restart</button>
+        <button class="btn btn-ghost" id="config-comfy-stop" type="button">Stop</button>
+      </div>
+      <p id="config-comfy-status" class="hint">Awaiting action.</p>
+    </section>
+
+    <section class="config-card" aria-label="Flask app controls">
+      <h2 class="section-heading">Flask App</h2>
+      <p class="section-desc">Restart this local UI backend without leaving the browser.</p>
+      <div class="config-actions-row">
+        <button class="btn btn-ghost" id="config-flask-restart" type="button">Restart Flask</button>
+      </div>
+      <p id="config-flask-status" class="hint">Awaiting action.</p>
     </section>
   </div>
 </section>
