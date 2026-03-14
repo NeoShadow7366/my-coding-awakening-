@@ -410,6 +410,89 @@ def test_image_delete_prunes_all_matching_refs_across_entries(client, monkeypatc
     assert history[0]["prompt"] == "keep"
 
 
+def test_image_delete_returns_404_when_file_missing(client, monkeypatch, tmp_path):
+    missing_path = tmp_path / "ghost.png"
+    monkeypatch.setattr(app_module, "_resolve_comfy_image_path", lambda _: missing_path)
+
+    resp = client.post("/api/image/delete", json={"filename": "ghost.png", "subfolder": "", "type": "output"})
+
+    assert resp.status_code == 404
+    assert "not found on disk" in resp.get_json()["error"]
+
+
+def test_image_delete_returns_500_on_unlink_oserror(client, monkeypatch, tmp_path):
+    import pathlib
+
+    image_path = tmp_path / "locked.png"
+    image_path.write_bytes(b"png")
+    monkeypatch.setattr(app_module, "_resolve_comfy_image_path", lambda _: image_path)
+
+    def explode_unlink(self, *args, **kwargs):
+        raise OSError("permission denied")
+
+    monkeypatch.setattr(pathlib.Path, "unlink", explode_unlink)
+
+    resp = client.post("/api/image/delete", json={"filename": "locked.png", "subfolder": "", "type": "output"})
+
+    assert resp.status_code == 500
+    assert "permission denied" in resp.get_json()["error"]
+
+
+def test_image_open_location_success_macos_uses_open_r(client, monkeypatch, tmp_path):
+    image_path = tmp_path / "art.png"
+    image_path.write_bytes(b"png")
+    monkeypatch.setattr(app_module, "_resolve_comfy_image_path", lambda _: image_path)
+    monkeypatch.setattr(app_module.os, "name", "posix", raising=False)
+    monkeypatch.setattr(app_module.sys, "platform", "darwin", raising=False)
+
+    captured = {}
+
+    def fake_popen(cmd, **kwargs):
+        captured["cmd"] = cmd
+
+    monkeypatch.setattr(app_module.subprocess, "Popen", fake_popen)
+
+    resp = client.post("/api/image/open-location", json={"filename": "art.png", "subfolder": "", "type": "output"})
+
+    assert resp.status_code == 200
+    assert captured["cmd"] == ["open", "-R", str(image_path)]
+
+
+def test_image_delete_entry_survives_when_other_images_remain(client, monkeypatch, tmp_path):
+    """An entry with multiple images keeps its remaining refs after one is deleted."""
+    del_path = tmp_path / "del.png"
+    del_path.write_bytes(b"png")
+
+    del_ref = {"filename": "del.png", "subfolder": "", "type": "output"}
+    keep_ref = {"filename": "keep.png", "subfolder": "", "type": "output"}
+
+    entry = {
+        "type": "image",
+        "prompt": "two images",
+        "negative_prompt": "",
+        "engine": "comfyui",
+        "model": "m1",
+        "params": {"steps": 20},
+        "images": [del_ref, keep_ref],
+    }
+    assert client.post("/api/history", json=entry).status_code == 201
+
+    monkeypatch.setattr(app_module, "_resolve_comfy_image_path", lambda _: del_path)
+
+    resp = client.post("/api/image/delete", json=del_ref)
+
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["removed_history_refs"] == 1
+    assert data["removed_history_entries"] == 0
+
+    history = client.get("/api/history?type=image").get_json()["history"]
+    assert len(history) == 1
+    remaining_images = history[0]["images"]
+    assert len(remaining_images) == 1
+    assert remaining_images[0]["filename"] == "keep.png"
+
+
 def test_live_preview_returns_first_available_prompt_image(client, monkeypatch):
     monkeypatch.setattr(app_module, "_comfy_available", lambda: True)
 
