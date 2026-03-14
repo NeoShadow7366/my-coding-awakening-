@@ -13,9 +13,20 @@ Everything runs on your own machine.
 - Image generation controls: checkpoint, sampler, seed, steps, CFG, denoise, width/height, batch
 - Img2img upload flow
 - Queue status panel
-- Queue controls: failed-only filter, auto-retry policy, and clear failed items
+- Queue controls: failed-only filter, auto-retry policy, clear failed, and clear done
+- Toast notifications for queue actions (cancel, retry, clear)
 - Local history and gallery persistence
 - Dark and light themes
+
+## Release notes
+
+### v0.4.0-queue-stability
+
+- Added queue UX polish with toast notifications and clear-done action.
+- Added backend regression coverage including SSE streaming tests.
+- Added accessibility improvements for queue controls and toast announcements.
+- Fixed queue summary counting to remain stable during rapid cancel/retry transitions.
+- Added ComfyUI custom model-path support via extra model paths configuration.
 
 ## Requirements
 
