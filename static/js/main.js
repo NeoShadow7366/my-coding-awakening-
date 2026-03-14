@@ -1803,7 +1803,7 @@ function renderQueueStatus(running, pending, donePromptIds = new Set()) {
 
 			const canCancel = status === 'queued' || status === 'running' || status === 'processing';
 			const canRetry = status === 'failed' || status === 'canceled';
-			const canRerun = status === 'completed' && snap.mode !== 'img2img';
+			const canRerun = status === 'completed' && snap.mode !== 'img2img' && !!String(snap.prompt || '').trim();
 			const cancelBusy = queueActionInFlight.has(`cancel:${promptId}`);
 			const retryBusy = queueActionInFlight.has(`retry:${promptId}`);
 			const rerunBusy = queueActionInFlight.has(`rerun:${promptId}`);
@@ -1995,7 +1995,7 @@ async function retryImageJob(promptId, isAuto = false) {
 
 async function rerunImageJob(promptId) {
 	const snapshot = (queueJobMeta.get(promptId) || {}).snapshot;
-	if (!snapshot) {
+	if (!snapshot || !String(snapshot.prompt || '').trim()) {
 		showToast('Re-run unavailable: no job snapshot found.', 'neg');
 		return;
 	}
@@ -2035,6 +2035,11 @@ async function rerunImageJob(promptId) {
 		showToast(`Re-run failed: ${err.message}`, 'neg');
 	} finally {
 		queueActionInFlight.delete(`rerun:${promptId}`);
+		if (trackedPromptIds.size) {
+			await pollQueue();
+		} else {
+			renderQueueStatus([], [], new Set());
+		}
 	}
 }
 
