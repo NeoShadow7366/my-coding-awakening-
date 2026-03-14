@@ -34,6 +34,11 @@ const imageModelSelect = document.getElementById('image-model-select');
 const imageSamplerSelect = document.getElementById('image-sampler-select');
 const imageSeed = document.getElementById('image-seed');
 const imageRandomSeed = document.getElementById('image-random-seed');
+const imageProfileSelect = document.getElementById('image-profile-select');
+const imageProfileName = document.getElementById('image-profile-name');
+const imageProfileSaveBtn = document.getElementById('image-profile-save');
+const imageProfileApplyBtn = document.getElementById('image-profile-apply');
+const imageProfileDeleteBtn = document.getElementById('image-profile-delete');
 const imageSteps = document.getElementById('image-steps');
 const imageStepsVal = document.getElementById('image-steps-val');
 const imageCfg = document.getElementById('image-cfg');
@@ -90,6 +95,8 @@ const queueJobMeta = new Map();
 const JOB_MISS_THRESHOLD = 4;
 const queueActionInFlight = new Set();
 let queueFilterFailedOnly = localStorage.getItem('queueFilterFailedOnly') === '1';
+const IMAGE_PROFILE_STORAGE_KEY = 'imagePresetProfilesV1';
+const IMAGE_PROFILE_SELECTED_KEY = 'imagePresetProfilesSelectedV1';
 
 if (failedOnlyToggle) {
 	failedOnlyToggle.checked = queueFilterFailedOnly;
@@ -242,6 +249,134 @@ function setModelSelectMessage(msg) {
 
 function setImageModelMessage(msg) {
 	imageModelSelect.innerHTML = `<option value="">${escHtml(msg)}</option>`;
+}
+
+function getImageProfileState() {
+	try {
+		const parsed = JSON.parse(localStorage.getItem(IMAGE_PROFILE_STORAGE_KEY) || '{}');
+		if (!parsed || typeof parsed !== 'object') return {};
+		return parsed;
+	} catch {
+		return {};
+	}
+}
+
+function setImageProfileState(state) {
+	localStorage.setItem(IMAGE_PROFILE_STORAGE_KEY, JSON.stringify(state));
+}
+
+function getCurrentImageSettings() {
+	return {
+		model: imageModelSelect.value,
+		sampler: imageSamplerSelect.value,
+		seed: imageSeed.value,
+		steps: Number(imageSteps.value),
+		cfg: Number(imageCfg.value),
+		denoise: Number(imageDenoise.value),
+		width: Number(imageWidth.value),
+		height: Number(imageHeight.value),
+		batch_size: Number(imageBatchSize.value),
+	};
+}
+
+function applyImageSettings(settings) {
+	if (!settings || typeof settings !== 'object') return;
+	if (settings.model && [...imageModelSelect.options].some((o) => o.value === settings.model)) {
+		imageModelSelect.value = settings.model;
+	}
+	if (settings.sampler && [...imageSamplerSelect.options].some((o) => o.value === settings.sampler)) {
+		imageSamplerSelect.value = settings.sampler;
+	}
+	if (settings.seed !== undefined && settings.seed !== null) imageSeed.value = String(settings.seed);
+	if (Number.isFinite(settings.steps)) imageSteps.value = String(settings.steps);
+	if (Number.isFinite(settings.cfg)) imageCfg.value = String(settings.cfg);
+	if (Number.isFinite(settings.denoise)) imageDenoise.value = String(settings.denoise);
+	if (Number.isFinite(settings.width)) imageWidth.value = String(settings.width);
+	if (Number.isFinite(settings.height)) imageHeight.value = String(settings.height);
+	if (Number.isFinite(settings.batch_size)) imageBatchSize.value = String(settings.batch_size);
+	syncImageControlLabels();
+}
+
+function renderImageProfileSelect(preferredName = '') {
+	if (!imageProfileSelect) return;
+	const profiles = getImageProfileState();
+	const names = Object.keys(profiles).sort((a, b) => a.localeCompare(b));
+	if (!names.length) {
+		imageProfileSelect.innerHTML = '<option value="">No saved profiles</option>';
+		imageProfileSelect.value = '';
+		if (imageProfileApplyBtn) imageProfileApplyBtn.disabled = true;
+		if (imageProfileDeleteBtn) imageProfileDeleteBtn.disabled = true;
+		return;
+	}
+
+	imageProfileSelect.innerHTML = names
+		.map((name) => `<option value="${escHtml(name)}">${escHtml(name)}</option>`)
+		.join('');
+
+	const savedSelected = localStorage.getItem(IMAGE_PROFILE_SELECTED_KEY) || '';
+	const nextSelected = preferredName || savedSelected;
+	if (nextSelected && names.includes(nextSelected)) {
+		imageProfileSelect.value = nextSelected;
+	} else {
+		imageProfileSelect.value = names[0];
+	}
+
+	localStorage.setItem(IMAGE_PROFILE_SELECTED_KEY, imageProfileSelect.value);
+	if (imageProfileApplyBtn) imageProfileApplyBtn.disabled = false;
+	if (imageProfileDeleteBtn) imageProfileDeleteBtn.disabled = false;
+}
+
+function saveCurrentImageProfile() {
+	if (!imageProfileName) return;
+	const rawName = imageProfileName.value.trim();
+	if (!rawName) {
+		showToast('Profile name is required.', 'neg');
+		imageProfileName.focus();
+		return;
+	}
+	const profiles = getImageProfileState();
+	profiles[rawName] = getCurrentImageSettings();
+	setImageProfileState(profiles);
+	renderImageProfileSelect(rawName);
+	imageProfileName.value = '';
+	showToast(`Saved profile: ${rawName}.`, 'pos');
+}
+
+function applySelectedImageProfile() {
+	if (!imageProfileSelect) return;
+	const name = imageProfileSelect.value;
+	if (!name) {
+		showToast('Select a saved profile first.', 'neg');
+		return;
+	}
+	const profiles = getImageProfileState();
+	const settings = profiles[name];
+	if (!settings) {
+		showToast('Selected profile was not found.', 'neg');
+		renderImageProfileSelect('');
+		return;
+	}
+	applyImageSettings(settings);
+	localStorage.setItem(IMAGE_PROFILE_SELECTED_KEY, name);
+	showToast(`Applied profile: ${name}.`, 'pos');
+}
+
+function deleteSelectedImageProfile() {
+	if (!imageProfileSelect) return;
+	const name = imageProfileSelect.value;
+	if (!name) {
+		showToast('No profile selected.', 'neg');
+		return;
+	}
+	const profiles = getImageProfileState();
+	if (!profiles[name]) {
+		renderImageProfileSelect('');
+		return;
+	}
+	delete profiles[name];
+	setImageProfileState(profiles);
+	renderImageProfileSelect('');
+	showToast(`Deleted profile: ${name}.`, 'pos');
 }
 
 function setDiagnosticValue(el, text, level = '') {
@@ -695,6 +830,34 @@ function applyImagePreset(preset) {
 imagePresetButtons.forEach((btn) => {
 	btn.addEventListener('click', () => applyImagePreset(btn.dataset.imagePreset));
 });
+
+if (imageProfileSelect) {
+	imageProfileSelect.addEventListener('change', () => {
+		localStorage.setItem(IMAGE_PROFILE_SELECTED_KEY, imageProfileSelect.value || '');
+	});
+}
+
+if (imageProfileSaveBtn) {
+	imageProfileSaveBtn.addEventListener('click', saveCurrentImageProfile);
+}
+
+if (imageProfileApplyBtn) {
+	imageProfileApplyBtn.addEventListener('click', applySelectedImageProfile);
+}
+
+if (imageProfileDeleteBtn) {
+	imageProfileDeleteBtn.addEventListener('click', deleteSelectedImageProfile);
+}
+
+if (imageProfileName) {
+	imageProfileName.addEventListener('keydown', (event) => {
+		if (event.key !== 'Enter') return;
+		event.preventDefault();
+		saveCurrentImageProfile();
+	});
+}
+
+renderImageProfileSelect('');
 
 function renderQueueStatus(running, pending, donePromptIds = new Set()) {
 	const focusedQueueAction = getFocusedQueueAction();

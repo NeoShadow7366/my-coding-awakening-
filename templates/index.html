@@ -158,6 +158,21 @@
         <button class="btn btn-ghost btn-xs" type="button" data-image-preset="quality">Quality</button>
         <button class="btn btn-ghost btn-xs" type="button" data-image-preset="creative">Creative</button>
       </div>
+      <div class="preset-profile-wrap" aria-label="Preset profiles">
+        <div class="select-wrapper">
+          <select id="image-profile-select" aria-label="Saved preset profiles">
+            <option value="">No saved profiles</option>
+          </select>
+        </div>
+        <div class="inline-field-row profile-row">
+          <input id="image-profile-name" type="text" class="compact-input" placeholder="Profile name" />
+          <button class="btn btn-ghost btn-xs" id="image-profile-save" type="button">Save</button>
+        </div>
+        <div class="preset-row" role="group" aria-label="Profile actions">
+          <button class="btn btn-ghost btn-xs" id="image-profile-apply" type="button">Apply</button>
+          <button class="btn btn-ghost btn-xs" id="image-profile-delete" type="button">Delete</button>
+        </div>
+      </div>
     </div>
 
     <div class="sidebar-section">
