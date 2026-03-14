@@ -228,6 +228,61 @@ def test_image_open_location_requires_resolvable_path(client, monkeypatch):
     assert "Set a ComfyUI path" in resp.get_json()["error"]
 
 
+def test_image_open_location_success_windows_uses_explorer_select(client, monkeypatch, tmp_path):
+    image_path = tmp_path / "open-me.png"
+    image_path.write_bytes(b"png")
+
+    monkeypatch.setattr(app_module, "_resolve_comfy_image_path", lambda _: image_path)
+    monkeypatch.setattr(app_module.os, "name", "nt", raising=False)
+
+    seen = {}
+
+    def fake_popen(args, stdout=None, stderr=None):
+        seen["args"] = args
+        seen["stdout"] = stdout
+        seen["stderr"] = stderr
+        return object()
+
+    monkeypatch.setattr(app_module.subprocess, "Popen", fake_popen)
+
+    resp = client.post("/api/image/open-location", json={"filename": "open-me.png", "subfolder": "", "type": "output"})
+
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["ok"] is True
+    assert data["path"] == str(image_path)
+    assert seen["args"][0] == "explorer"
+    assert seen["args"][1] == f"/select,{image_path}"
+
+
+def test_image_open_location_success_linux_uses_xdg_open_parent(client, monkeypatch, tmp_path):
+    image_path = tmp_path / "folder" / "open-linux.png"
+    image_path.parent.mkdir(parents=True, exist_ok=True)
+    image_path.write_bytes(b"png")
+
+    monkeypatch.setattr(app_module, "_resolve_comfy_image_path", lambda _: image_path)
+    monkeypatch.setattr(app_module.os, "name", "posix", raising=False)
+    monkeypatch.setattr(app_module.sys, "platform", "linux", raising=False)
+
+    seen = {}
+
+    def fake_popen(args, stdout=None, stderr=None):
+        seen["args"] = args
+        seen["stdout"] = stdout
+        seen["stderr"] = stderr
+        return object()
+
+    monkeypatch.setattr(app_module.subprocess, "Popen", fake_popen)
+
+    resp = client.post("/api/image/open-location", json={"filename": "open-linux.png", "subfolder": "folder", "type": "output"})
+
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["ok"] is True
+    assert data["path"] == str(image_path)
+    assert seen["args"] == ["xdg-open", str(image_path.parent)]
+
+
 def test_image_delete_removes_file_and_history_refs(client, monkeypatch, tmp_path):
     image_path = tmp_path / "to-delete.png"
     image_path.write_bytes(b"png")
