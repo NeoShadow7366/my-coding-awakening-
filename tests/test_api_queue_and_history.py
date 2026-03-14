@@ -142,3 +142,75 @@ def test_history_type_and_limit_filters(client):
     assert len(history) == 1
     assert history[0]["type"] == "image"
     assert history[0]["prompt"] == "img-2"
+
+
+def test_history_dedupes_image_entries_by_prompt_id_and_images(client):
+    base_entry = {
+        "type": "image",
+        "prompt": "castle",
+        "negative_prompt": "",
+        "engine": "comfyui",
+        "model": "model-a",
+        "params": {"prompt_id": "pid-123", "steps": 20, "cfg": 7},
+        "images": [{"filename": "out-1.png", "subfolder": "", "type": "output"}],
+    }
+
+    first = client.post("/api/history", json=base_entry)
+    duplicate = client.post(
+        "/api/history",
+        json={
+            **base_entry,
+            "prompt": "Image generation",
+            "model": "",
+            "params": {"prompt_id": "pid-123", "steps": 0, "cfg": 0},
+        },
+    )
+
+    assert first.status_code == 201
+    assert duplicate.status_code == 201
+
+    resp = client.get("/api/history?type=image")
+    history = resp.get_json()["history"]
+
+    assert len(history) == 1
+    assert history[0]["prompt"] == "castle"
+    assert history[0]["model"] == "model-a"
+    assert history[0]["params"]["prompt_id"] == "pid-123"
+
+
+def test_history_duplicate_image_entry_upgrades_placeholder_metadata(client):
+    placeholder = {
+        "type": "image",
+        "prompt": "Image generation",
+        "negative_prompt": "",
+        "engine": "comfyui",
+        "model": "",
+        "params": {"prompt_id": "pid-upgrade", "steps": 0, "cfg": 0, "sampler": ""},
+        "images": [{"filename": "out-upgrade.png", "subfolder": "", "type": "output"}],
+    }
+    richer = {
+        "type": "image",
+        "prompt": "Detailed castle matte painting",
+        "negative_prompt": "blurry",
+        "engine": "comfyui",
+        "model": "model-b",
+        "params": {"prompt_id": "pid-upgrade", "steps": 30, "cfg": 7, "sampler": "euler"},
+        "images": [{"filename": "out-upgrade.png", "subfolder": "", "type": "output"}],
+    }
+
+    first = client.post("/api/history", json=placeholder)
+    second = client.post("/api/history", json=richer)
+
+    assert first.status_code == 201
+    assert second.status_code == 201
+
+    resp = client.get("/api/history?type=image")
+    history = resp.get_json()["history"]
+
+    assert len(history) == 1
+    assert history[0]["prompt"] == "Detailed castle matte painting"
+    assert history[0]["negative_prompt"] == "blurry"
+    assert history[0]["model"] == "model-b"
+    assert history[0]["params"]["steps"] == 30
+    assert history[0]["params"]["cfg"] == 7
+    assert history[0]["params"]["sampler"] == "euler"

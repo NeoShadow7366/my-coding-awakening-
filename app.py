@@ -8,8 +8,12 @@ The app uses:
 import json
 import logging
 import os
+import shlex
+import subprocess
+import sys
 import threading
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 from random import randint
 
@@ -41,8 +45,19 @@ MIN_CFG = 1.0
 
 DATA_DIR = Path(app.root_path) / "data"
 HISTORY_FILE = DATA_DIR / "history.json"
+SERVICE_CONFIG_FILE = DATA_DIR / "service_config.json"
+
+SERVICE_PORTS = {
+    "ollama": 11434,
+    "comfyui": 8188,
+}
 
 _history_lock = threading.Lock()
+_service_config_lock = threading.Lock()
+_service_processes: dict[str, subprocess.Popen | None] = {
+    "ollama": None,
+    "comfyui": None,
+}
 
 
 # ---------------------------------------------------------------------------
@@ -67,6 +82,47 @@ def _list_ollama_models() -> list[dict]:
     except Exception as exc:
         logger.warning("Could not fetch Ollama models: %s", exc)
         return []
+
+
+def _pick_default_ollama_model() -> str:
+    """Return a usable local Ollama model name or empty string."""
+    models = _list_ollama_models()
+    for model in models:
+        name = (model.get("name") or "").strip()
+        if name:
+            return name
+    return ""
+
+
+def _extract_prompt_suggestions(raw_text: str) -> list[str]:
+    """Parse up to 3 concise prompt suggestions from an LLM response."""
+    lines: list[str] = []
+    for raw_line in (raw_text or "").splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        line = line.lstrip("- ").strip()
+        if ". " in line[:4] and line[0].isdigit():
+            line = line.split(". ", 1)[1].strip()
+        if line:
+            lines.append(line)
+
+    if not lines:
+        fallback = (raw_text or "").strip()
+        return [fallback] if fallback else []
+
+    # Keep only unique suggestions while preserving order.
+    unique_lines: list[str] = []
+    seen = set()
+    for line in lines:
+        key = line.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        unique_lines.append(line)
+        if len(unique_lines) >= 3:
+            break
+    return unique_lines
 
 
 def _comfy_available() -> bool:
@@ -135,6 +191,258 @@ def _ensure_history_store() -> None:
         HISTORY_FILE.write_text("[]", encoding="utf-8")
 
 
+def _default_service_config() -> dict:
+    return {
+        "ollama_path": "",
+        "comfyui_path": "",
+        "updated_at": "",
+    }
+
+
+def _service_config_timestamp() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _ensure_service_config_store() -> None:
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    if not SERVICE_CONFIG_FILE.exists():
+        SERVICE_CONFIG_FILE.write_text(
+            json.dumps(_default_service_config(), ensure_ascii=True, indent=2),
+            encoding="utf-8",
+        )
+
+
+def _load_service_config() -> dict:
+    _ensure_service_config_store()
+    with _service_config_lock:
+        try:
+            raw = json.loads(SERVICE_CONFIG_FILE.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            logger.warning("Service config file was invalid JSON, resetting.")
+            raw = _default_service_config()
+
+        config = _default_service_config()
+        if isinstance(raw, dict):
+            config["ollama_path"] = str(raw.get("ollama_path") or "").strip()
+            config["comfyui_path"] = str(raw.get("comfyui_path") or "").strip()
+            config["updated_at"] = str(raw.get("updated_at") or "").strip()
+
+        SERVICE_CONFIG_FILE.write_text(json.dumps(config, ensure_ascii=True, indent=2), encoding="utf-8")
+        return config
+
+
+def _save_service_config(config: dict) -> dict:
+    _ensure_service_config_store()
+    sanitized = {
+        "ollama_path": str(config.get("ollama_path") or "").strip(),
+        "comfyui_path": str(config.get("comfyui_path") or "").strip(),
+        "updated_at": _service_config_timestamp(),
+    }
+    with _service_config_lock:
+        SERVICE_CONFIG_FILE.write_text(json.dumps(sanitized, ensure_ascii=True, indent=2), encoding="utf-8")
+    return sanitized
+
+
+def _normalize_service_name(name: str) -> str:
+    value = (name or "").strip().lower()
+    if value not in SERVICE_PORTS:
+        raise ValueError("service must be 'ollama' or 'comfyui'")
+    return value
+
+
+def _resolve_ollama_launch(path_value: str) -> tuple[list[str], Path | None]:
+    candidate = Path(path_value).expanduser()
+    if candidate.is_dir():
+        exe_name = "ollama.exe" if os.name == "nt" else "ollama"
+        exe_path = candidate / exe_name
+        if not exe_path.exists():
+            raise ValueError(f"Could not find {exe_name} in configured Ollama directory")
+        return [str(exe_path), "serve"], candidate
+
+    if candidate.is_file():
+        return [str(candidate), "serve"], candidate.parent
+
+    raise ValueError("Configured Ollama path does not exist")
+
+
+def _resolve_comfyui_launch(path_value: str) -> tuple[list[str], Path | None]:
+    candidate = Path(path_value).expanduser()
+    if candidate.is_dir():
+        main_py = candidate / "main.py"
+        if main_py.exists():
+            return [sys.executable, str(main_py)], candidate
+
+        bat_candidates = ["run_nvidia_gpu.bat", "run_cpu.bat", "run.bat"]
+        for bat_name in bat_candidates:
+            bat_path = candidate / bat_name
+            if bat_path.exists():
+                return ["cmd", "/c", str(bat_path)], candidate
+
+        raise ValueError("Configured ComfyUI directory must contain main.py or a run.bat script")
+
+    if candidate.is_file():
+        suffix = candidate.suffix.lower()
+        if suffix == ".py":
+            return [sys.executable, str(candidate)], candidate.parent
+        if suffix in {".bat", ".cmd"}:
+            return ["cmd", "/c", str(candidate)], candidate.parent
+        return [str(candidate)], candidate.parent
+
+    raise ValueError("Configured ComfyUI path does not exist")
+
+
+def _kill_process_on_port(port: int) -> bool:
+    if os.name == "nt":
+        script = (
+            "$owners = Get-NetTCPConnection -State Listen -LocalPort "
+            f"{port} -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique; "
+            "if (-not $owners) { 'NOT_FOUND'; exit 0 }; "
+            "foreach ($id in $owners) { Stop-Process -Id $id -Force -ErrorAction SilentlyContinue }; "
+            "'STOPPED'"
+        )
+        proc = subprocess.run(
+            ["powershell", "-NoProfile", "-Command", script],
+            capture_output=True,
+            text=True,
+            timeout=8,
+            check=False,
+        )
+        return "STOPPED" in (proc.stdout or "")
+
+    try:
+        find_proc = subprocess.run(
+            ["lsof", "-ti", f"tcp:{port}"],
+            capture_output=True,
+            text=True,
+            timeout=4,
+            check=False,
+        )
+        pids = [line.strip() for line in (find_proc.stdout or "").splitlines() if line.strip()]
+        if not pids:
+            return False
+        for pid in pids:
+            subprocess.run(["kill", "-9", pid], timeout=4, check=False)
+        return True
+    except Exception:
+        return False
+
+
+def _spawn_service_process(command: list[str], cwd: Path | None = None) -> subprocess.Popen:
+    kwargs = {
+        "cwd": str(cwd) if cwd else None,
+        "stdout": subprocess.DEVNULL,
+        "stderr": subprocess.DEVNULL,
+        "stdin": subprocess.DEVNULL,
+        "start_new_session": True,
+    }
+    if os.name == "nt":
+        kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
+    return subprocess.Popen(command, **kwargs)
+
+
+def _start_configured_service(service: str, config: dict) -> tuple[bool, str, int | None]:
+    if service == "ollama":
+        path_value = config.get("ollama_path") or ""
+        if not path_value:
+            raise ValueError("Set an Ollama install path in Configurations before launching.")
+        command, cwd = _resolve_ollama_launch(path_value)
+    else:
+        path_value = config.get("comfyui_path") or ""
+        if not path_value:
+            raise ValueError("Set a ComfyUI install path in Configurations before launching.")
+        command, cwd = _resolve_comfyui_launch(path_value)
+
+    proc = _spawn_service_process(command, cwd=cwd)
+    _service_processes[service] = proc
+    return True, "started", proc.pid
+
+
+def _service_available(service: str) -> bool:
+    return _ollama_available() if service == "ollama" else _comfy_available()
+
+
+def _restart_flask_via_helper(port: int = 5000) -> int:
+    """Launch a detached helper that restarts this Flask app on the target port."""
+    script_path = Path(app.root_path) / "scripts" / "start_app.ps1"
+    if not script_path.exists():
+        raise FileNotFoundError(f"Missing restart helper script: {script_path}")
+
+    if os.name == "nt":
+        script_for_ps = str(script_path).replace("'", "''")
+        ps_command = (
+            f"Start-Sleep -Milliseconds 800; & '{script_for_ps}' -Port {int(port)}"
+        )
+        creationflags = subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS
+        proc = subprocess.Popen(
+            [
+                "powershell",
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-Command",
+                ps_command,
+            ],
+            cwd=app.root_path,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            stdin=subprocess.DEVNULL,
+            creationflags=creationflags,
+            close_fds=True,
+        )
+        return proc.pid
+
+    # Fallback for non-Windows environments.
+    cmd = f"sleep 1; {shlex.quote(sys.executable)} {shlex.quote(str(Path(app.root_path) / 'app.py'))}"
+    proc = subprocess.Popen(
+        ["sh", "-lc", cmd],
+        cwd=app.root_path,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        stdin=subprocess.DEVNULL,
+        start_new_session=True,
+        close_fds=True,
+    )
+    return proc.pid
+
+
+def _pick_path_dialog(service: str, initial_path: str = "") -> str:
+    """Open a native path picker dialog and return the selected path."""
+    try:
+        import tkinter as tk
+        from tkinter import filedialog
+    except Exception as exc:
+        raise RuntimeError("Native file picker is unavailable in this environment") from exc
+
+    root = tk.Tk()
+    root.withdraw()
+    root.attributes("-topmost", True)
+
+    initial_dir = ""
+    if initial_path:
+        p = Path(initial_path).expanduser()
+        if p.is_dir():
+            initial_dir = str(p)
+        elif p.parent.exists():
+            initial_dir = str(p.parent)
+
+    try:
+        if service == "ollama":
+            selected = filedialog.askopenfilename(
+                title="Select Ollama executable",
+                initialdir=initial_dir or None,
+                filetypes=[("Executable", "*.exe"), ("All files", "*.*")],
+            )
+        else:
+            selected = filedialog.askdirectory(
+                title="Select ComfyUI folder",
+                initialdir=initial_dir or None,
+                mustexist=True,
+            )
+        return (selected or "").strip()
+    finally:
+        root.destroy()
+
+
 def _load_history() -> list[dict]:
     _ensure_history_store()
     with _history_lock:
@@ -152,8 +460,129 @@ def _save_history(items: list[dict]) -> None:
         HISTORY_FILE.write_text(json.dumps(items, ensure_ascii=True, indent=2), encoding="utf-8")
 
 
+def _history_image_key(item: dict) -> tuple[str, str, tuple[tuple[str, str, str], ...]] | None:
+    """Return the dedupe key for persisted image history entries."""
+    if item.get("type") != "image":
+        return None
+    params = item.get("params") if isinstance(item.get("params"), dict) else {}
+    prompt_id = str(params.get("prompt_id") or "").strip()
+    image_sig = _image_refs_signature(item.get("images") or [])
+    if not prompt_id or not image_sig:
+        return None
+    return ("image", prompt_id, image_sig)
+
+
+def _image_refs_signature(images: list[dict]) -> tuple[tuple[str, str, str], ...]:
+    """Create a stable signature for generated image references."""
+    refs: list[tuple[str, str, str]] = []
+    for image in images or []:
+        filename = (image.get("filename") or "").strip()
+        if not filename:
+            continue
+        refs.append(
+            (
+                filename,
+                (image.get("subfolder") or "").strip(),
+                (image.get("type") or "output").strip(),
+            )
+        )
+    return tuple(sorted(refs))
+
+
+def _history_entry_score(item: dict) -> int:
+    """Score how useful a history entry is so richer duplicates win."""
+    score = 0
+    prompt = (item.get("prompt") or "").strip()
+    if prompt and prompt.lower() != "image generation":
+        score += 4
+
+    negative_prompt = (item.get("negative_prompt") or "").strip()
+    if negative_prompt:
+        score += 1
+
+    engine = (item.get("engine") or "").strip()
+    if engine:
+        score += 1
+
+    model = (item.get("model") or "").strip()
+    if model:
+        score += 4
+
+    params = item.get("params") if isinstance(item.get("params"), dict) else {}
+    if (params.get("sampler") or "").strip():
+        score += 2
+    if params.get("seed") not in (None, ""):
+        score += 1
+    if params.get("steps") not in (None, "", 0):
+        score += 2
+    if params.get("cfg") not in (None, "", 0):
+        score += 2
+    if params.get("denoise") not in (None, "", 0):
+        score += 1
+    if params.get("width") not in (None, "", 0):
+        score += 1
+    if params.get("height") not in (None, "", 0):
+        score += 1
+    if params.get("batch_size") not in (None, ""):
+        score += 1
+    if (params.get("mode") or "").strip():
+        score += 1
+
+    if item.get("response"):
+        score += 1
+
+    score += len(_image_refs_signature(item.get("images") or []))
+    return score
+
+
+def _merge_preferred_history_entry(existing: dict, candidate: dict) -> dict:
+    """Keep the entry with richer metadata while preserving the existing history slot."""
+    if _history_entry_score(candidate) <= _history_entry_score(existing):
+        return existing
+    return {
+        **existing,
+        **candidate,
+        "id": existing.get("id") or candidate.get("id"),
+        "created_at": existing.get("created_at") or candidate.get("created_at"),
+    }
+
+
+def _dedupe_history_entries(entries: list[dict]) -> list[dict]:
+    """Remove duplicate image-history rows while preserving the best metadata."""
+    deduped: list[dict] = []
+    key_to_index: dict[tuple[str, str, tuple[tuple[str, str, str], ...]], int] = {}
+
+    for entry in entries:
+        key = _history_image_key(entry)
+        if not key:
+            deduped.append(entry)
+            continue
+
+        existing_index = key_to_index.get(key)
+        if existing_index is None:
+            key_to_index[key] = len(deduped)
+            deduped.append(entry)
+            continue
+
+        deduped[existing_index] = _merge_preferred_history_entry(deduped[existing_index], entry)
+
+    return deduped
+
+
 def _append_history(item: dict) -> dict:
     entries = _load_history()
+
+    duplicate_key = _history_image_key(item)
+    if duplicate_key:
+        for index, existing in enumerate(entries):
+            if _history_image_key(existing) != duplicate_key:
+                continue
+            merged = _merge_preferred_history_entry(existing, item)
+            if merged != existing:
+                entries[index] = merged
+                _save_history(entries[:300])
+            return merged
+
     entry = {
         "id": f"h_{int(time.time() * 1000)}",
         "created_at": int(time.time()),
@@ -382,11 +811,171 @@ def api_status():
     )
 
 
+@app.route("/api/config/services", methods=["GET", "POST"])
+def api_config_services():
+    """Persist and retrieve local service launch paths."""
+    if request.method == "GET":
+        return jsonify(_load_service_config())
+
+    body = request.get_json(silent=True) or {}
+    config = _save_service_config(
+        {
+            "ollama_path": body.get("ollama_path"),
+            "comfyui_path": body.get("comfyui_path"),
+        }
+    )
+    return jsonify({"ok": True, "config": config})
+
+
+@app.route("/api/config/pick-path", methods=["POST"])
+def api_config_pick_path():
+    """Open native picker for a service path and return selected value."""
+    body = request.get_json(silent=True) or {}
+    service = (body.get("service") or "").strip().lower()
+    try:
+        service_name = _normalize_service_name(service)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+
+    initial_path = str(body.get("initial_path") or "").strip()
+    try:
+        path = _pick_path_dialog(service_name, initial_path)
+        return jsonify({"ok": True, "service": service_name, "path": path})
+    except RuntimeError as exc:
+        return jsonify({"error": str(exc)}), 500
+    except Exception as exc:
+        logger.error("Path picker failed for %s: %s", service_name, exc)
+        return jsonify({"error": str(exc)}), 500
+
+
+@app.route("/api/service/<service>/<action>", methods=["POST"])
+def api_service_control(service: str, action: str):
+    """Start, stop, and restart local inference services from configured paths."""
+    try:
+        service_name = _normalize_service_name(service)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+
+    action_name = (action or "").strip().lower()
+    if action_name not in {"start", "stop", "restart"}:
+        return jsonify({"error": "action must be 'start', 'stop', or 'restart'"}), 400
+
+    port = SERVICE_PORTS[service_name]
+    config = _load_service_config()
+
+    try:
+        if action_name == "start":
+            if _service_available(service_name):
+                return jsonify({"ok": True, "service": service_name, "action": action_name, "status": "already-running"})
+            ok, status, pid = _start_configured_service(service_name, config)
+            return jsonify({"ok": ok, "service": service_name, "action": action_name, "status": status, "pid": pid})
+
+        if action_name == "stop":
+            stopped = _kill_process_on_port(port)
+            if not stopped:
+                proc = _service_processes.get(service_name)
+                if proc and proc.poll() is None:
+                    proc.terminate()
+                    stopped = True
+            return jsonify({"ok": True, "service": service_name, "action": action_name, "status": "stopped" if stopped else "not-running"})
+
+        # restart
+        _kill_process_on_port(port)
+        proc = _service_processes.get(service_name)
+        if proc and proc.poll() is None:
+            proc.terminate()
+        ok, status, pid = _start_configured_service(service_name, config)
+        return jsonify({"ok": ok, "service": service_name, "action": action_name, "status": status, "pid": pid})
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    except Exception as exc:
+        logger.error("Service control failed for %s/%s: %s", service_name, action_name, exc)
+        return jsonify({"error": str(exc)}), 500
+
+
+@app.route("/api/app/restart", methods=["POST"])
+def api_app_restart():
+    """Trigger a detached app restart sequence via helper script."""
+    body = request.get_json(silent=True) or {}
+    try:
+        port = int(body.get("port", 5000))
+    except (TypeError, ValueError):
+        return jsonify({"error": "port must be an integer"}), 400
+
+    if port < 1 or port > 65535:
+        return jsonify({"error": "port must be between 1 and 65535"}), 400
+
+    try:
+        helper_pid = _restart_flask_via_helper(port=port)
+        return jsonify({"ok": True, "status": "restarting", "port": port, "helper_pid": helper_pid}), 202
+    except Exception as exc:
+        logger.error("App restart failed: %s", exc)
+        return jsonify({"error": str(exc)}), 500
+
+
 @app.route("/api/models")
 def api_models():
     """List models available in Ollama."""
     models = _list_ollama_models()
     return jsonify({"models": models})
+
+
+@app.route("/api/image/prompt-suggestions", methods=["POST"])
+def api_image_prompt_suggestions():
+    """Generate enhanced image prompt suggestions using local Ollama."""
+    if not _ollama_available():
+        return jsonify({"error": "Ollama is not running. Start Ollama first."}), 503
+
+    body = request.get_json(silent=True) or {}
+    fields = {
+        "subject": (body.get("subject") or "").strip(),
+        "setting": (body.get("setting") or "").strip(),
+        "composition": (body.get("composition") or "").strip(),
+        "lighting": (body.get("lighting") or "").strip(),
+        "style": (body.get("style") or "").strip(),
+    }
+    missing = [name for name, value in fields.items() if not value]
+    if missing:
+        return jsonify({"error": f"Missing required fields: {', '.join(missing)}"}), 400
+
+    model = (body.get("model") or "").strip() or _pick_default_ollama_model()
+    if not model:
+        return jsonify({"error": "No local Ollama models found. Pull a model first."}), 400
+
+    prompt = (
+        "Create 3 enhanced text-to-image prompts using these constraints. "
+        "Each prompt must be one line, vivid, and under 55 words. "
+        "Do not include explanations, labels, markdown, or numbering.\n\n"
+        f"Subject: {fields['subject']}\n"
+        f"Setting/Environment: {fields['setting']}\n"
+        f"Composition & Framing: {fields['composition']}\n"
+        f"Lighting: {fields['lighting']}\n"
+        f"Style/Medium: {fields['style']}"
+    )
+
+    payload = {
+        "model": model,
+        "prompt": prompt,
+        "stream": False,
+        "options": {
+            "temperature": 0.8,
+            "top_p": 0.95,
+            "top_k": 60,
+            "num_predict": 300,
+        },
+    }
+
+    try:
+        resp = requests.post(f"{OLLAMA_BASE_URL}/api/generate", json=payload, timeout=60)
+        resp.raise_for_status()
+        content = (resp.json() or {}).get("response", "")
+        suggestions = _extract_prompt_suggestions(content)
+        if not suggestions:
+            return jsonify({"error": "No suggestions were generated."}), 502
+        return jsonify({"ok": True, "model": model, "suggestions": suggestions})
+    except requests.RequestException as exc:
+        logger.error("Ollama prompt suggestions failed: %s", exc)
+        return jsonify({"error": str(exc)}), 502
 
 
 @app.route("/api/generate", methods=["POST"])

@@ -1,6 +1,7 @@
 from io import BytesIO
 
 import pytest
+import requests as req_lib
 
 import app as app_module
 
@@ -123,3 +124,106 @@ def test_img2img_success_returns_prompt_metadata(client, monkeypatch):
     assert data["prompt_id"] == "pid-img2img"
     assert data["number"] == 13
     assert data["meta"] == {"prompt": "forest", "image": "uploaded-in.png", "mode": "img2img"}
+
+
+def test_image_prompt_suggestions_requires_all_fields(client, monkeypatch):
+    monkeypatch.setattr(app_module, "_ollama_available", lambda: True)
+
+    resp = client.post(
+        "/api/image/prompt-suggestions",
+        json={
+            "subject": "weathered fisherman",
+            "setting": "on a storm-tossed deck",
+            "composition": "close-up portrait",
+            "lighting": "dramatic rim lighting",
+            "style": "   ",
+        },
+    )
+
+    assert resp.status_code == 400
+    assert "Missing required fields" in resp.get_json()["error"]
+
+
+def test_image_prompt_suggestions_unavailable_returns_503(client, monkeypatch):
+    monkeypatch.setattr(app_module, "_ollama_available", lambda: False)
+
+    resp = client.post(
+        "/api/image/prompt-suggestions",
+        json={
+            "subject": "vintage brass compass",
+            "setting": "inside a foggy lantern-lit cabin",
+            "composition": "wide-angle lens",
+            "lighting": "golden hour glow",
+            "style": "cinematic photography",
+        },
+    )
+
+    assert resp.status_code == 503
+    assert "Ollama is not running" in resp.get_json()["error"]
+
+
+def test_image_prompt_suggestions_success_returns_suggestions(client, monkeypatch):
+    monkeypatch.setattr(app_module, "_ollama_available", lambda: True)
+    monkeypatch.setattr(app_module, "_pick_default_ollama_model", lambda: "llama3")
+
+    class FakeResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {
+                "response": "- cinematic portrait of a weathered fisherman in dense fog\n"
+                "- low-angle deck shot of a weathered fisherman at sea\n"
+                "- moody close-up of a weathered fisherman under storm light"
+            }
+
+    def fake_post(url, json=None, timeout=0, **kwargs):
+        assert url.endswith("/api/generate")
+        assert timeout == 60
+        assert json["model"] == "llama3"
+        assert json["stream"] is False
+        assert "Subject:" in json["prompt"]
+        return FakeResponse()
+
+    monkeypatch.setattr(app_module.requests, "post", fake_post)
+
+    resp = client.post(
+        "/api/image/prompt-suggestions",
+        json={
+            "subject": "weathered fisherman",
+            "setting": "storm-tossed deck, dense fog",
+            "composition": "close-up portrait",
+            "lighting": "dramatic rim lighting",
+            "style": "cinematic photography",
+        },
+    )
+
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["ok"] is True
+    assert data["model"] == "llama3"
+    assert len(data["suggestions"]) == 3
+
+
+def test_image_prompt_suggestions_upstream_error_returns_502(client, monkeypatch):
+    monkeypatch.setattr(app_module, "_ollama_available", lambda: True)
+    monkeypatch.setattr(app_module, "_pick_default_ollama_model", lambda: "llama3")
+
+    def exploding_post(url, json=None, timeout=0, **kwargs):
+        raise req_lib.Timeout("read timed out")
+
+    monkeypatch.setattr(app_module.requests, "post", exploding_post)
+
+    resp = client.post(
+        "/api/image/prompt-suggestions",
+        json={
+            "subject": "weathered fisherman",
+            "setting": "storm-tossed deck, dense fog",
+            "composition": "close-up portrait",
+            "lighting": "dramatic rim lighting",
+            "style": "cinematic photography",
+        },
+    )
+
+    assert resp.status_code == 502
+    assert "read timed out" in resp.get_json()["error"]
