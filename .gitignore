@@ -39,3 +39,6 @@ logs/
 .pytest_cache/
 htmlcov/
 .coverage
+
+# Runtime app data
+data/history.json
