@@ -522,3 +522,134 @@ def test_live_preview_returns_first_available_prompt_image(client, monkeypatch):
     assert data["preview"]["prompt_id"] == "pid-run"
     assert data["preview"]["status"] == "running"
     assert data["preview"]["image"] == {"filename": "live.png", "subfolder": "", "type": "temp"}
+
+
+def test_live_preview_returns_503_when_comfy_unavailable(client, monkeypatch):
+    monkeypatch.setattr(app_module, "_comfy_available", lambda: False)
+
+    resp = client.get("/api/image/live-preview?prompt_ids=pid-1")
+
+    assert resp.status_code == 503
+    data = resp.get_json()
+    assert data["ok"] is False
+    assert data["preview"] is None
+    assert "ComfyUI" in data["error"]
+
+
+def test_live_preview_queue_fetch_failure_returns_no_preview_when_no_images(client, monkeypatch):
+    """If the ComfyUI queue fetch raises, the warning is logged and we fall through.
+    When _parse_prompt_images also returns nothing, result is ok=True, preview=None."""
+    monkeypatch.setattr(app_module, "_comfy_available", lambda: True)
+
+    def exploding_get(url, timeout=0, **kwargs):
+        raise app_module.requests.ConnectionError("refused")
+
+    monkeypatch.setattr(app_module.requests, "get", exploding_get)
+    monkeypatch.setattr(app_module, "_parse_prompt_images", lambda pid: [])
+
+    resp = client.get("/api/image/live-preview?prompt_ids=pid-x")
+
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["ok"] is True
+    assert data["preview"] is None
+
+
+def test_live_preview_parse_exception_skips_prompt_id(client, monkeypatch):
+    """If _parse_prompt_images raises RequestException for a prompt_id it is skipped;
+    the next prompt_id is tried; if none succeed, result is ok=True, preview=None."""
+    monkeypatch.setattr(app_module, "_comfy_available", lambda: True)
+    monkeypatch.setattr(
+        app_module.requests,
+        "get",
+        lambda url, timeout=0, **kw: DummyResponse(
+            payload={"queue_running": [], "queue_pending": []}
+        ),
+    )
+
+    call_order = []
+
+    def flaky_parse(prompt_id):
+        call_order.append(prompt_id)
+        raise app_module.requests.ConnectionError("timeout")
+
+    monkeypatch.setattr(app_module, "_parse_prompt_images", flaky_parse)
+
+    resp = client.get("/api/image/live-preview?prompt_ids=pid-a,pid-b")
+
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["ok"] is True
+    assert data["preview"] is None
+    # Both prompt_ids were attempted before giving up
+    assert call_order == ["pid-a", "pid-b"]
+
+
+# ---------------------------------------------------------------------------
+# _coerce_seed / _clamp_int / _clamp_float — unit tests for workflow helpers
+# ---------------------------------------------------------------------------
+
+def test_coerce_seed_none_and_empty_produce_positive_int():
+    for bad in (None, "", -1, -99, "not-a-number"):
+        seed = app_module._coerce_seed(bad)
+        assert isinstance(seed, int)
+        assert seed >= 1
+
+
+def test_coerce_seed_valid_positive_passthrough():
+    assert app_module._coerce_seed(42) == 42
+    assert app_module._coerce_seed("123") == 123
+    assert app_module._coerce_seed(0) == 0
+
+
+def test_clamp_int_clamps_to_bounds():
+    assert app_module._clamp_int(0, app_module.MIN_STEPS, app_module.MAX_STEPS) == app_module.MIN_STEPS
+    assert app_module._clamp_int(9999, app_module.MIN_STEPS, app_module.MAX_STEPS) == app_module.MAX_STEPS
+    assert app_module._clamp_int(30, app_module.MIN_STEPS, app_module.MAX_STEPS) == 30
+
+
+def test_clamp_float_clamps_to_bounds():
+    assert app_module._clamp_float(0.0, app_module.MIN_CFG, app_module.MAX_CFG) == app_module.MIN_CFG
+    assert app_module._clamp_float(999.0, app_module.MIN_CFG, app_module.MAX_CFG) == app_module.MAX_CFG
+    assert app_module._clamp_float(7.0, app_module.MIN_CFG, app_module.MAX_CFG) == 7.0
+
+
+def test_image_generate_clamps_out_of_range_workflow_params(client, monkeypatch):
+    """Values outside allowed ranges are clamped before the workflow is built."""
+    monkeypatch.setattr(app_module, "_comfy_available", lambda: True)
+
+    captured_meta = {}
+
+    def fake_build(body):
+        # Call the real builder so clamping is exercised
+        workflow, meta = app_module._original_build_txt2img_workflow(body)
+        captured_meta.update(meta)
+        return workflow, meta
+
+    # Expose the real builder under an alias for the spy
+    app_module._original_build_txt2img_workflow = app_module._build_txt2img_workflow
+
+    def fake_submit(workflow):
+        return {"prompt_id": "pid-clamp", "number": 1}
+
+    monkeypatch.setattr(app_module, "_build_txt2img_workflow", fake_build)
+    monkeypatch.setattr(app_module, "_comfy_submit_prompt", fake_submit)
+
+    resp = client.post(
+        "/api/image/generate",
+        json={
+            "prompt": "clamp test",
+            "steps": 9999,          # > MAX_STEPS (150)
+            "cfg": 0.0,             # < MIN_CFG (1.0)
+            "width": 100,           # < 256
+            "height": 8192,         # > 2048
+            "batch_size": 50,       # > 8
+        },
+    )
+
+    assert resp.status_code == 200
+    assert captured_meta["steps"] == app_module.MAX_STEPS
+    assert captured_meta["cfg"] == app_module.MIN_CFG
+    assert captured_meta["width"] == 256
+    assert captured_meta["height"] == 2048
+    assert captured_meta["batch_size"] == 8
