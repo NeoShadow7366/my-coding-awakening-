@@ -272,6 +272,61 @@ def test_image_delete_removes_file_and_history_refs(client, monkeypatch, tmp_pat
     assert history[0]["prompt"] == "keep"
 
 
+def test_image_delete_prunes_all_matching_refs_across_entries(client, monkeypatch, tmp_path):
+    image_path = tmp_path / "shared.png"
+    image_path.write_bytes(b"png")
+
+    monkeypatch.setattr(app_module, "_resolve_comfy_image_path", lambda image_ref: image_path)
+
+    shared_ref = {"filename": "shared.png", "subfolder": "", "type": "output"}
+    entry_a = {
+        "type": "image",
+        "prompt": "entry-a",
+        "negative_prompt": "",
+        "engine": "comfyui",
+        "model": "m1",
+        "params": {"steps": 20},
+        "images": [shared_ref],
+    }
+    entry_b = {
+        "type": "image",
+        "prompt": "entry-b",
+        "negative_prompt": "",
+        "engine": "comfyui",
+        "model": "m2",
+        "params": {"steps": 20},
+        "images": [shared_ref],
+    }
+    keep_entry = {
+        "type": "image",
+        "prompt": "keep",
+        "negative_prompt": "",
+        "engine": "comfyui",
+        "model": "m3",
+        "params": {"steps": 20},
+        "images": [{"filename": "keep.png", "subfolder": "", "type": "output"}],
+    }
+
+    assert client.post("/api/history", json=entry_a).status_code == 201
+    assert client.post("/api/history", json=entry_b).status_code == 201
+    assert client.post("/api/history", json=keep_entry).status_code == 201
+
+    resp = client.post("/api/image/delete", json=shared_ref)
+
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["ok"] is True
+    assert data["deleted"] is True
+    assert data["removed_history_refs"] == 2
+    assert data["removed_history_entries"] == 2
+    assert not image_path.exists()
+
+    history_resp = client.get("/api/history?type=image")
+    history = history_resp.get_json()["history"]
+    assert len(history) == 1
+    assert history[0]["prompt"] == "keep"
+
+
 def test_live_preview_returns_first_available_prompt_image(client, monkeypatch):
     monkeypatch.setattr(app_module, "_comfy_available", lambda: True)
 
