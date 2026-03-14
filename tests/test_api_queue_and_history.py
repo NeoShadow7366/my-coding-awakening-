@@ -283,6 +283,34 @@ def test_image_open_location_success_linux_uses_xdg_open_parent(client, monkeypa
     assert seen["args"] == ["xdg-open", str(image_path.parent)]
 
 
+def test_image_open_location_returns_404_when_file_missing(client, monkeypatch, tmp_path):
+    missing_path = tmp_path / "missing.png"
+    monkeypatch.setattr(app_module, "_resolve_comfy_image_path", lambda _: missing_path)
+
+    resp = client.post("/api/image/open-location", json={"filename": "missing.png", "subfolder": "", "type": "output"})
+
+    assert resp.status_code == 404
+    assert "not found on disk" in resp.get_json()["error"]
+
+
+def test_image_open_location_launcher_failure_returns_500(client, monkeypatch, tmp_path):
+    image_path = tmp_path / "open-fail.png"
+    image_path.write_bytes(b"png")
+
+    monkeypatch.setattr(app_module, "_resolve_comfy_image_path", lambda _: image_path)
+    monkeypatch.setattr(app_module.os, "name", "nt", raising=False)
+
+    def explode_popen(*args, **kwargs):
+        raise OSError("explorer unavailable")
+
+    monkeypatch.setattr(app_module.subprocess, "Popen", explode_popen)
+
+    resp = client.post("/api/image/open-location", json={"filename": "open-fail.png", "subfolder": "", "type": "output"})
+
+    assert resp.status_code == 500
+    assert "explorer unavailable" in resp.get_json()["error"]
+
+
 def test_image_delete_removes_file_and_history_refs(client, monkeypatch, tmp_path):
     image_path = tmp_path / "to-delete.png"
     image_path.write_bytes(b"png")
