@@ -26,6 +26,29 @@ def test_image_generate_requires_prompt(client, monkeypatch):
     assert resp.get_json()["error"] == "prompt is required"
 
 
+def test_image_generate_rerun_payload_missing_prompt_returns_400(client, monkeypatch):
+    monkeypatch.setattr(app_module, "_comfy_available", lambda: True)
+
+    # Mirrors a rerun-style payload shape but intentionally omits prompt.
+    rerun_like_payload = {
+        "negative_prompt": "",
+        "model": "AnythingXL_xl.safetensors",
+        "sampler": "euler",
+        "scheduler": "normal",
+        "steps": 30,
+        "cfg": 7,
+        "width": 1024,
+        "height": 1024,
+        "batch_size": 1,
+        "mode": "txt2img",
+    }
+
+    resp = client.post("/api/image/generate", json=rerun_like_payload)
+
+    assert resp.status_code == 400
+    assert resp.get_json()["error"] == "prompt is required"
+
+
 def test_image_generate_unavailable_returns_503(client, monkeypatch):
     monkeypatch.setattr(app_module, "_comfy_available", lambda: False)
 
