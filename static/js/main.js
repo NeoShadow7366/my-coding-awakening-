@@ -21,6 +21,21 @@ const panelGen = document.getElementById('panel-generative');
 const panelImage = document.getElementById('panel-image');
 const panelConfig = document.getElementById('panel-config');
 const panelModels = document.getElementById('panel-models');
+const mbSearchBtn = document.getElementById('mb-search-btn');
+const mbSearchQuery = document.getElementById('mb-search-query');
+const mbSearchType = document.getElementById('mb-search-type');
+const mbLibraryRefreshBtn = document.getElementById('mb-library-refresh-btn');
+const mbLibraryGrid = document.getElementById('mb-library-grid');
+const mbLibraryStatus = document.getElementById('mb-library-status');
+const mbResultsSection = document.getElementById('mb-results-section');
+const mbResultsGrid = document.getElementById('mb-results-grid');
+const mbResultsCount = document.getElementById('mb-results-count');
+const mbSearchStatus = document.getElementById('mb-search-status');
+const mbDownloadsSection = document.getElementById('mb-downloads-section');
+const mbDownloadsList = document.getElementById('mb-downloads-list');
+const mbPrevPage = document.getElementById('mb-prev-page');
+const mbNextPage = document.getElementById('mb-next-page');
+const mbPageInfo = document.getElementById('mb-page-info');
 
 // Text panel
 const modelSelect = document.getElementById('gen-model-select');
@@ -3238,22 +3253,6 @@ function bindSuggestionTagCollapsers() {
 }
 
 // ─── Model Browser ────────────────────────────────────────────────────────────
-
-const mbSearchBtn         = document.getElementById('mb-search-btn');
-const mbSearchQuery       = document.getElementById('mb-search-query');
-const mbSearchType        = document.getElementById('mb-search-type');
-const mbLibraryRefreshBtn = document.getElementById('mb-library-refresh-btn');
-const mbLibraryGrid       = document.getElementById('mb-library-grid');
-const mbLibraryStatus     = document.getElementById('mb-library-status');
-const mbResultsSection    = document.getElementById('mb-results-section');
-const mbResultsGrid       = document.getElementById('mb-results-grid');
-const mbResultsCount      = document.getElementById('mb-results-count');
-const mbSearchStatus      = document.getElementById('mb-search-status');
-const mbDownloadsSection  = document.getElementById('mb-downloads-section');
-const mbDownloadsList     = document.getElementById('mb-downloads-list');
-const mbPrevPage          = document.getElementById('mb-prev-page');
-const mbNextPage          = document.getElementById('mb-next-page');
-const mbPageInfo          = document.getElementById('mb-page-info');
 
 let mbCurrentPage = 1;
 let mbTotalPages  = 1;
