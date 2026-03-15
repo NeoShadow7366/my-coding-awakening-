@@ -213,6 +213,9 @@ def test_diagnostics_drawer_keyboard_handler_wiring_present_in_js_bundle():
     assert "appendDiagnosticsConsoleLine(attempted ? 'Triggered ComfyUI websocket retry attempt.' : 'ComfyUI websocket already connected.');" in content
     assert "} else if (event.key === 'Home' && event.ctrlKey) {" in content
     assert "} else if (event.key === 'End' && event.ctrlKey) {" in content
+    assert "const now = new Date();" in content
+    assert "const ts = now.toTimeString().slice(0, 8);" in content
+    assert "row.textContent = `[${ts}] ${text}`;" in content
 
 
 def test_index_model_download_actions_and_modal_semantics():

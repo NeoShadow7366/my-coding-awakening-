@@ -369,9 +369,11 @@ const DIAGNOSTICS_COMMAND_SUGGESTIONS = [
 
 function appendDiagnosticsConsoleLine(text, level = 'info') {
 	if (!diagDrawerOutput) return;
+	const now = new Date();
+	const ts = now.toTimeString().slice(0, 8);
 	const row = document.createElement('p');
 	row.className = `diag-line ${level}`.trim();
-	row.textContent = text;
+	row.textContent = `[${ts}] ${text}`;
 	diagDrawerOutput.appendChild(row);
 	while (diagDrawerOutput.childElementCount > 250) {
 		diagDrawerOutput.removeChild(diagDrawerOutput.firstChild);
