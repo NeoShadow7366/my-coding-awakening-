@@ -288,12 +288,24 @@ def test_model_search_aborts_previous_requests_and_ignores_stale_results():
 
     assert "let mbSearchAbortController = null;" in content
     assert "let mbSearchRequestSeq = 0;" in content
+    assert "let mbSearchInFlight = false;" in content
     assert "const requestId = ++mbSearchRequestSeq;" in content
     assert "mbSearchAbortController.abort();" in content
     assert "const { signal } = mbSearchAbortController;" in content
+    assert "mbSearchInFlight = true;" in content
+    assert "mbSearchInFlight = false;" in content
     assert "await fetch(endpoint + params.toString(), { signal });" in content
     assert "if (requestId !== mbSearchRequestSeq) return;" in content
     assert "if (err && err.name === 'AbortError') return;" in content
+
+
+def test_model_search_disables_pagination_controls_while_request_is_active():
+    js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
+    content = js_path.read_text(encoding="utf-8")
+
+    assert "mbPrevPage.disabled = mbSearchInFlight || mbCurrentPage <= 1;" in content
+    assert "mbNextPage.disabled = mbSearchInFlight || (mbQueryMode ? !mbHasNextPage : (mbCurrentPage >= mbTotalPages));" in content
+    assert "if (mbSearchInFlight) return;" in content
 
 
 def test_model_modal_preserves_search_result_type_when_details_are_less_specific():

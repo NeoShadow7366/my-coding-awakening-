@@ -4017,6 +4017,7 @@ let mbModelModalLastFocus = null;
 let mbReportTargetTimer = null;
 let mbSearchAbortController = null;
 let mbSearchRequestSeq = 0;
+let mbSearchInFlight = false;
 
 if (mbLocalQuery) {
 	mbLocalQuery.value = localStorage.getItem('mbLocalQuery') || '';
@@ -5557,6 +5558,7 @@ async function runCivitaiSearch(page) {
 	}
 	mbSearchAbortController = new AbortController();
 	const { signal } = mbSearchAbortController;
+	mbSearchInFlight = true;
 	if (mbSearchBtn) mbSearchBtn.disabled = true;
 	const provider = mbProvider ? String(mbProvider.value || 'civitai') : 'civitai';
 	const query = mbSearchQuery ? mbSearchQuery.value.trim() : '';
@@ -5569,6 +5571,7 @@ async function runCivitaiSearch(page) {
 	if (mbCurrentPage <= 1) {
 		mbCursorByPage = { 1: '' };
 	}
+	updatePagination();
 	setModelSearchStatus(provider === 'huggingface' ? 'Searching Hugging Face…' : 'Searching CivitAI…', true);
 	if (mbResultsCount) mbResultsCount.textContent = '';
 	mbResultsGrid.innerHTML = '';
@@ -5619,8 +5622,11 @@ async function runCivitaiSearch(page) {
 		if (mbPagination) mbPagination.hidden = true;
 		setModelSearchStatus('Search failed: ' + err.message, true);
 	} finally {
-		if (requestId === mbSearchRequestSeq && mbSearchBtn) {
-			mbSearchBtn.disabled = false;
+		if (requestId === mbSearchRequestSeq) {
+			mbSearchInFlight = false;
+			mbSearchAbortController = null;
+			if (mbSearchBtn) mbSearchBtn.disabled = false;
+			updatePagination();
 		}
 	}
 }
@@ -5697,12 +5703,17 @@ function renderSearchResults(items, totalItems, hasProviderTotal = false) {
 }
 
 function updatePagination() {
-	if (!mbPrevPage || !mbNextPage || !mbPageInfo) return;
-	mbPrevPage.disabled = mbCurrentPage <= 1;
-	mbNextPage.disabled = mbQueryMode ? !mbHasNextPage : (mbCurrentPage >= mbTotalPages);
-	mbPageInfo.textContent = mbQueryMode
-		? (mbHasNextPage ? `Page ${mbCurrentPage} (more available)` : `Page ${mbCurrentPage}`)
-		: `Page ${mbCurrentPage} of ${mbTotalPages}`;
+	if (mbPrevPage) {
+		mbPrevPage.disabled = mbSearchInFlight || mbCurrentPage <= 1;
+	}
+	if (mbNextPage) {
+		mbNextPage.disabled = mbSearchInFlight || (mbQueryMode ? !mbHasNextPage : (mbCurrentPage >= mbTotalPages));
+	}
+	if (mbPageInfo) {
+		mbPageInfo.textContent = mbQueryMode
+			? (mbHasNextPage ? `Page ${mbCurrentPage} (more available)` : `Page ${mbCurrentPage}`)
+			: `Page ${mbCurrentPage} of ${mbTotalPages}`;
+	}
 }
 
 async function startModelDownload(url, fileName, folder, btn, provider = 'civitai', modelId = '', versionName = '', modelName = '', modelType = '', baseModel = '', modelUrl = '', previewUrl = '') {
@@ -6162,11 +6173,15 @@ if (mbLocalMatchedOnly) {
 	mbLocalMatchedOnly.addEventListener('keydown', onLocalLibraryQuickFiltersKeydown);
 }
 if (mbPrevPage) {
-	mbPrevPage.addEventListener('click', () => { if (mbCurrentPage > 1) runCivitaiSearch(mbCurrentPage - 1); });
+	mbPrevPage.addEventListener('click', () => {
+		if (mbSearchInFlight) return;
+		if (mbCurrentPage > 1) runCivitaiSearch(mbCurrentPage - 1);
+	});
 	mbPrevPage.addEventListener('keydown', onModelPaginationKeydown);
 }
 if (mbNextPage) {
 	mbNextPage.addEventListener('click', () => {
+		if (mbSearchInFlight) return;
 		if (mbQueryMode) {
 			if (mbHasNextPage) runCivitaiSearch(mbCurrentPage + 1);
 			return;
