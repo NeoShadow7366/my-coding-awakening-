@@ -16,9 +16,11 @@ const statusText = document.getElementById('status-text');
 const navGenerative = document.getElementById('nav-generative');
 const navImage = document.getElementById('nav-image');
 const navConfig = document.getElementById('nav-config');
+const navModels = document.getElementById('nav-models');
 const panelGen = document.getElementById('panel-generative');
 const panelImage = document.getElementById('panel-image');
 const panelConfig = document.getElementById('panel-config');
+const panelModels = document.getElementById('panel-models');
 
 // Text panel
 const modelSelect = document.getElementById('gen-model-select');
@@ -470,46 +472,21 @@ themeToggle.addEventListener('click', () => {
 	 Tab navigation
 	 -------------------------------------------------------------------------- */
 function showPanel(panel) {
-	if (panel === 'generative') {
-		panelGen.classList.add('active');
-		panelImage.classList.remove('active');
-		if (panelConfig) panelConfig.classList.remove('active');
-		panelGen.hidden = false;
-		panelImage.hidden = true;
-		if (panelConfig) panelConfig.hidden = true;
-		navGenerative.classList.add('active');
-		navImage.classList.remove('active');
-		if (navConfig) navConfig.classList.remove('active');
-		navGenerative.setAttribute('aria-selected', 'true');
-		navImage.setAttribute('aria-selected', 'false');
-		if (navConfig) navConfig.setAttribute('aria-selected', 'false');
-	} else if (panel === 'image') {
-		panelImage.classList.add('active');
-		panelGen.classList.remove('active');
-		if (panelConfig) panelConfig.classList.remove('active');
-		panelImage.hidden = false;
-		panelGen.hidden = true;
-		if (panelConfig) panelConfig.hidden = true;
-		navImage.classList.add('active');
-		navGenerative.classList.remove('active');
-		if (navConfig) navConfig.classList.remove('active');
-		navImage.setAttribute('aria-selected', 'true');
-		navGenerative.setAttribute('aria-selected', 'false');
-		if (navConfig) navConfig.setAttribute('aria-selected', 'false');
-	} else {
-		if (panelConfig) panelConfig.classList.add('active');
-		panelGen.classList.remove('active');
-		panelImage.classList.remove('active');
-		if (panelConfig) panelConfig.hidden = false;
-		panelGen.hidden = true;
-		panelImage.hidden = true;
-		if (navConfig) navConfig.classList.add('active');
-		navGenerative.classList.remove('active');
-		navImage.classList.remove('active');
-		if (navConfig) navConfig.setAttribute('aria-selected', 'true');
-		navGenerative.setAttribute('aria-selected', 'false');
-		navImage.setAttribute('aria-selected', 'false');
-	}
+	const allPanels = [panelGen, panelImage, panelConfig, panelModels].filter(Boolean);
+	const allNavs = [navGenerative, navImage, navConfig, navModels].filter(Boolean);
+	allPanels.forEach(p => { p.hidden = true; p.classList.remove('active'); });
+	allNavs.forEach(n => { n.classList.remove('active'); n.setAttribute('aria-selected', 'false'); });
+
+	let targetPanel = panelGen;
+	let targetNav = navGenerative;
+	if (panel === 'image') { targetPanel = panelImage; targetNav = navImage; }
+	else if (panel === 'config') { targetPanel = panelConfig; targetNav = navConfig; }
+	else if (panel === 'models') { targetPanel = panelModels; targetNav = navModels; }
+
+	if (targetPanel) { targetPanel.hidden = false; targetPanel.classList.add('active'); }
+	if (targetNav) { targetNav.classList.add('active'); targetNav.setAttribute('aria-selected', 'true'); }
+
+	if (panel === 'models') mbOnTabActivate();
 	localStorage.setItem('activePanel', panel);
 }
 
@@ -527,10 +504,16 @@ if (navConfig) {
 		showPanel('config');
 	});
 }
+if (navModels) {
+	navModels.addEventListener('click', (e) => {
+		e.preventDefault();
+		showPanel('models');
+	});
+}
 
 (function initPanel() {
 	const saved = localStorage.getItem('activePanel');
-	if (saved === 'image' || saved === 'config') {
+	if (saved === 'image' || saved === 'config' || saved === 'models') {
 		showPanel(saved);
 		return;
 	}
@@ -3252,6 +3235,314 @@ function bindSuggestionTagCollapsers() {
 		btn.setAttribute('aria-controls', targetId);
 		btn.setAttribute('aria-expanded', target.hidden ? 'false' : 'true');
 	});
+}
+
+// ─── Model Browser ────────────────────────────────────────────────────────────
+
+const mbSearchBtn         = document.getElementById('mb-search-btn');
+const mbSearchQuery       = document.getElementById('mb-search-query');
+const mbSearchType        = document.getElementById('mb-search-type');
+const mbLibraryRefreshBtn = document.getElementById('mb-library-refresh-btn');
+const mbLibraryGrid       = document.getElementById('mb-library-grid');
+const mbLibraryStatus     = document.getElementById('mb-library-status');
+const mbResultsSection    = document.getElementById('mb-results-section');
+const mbResultsGrid       = document.getElementById('mb-results-grid');
+const mbResultsCount      = document.getElementById('mb-results-count');
+const mbSearchStatus      = document.getElementById('mb-search-status');
+const mbDownloadsSection  = document.getElementById('mb-downloads-section');
+const mbDownloadsList     = document.getElementById('mb-downloads-list');
+const mbPrevPage          = document.getElementById('mb-prev-page');
+const mbNextPage          = document.getElementById('mb-next-page');
+const mbPageInfo          = document.getElementById('mb-page-info');
+
+let mbCurrentPage = 1;
+let mbTotalPages  = 1;
+let mbPollTimer   = null;
+
+function formatBytes(bytes) {
+	if (!bytes || bytes === 0) return '—';
+	const units = ['B', 'KB', 'MB', 'GB'];
+	let v = bytes;
+	let i = 0;
+	while (v >= 1024 && i < units.length - 1) { v /= 1024; i++; }
+	return v.toFixed(i === 0 ? 0 : 1) + ' ' + units[i];
+}
+
+function mbOnTabActivate() {
+	loadModelLibrary();
+}
+
+async function loadModelLibrary() {
+	if (!mbLibraryGrid) return;
+	if (mbLibraryStatus) { mbLibraryStatus.textContent = 'Scanning local models…'; mbLibraryStatus.hidden = false; }
+	mbLibraryGrid.innerHTML = '';
+	try {
+		const resp = await fetch('/api/models/library');
+		const data = await resp.json();
+		if (!resp.ok) throw new Error(data.error || resp.statusText);
+		renderLocalLibrary(data.models || [], data.models_root || '');
+	} catch (err) {
+		if (mbLibraryStatus) { mbLibraryStatus.textContent = 'Could not load local models: ' + err.message; mbLibraryStatus.hidden = false; }
+	}
+}
+
+function renderLocalLibrary(models, root) {
+	if (!mbLibraryGrid) return;
+	mbLibraryGrid.innerHTML = '';
+	if (models.length === 0) {
+		if (mbLibraryStatus) {
+			mbLibraryStatus.textContent = root ? 'No models found in ' + root : 'ComfyUI path not configured — set it on the Configurations tab.';
+			mbLibraryStatus.hidden = false;
+		}
+		return;
+	}
+	if (mbLibraryStatus) mbLibraryStatus.hidden = true;
+	models.forEach(m => {
+		const card = document.createElement('div');
+		card.className = 'mb-local-card';
+		card.innerHTML = `
+			<div class="mb-local-card-name" title="${escHtml(m.name)}">${escHtml(m.name)}</div>
+			<div class="mb-local-card-meta">${escHtml(m.folder)} &middot; ${formatBytes(m.size_bytes)}</div>
+			<div class="mb-local-card-actions">
+				<button class="btn btn-sm btn-danger mb-delete-btn" data-name="${escHtml(m.name)}" data-folder="${escHtml(m.folder)}">Delete</button>
+			</div>`;
+		mbLibraryGrid.appendChild(card);
+	});
+	mbLibraryGrid.querySelectorAll('.mb-delete-btn').forEach(btn => {
+		btn.addEventListener('click', () => deleteLocalModel(btn.dataset.name, btn.dataset.folder, btn));
+	});
+}
+
+async function deleteLocalModel(fileName, folder, btn) {
+	if (!confirm(`Delete "${fileName}" from ${folder}? This cannot be undone.`)) return;
+	if (btn) btn.disabled = true;
+	try {
+		const resp = await fetch('/api/models/delete', {
+			method: 'POST',
+			headers: {'Content-Type': 'application/json'},
+			body: JSON.stringify({file_name: fileName, folder})
+		});
+		const data = await resp.json();
+		if (!resp.ok) throw new Error(data.error || resp.statusText);
+		loadModelLibrary();
+	} catch (err) {
+		alert('Delete failed: ' + err.message);
+		if (btn) btn.disabled = false;
+	}
+}
+
+async function runCivitaiSearch(page) {
+	if (!mbResultsGrid) return;
+	const query = mbSearchQuery ? mbSearchQuery.value.trim() : '';
+	const type  = mbSearchType  ? mbSearchType.value : '';
+	mbCurrentPage = page || 1;
+	if (mbSearchStatus) { mbSearchStatus.textContent = 'Searching…'; mbSearchStatus.hidden = false; }
+	if (mbResultsCount) mbResultsCount.textContent = '';
+	mbResultsGrid.innerHTML = '';
+	if (mbResultsSection) mbResultsSection.hidden = false;
+	try {
+		const params = new URLSearchParams({page: mbCurrentPage});
+		if (query) params.set('query', query);
+		if (type)  params.set('type', type);
+		const resp = await fetch('/api/models/civitai/search?' + params.toString());
+		const data = await resp.json();
+		if (!resp.ok) throw new Error(data.error || resp.statusText);
+		mbTotalPages = data.total_pages || 1;
+		renderSearchResults(data.items || [], data.total_items);
+	} catch (err) {
+		if (mbSearchStatus) { mbSearchStatus.textContent = 'Search failed: ' + err.message; mbSearchStatus.hidden = false; }
+	}
+}
+
+function renderSearchResults(items, totalItems) {
+	if (!mbResultsGrid) return;
+	mbResultsGrid.innerHTML = '';
+	if (mbSearchStatus) mbSearchStatus.hidden = true;
+	if (mbResultsCount) mbResultsCount.textContent = totalItems != null ? `(${totalItems.toLocaleString()} total)` : '';
+	if (items.length === 0) {
+		mbResultsGrid.innerHTML = '<p class="mb-library-status">No results found.</p>';
+		updatePagination();
+		return;
+	}
+	items.forEach(item => {
+		const card = document.createElement('div');
+		card.className = 'mb-result-card';
+		const thumb = item.preview_url
+			? `<img class="mb-result-thumb" src="${escHtml(item.preview_url)}" alt="" loading="lazy">`
+			: `<div class="mb-result-thumb-placeholder"></div>`;
+		card.innerHTML = `
+			${thumb}
+			<div class="mb-result-body">
+				<div class="mb-result-name" title="${escHtml(item.name)}">${escHtml(item.name)}</div>
+				<div class="mb-result-meta">
+					<span class="mb-type-chip">${escHtml(item.type || '')}</span>
+					${item.rating != null ? `<span>&#9733; ${item.rating.toFixed(1)}</span>` : ''}
+					${item.download_count != null ? `<span>${item.download_count.toLocaleString()} downloads</span>` : ''}
+				</div>
+				${item.version_name ? `<div class="mb-result-meta" style="font-size:0.78em;opacity:0.7">v: ${escHtml(item.version_name)}</div>` : ''}
+				<div class="mb-result-actions">
+					<button class="btn btn-sm btn-primary mb-dl-btn"
+						data-url="${escHtml(item.download_url || '')}"
+						data-name="${escHtml(item.file_name || item.name)}"
+						data-folder="${escHtml(item.model_type_folder || 'checkpoints')}"
+						${item.download_url ? '' : 'disabled title="No download URL available"'}>
+						Download
+					</button>
+				</div>
+			</div>`;
+		mbResultsGrid.appendChild(card);
+	});
+	mbResultsGrid.querySelectorAll('.mb-dl-btn').forEach(btn => {
+		btn.addEventListener('click', () => startModelDownload(btn.dataset.url, btn.dataset.name, btn.dataset.folder, btn));
+	});
+	updatePagination();
+}
+
+function updatePagination() {
+	if (!mbPrevPage || !mbNextPage || !mbPageInfo) return;
+	mbPrevPage.disabled = mbCurrentPage <= 1;
+	mbNextPage.disabled = mbCurrentPage >= mbTotalPages;
+	mbPageInfo.textContent = `Page ${mbCurrentPage} of ${mbTotalPages}`;
+}
+
+async function startModelDownload(url, fileName, folder, btn) {
+	if (!url) return;
+	if (btn) btn.disabled = true;
+	try {
+		const resp = await fetch('/api/models/download', {
+			method: 'POST',
+			headers: {'Content-Type': 'application/json'},
+			body: JSON.stringify({url, file_name: fileName, folder})
+		});
+		const data = await resp.json();
+		if (!resp.ok) throw new Error(data.error || resp.statusText);
+		if (mbDownloadsSection) mbDownloadsSection.hidden = false;
+		ensureDownloadPoll();
+	} catch (err) {
+		alert('Download failed to start: ' + err.message);
+		if (btn) btn.disabled = false;
+	}
+}
+
+async function refreshDownloadsList() {
+	if (!mbDownloadsList) return;
+	try {
+		// Collect known download IDs from existing rows, then poll each
+		const rows = mbDownloadsList.querySelectorAll('[data-dl-id]');
+		const ids = Array.from(rows).map(r => r.dataset.dlId);
+		if (ids.length === 0) { stopDownloadPoll(); return; }
+		await Promise.all(ids.map(async id => {
+			const r = await fetch('/api/models/download/' + encodeURIComponent(id));
+			if (!r.ok) return;
+			const state = await r.json();
+			updateDownloadRow(id, state);
+		}));
+	} catch (_) { /* ignore poll errors */ }
+}
+
+function ensureDownloadPoll() {
+	if (mbPollTimer) return;
+	// Immediately render any pending rows by fetching full state
+	fetchAndRenderAllDownloads();
+	mbPollTimer = setInterval(fetchAndRenderAllDownloads, 1500);
+}
+
+function stopDownloadPoll() {
+	if (mbPollTimer) { clearInterval(mbPollTimer); mbPollTimer = null; }
+}
+
+async function fetchAndRenderAllDownloads() {
+	if (!mbDownloadsList) return;
+	// We don't have a list endpoint, so just refresh existing rows
+	const rows = mbDownloadsList.querySelectorAll('[data-dl-id]');
+	if (rows.length === 0) { stopDownloadPoll(); return; }
+	let anyActive = false;
+	await Promise.all(Array.from(rows).map(async row => {
+		const id = row.dataset.dlId;
+		try {
+			const r = await fetch('/api/models/download/' + encodeURIComponent(id));
+			if (!r.ok) return;
+			const state = await r.json();
+			updateDownloadRow(id, state);
+			if (state.status === 'downloading') anyActive = true;
+		} catch (_) {}
+	}));
+	if (!anyActive) stopDownloadPoll();
+}
+
+function addDownloadRow(downloadId, fileName) {
+	if (!mbDownloadsList) return;
+	const row = document.createElement('div');
+	row.className = 'mb-download-row';
+	row.dataset.dlId = downloadId;
+	row.innerHTML = `
+		<div class="mb-download-row-head">
+			<span class="mb-download-name">${escHtml(fileName)}</span>
+			<span class="mb-download-status">queued</span>
+			<button class="btn btn-sm mb-cancel-dl-btn" data-id="${escHtml(downloadId)}">Cancel</button>
+		</div>
+		<div class="mb-progress"><div class="mb-progress-bar" style="width:0%"></div></div>`;
+	mbDownloadsList.appendChild(row);
+	row.querySelector('.mb-cancel-dl-btn').addEventListener('click', () => cancelDownload(downloadId, row));
+	ensureDownloadPoll();
+}
+
+function updateDownloadRow(downloadId, state) {
+	if (!mbDownloadsList) return;
+	let row = mbDownloadsList.querySelector(`[data-dl-id="${CSS.escape(downloadId)}"]`);
+	if (!row) {
+		// Create row if missing (e.g. on page reload)
+		const newRow = document.createElement('div');
+		newRow.className = 'mb-download-row';
+		newRow.dataset.dlId = downloadId;
+		newRow.innerHTML = `
+			<div class="mb-download-row-head">
+				<span class="mb-download-name">${escHtml(state.file_name || downloadId)}</span>
+				<span class="mb-download-status"></span>
+				<button class="btn btn-sm mb-cancel-dl-btn" data-id="${escHtml(downloadId)}">Cancel</button>
+			</div>
+			<div class="mb-progress"><div class="mb-progress-bar" style="width:0%"></div></div>`;
+		mbDownloadsList.appendChild(newRow);
+		newRow.querySelector('.mb-cancel-dl-btn').addEventListener('click', () => cancelDownload(downloadId, newRow));
+		row = newRow;
+	}
+	const statusEl = row.querySelector('.mb-download-status');
+	const bar      = row.querySelector('.mb-progress-bar');
+	const cancelBtn = row.querySelector('.mb-cancel-dl-btn');
+	if (statusEl) statusEl.textContent = state.status === 'downloading'
+		? `${state.downloaded_bytes != null ? formatBytes(state.downloaded_bytes) : ''}${state.total_bytes ? ' / ' + formatBytes(state.total_bytes) : ''}`
+		: state.status;
+	const pct = state.total_bytes && state.total_bytes > 0 ? (state.downloaded_bytes / state.total_bytes) * 100 : 0;
+	if (bar) bar.style.width = pct.toFixed(1) + '%';
+	row.classList.toggle('is-done',      state.status === 'done');
+	row.classList.toggle('is-error',     state.status === 'error');
+	row.classList.toggle('is-cancelled', state.status === 'cancelled');
+	if (cancelBtn) cancelBtn.hidden = (state.status !== 'downloading');
+	if (state.status === 'done') loadModelLibrary();
+}
+
+async function cancelDownload(downloadId, row) {
+	try {
+		await fetch('/api/models/download/' + encodeURIComponent(downloadId) + '/cancel', {method: 'POST'});
+		if (row) row.classList.add('is-cancelled');
+	} catch (_) {}
+}
+
+// Wire model browser events
+if (mbSearchBtn) {
+	mbSearchBtn.addEventListener('click', () => runCivitaiSearch(1));
+}
+if (mbSearchQuery) {
+	mbSearchQuery.addEventListener('keydown', (e) => { if (e.key === 'Enter') runCivitaiSearch(1); });
+}
+if (mbLibraryRefreshBtn) {
+	mbLibraryRefreshBtn.addEventListener('click', loadModelLibrary);
+}
+if (mbPrevPage) {
+	mbPrevPage.addEventListener('click', () => { if (mbCurrentPage > 1) runCivitaiSearch(mbCurrentPage - 1); });
+}
+if (mbNextPage) {
+	mbNextPage.addEventListener('click', () => { if (mbCurrentPage < mbTotalPages) runCivitaiSearch(mbCurrentPage + 1); });
 }
 
 function buildRandomPromptFromTags() {

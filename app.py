@@ -958,6 +958,267 @@ def index():
 # Routes — API
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# Model browser state
+# ---------------------------------------------------------------------------
+
+_model_downloads: dict[str, dict] = {}      # download_id → state dict
+_model_downloads_lock = threading.Lock()
+
+_CIVITAI_API = "https://civitai.com/api/v1"
+_CIVITAI_MODEL_TYPES = {"Checkpoint", "LORA", "VAE", "TextualInversion", "ControlNet", "Upscaler"}
+
+# Maps CivitAI model type → ComfyUI subfolder name
+_CIVITAI_TYPE_TO_FOLDER: dict[str, str] = {
+    "Checkpoint": "checkpoints",
+    "LORA": "loras",
+    "VAE": "vae",
+    "TextualInversion": "embeddings",
+    "ControlNet": "controlnet",
+    "Upscaler": "upscale_models",
+}
+
+_COMFY_MODEL_SUBFOLDERS = list(_CIVITAI_TYPE_TO_FOLDER.values())
+
+
+def _comfy_models_root() -> Path | None:
+    """Return the ComfyUI models/ directory or None if not configured."""
+    root = _resolve_comfy_root_dir()
+    if root is None:
+        return None
+    candidate = root / "models"
+    return candidate if candidate.is_dir() else None
+
+
+def _scan_local_models() -> list[dict]:
+    """Walk all ComfyUI model subdirectories and return file metadata."""
+    models_root = _comfy_models_root()
+    if models_root is None:
+        return []
+    results: list[dict] = []
+    for folder in _COMFY_MODEL_SUBFOLDERS:
+        folder_path = models_root / folder
+        if not folder_path.is_dir():
+            continue
+        for f in folder_path.iterdir():
+            if f.is_file() and f.suffix.lower() in {".safetensors", ".ckpt", ".pt", ".pth", ".bin"}:
+                results.append({
+                    "name": f.name,
+                    "folder": folder,
+                    "size_bytes": f.stat().st_size,
+                    "path": str(f),
+                })
+    results.sort(key=lambda m: (m["folder"], m["name"].lower()))
+    return results
+
+
+def _civitai_search(query: str, model_type: str, page: int) -> dict:
+    """Call CivitAI models API and return sanitised results."""
+    params: dict = {
+        "limit": 20,
+        "page": page,
+        "sort": "Highest Rated",
+        "nsfw": "false",
+    }
+    if query:
+        params["query"] = query
+    if model_type and model_type in _CIVITAI_MODEL_TYPES:
+        params["types"] = model_type
+    resp = requests.get(f"{_CIVITAI_API}/models", params=params, timeout=15)
+    resp.raise_for_status()
+    raw = resp.json() or {}
+    items = []
+    for model in raw.get("items", []):
+        versions = model.get("modelVersions") or []
+        latest = versions[0] if versions else {}
+        files = latest.get("files") or []
+        primary_file = next((f for f in files if f.get("primary")), files[0] if files else {})
+        preview_images = latest.get("images") or []
+        preview_url = ""
+        for img in preview_images:
+            if img.get("nsfwLevel", 0) == 0 or img.get("nsfw") is False:
+                preview_url = img.get("url", "")
+                break
+        items.append({
+            "id": model.get("id"),
+            "name": model.get("name", ""),
+            "type": model.get("type", ""),
+            "creator": (model.get("creator") or {}).get("username", ""),
+            "description": (model.get("description") or "")[:300],
+            "rating": (model.get("stats") or {}).get("rating", 0),
+            "download_count": (model.get("stats") or {}).get("downloadCount", 0),
+            "preview_url": preview_url,
+            "version_id": latest.get("id"),
+            "version_name": latest.get("name", ""),
+            "file_name": primary_file.get("name", ""),
+            "file_size_bytes": primary_file.get("sizeKB", 0) * 1024,
+            "download_url": primary_file.get("downloadUrl", ""),
+            "model_type_folder": _CIVITAI_TYPE_TO_FOLDER.get(model.get("type", ""), "checkpoints"),
+        })
+    return {
+        "items": items,
+        "total_pages": (raw.get("metadata") or {}).get("totalPages", 1),
+        "current_page": page,
+    }
+
+
+def _do_download(download_id: str, url: str, dest_path: Path) -> None:
+    """Background thread: stream a file from url to dest_path, updating state."""
+    dest_path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = dest_path.with_suffix(dest_path.suffix + ".tmp")
+    try:
+        with requests.get(url, stream=True, timeout=30) as r:
+            r.raise_for_status()
+            total = int(r.headers.get("content-length", 0))
+            downloaded = 0
+            with open(tmp_path, "wb") as f:
+                for chunk in r.iter_content(chunk_size=1024 * 256):
+                    if chunk:
+                        f.write(chunk)
+                        downloaded += len(chunk)
+                        with _model_downloads_lock:
+                            dl = _model_downloads.get(download_id)
+                            if dl and dl["status"] == "cancelled":
+                                raise InterruptedError("cancelled")
+                            if dl:
+                                dl["downloaded_bytes"] = downloaded
+                                dl["total_bytes"] = total
+        tmp_path.rename(dest_path)
+        with _model_downloads_lock:
+            if download_id in _model_downloads:
+                _model_downloads[download_id]["status"] = "done"
+                _model_downloads[download_id]["downloaded_bytes"] = _model_downloads[download_id]["total_bytes"]
+    except InterruptedError:
+        if tmp_path.exists():
+            tmp_path.unlink(missing_ok=True)
+        with _model_downloads_lock:
+            if download_id in _model_downloads:
+                _model_downloads[download_id]["status"] = "cancelled"
+    except Exception as exc:
+        if tmp_path.exists():
+            tmp_path.unlink(missing_ok=True)
+        logger.error("Model download %s failed: %s", download_id, exc)
+        with _model_downloads_lock:
+            if download_id in _model_downloads:
+                _model_downloads[download_id]["status"] = "error"
+                _model_downloads[download_id]["error"] = str(exc)
+
+
+@app.route("/api/models/library")
+def api_models_library():
+    """List locally installed ComfyUI model files."""
+    models = _scan_local_models()
+    root = _comfy_models_root()
+    return jsonify({"models": models, "models_root": str(root) if root else None})
+
+
+@app.route("/api/models/civitai/search")
+def api_models_civitai_search():
+    """Search CivitAI for models."""
+    query = (request.args.get("query") or "").strip()
+    model_type = (request.args.get("type") or "").strip()
+    try:
+        page = max(1, int(request.args.get("page", 1)))
+    except (TypeError, ValueError):
+        page = 1
+    try:
+        results = _civitai_search(query, model_type, page)
+        return jsonify({"ok": True, **results})
+    except requests.RequestException as exc:
+        logger.error("CivitAI search failed: %s", exc)
+        return jsonify({"ok": False, "error": str(exc), "items": [], "total_pages": 1, "current_page": 1}), 502
+
+
+@app.route("/api/models/download", methods=["POST"])
+def api_models_download():
+    """Start downloading a model file into the ComfyUI models directory."""
+    body = request.get_json(silent=True) or {}
+    url = (body.get("url") or "").strip()
+    file_name = (body.get("file_name") or "").strip()
+    folder = (body.get("folder") or "checkpoints").strip()
+
+    if not url:
+        return jsonify({"error": "url is required"}), 400
+    if not file_name or Path(file_name).name != file_name:
+        return jsonify({"error": "invalid file_name"}), 400
+    if folder not in _COMFY_MODEL_SUBFOLDERS:
+        return jsonify({"error": f"folder must be one of: {', '.join(_COMFY_MODEL_SUBFOLDERS)}"}), 400
+
+    models_root = _comfy_models_root()
+    if models_root is None:
+        return jsonify({"error": "Set a ComfyUI path in Configurations before downloading models"}), 400
+
+    dest_path = _safe_child_path(models_root, folder, file_name)
+    if dest_path.exists():
+        return jsonify({"error": f"{file_name} already exists in {folder}"}), 409
+
+    download_id = f"{int(time.time() * 1000)}-{file_name}"
+    state = {
+        "id": download_id,
+        "file_name": file_name,
+        "folder": folder,
+        "status": "downloading",
+        "downloaded_bytes": 0,
+        "total_bytes": 0,
+        "error": "",
+    }
+    with _model_downloads_lock:
+        _model_downloads[download_id] = state
+
+    t = threading.Thread(target=_do_download, args=(download_id, url, dest_path), daemon=True)
+    t.start()
+    return jsonify({"ok": True, "download_id": download_id})
+
+
+@app.route("/api/models/download/<download_id>")
+def api_models_download_status(download_id: str):
+    """Return download progress for a given download_id."""
+    with _model_downloads_lock:
+        state = _model_downloads.get(download_id)
+    if state is None:
+        return jsonify({"error": "unknown download_id"}), 404
+    return jsonify(state)
+
+
+@app.route("/api/models/download/<download_id>/cancel", methods=["POST"])
+def api_models_download_cancel(download_id: str):
+    """Cancel an in-progress download."""
+    with _model_downloads_lock:
+        state = _model_downloads.get(download_id)
+        if state is None:
+            return jsonify({"error": "unknown download_id"}), 404
+        if state["status"] == "downloading":
+            state["status"] = "cancelled"
+    return jsonify({"ok": True})
+
+
+@app.route("/api/models/delete", methods=["POST"])
+def api_models_delete_local():
+    """Delete a locally installed model file."""
+    body = request.get_json(silent=True) or {}
+    file_name = (body.get("file_name") or "").strip()
+    folder = (body.get("folder") or "").strip()
+
+    if not file_name or Path(file_name).name != file_name:
+        return jsonify({"error": "invalid file_name"}), 400
+    if folder not in _COMFY_MODEL_SUBFOLDERS:
+        return jsonify({"error": f"folder must be one of: {', '.join(_COMFY_MODEL_SUBFOLDERS)}"}), 400
+
+    models_root = _comfy_models_root()
+    if models_root is None:
+        return jsonify({"error": "Set a ComfyUI path in Configurations before managing models"}), 400
+
+    file_path = _safe_child_path(models_root, folder, file_name)
+    if not file_path.exists():
+        return jsonify({"error": "Model file not found"}), 404
+
+    try:
+        file_path.unlink()
+    except OSError as exc:
+        return jsonify({"error": str(exc)}), 500
+
+    return jsonify({"ok": True, "deleted": file_name})
+
 @app.route("/api/status")
 def api_status():
     """Return the health status of both inference backends."""

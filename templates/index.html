@@ -537,4 +537,72 @@
   </div>
 </section>
 
+<!-- =====================================================================
+     MODELS PANEL
+     ===================================================================== -->
+<section id="panel-models" class="panel" role="tabpanel" aria-labelledby="nav-models" hidden>
+
+  <aside class="sidebar" aria-label="Model browser filters">
+    <div class="sidebar-section">
+      <p class="field-label">CivitAI Search</p>
+    </div>
+    <div class="sidebar-section">
+      <label for="mb-search-query" class="field-label">Query</label>
+      <input id="mb-search-query" type="text" placeholder="e.g. realistic, anime, xl…" />
+    </div>
+    <div class="sidebar-section">
+      <label for="mb-search-type" class="field-label">Model type</label>
+      <div class="select-wrapper">
+        <select id="mb-search-type">
+          <option value="">All types</option>
+          <option value="Checkpoint">Checkpoint</option>
+          <option value="LORA">LoRA</option>
+          <option value="VAE">VAE</option>
+          <option value="TextualInversion">Textual Inversion</option>
+          <option value="ControlNet">ControlNet</option>
+          <option value="Upscaler">Upscaler</option>
+        </select>
+      </div>
+    </div>
+    <div class="sidebar-section">
+      <button class="btn btn-primary btn-full" id="mb-search-btn" type="button">Search CivitAI</button>
+    </div>
+    <div class="sidebar-section">
+      <button class="btn btn-ghost btn-full" id="mb-library-refresh-btn" type="button">Refresh Local Library</button>
+    </div>
+  </aside>
+
+  <div class="models-container">
+
+    <!-- Active downloads -->
+    <section class="models-section" id="mb-downloads-section" hidden>
+      <h2 class="section-heading">Active Downloads</h2>
+      <div id="mb-downloads-list" class="mb-downloads-list"></div>
+    </section>
+
+    <!-- Local library -->
+    <section class="models-section">
+      <h2 class="section-heading">Local Library</h2>
+      <p id="mb-library-status" class="hint">Loading…</p>
+      <div id="mb-library-grid" class="mb-library-grid"></div>
+    </section>
+
+    <!-- Search results -->
+    <section class="models-section" id="mb-results-section" hidden>
+      <h2 class="section-heading">
+        Search Results
+        <span id="mb-results-count" class="section-count"></span>
+      </h2>
+      <p id="mb-search-status" class="hint"></p>
+      <div id="mb-results-grid" class="mb-results-grid"></div>
+      <div class="mb-pagination" id="mb-pagination" hidden>
+        <button class="btn btn-ghost btn-xs" id="mb-prev-page" type="button">&#8249; Prev</button>
+        <span id="mb-page-info" class="hint"></span>
+        <button class="btn btn-ghost btn-xs" id="mb-next-page" type="button">Next &#8250;</button>
+      </div>
+    </section>
+
+  </div>
+</section>
+
 {% endblock %}

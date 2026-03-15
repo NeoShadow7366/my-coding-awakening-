@@ -1543,3 +1543,217 @@ body.gallery-lightbox-open {
     height: min(50vh, 360px);
   }
 }
+
+/* ==========================================================================
+   Model Browser
+   ========================================================================== */
+
+.models-container {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+  padding: var(--sp-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-xl);
+}
+
+.models-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-md);
+}
+
+.section-count {
+  font-size: 0.78rem;
+  color: var(--clr-text-muted);
+  font-weight: 400;
+  margin-left: var(--sp-xs);
+}
+
+/* Local library grid */
+.mb-library-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: var(--sp-sm);
+}
+
+.mb-local-card {
+  border: 1px solid var(--clr-border);
+  border-radius: var(--radius);
+  background: var(--clr-surface);
+  box-shadow: var(--shadow-sm);
+  padding: var(--sp-sm);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-xs);
+}
+
+.mb-local-card-name {
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: var(--clr-text);
+  word-break: break-all;
+}
+
+.mb-local-card-meta {
+  font-size: 0.75rem;
+  color: var(--clr-text-muted);
+  display: flex;
+  gap: var(--sp-sm);
+  flex-wrap: wrap;
+}
+
+.mb-local-card-actions {
+  display: flex;
+  gap: var(--sp-xs);
+  margin-top: var(--sp-xs);
+}
+
+/* CivitAI search results grid */
+.mb-results-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: var(--sp-md);
+}
+
+.mb-result-card {
+  border: 1px solid var(--clr-border);
+  border-radius: var(--radius-lg);
+  background: var(--clr-surface);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  transition: transform 130ms ease, box-shadow 130ms ease;
+}
+
+.mb-result-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.mb-result-thumb {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  background: var(--clr-bg);
+  border-bottom: 1px solid var(--clr-border);
+  display: block;
+}
+
+.mb-result-thumb-placeholder {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--clr-bg);
+  border-bottom: 1px solid var(--clr-border);
+  color: var(--clr-text-muted);
+  font-size: 2rem;
+}
+
+.mb-result-body {
+  padding: var(--sp-sm);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-xs);
+  flex: 1;
+}
+
+.mb-result-name {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--clr-text);
+  line-height: 1.3;
+}
+
+.mb-result-meta {
+  font-size: 0.73rem;
+  color: var(--clr-text-muted);
+  display: flex;
+  gap: var(--sp-xs);
+  flex-wrap: wrap;
+}
+
+.mb-result-type-chip {
+  font-size: 0.68rem;
+  padding: 1px 6px;
+  border-radius: 999px;
+  border: 1px solid var(--clr-border);
+  color: var(--clr-text-muted);
+}
+
+.mb-result-actions {
+  margin-top: auto;
+  padding-top: var(--sp-xs);
+  display: flex;
+  gap: var(--sp-xs);
+}
+
+/* Download queue */
+.mb-downloads-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-sm);
+}
+
+.mb-download-row {
+  border: 1px solid var(--clr-border);
+  border-radius: var(--radius);
+  background: var(--clr-surface);
+  padding: var(--sp-sm);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-xs);
+}
+
+.mb-download-row-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-sm);
+}
+
+.mb-download-name {
+  font-size: 0.83rem;
+  font-weight: 600;
+  color: var(--clr-text);
+  word-break: break-all;
+}
+
+.mb-download-status {
+  font-size: 0.73rem;
+  color: var(--clr-text-muted);
+  white-space: nowrap;
+}
+
+.mb-progress {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--clr-border);
+  overflow: hidden;
+}
+
+.mb-progress-bar {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--clr-primary);
+  transition: width 300ms ease;
+}
+
+.mb-download-row.is-done .mb-progress-bar { background: #22c55e; }
+.mb-download-row.is-error .mb-progress-bar { background: #ef4444; }
+.mb-download-row.is-cancelled .mb-progress-bar { background: var(--clr-border); }
+
+/* Pagination */
+.mb-pagination {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-md);
+  justify-content: center;
+  padding-top: var(--sp-sm);
+}
+
+.mb-pagination[hidden] { display: none !important; }
