@@ -108,6 +108,25 @@ def test_image_cancel_posts_delete_payload(client, monkeypatch):
     assert seen["timeout"] == 12
 
 
+def test_history_text_entry_stored_and_retrieved(client):
+    text_entry = {
+        "type": "text",
+        "prompt": "Tell me a story",
+        "model": "llama3",
+        "response": "Once upon a time...",
+    }
+
+    post_resp = client.post("/api/history", json=text_entry)
+    assert post_resp.status_code == 201
+
+    get_resp = client.get("/api/history?type=text")
+    assert get_resp.status_code == 200
+    history = get_resp.get_json()["history"]
+    assert len(history) == 1
+    assert history[0]["prompt"] == "Tell me a story"
+    assert history[0]["type"] == "text"
+
+
 def test_history_type_and_limit_filters(client):
     image_entry = {
         "type": "image",

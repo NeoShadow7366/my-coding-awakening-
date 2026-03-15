@@ -143,3 +143,149 @@ def test_image_generate_submit_exception_returns_502(client, monkeypatch):
 
     assert resp.status_code == 502
     assert "comfy down" in resp.get_json()["error"]
+
+
+# ---------------------------------------------------------------------------
+# /api/status — response shape
+# ---------------------------------------------------------------------------
+
+def test_status_returns_expected_shape_when_both_available(client, monkeypatch):
+    monkeypatch.setattr(app_module, "_ollama_available", lambda: True)
+    monkeypatch.setattr(app_module, "_comfy_available", lambda: True)
+
+    resp = client.get("/api/status")
+
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["text"]["available"] is True
+    assert data["image"]["available"] is True
+    assert "service_errors" in data
+    assert "ollama" in data["service_errors"]
+    assert "comfyui" in data["service_errors"]
+
+
+def test_status_reflects_unavailable_backends(client, monkeypatch):
+    monkeypatch.setattr(app_module, "_ollama_available", lambda: False)
+    monkeypatch.setattr(app_module, "_comfy_available", lambda: False)
+
+    resp = client.get("/api/status")
+
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["text"]["available"] is False
+    assert data["image"]["available"] is False
+
+
+# ---------------------------------------------------------------------------
+# /api/models — Ollama model list
+# ---------------------------------------------------------------------------
+
+def test_models_returns_list_from_ollama(client, monkeypatch):
+    fake_models = [{"name": "llama3"}, {"name": "mistral"}]
+    monkeypatch.setattr(app_module, "_list_ollama_models", lambda: fake_models)
+
+    resp = client.get("/api/models")
+
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["models"] == fake_models
+
+
+def test_models_returns_empty_list_when_ollama_down(client, monkeypatch):
+    monkeypatch.setattr(app_module, "_list_ollama_models", lambda: [])
+
+    resp = client.get("/api/models")
+
+    assert resp.status_code == 200
+    assert resp.get_json()["models"] == []
+
+
+# ---------------------------------------------------------------------------
+# /api/image/models + /api/image/samplers
+# ---------------------------------------------------------------------------
+
+def test_image_models_returns_list_when_available(client, monkeypatch):
+    monkeypatch.setattr(app_module, "_comfy_available", lambda: True)
+    monkeypatch.setattr(app_module, "_image_models", lambda: ["v1-5.safetensors", "xl.safetensors"])
+
+    resp = client.get("/api/image/models")
+
+    assert resp.status_code == 200
+    assert resp.get_json()["models"] == ["v1-5.safetensors", "xl.safetensors"]
+
+
+def test_image_models_returns_503_when_unavailable(client, monkeypatch):
+    monkeypatch.setattr(app_module, "_comfy_available", lambda: False)
+
+    resp = client.get("/api/image/models")
+
+    assert resp.status_code == 503
+    data = resp.get_json()
+    assert data["models"] == []
+    assert "error" in data
+
+
+def test_image_samplers_returns_list_when_available(client, monkeypatch):
+    monkeypatch.setattr(app_module, "_comfy_available", lambda: True)
+    monkeypatch.setattr(app_module, "_image_samplers", lambda: ["euler", "dpmpp_2m"])
+
+    resp = client.get("/api/image/samplers")
+
+    assert resp.status_code == 200
+    assert resp.get_json()["samplers"] == ["euler", "dpmpp_2m"]
+
+
+def test_image_samplers_returns_503_when_unavailable(client, monkeypatch):
+    monkeypatch.setattr(app_module, "_comfy_available", lambda: False)
+
+    resp = client.get("/api/image/samplers")
+
+    assert resp.status_code == 503
+    data = resp.get_json()
+    assert data["samplers"] == []
+    assert "error" in data
+
+
+# ---------------------------------------------------------------------------
+# /api/image/view — happy path (proxied image bytes)
+# ---------------------------------------------------------------------------
+
+def test_image_view_proxies_bytes_and_mimetype(client, monkeypatch):
+    fake_bytes = b"\x89PNG\r\n\x1a\n"  # PNG magic bytes
+
+    class FakeImageResponse:
+        status_code = 200
+        content = fake_bytes
+        headers = {"content-type": "image/png"}
+
+        def raise_for_status(self):
+            pass
+
+    monkeypatch.setattr(app_module.requests, "get", lambda url, params=None, timeout=0, **kw: FakeImageResponse())
+
+    resp = client.get("/api/image/view?filename=test.png&subfolder=&type=output")
+
+    assert resp.status_code == 200
+    assert resp.content_type == "image/png"
+    assert resp.data == fake_bytes
+
+
+# ---------------------------------------------------------------------------
+# /api/image/cancel — success path
+# ---------------------------------------------------------------------------
+
+def test_image_cancel_success_returns_ok_and_prompt_id(client, monkeypatch):
+    monkeypatch.setattr(app_module, "_comfy_available", lambda: True)
+
+    def fake_post(url, json=None, timeout=0, **kwargs):
+        assert json == {"delete": ["pid-xyz"]}
+        return DummyResponse(status_code=200)
+
+    monkeypatch.setattr(app_module.requests, "post", fake_post)
+
+    resp = client.post("/api/image/cancel", json={"prompt_id": "pid-xyz"})
+
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["ok"] is True
+    assert data["prompt_id"] == "pid-xyz"
