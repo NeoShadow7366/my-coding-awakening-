@@ -238,6 +238,7 @@ const galleryLightboxNext = document.getElementById('gallery-lightbox-next');
 const galleryLightboxCounter = document.getElementById('gallery-lightbox-counter');
 const imagePresetButtons = document.querySelectorAll('[data-image-preset]');
 const previewUpdated = document.getElementById('preview-updated');
+const previewTransportBadge = document.getElementById('preview-transport-badge');
 const previewEmpty = document.getElementById('preview-empty');
 const previewImage = document.getElementById('preview-image');
 const previewMeta = document.getElementById('preview-meta');
@@ -768,6 +769,10 @@ function stopLivePreviewAutoRefresh() {
 	livePreviewTimer = null;
 }
 
+function isComfyWsOpen() {
+	return Boolean(comfyWs && comfyWs.readyState === WebSocket.OPEN);
+}
+
 function renderPollOwnerStatus() {
 	if (!pollOwnerStatus) return;
 	pollOwnerStatus.classList.remove('owner', 'standby', 'hidden');
@@ -797,6 +802,9 @@ function syncBackgroundPollingOwnership() {
 		stopStatusPolling();
 		stopLivePreviewAutoRefresh();
 		stopQueuePolling();
+		if (!isComfyWsOpen()) {
+			setPreviewTransportMode('polling', 'Polling fallback is active in another tab that owns the lease.');
+		}
 		renderPollOwnerStatus();
 		return;
 	}
@@ -1596,6 +1604,9 @@ async function checkStatus() {
 		if (imageOk) {
 			imageEngineStatus.textContent = 'ComfyUI online and ready';
 			imageEngineStatus.style.color = 'var(--clr-accent-pos)';
+			if (!isComfyWsOpen()) {
+				setPreviewTransportMode('polling', 'Attempting ComfyUI WebSocket connection. HTTP polling fallback is active until connected.');
+			}
 			await loadImageModels();
 			await loadImageSamplers();
 			await loadImageLoraModels();
@@ -1604,6 +1615,7 @@ async function checkStatus() {
 		} else {
 			imageEngineStatus.textContent = 'ComfyUI offline - start server at localhost:8188';
 			imageEngineStatus.style.color = 'var(--clr-accent-neg)';
+			setPreviewTransportMode('offline');
 			setImageModelMessage('ComfyUI unavailable');
 			if (loraModelSelect) loraModelSelect.innerHTML = '<option value="">None</option>';
 			if (controlnetModelSelect) controlnetModelSelect.innerHTML = '<option value="">None</option>';
@@ -1628,6 +1640,7 @@ async function checkStatus() {
 		statusDot.className = 'status-dot offline';
 		statusText.textContent = 'Offline';
 		imageEngineStatus.textContent = 'Could not reach backend status endpoint';
+		setPreviewTransportMode('offline', 'Backend status endpoint is unavailable, so preview transport status is unknown.');
 		renderDiagnosticsSnapshot({
 			textOk: false,
 			imageOk: false,
@@ -3420,6 +3433,37 @@ function _isComfyWsCooldownActive() {
 	return _getComfyWsCooldownUntil() > Date.now();
 }
 
+function _getComfyWsCooldownMinutesLeft() {
+	const until = _getComfyWsCooldownUntil();
+	if (until <= Date.now()) return 0;
+	return Math.max(1, Math.ceil((until - Date.now()) / 60000));
+}
+
+function setPreviewTransportMode(mode, titleText = '') {
+	if (!previewTransportBadge) return;
+	const nextMode = mode === 'websocket' || mode === 'offline' ? mode : 'polling';
+	previewTransportBadge.dataset.transport = nextMode;
+	if (nextMode === 'websocket') {
+		previewTransportBadge.textContent = 'WebSocket';
+		previewTransportBadge.title = titleText || 'Live preview is connected to ComfyUI WebSocket.';
+		return;
+	}
+	if (nextMode === 'offline') {
+		previewTransportBadge.textContent = 'Preview offline';
+		previewTransportBadge.title = titleText || 'ComfyUI is offline, so live preview updates are unavailable.';
+		return;
+	}
+	previewTransportBadge.textContent = 'Polling fallback';
+	previewTransportBadge.title = titleText || 'Live preview is using HTTP polling fallback.';
+}
+
+if (_isComfyWsCooldownActive()) {
+	const minsLeft = _getComfyWsCooldownMinutesLeft();
+	setPreviewTransportMode('polling', `ComfyUI WebSocket cooldown active (${minsLeft}m left). HTTP polling fallback is active.`);
+} else {
+	setPreviewTransportMode('polling');
+}
+
 function _revokeComfyPreviewUrl() {
 	if (comfyWsPreviewUrl) {
 		URL.revokeObjectURL(comfyWsPreviewUrl);
@@ -3438,13 +3482,28 @@ function _showComfyStepPreview(blobUrl) {
 }
 
 function connectComfyWebSocket() {
-	if (comfyWs && (comfyWs.readyState === WebSocket.OPEN || comfyWs.readyState === WebSocket.CONNECTING)) return;
-	if (_isComfyWsCooldownActive()) return;
-	if (comfyWsFailCount >= COMFY_WS_MAX_RETRIES) return; // gave up; reset on tab focus
+	if (comfyWs && (comfyWs.readyState === WebSocket.OPEN || comfyWs.readyState === WebSocket.CONNECTING)) {
+		if (comfyWs.readyState === WebSocket.OPEN) {
+			setPreviewTransportMode('websocket');
+		} else {
+			setPreviewTransportMode('polling', 'Attempting ComfyUI WebSocket connection. HTTP polling fallback is active until connected.');
+		}
+		return;
+	}
+	if (_isComfyWsCooldownActive()) {
+		const minsLeft = _getComfyWsCooldownMinutesLeft();
+		setPreviewTransportMode('polling', `ComfyUI WebSocket cooldown active (${minsLeft}m left). HTTP polling fallback is active.`);
+		return;
+	}
+	if (comfyWsFailCount >= COMFY_WS_MAX_RETRIES) {
+		setPreviewTransportMode('polling', 'ComfyUI WebSocket unavailable after repeated failures. HTTP polling fallback is active.');
+		return; // gave up; reset on tab focus
+	}
 	if (comfyWsReconnectTimer) {
 		window.clearTimeout(comfyWsReconnectTimer);
 		comfyWsReconnectTimer = null;
 	}
+	setPreviewTransportMode('polling', 'Attempting ComfyUI WebSocket connection. HTTP polling fallback is active until connected.');
 	try {
 		comfyWs = new WebSocket(COMFY_WS_URL);
 		comfyWs.binaryType = 'arraybuffer';
@@ -3487,6 +3546,7 @@ function connectComfyWebSocket() {
 			comfyWsFailCount = 0;
 			_setComfyWsCooldownUntil(0);
 			comfyWsCooldownNotified = false;
+			setPreviewTransportMode('websocket');
 		};
 		comfyWs.onerror = () => { /* errors handled in onclose */ };
 		comfyWs.onclose = () => {
@@ -3494,6 +3554,8 @@ function connectComfyWebSocket() {
 			comfyWsFailCount++;
 			if (comfyWsFailCount >= COMFY_WS_MAX_RETRIES) {
 				_setComfyWsCooldownUntil(Date.now() + COMFY_WS_COOLDOWN_MS);
+				const minsLeft = _getComfyWsCooldownMinutesLeft();
+				setPreviewTransportMode('polling', `ComfyUI WebSocket cooldown active (${minsLeft}m left). HTTP polling fallback is active.`);
 				if (!comfyWsCooldownNotified) {
 					comfyWsCooldownNotified = true;
 					appendDiagnosticsConsoleLine('ComfyUI websocket preview unavailable; switched to HTTP polling fallback for live preview updates.', 'warn');
@@ -3501,18 +3563,26 @@ function connectComfyWebSocket() {
 				// ComfyUI WS unavailable (likely cross-origin 403); HTTP polling covers live preview
 				return;
 			}
+			setPreviewTransportMode('polling', 'ComfyUI WebSocket disconnected. Retrying while HTTP polling fallback remains active.');
 			// Reconnect with exponential backoff if page is still visible
 			if (!document.hidden) {
 				const delay = Math.min(5000 * Math.pow(2, comfyWsFailCount - 1), 60000);
 				comfyWsReconnectTimer = window.setTimeout(connectComfyWebSocket, delay);
 			}
 		};
-	} catch { /* WebSocket unavailable — polling will cover this */ }
+	} catch {
+		setPreviewTransportMode('polling', 'Browser could not open ComfyUI WebSocket. HTTP polling fallback is active.');
+		/* WebSocket unavailable — polling will cover this */
+	}
 }
 
 document.addEventListener('visibilitychange', () => {
 	if (!document.hidden && !comfyWs) {
-		if (_isComfyWsCooldownActive()) return;
+		if (_isComfyWsCooldownActive()) {
+			const minsLeft = _getComfyWsCooldownMinutesLeft();
+			setPreviewTransportMode('polling', `ComfyUI WebSocket cooldown active (${minsLeft}m left). HTTP polling fallback is active.`);
+			return;
+		}
 		// Reset failure count on tab re-focus so it can retry after a long pause
 		comfyWsFailCount = 0;
 		connectComfyWebSocket();

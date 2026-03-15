@@ -147,6 +147,47 @@
     </div>
 
     <div class="sidebar-section">
+      <label for="lora-model-select" class="field-label">LoRA (optional)</label>
+      <div class="select-wrapper">
+        <select id="lora-model-select">
+          <option value="">None</option>
+        </select>
+      </div>
+      <div class="slider-group">
+        <label for="lora-strength" class="inline-label">LoRA Strength <span id="lora-strength-val">0.80</span></label>
+        <input id="lora-strength" type="range" min="0" max="2" step="0.05" value="0.8" />
+      </div>
+    </div>
+
+    <details class="sidebar-section cn-panel" id="controlnet-panel">
+      <summary class="field-label">ControlNet (optional)</summary>
+      <div class="form-field cn-controls">
+        <label for="controlnet-model-select" class="field-label">ControlNet Model</label>
+        <div class="select-wrapper">
+          <select id="controlnet-model-select">
+            <option value="">None</option>
+          </select>
+        </div>
+
+        <label for="controlnet-image-upload" class="field-label">Control Image</label>
+        <input id="controlnet-image-upload" type="file" accept="image/*" />
+
+        <div class="slider-group">
+          <label for="controlnet-weight" class="inline-label">Weight <span id="controlnet-weight-val">1.00</span></label>
+          <input id="controlnet-weight" type="range" min="0" max="2" step="0.05" value="1" />
+        </div>
+        <div class="slider-group">
+          <label for="controlnet-start" class="inline-label">Start <span id="controlnet-start-val">0.00</span></label>
+          <input id="controlnet-start" type="range" min="0" max="1" step="0.01" value="0" />
+        </div>
+        <div class="slider-group">
+          <label for="controlnet-end" class="inline-label">End <span id="controlnet-end-val">1.00</span></label>
+          <input id="controlnet-end" type="range" min="0" max="1" step="0.01" value="1" />
+        </div>
+      </div>
+    </details>
+
+    <div class="sidebar-section">
       <p class="field-label">Seed and Presets</p>
       <div class="inline-field-row">
         <label for="image-seed" class="inline-label">Seed</label>
@@ -154,9 +195,9 @@
         <button class="btn btn-ghost btn-xs" id="image-random-seed" type="button">Random</button>
       </div>
       <div class="preset-row" role="group" aria-label="Image presets">
-        <button class="btn btn-ghost btn-xs" type="button" data-image-preset="fast">Fast</button>
-        <button class="btn btn-ghost btn-xs" type="button" data-image-preset="quality">Quality</button>
-        <button class="btn btn-ghost btn-xs" type="button" data-image-preset="creative">Creative</button>
+        <button class="btn btn-ghost btn-xs" type="button" data-image-preset="fast" aria-pressed="false">Fast</button>
+        <button class="btn btn-ghost btn-xs" type="button" data-image-preset="quality" aria-pressed="false">Quality</button>
+        <button class="btn btn-ghost btn-xs" type="button" data-image-preset="creative" aria-pressed="false">Creative</button>
       </div>
       <div class="preset-profile-wrap" aria-label="Preset profiles">
         <div class="select-wrapper">
@@ -310,9 +351,24 @@
         <div id="normal-prompt-wrap" class="form-field">
           <div class="field-label-inline-row">
             <label for="image-prompt" class="field-label">Prompt</label>
-            <button class="btn btn-ghost btn-xs" id="prompt-randomize-btn" type="button">Randomize</button>
+            <div class="prompt-toolbar">
+              <button class="btn btn-ghost btn-xs" id="prompt-randomize-btn" type="button">Randomize</button>
+              <div class="prompt-recent-wrap">
+                <button class="btn btn-ghost btn-xs" id="prompt-recent-btn" type="button" aria-haspopup="listbox" aria-expanded="false">Recent ▾</button>
+                <ul id="prompt-recent-dropdown" class="prompt-recent-dropdown" role="listbox" aria-label="Recent prompts" hidden></ul>
+              </div>
+            </div>
           </div>
           <textarea id="image-prompt" rows="4" placeholder="A cinematic forest temple, volumetric light, detailed illustration"></textarea>
+          <div class="prompt-saved-row">
+            <input id="prompt-saved-name" type="text" class="compact-input" placeholder="Preset name" />
+            <button class="btn btn-ghost btn-xs" id="prompt-save-btn" type="button">Save</button>
+            <div class="select-wrapper prompt-saved-select-wrap">
+              <select id="prompt-saved-select" aria-label="Saved prompt presets"><option value="">No saved prompts</option></select>
+            </div>
+            <button class="btn btn-ghost btn-xs" id="prompt-load-btn" type="button">Load</button>
+            <button class="btn btn-ghost btn-xs" id="prompt-delete-saved-btn" type="button">Del</button>
+          </div>
         </div>
 
         <div class="form-field">
@@ -382,7 +438,20 @@
     <section class="preview-wrap" aria-label="Live preview">
       <div class="gallery-head">
         <h3 class="history-heading">Live Preview</h3>
-        <span id="preview-updated" class="hint">Waiting for output...</span>
+        <div class="preview-status-wrap">
+          <span
+            id="preview-transport-badge"
+            class="history-badge preview-transport-badge"
+            data-transport="polling"
+            role="status"
+            aria-live="polite"
+            aria-atomic="true"
+            title="Live preview is using HTTP polling fallback."
+          >
+            Polling fallback
+          </span>
+          <span id="preview-updated" class="hint">Waiting for output...</span>
+        </div>
       </div>
       <div class="preview-card">
         <div id="preview-empty" class="empty-gallery">No completed outputs yet.</div>
@@ -397,7 +466,7 @@
     <section class="gallery-wrap" aria-label="Generation gallery">
       <div class="gallery-head">
         <h3 class="history-heading">Gallery</h3>
-        <div class="gallery-controls">
+        <div class="gallery-controls" role="group" aria-label="Gallery controls">
           <input id="gallery-search" type="search" class="gallery-search-input" placeholder="Filter by prompt…" aria-label="Filter gallery by prompt text" autocomplete="off" />
           <button class="btn btn-ghost btn-xs" id="gallery-view-toggle" type="button" aria-pressed="false">Grid</button>
           <button class="btn btn-ghost btn-xs" id="refresh-gallery" type="button">Refresh</button>
@@ -435,7 +504,7 @@
   </div>
 
   <button id="diag-drawer-toggle" class="diag-drawer-toggle" type="button" aria-expanded="false" aria-controls="diag-drawer">Diagnostics<span id="diag-status-badge" class="diag-status-badge" aria-hidden="true"></span></button>
-  <section id="diag-drawer" class="diag-drawer" hidden aria-label="Diagnostics console">
+  <section id="diag-drawer" class="diag-drawer" hidden aria-hidden="true" aria-label="Diagnostics console">
     <div class="diag-drawer-head">
       <h3 class="diag-drawer-title">Diagnostics Console</h3>
       <button id="diag-drawer-close" class="btn btn-ghost btn-xs" type="button">Close</button>
@@ -483,7 +552,24 @@
     </div>
 
     <div class="sidebar-section">
-      <button class="btn btn-primary btn-full" id="config-save-btn" type="button">Save Paths</button>
+      <p class="field-label">Integrations</p>
+      <p class="hint">Optional API keys for external model repositories.</p>
+    </div>
+
+    <div class="sidebar-section">
+      <label for="config-civitai-key" class="field-label">CivitAI API Key</label>
+      <input id="config-civitai-key" type="password" placeholder="Enter CivitAI API key" autocomplete="off" />
+      <p class="hint">Used for authenticated model downloads and higher API limits.</p>
+    </div>
+
+    <div class="sidebar-section">
+      <label for="config-huggingface-key" class="field-label">Hugging Face API Key</label>
+      <input id="config-huggingface-key" type="password" placeholder="Enter Hugging Face token" autocomplete="off" />
+      <p class="hint">Used for Hugging Face model search and downloads.</p>
+    </div>
+
+    <div class="sidebar-section">
+      <button class="btn btn-primary btn-full" id="config-save-btn" type="button">Save Configuration</button>
       <button class="btn btn-ghost btn-full" id="config-models-migrate-btn" type="button">Migrate Legacy Model Folders</button>
       <p id="config-save-status" class="hint">No saved changes yet.</p>
       <p id="config-last-saved" class="hint">Last saved: never</p>
@@ -494,7 +580,7 @@
     <section class="config-card" aria-label="Ollama service controls">
       <h2 class="section-heading">Ollama Service</h2>
       <p class="section-desc">Launch text inference backend using the configured path.</p>
-      <div class="config-actions-row">
+      <div class="config-actions-row" role="group" aria-label="Ollama service actions">
         <button class="btn btn-ghost" id="config-ollama-start" type="button">Start</button>
         <button class="btn btn-ghost" id="config-ollama-restart" type="button">Restart</button>
         <button class="btn btn-ghost" id="config-ollama-stop" type="button">Stop</button>
@@ -505,7 +591,7 @@
     <section class="config-card" aria-label="ComfyUI service controls">
       <h2 class="section-heading">ComfyUI Service</h2>
       <p class="section-desc">Launch image backend using the configured path.</p>
-      <div class="config-actions-row">
+      <div class="config-actions-row" role="group" aria-label="ComfyUI service actions">
         <button class="btn btn-ghost" id="config-comfy-start" type="button">Start</button>
         <button class="btn btn-ghost" id="config-comfy-restart" type="button">Restart</button>
         <button class="btn btn-ghost" id="config-comfy-stop" type="button">Stop</button>
@@ -516,7 +602,7 @@
     <section class="config-card" aria-label="Flask app controls">
       <h2 class="section-heading">Flask App</h2>
       <p class="section-desc">Restart this local UI backend without leaving the browser.</p>
-      <div class="config-actions-row">
+      <div class="config-actions-row" role="group" aria-label="Flask app actions">
         <button class="btn btn-ghost" id="config-flask-restart" type="button">Restart Flask</button>
       </div>
       <p id="config-flask-status" class="hint">Awaiting action.</p>
@@ -533,14 +619,14 @@
       </div>
       <div class="form-field">
         <label for="tag-new-input" class="field-label">Add Tag</label>
-        <div class="config-actions-row">
+        <div class="config-actions-row" role="group" aria-label="Add tag actions">
           <input id="tag-new-input" type="text" placeholder="Enter new tag text" />
           <button class="btn btn-ghost btn-xs" id="tag-add-btn" type="button">Add</button>
         </div>
       </div>
       <p id="tag-manager-status" class="hint">Select a category to edit tags.</p>
       <div id="tag-editor-list" class="tag-editor-list" aria-live="polite"></div>
-      <div class="config-actions-row">
+      <div class="config-actions-row" role="group" aria-label="Reset tag actions">
         <button class="btn btn-ghost btn-xs" id="tag-reset-defaults-btn" type="button">Reset Defaults</button>
       </div>
     </section>
@@ -554,7 +640,22 @@
 
   <aside class="sidebar" aria-label="Model browser filters">
     <div class="sidebar-section">
-      <p class="field-label">CivitAI Search</p>
+      <p class="field-label">Model Browser</p>
+      <div class="mb-view-toggle" role="tablist" aria-label="Model browser views">
+        <button class="btn btn-ghost btn-xs mb-view-btn is-active" id="mb-view-search-btn" type="button" role="tab" aria-selected="true" aria-controls="mb-remote-view">Search</button>
+        <button class="btn btn-ghost btn-xs mb-view-btn" id="mb-view-library-btn" type="button" role="tab" aria-selected="false" aria-controls="mb-local-view">Local Library</button>
+      </div>
+    </div>
+
+    <div id="mb-remote-controls">
+    <div class="sidebar-section">
+      <label for="mb-provider" class="field-label">Provider</label>
+      <div class="select-wrapper">
+        <select id="mb-provider">
+          <option value="civitai">CivitAI</option>
+          <option value="huggingface">Hugging Face</option>
+        </select>
+      </div>
     </div>
     <div class="sidebar-section">
       <label for="mb-search-query" class="field-label">Query</label>
@@ -575,42 +676,242 @@
       </div>
     </div>
     <div class="sidebar-section">
-      <button class="btn btn-primary btn-full" id="mb-search-btn" type="button">Search CivitAI</button>
+      <label for="mb-base-model" class="field-label">Base model</label>
+      <div class="select-wrapper">
+        <select id="mb-base-model">
+          <option value="">All base models</option>
+          <option value="SD 1.5">SD 1.5</option>
+          <option value="SDXL 1.0">SDXL 1.0</option>
+          <option value="SDXL Turbo">SDXL Turbo</option>
+          <option value="Pony">Pony</option>
+          <option value="Flux.1 D">Flux.1 D</option>
+          <option value="Flux.1 S">Flux.1 S</option>
+        </select>
+      </div>
+    </div>
+    <div class="sidebar-section">
+      <label for="mb-sort" class="field-label">Sort</label>
+      <div class="select-wrapper">
+        <select id="mb-sort">
+          <option value="highest-rated">Highest rated</option>
+          <option value="most-downloaded">Most downloaded</option>
+          <option value="newest">Newest</option>
+          <option value="installed">Installed</option>
+          <option value="favorites">Favorites</option>
+          <option value="type">Type</option>
+        </select>
+      </div>
+    </div>
+    <div class="sidebar-section">
+      <label for="mb-page-size" class="field-label">Cards per page</label>
+      <div class="select-wrapper">
+        <select id="mb-page-size">
+          <option value="20">20</option>
+          <option value="40">40</option>
+          <option value="60">60</option>
+          <option value="80">80</option>
+        </select>
+      </div>
+    </div>
+    <div class="sidebar-section mb-filter-icons" role="group" aria-label="Model browser quick filters">
+      <button class="btn btn-ghost btn-xs mb-filter-toggle" id="mb-hide-installed" type="button" title="Hide installed models" aria-label="Hide installed models" aria-pressed="false">
+        <span aria-hidden="true">💾</span>
+        <span class="mb-filter-toggle-label">Hide Installed</span>
+      </button>
+      <button class="btn btn-ghost btn-xs mb-filter-toggle" id="mb-show-installed-only" type="button" title="Show only installed models" aria-label="Show only installed models" aria-pressed="false">
+        <span aria-hidden="true">✅</span>
+        <span class="mb-filter-toggle-label">Installed Only</span>
+      </button>
+      <button class="btn btn-ghost btn-xs mb-filter-toggle" id="mb-hide-early-access" type="button" title="Hide early access models" aria-label="Hide early access models" aria-pressed="false">
+        <span aria-hidden="true">⏱</span>
+        <span class="mb-filter-toggle-label">Hide Early Access</span>
+      </button>
+      <button class="btn btn-ghost btn-xs mb-filter-toggle" id="mb-show-nsfw" type="button" title="Show NSFW content" aria-label="Show NSFW content" aria-pressed="false">
+        <span aria-hidden="true">⚠</span>
+        <span class="mb-filter-toggle-label">Show NSFW</span>
+      </button>
+    </div>
+    <div class="sidebar-section">
+      <button class="btn btn-ghost btn-full" id="mb-type-info-btn" type="button" aria-expanded="false" aria-controls="mb-type-info-panel">Model Type Guide</button>
+      <div id="mb-type-info-panel" class="mb-type-info-panel" hidden>
+        <p><strong>Checkpoint:</strong> Full base model for txt2img and img2img.</p>
+        <p><strong>LoRA:</strong> Lightweight style/character addon that needs a base checkpoint.</p>
+        <p><strong>VAE:</strong> Improves color/detail decoding for many checkpoints.</p>
+        <p><strong>Textual Inversion:</strong> Embedding token for niche styles or concepts.</p>
+        <p><strong>ControlNet:</strong> Adds structural guidance like pose, depth, or edges.</p>
+        <p><strong>Upscaler:</strong> Post-process model for resolution and detail enhancement.</p>
+      </div>
+    </div>
+    <div class="sidebar-section">
+      <button class="btn btn-primary btn-full" id="mb-search-btn" type="button">Search Models</button>
+      <button class="btn btn-ghost btn-full" id="mb-search-bulk-refresh-installed-btn" type="button">Bulk Update Installed Preview + Metadata</button>
+    </div>
+    </div>
+
+    <div id="mb-local-controls" hidden>
+    <div class="sidebar-section">
+      <label for="mb-local-query" class="field-label">Query</label>
+      <input id="mb-local-query" type="text" placeholder="e.g. realistic, anime, xl..." />
+    </div>
+    <div class="sidebar-section">
+      <label for="mb-local-type" class="field-label">Model type</label>
+      <div class="select-wrapper">
+        <select id="mb-local-type">
+          <option value="">All types</option>
+          <option value="Checkpoint">Checkpoint</option>
+          <option value="LORA">LoRA</option>
+          <option value="VAE">VAE</option>
+          <option value="TextualInversion">Textual Inversion</option>
+          <option value="ControlNet">ControlNet</option>
+          <option value="Upscaler">Upscaler</option>
+        </select>
+      </div>
+    </div>
+    <div class="sidebar-section">
+      <label for="mb-local-base-model" class="field-label">Base model</label>
+      <div class="select-wrapper">
+        <select id="mb-local-base-model">
+          <option value="">All base models</option>
+          <option value="SD 1.5">SD 1.5</option>
+          <option value="SDXL 1.0">SDXL 1.0</option>
+          <option value="SDXL Turbo">SDXL Turbo</option>
+          <option value="Pony">Pony</option>
+          <option value="Flux.1 D">Flux.1 D</option>
+          <option value="Flux.1 S">Flux.1 S</option>
+        </select>
+      </div>
+    </div>
+    <div class="sidebar-section">
+      <label for="mb-local-sort" class="field-label">Sort</label>
+      <div class="select-wrapper">
+        <select id="mb-local-sort">
+          <option value="name-asc">Name A-Z</option>
+          <option value="name-desc">Name Z-A</option>
+          <option value="size-desc">Largest first</option>
+          <option value="size-asc">Smallest first</option>
+          <option value="folder">Folder</option>
+        </select>
+      </div>
+    </div>
+    <div class="sidebar-section mb-filter-icons" role="group" aria-label="Local library quick filters">
+      <button class="btn btn-ghost btn-xs mb-filter-toggle" id="mb-local-hide-embeddings" type="button" title="Hide embedding files" aria-label="Hide embedding files" aria-pressed="false">
+        <span aria-hidden="true">🧩</span>
+        <span class="mb-filter-toggle-label">Hide Embeddings</span>
+      </button>
+      <button class="btn btn-ghost btn-xs mb-filter-toggle" id="mb-local-matched-only" type="button" title="Show only models with matched metadata" aria-label="Show only models with matched metadata" aria-pressed="false">
+        <span aria-hidden="true">🔎</span>
+        <span class="mb-filter-toggle-label">Matched Only</span>
+      </button>
     </div>
     <div class="sidebar-section">
       <button class="btn btn-ghost btn-full" id="mb-library-refresh-btn" type="button">Refresh Local Library</button>
+      <button class="btn btn-ghost btn-full" id="mb-library-enrich-previews-btn" type="button">Find Missing Previews</button>
+      <button class="btn btn-ghost btn-full" id="mb-library-recover-metadata-btn" type="button">Find Missing Metadata and Previews</button>
+      <p class="field-label">Compare providers</p>
+      <label for="mb-compare-provider-civitai" class="hint">
+        <input id="mb-compare-provider-civitai" type="checkbox" checked /> CivitAI
+      </label>
+      <label for="mb-compare-provider-huggingface" class="hint">
+        <input id="mb-compare-provider-huggingface" type="checkbox" checked /> Hugging Face
+      </label>
+      <button class="btn btn-ghost btn-full" id="mb-library-compare-metadata-btn" type="button">Compare Missing Metadata</button>
+    </div>
+    <div class="sidebar-section">
+      <button class="btn btn-ghost btn-full" id="mb-reset-filters-btn" type="button">Reset Models Filters</button>
+      <p id="mb-reset-status" class="hint mb-reset-status" aria-live="polite" hidden>Defaults restored.</p>
+    </div>
+    <div class="sidebar-section">
+      <div id="mb-library-action-report" class="mb-library-action-report" hidden aria-live="polite">
+        <div class="mb-library-action-report-head">
+          <button class="btn btn-ghost btn-xs" id="mb-library-action-report-clear" type="button">Clear Report</button>
+        </div>
+      </div>
+    </div>
     </div>
   </aside>
 
   <div class="models-container">
 
-    <!-- Active downloads -->
-    <section class="models-section" id="mb-downloads-section" hidden>
-      <h2 class="section-heading">Active Downloads</h2>
-      <div id="mb-downloads-list" class="mb-downloads-list"></div>
-    </section>
+    <div id="mb-remote-view">
+      <!-- Active downloads -->
+      <section class="models-section mb-downloads-drawer" id="mb-downloads-section" hidden>
+        <div class="mb-downloads-head">
+          <div class="mb-downloads-title-wrap">
+            <h2 class="section-heading">Download Queue</h2>
+            <span id="mb-downloads-counter" class="mb-downloads-counter" hidden>0 active • 0 pending</span>
+          </div>
+          <div class="mb-downloads-actions" role="group" aria-label="Download queue actions">
+            <button class="btn btn-ghost btn-xs" id="mb-clear-finished-downloads" type="button">Clear Finished</button>
+            <button class="btn btn-ghost btn-xs" id="mb-downloads-toggle" type="button" aria-expanded="true">Minimize</button>
+          </div>
+        </div>
+        <div id="mb-downloads-body">
+          <div id="mb-downloads-list" class="mb-downloads-list"></div>
+        </div>
+      </section>
 
-    <!-- Local library -->
-    <section class="models-section">
-      <h2 class="section-heading">Local Library</h2>
-      <p id="mb-library-status" class="hint">Loading…</p>
-      <div id="mb-library-grid" class="mb-library-grid"></div>
-    </section>
+      <!-- Search results -->
+      <section class="models-section" id="mb-results-section" hidden>
+        <h2 class="section-heading">
+          Search Results
+          <span id="mb-results-count" class="section-count"></span>
+        </h2>
+        <p id="mb-search-status" class="hint"></p>
+        <div id="mb-results-grid" class="mb-results-grid"></div>
+        <div class="mb-pagination" id="mb-pagination" role="group" aria-label="Model search pagination" hidden>
+          <button class="btn btn-ghost btn-xs" id="mb-prev-page" type="button">&#8249; Prev</button>
+          <span id="mb-page-info" class="hint"></span>
+          <button class="btn btn-ghost btn-xs" id="mb-next-page" type="button">Next &#8250;</button>
+        </div>
+      </section>
+    </div>
 
-    <!-- Search results -->
-    <section class="models-section" id="mb-results-section" hidden>
-      <h2 class="section-heading">
-        Search Results
-        <span id="mb-results-count" class="section-count"></span>
-      </h2>
-      <p id="mb-search-status" class="hint"></p>
-      <div id="mb-results-grid" class="mb-results-grid"></div>
-      <div class="mb-pagination" id="mb-pagination" hidden>
-        <button class="btn btn-ghost btn-xs" id="mb-prev-page" type="button">&#8249; Prev</button>
-        <span id="mb-page-info" class="hint"></span>
-        <button class="btn btn-ghost btn-xs" id="mb-next-page" type="button">Next &#8250;</button>
+    <div id="mb-local-view" hidden>
+      <!-- Local library -->
+      <section class="models-section">
+        <h2 class="section-heading">Local Library</h2>
+        <p id="mb-library-status" class="hint">Loading…</p>
+        <div id="mb-library-grid" class="mb-library-grid"></div>
+      </section>
+    </div>
+
+    <div id="mb-model-modal" class="mb-model-modal" hidden aria-hidden="true" role="dialog" aria-modal="true" aria-label="Model details">
+      <div class="mb-model-modal-backdrop" data-mb-modal-close="backdrop"></div>
+      <div class="mb-model-modal-panel" role="document">
+        <div class="mb-model-modal-head">
+          <h3 id="mb-model-modal-title" class="section-heading">Model details</h3>
+          <button id="mb-model-modal-close" class="btn btn-ghost btn-xs" type="button" aria-label="Close model details">Close</button>
+        </div>
+        <p id="mb-model-modal-meta" class="hint"></p>
+        <p id="mb-model-modal-description" class="mb-model-modal-description"></p>
+
+        <div class="mb-model-modal-preview-wrap">
+          <img id="mb-model-modal-preview" class="mb-model-modal-preview" src="" alt="Model preview" />
+          <video id="mb-model-modal-preview-video" class="mb-model-modal-preview mb-model-modal-preview-video" controls loop muted hidden></video>
+          <div id="mb-model-modal-thumbs" class="mb-model-modal-thumbs"></div>
+        </div>
+
+        <div class="mb-model-modal-version-row">
+          <label for="mb-model-modal-version" class="field-label">Version</label>
+          <div class="select-wrapper">
+            <select id="mb-model-modal-version"></select>
+          </div>
+          <span id="mb-model-modal-version-status" class="hint"></span>
+        </div>
+        <p id="mb-model-modal-download-status" class="hint mb-model-modal-download-status" aria-live="polite" hidden></p>
+
+        <div class="mb-model-modal-grid">
+          <section>
+            <h4 class="field-label">Files</h4>
+            <div id="mb-model-modal-files" class="mb-model-modal-list"></div>
+          </section>
+          <section>
+            <h4 class="field-label">Inference Defaults</h4>
+            <div id="mb-model-modal-defaults" class="mb-model-modal-list"></div>
+          </section>
+        </div>
       </div>
-    </section>
+    </div>
 
   </div>
 </section>
