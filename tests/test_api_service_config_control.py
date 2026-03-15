@@ -1,4 +1,5 @@
 """Tests for service path configuration and service control endpoints."""
+import time
 from pathlib import Path
 
 import pytest
@@ -210,3 +211,51 @@ def test_migrate_model_folders_moves_legacy_content(client, tmp_path):
     assert data["moved_count"] == 2
     assert (shared_root / "StableDiffusion" / "legacy.safetensors").exists()
     assert (shared_root / "Lora" / "style.safetensors").exists()
+
+
+def test_migrate_model_folders_dry_run_does_not_move_files(client, tmp_path):
+    shared_root = tmp_path / "models-root"
+    (shared_root / "checkpoints").mkdir(parents=True)
+    (shared_root / "checkpoints" / "legacy.safetensors").write_bytes(b"abc")
+
+    client.post("/api/config/services", json={"shared_models_path": str(shared_root)})
+
+    resp = client.post("/api/config/migrate-model-folders", json={"dry_run": True})
+
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["ok"] is True
+    assert data["dry_run"] is True
+    assert data["moved_count"] == 1
+    assert (shared_root / "checkpoints" / "legacy.safetensors").exists()
+    assert not (shared_root / "StableDiffusion" / "legacy.safetensors").exists()
+
+
+def test_migrate_model_folders_async_returns_job_status(client, tmp_path):
+    shared_root = tmp_path / "models-root"
+    (shared_root / "checkpoints").mkdir(parents=True)
+    (shared_root / "checkpoints" / "legacy.safetensors").write_bytes(b"abc")
+    client.post("/api/config/services", json={"shared_models_path": str(shared_root)})
+
+    start = client.post("/api/config/migrate-model-folders", json={"async": True})
+    assert start.status_code == 202
+    job_id = start.get_json()["job"]["id"]
+
+    final = None
+    for _ in range(50):
+        status = client.get(f"/api/config/migrate-model-folders/status/{job_id}")
+        assert status.status_code == 200
+        job = status.get_json()["job"]
+        if job["status"] in {"done", "error"}:
+            final = job
+            break
+        time.sleep(0.02)
+
+    assert final is not None
+    assert final["status"] == "done"
+    assert final["result"]["moved_count"] == 1
+
+
+def test_migration_status_unknown_job_returns_404(client):
+    resp = client.get("/api/config/migrate-model-folders/status/unknown-job")
+    assert resp.status_code == 404

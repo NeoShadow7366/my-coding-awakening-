@@ -1110,31 +1110,98 @@ async function browseServicePath(service) {
 async function migrateSharedModelFolders() {
 	if (!configModelsMigrateBtn) return;
 
-	const confirmed = window.confirm('Migrate legacy folder names (checkpoints, loras, etc.) into Stability Matrix naming now?');
-	if (!confirmed) {
-		setConfigStatusLine(configSaveStatus, 'Migration canceled.');
-		return;
-	}
-
 	configModelsMigrateBtn.disabled = true;
-	setConfigStatusLine(configSaveStatus, 'Running shared model folder migration...');
+	setConfigStatusLine(configSaveStatus, 'Analyzing folders for migration preview...');
 
 	try {
-		const res = await fetch('/api/config/migrate-model-folders', {
+		const previewRes = await fetch('/api/config/migrate-model-folders', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({}),
+			body: JSON.stringify({ dry_run: true }),
 		});
-		const data = await res.json().catch(() => ({}));
-		if (!res.ok) {
-			setConfigStatusLine(configSaveStatus, data.error || 'Migration failed.', 'error');
+		const preview = await previewRes.json().catch(() => ({}));
+		if (!previewRes.ok) {
+			setConfigStatusLine(configSaveStatus, preview.error || 'Migration preview failed.', 'error');
+			showToast('Model folder migration preview failed.', 'neg');
+			return;
+		}
+
+		const total = Number(preview.total_files || 0);
+		const wouldMove = Number(preview.moved_count || 0);
+		const wouldSkip = Number(preview.skipped_count || 0);
+		const previewMsg = `Preview: ${total} files scanned, ${wouldMove} to move, ${wouldSkip} to skip.`;
+
+		if (total === 0) {
+			setConfigStatusLine(configSaveStatus, 'No legacy files found to migrate.', 'ok');
+			showToast('No legacy model folders needed migration.', 'pos');
+			return;
+		}
+
+		const confirmed = window.confirm(`${previewMsg}\n\nRun migration now?`);
+		if (!confirmed) {
+			setConfigStatusLine(configSaveStatus, 'Migration canceled after preview.');
+			return;
+		}
+
+		setConfigStatusLine(configSaveStatus, 'Starting migration job...');
+		const startRes = await fetch('/api/config/migrate-model-folders', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ async: true }),
+		});
+		const startData = await startRes.json().catch(() => ({}));
+		if (!startRes.ok) {
+			setConfigStatusLine(configSaveStatus, startData.error || 'Migration failed to start.', 'error');
 			showToast('Model folder migration failed.', 'neg');
 			return;
 		}
 
-		const movedCount = Number(data.moved_count || 0);
-		const skippedCount = Number(data.skipped_count || 0);
-		const errorCount = Number(data.error_count || 0);
+		const jobId = startData.job?.id;
+		if (!jobId) {
+			setConfigStatusLine(configSaveStatus, 'Migration failed: missing job id.', 'error');
+			showToast('Model folder migration failed.', 'neg');
+			return;
+		}
+
+		let finalJob = null;
+		for (let i = 0; i < 600; i++) {
+			await new Promise((resolve) => window.setTimeout(resolve, 500));
+			const statusRes = await fetch(`/api/config/migrate-model-folders/status/${encodeURIComponent(jobId)}`);
+			const statusData = await statusRes.json().catch(() => ({}));
+			if (!statusRes.ok) {
+				setConfigStatusLine(configSaveStatus, statusData.error || 'Migration status check failed.', 'error');
+				showToast('Migration status check failed.', 'neg');
+				return;
+			}
+
+			const job = statusData.job || {};
+			const progress = job.progress || {};
+			const processed = Number(progress.processed_files || 0);
+			const totalFiles = Number(progress.total_files || 0);
+			setConfigStatusLine(configSaveStatus, `Migrating... ${processed}/${totalFiles} files`);
+
+			if (job.status === 'done' || job.status === 'error') {
+				finalJob = job;
+				break;
+			}
+		}
+
+		if (!finalJob) {
+			setConfigStatusLine(configSaveStatus, 'Migration is still running. Check again shortly.');
+			showToast('Migration still running in background.', '');
+			return;
+		}
+
+		if (finalJob.status === 'error') {
+			setConfigStatusLine(configSaveStatus, finalJob.error || 'Migration failed.', 'error');
+			showToast('Model folder migration failed.', 'neg');
+			return;
+		}
+
+		const result = finalJob.result || {};
+		const movedCount = Number(result.moved_count || 0);
+		const skippedCount = Number(result.skipped_count || 0);
+		const errorCount = Number(result.error_count || 0);
 		const summary = `Migration complete: moved ${movedCount}, skipped ${skippedCount}, errors ${errorCount}.`;
 		setConfigStatusLine(configSaveStatus, summary, errorCount > 0 ? 'error' : 'ok');
 		showToast(summary, errorCount > 0 ? 'neg' : 'pos');

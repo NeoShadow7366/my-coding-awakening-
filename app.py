@@ -56,6 +56,8 @@ SERVICE_PORTS = {
 _history_lock = threading.Lock()
 _service_config_lock = threading.Lock()
 _service_log_lock = threading.Lock()
+_migration_jobs_lock = threading.Lock()
+_migration_jobs: dict[str, dict] = {}
 _service_processes: dict[str, subprocess.Popen | None] = {
     "ollama": None,
     "comfyui": None,
@@ -772,7 +774,7 @@ def _resolve_shared_models_root_dir() -> Path | None:
     return candidate
 
 
-def _migrate_shared_model_folders() -> dict:
+def _migrate_shared_model_folders(dry_run: bool = False, progress_cb=None) -> dict:
     """Move legacy Comfy-style folder content into Stability Matrix-style shared folders."""
     shared_root = _resolve_shared_models_root_dir()
     if shared_root is None:
@@ -791,6 +793,30 @@ def _migrate_shared_model_folders() -> dict:
     moved: list[dict] = []
     skipped: list[dict] = []
     errors: list[dict] = []
+    processed_files = 0
+
+    def _append_capped(items: list[dict], payload: dict, cap: int = 500) -> None:
+        if len(items) < cap:
+            items.append(payload)
+
+    candidate_files: list[tuple[Path, Path, str, str]] = []
+    for legacy_folder, target_folder in legacy_to_stability.items():
+        src_dir = shared_root / legacy_folder
+        dst_dir = shared_root / target_folder
+        if not src_dir.exists() or not src_dir.is_dir():
+            continue
+        for src_file in src_dir.rglob("*"):
+            if not src_file.is_file():
+                continue
+            rel_path = src_file.relative_to(src_dir)
+            dest_file = dst_dir / rel_path
+            src_rel = str(src_file.relative_to(shared_root)).replace("\\", "/")
+            dest_rel = str(dest_file.relative_to(shared_root)).replace("\\", "/")
+            candidate_files.append((src_file, dest_file, src_rel, dest_rel))
+
+    total_files = len(candidate_files)
+    if progress_cb:
+        progress_cb(processed_files, total_files, len(moved), len(skipped), len(errors))
 
     for legacy_folder, target_folder in legacy_to_stability.items():
         src_dir = shared_root / legacy_folder
@@ -801,33 +827,44 @@ def _migrate_shared_model_folders() -> dict:
 
         dst_dir.mkdir(parents=True, exist_ok=True)
 
-        for src_file in src_dir.rglob("*"):
-            if not src_file.is_file():
-                continue
-            rel_path = src_file.relative_to(src_dir)
-            dest_file = dst_dir / rel_path
+        for src_file, dest_file, src_rel, dest_rel in [
+            entry for entry in candidate_files if entry[2].startswith(f"{legacy_folder}/")
+        ]:
             dest_file.parent.mkdir(parents=True, exist_ok=True)
 
-            src_rel = str(src_file.relative_to(shared_root)).replace("\\", "/")
-            dest_rel = str(dest_file.relative_to(shared_root)).replace("\\", "/")
-
             if dest_file.exists():
-                skipped.append({
+                _append_capped(skipped, {
                     "source": src_rel,
                     "destination": dest_rel,
                     "reason": "destination exists",
                 })
+                processed_files += 1
+                if progress_cb:
+                    progress_cb(processed_files, total_files, len(moved), len(skipped), len(errors))
+                continue
+
+            if dry_run:
+                _append_capped(moved, {"source": src_rel, "destination": dest_rel})
+                processed_files += 1
+                if progress_cb:
+                    progress_cb(processed_files, total_files, len(moved), len(skipped), len(errors))
                 continue
 
             try:
                 src_file.replace(dest_file)
-                moved.append({"source": src_rel, "destination": dest_rel})
+                _append_capped(moved, {"source": src_rel, "destination": dest_rel})
             except OSError as exc:
-                errors.append({
+                _append_capped(errors, {
                     "source": src_rel,
                     "destination": dest_rel,
                     "error": str(exc),
                 })
+            processed_files += 1
+            if progress_cb:
+                progress_cb(processed_files, total_files, len(moved), len(skipped), len(errors))
+
+        if dry_run:
+            continue
 
         # Best-effort cleanup of emptied legacy folders.
         for entry in sorted(src_dir.rglob("*"), reverse=True):
@@ -842,7 +879,9 @@ def _migrate_shared_model_folders() -> dict:
             pass
 
     return {
+        "dry_run": dry_run,
         "root": str(shared_root),
+        "total_files": total_files,
         "moved_count": len(moved),
         "skipped_count": len(skipped),
         "error_count": len(errors),
@@ -850,6 +889,75 @@ def _migrate_shared_model_folders() -> dict:
         "skipped": skipped,
         "errors": errors,
     }
+
+
+def _migration_job_snapshot(job: dict) -> dict:
+    return {
+        "id": job.get("id"),
+        "status": job.get("status"),
+        "dry_run": bool(job.get("dry_run")),
+        "started_at": job.get("started_at"),
+        "finished_at": job.get("finished_at"),
+        "error": job.get("error", ""),
+        "progress": job.get("progress", {}),
+        "result": job.get("result"),
+    }
+
+
+def _run_migration_job(job_id: str, dry_run: bool = False) -> None:
+    def _on_progress(processed: int, total: int, moved: int, skipped: int, errors: int) -> None:
+        with _migration_jobs_lock:
+            job = _migration_jobs.get(job_id)
+            if not job:
+                return
+            job["progress"] = {
+                "processed_files": processed,
+                "total_files": total,
+                "moved_count": moved,
+                "skipped_count": skipped,
+                "error_count": errors,
+            }
+
+    try:
+        result = _migrate_shared_model_folders(dry_run=dry_run, progress_cb=_on_progress)
+        with _migration_jobs_lock:
+            job = _migration_jobs.get(job_id)
+            if job:
+                job["status"] = "done"
+                job["result"] = result
+                job["finished_at"] = datetime.now(timezone.utc).isoformat()
+    except Exception as exc:
+        with _migration_jobs_lock:
+            job = _migration_jobs.get(job_id)
+            if job:
+                job["status"] = "error"
+                job["error"] = str(exc)
+                job["finished_at"] = datetime.now(timezone.utc).isoformat()
+
+
+def _start_migration_job(dry_run: bool = False) -> dict:
+    job_id = f"mig-{int(time.time() * 1000)}"
+    job = {
+        "id": job_id,
+        "status": "running",
+        "dry_run": dry_run,
+        "started_at": datetime.now(timezone.utc).isoformat(),
+        "finished_at": "",
+        "error": "",
+        "progress": {
+            "processed_files": 0,
+            "total_files": 0,
+            "moved_count": 0,
+            "skipped_count": 0,
+            "error_count": 0,
+        },
+        "result": None,
+    }
+    with _migration_jobs_lock:
+        _migration_jobs[job_id] = job
+
+    threading.Thread(target=_run_migration_job, args=(job_id, dry_run), daemon=True).start()
+    return _migration_job_snapshot(job)
 
 
 def _normalize_image_ref(body: dict) -> dict:
@@ -1499,14 +1607,35 @@ def api_config_pick_path():
 @app.route("/api/config/migrate-model-folders", methods=["POST"])
 def api_config_migrate_model_folders():
     """Move shared model files from legacy Comfy naming to Stability Matrix naming."""
+    body = request.get_json(silent=True) or {}
+    dry_run = bool(body.get("dry_run", False))
+    run_async = bool(body.get("async", False))
+
+    if _resolve_shared_models_root_dir() is None:
+        return jsonify({"error": "Set Shared Model Root Path in Configurations before running migration"}), 400
+
     try:
-        result = _migrate_shared_model_folders()
+        if run_async:
+            job = _start_migration_job(dry_run=dry_run)
+            return jsonify({"ok": True, "job": job}), 202
+
+        result = _migrate_shared_model_folders(dry_run=dry_run)
         return jsonify({"ok": True, **result})
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
     except Exception as exc:
         logger.error("Shared model folder migration failed: %s", exc)
         return jsonify({"error": str(exc)}), 500
+
+
+@app.route("/api/config/migrate-model-folders/status/<job_id>")
+def api_config_migrate_model_folders_status(job_id: str):
+    """Return migration job status and progress."""
+    with _migration_jobs_lock:
+        job = _migration_jobs.get(job_id)
+    if not job:
+        return jsonify({"error": "unknown migration job id"}), 404
+    return jsonify({"ok": True, "job": _migration_job_snapshot(job)})
 
 
 @app.route("/api/service/<service>/<action>", methods=["POST"])
