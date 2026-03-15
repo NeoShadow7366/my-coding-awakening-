@@ -339,6 +339,9 @@ def test_model_search_cancel_button_is_wired_to_abort_active_request():
     assert "if (mbCancelSearchBtn) {" in content
     assert "mbCancelSearchBtn.addEventListener('click', cancelModelSearch);" in content
     assert "if (mbCancelSearchBtn) mbCancelSearchBtn.disabled = !mbSearchInFlight;" in content
+    assert "if (e.key === 'Escape') {" in content
+    assert "if (mbSearchInFlight) {" in content
+    assert "cancelModelSearch();" in content
 
 
 def test_model_search_disables_pagination_controls_while_request_is_active():

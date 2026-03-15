@@ -6064,7 +6064,16 @@ if (mbSearchQuery) {
 	mbSearchQuery.addEventListener('input', () => {
 		localStorage.setItem('mbSearchQuery', mbSearchQuery.value || '');
 	});
-	mbSearchQuery.addEventListener('keydown', (e) => { if (e.key === 'Enter') runCivitaiSearch(1); });
+	mbSearchQuery.addEventListener('keydown', (e) => {
+		if (e.key === 'Escape') {
+			if (mbSearchInFlight) {
+				e.preventDefault();
+				cancelModelSearch();
+			}
+			return;
+		}
+		if (e.key === 'Enter') runCivitaiSearch(1);
+	});
 }
 if (mbSearchType) {
 	mbSearchType.addEventListener('change', () => {
