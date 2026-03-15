@@ -4018,6 +4018,7 @@ let mbReportTargetTimer = null;
 let mbSearchAbortController = null;
 let mbSearchRequestSeq = 0;
 let mbSearchInFlight = false;
+const MB_SEARCH_TIMEOUT_MS = 25000;
 
 if (mbLocalQuery) {
 	mbLocalQuery.value = localStorage.getItem('mbLocalQuery') || '';
@@ -5556,8 +5557,11 @@ async function runCivitaiSearch(page) {
 	if (mbSearchAbortController) {
 		mbSearchAbortController.abort();
 	}
-	mbSearchAbortController = new AbortController();
-	const { signal } = mbSearchAbortController;
+	const controller = new AbortController();
+	mbSearchAbortController = controller;
+	const { signal } = controller;
+	let timeoutHandle = null;
+	let searchTimedOut = false;
 	mbSearchInFlight = true;
 	if (mbSearchBtn) mbSearchBtn.disabled = true;
 	const provider = mbProvider ? String(mbProvider.value || 'civitai') : 'civitai';
@@ -5577,6 +5581,11 @@ async function runCivitaiSearch(page) {
 	mbResultsGrid.innerHTML = '';
 	if (mbResultsSection) mbResultsSection.hidden = false;
 	try {
+		timeoutHandle = setTimeout(() => {
+			if (requestId !== mbSearchRequestSeq) return;
+			searchTimedOut = true;
+			controller.abort();
+		}, MB_SEARCH_TIMEOUT_MS);
 		const params = new URLSearchParams({page: mbCurrentPage});
 		params.set('limit', String(getMbPageSize()));
 		if (query) params.set('query', query);
@@ -5617,11 +5626,21 @@ async function runCivitaiSearch(page) {
 		renderSearchResults(mbLastSearchItems, data.total_items, hasProviderTotal);
 	} catch (err) {
 		if (requestId !== mbSearchRequestSeq) return;
-		if (err && err.name === 'AbortError') return;
+		if (err && err.name === 'AbortError') {
+			if (searchTimedOut) {
+				mbHasNextPage = false;
+				if (mbPagination) mbPagination.hidden = true;
+				setModelSearchStatus(`Search timed out after ${Math.round(MB_SEARCH_TIMEOUT_MS / 1000)}s. Please try again.`, true);
+			}
+			return;
+		}
 		mbHasNextPage = false;
 		if (mbPagination) mbPagination.hidden = true;
 		setModelSearchStatus('Search failed: ' + err.message, true);
 	} finally {
+		if (timeoutHandle) {
+			clearTimeout(timeoutHandle);
+		}
 		if (requestId === mbSearchRequestSeq) {
 			mbSearchInFlight = false;
 			mbSearchAbortController = null;

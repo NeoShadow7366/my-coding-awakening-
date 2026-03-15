@@ -289,14 +289,26 @@ def test_model_search_aborts_previous_requests_and_ignores_stale_results():
     assert "let mbSearchAbortController = null;" in content
     assert "let mbSearchRequestSeq = 0;" in content
     assert "let mbSearchInFlight = false;" in content
+    assert "const MB_SEARCH_TIMEOUT_MS = 25000;" in content
     assert "const requestId = ++mbSearchRequestSeq;" in content
     assert "mbSearchAbortController.abort();" in content
-    assert "const { signal } = mbSearchAbortController;" in content
+    assert "const controller = new AbortController();" in content
+    assert "const { signal } = controller;" in content
+    assert "timeoutHandle = setTimeout(() => {" in content
     assert "mbSearchInFlight = true;" in content
     assert "mbSearchInFlight = false;" in content
     assert "await fetch(endpoint + params.toString(), { signal });" in content
     assert "if (requestId !== mbSearchRequestSeq) return;" in content
-    assert "if (err && err.name === 'AbortError') return;" in content
+    assert "if (err && err.name === 'AbortError') {" in content
+    assert "if (searchTimedOut) {" in content
+    assert "clearTimeout(timeoutHandle);" in content
+
+
+def test_model_search_timeout_message_is_exposed_for_stalled_requests():
+    js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
+    content = js_path.read_text(encoding="utf-8")
+
+    assert "Search timed out after ${Math.round(MB_SEARCH_TIMEOUT_MS / 1000)}s. Please try again." in content
 
 
 def test_model_search_disables_pagination_controls_while_request_is_active():
