@@ -1857,6 +1857,10 @@ if (diagDrawerCommandForm && diagDrawerCommandInput) {
 			diagHistoryIndex = Math.min(diagHistoryIndex + 1, diagHistory.length - 1);
 			diagDrawerCommandInput.value = diagHistory[diagHistory.length - 1 - diagHistoryIndex];
 			diagDrawerCommandInput.setSelectionRange(diagDrawerCommandInput.value.length, diagDrawerCommandInput.value.length);
+		} else if ((event.key === 'l' || event.key === 'L') && event.ctrlKey) {
+			event.preventDefault();
+			if (diagDrawerOutput) diagDrawerOutput.innerHTML = '';
+			appendDiagnosticsConsoleLine('Console cleared.');
 		} else if (event.key === 'ArrowDown') {
 			event.preventDefault();
 			if (diagHistoryIndex <= 0) {

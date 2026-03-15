@@ -189,6 +189,8 @@ def test_diagnostics_drawer_keyboard_handler_wiring_present_in_js_bundle():
     assert "diagDrawer.setAttribute('aria-hidden', isOpen ? 'false' : 'true');" in content
     assert "diagDrawer.addEventListener('keydown', (event) => {" in content
     assert "if (event.key !== 'Escape') return;" in content
+    assert "} else if ((event.key === 'l' || event.key === 'L') && event.ctrlKey) {" in content
+    assert "appendDiagnosticsConsoleLine('Console cleared.');" in content
     assert "} else if (event.key === 'Home' && event.ctrlKey) {" in content
     assert "} else if (event.key === 'End' && event.ctrlKey) {" in content
 
