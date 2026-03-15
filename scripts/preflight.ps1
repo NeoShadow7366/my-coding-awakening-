@@ -65,6 +65,14 @@ function Save-ServiceConfig {
     }
 
     $payload | ConvertTo-Json -Depth 6 | Set-Content -Path $configPath -Encoding UTF8
+
+    if (-not [string]::IsNullOrWhiteSpace($SharedModelsPath)) {
+        $root = ([string]$SharedModelsPath).Trim()
+        New-Item -ItemType Directory -Path $root -Force | Out-Null
+        foreach ($name in @('StableDiffusion', 'Lora', 'VAE', 'Embeddings', 'ControlNet', 'ESRGAN')) {
+            New-Item -ItemType Directory -Path (Join-Path $root $name) -Force | Out-Null
+        }
+    }
 }
 
 if ($ConfigurePaths) {

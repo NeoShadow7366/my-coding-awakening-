@@ -150,3 +150,34 @@ def test_comfy_models_root_prefers_shared_path(client, tmp_path):
 
     resolved = app_module._comfy_models_root()
     assert resolved == shared_root
+
+
+def test_shared_models_path_creates_stability_matrix_subfolders(client, tmp_path):
+    shared_root = tmp_path / "models-root"
+
+    resp = client.post(
+        "/api/config/services",
+        json={
+            "ollama_path": "C:/Ollama/ollama.exe",
+            "comfyui_path": "D:/ComfyUI",
+            "shared_models_path": str(shared_root),
+        },
+    )
+
+    assert resp.status_code == 200
+    for folder in ("StableDiffusion", "Lora", "VAE", "Embeddings", "ControlNet", "ESRGAN"):
+        assert (shared_root / folder).is_dir()
+
+
+def test_model_folder_aliases_map_to_stability_names_when_shared(client, tmp_path):
+    shared_root = tmp_path / "models-root"
+    client.post(
+        "/api/config/services",
+        json={
+            "shared_models_path": str(shared_root),
+        },
+    )
+
+    assert app_module._normalize_model_folder("checkpoints") == "StableDiffusion"
+    assert app_module._normalize_model_folder("loras") == "Lora"
+    assert app_module._normalize_model_folder("upscale_models") == "ESRGAN"

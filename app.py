@@ -274,6 +274,14 @@ def _save_service_config(config: dict) -> dict:
         "shared_models_path": str(config.get("shared_models_path") or "").strip(),
         "updated_at": _service_config_timestamp(),
     }
+
+    shared_root_raw = sanitized["shared_models_path"]
+    if shared_root_raw:
+        shared_root = Path(shared_root_raw).expanduser()
+        shared_root.mkdir(parents=True, exist_ok=True)
+        for folder in ("StableDiffusion", "Lora", "VAE", "Embeddings", "ControlNet", "ESRGAN"):
+            (shared_root / folder).mkdir(parents=True, exist_ok=True)
+
     with _service_config_lock:
         SERVICE_CONFIG_FILE.write_text(json.dumps(sanitized, ensure_ascii=True, indent=2), encoding="utf-8")
     return sanitized
@@ -1013,7 +1021,7 @@ _CIVITAI_API = "https://civitai.com/api/v1"
 _CIVITAI_MODEL_TYPES = {"Checkpoint", "LORA", "VAE", "TextualInversion", "ControlNet", "Upscaler"}
 
 # Maps CivitAI model type → ComfyUI subfolder name
-_CIVITAI_TYPE_TO_FOLDER: dict[str, str] = {
+_CIVITAI_TYPE_TO_COMFY_FOLDER: dict[str, str] = {
     "Checkpoint": "checkpoints",
     "LORA": "loras",
     "VAE": "vae",
@@ -1022,7 +1030,54 @@ _CIVITAI_TYPE_TO_FOLDER: dict[str, str] = {
     "Upscaler": "upscale_models",
 }
 
-_COMFY_MODEL_SUBFOLDERS = list(_CIVITAI_TYPE_TO_FOLDER.values())
+# Maps CivitAI model type → Stability Matrix shared folder name
+_CIVITAI_TYPE_TO_STABILITY_FOLDER: dict[str, str] = {
+    "Checkpoint": "StableDiffusion",
+    "LORA": "Lora",
+    "VAE": "VAE",
+    "TextualInversion": "Embeddings",
+    "ControlNet": "ControlNet",
+    "Upscaler": "ESRGAN",
+}
+
+_COMFY_MODEL_SUBFOLDERS = sorted(set(_CIVITAI_TYPE_TO_COMFY_FOLDER.values()))
+_STABILITY_MODEL_SUBFOLDERS = sorted(set(_CIVITAI_TYPE_TO_STABILITY_FOLDER.values()))
+
+
+def _using_shared_models_root() -> bool:
+    return _resolve_shared_models_root_dir() is not None
+
+
+def _preferred_model_folder_for_type(model_type: str) -> str:
+    if _using_shared_models_root():
+        return _CIVITAI_TYPE_TO_STABILITY_FOLDER.get(model_type, "StableDiffusion")
+    return _CIVITAI_TYPE_TO_COMFY_FOLDER.get(model_type, "checkpoints")
+
+
+def _normalize_model_folder(folder: str) -> str | None:
+    value = (folder or "").strip()
+    if not value:
+        return None
+
+    # Compatibility aliases between Comfy and Stability Matrix naming.
+    shared_aliases = {
+        "checkpoints": "StableDiffusion",
+        "loras": "Lora",
+        "vae": "VAE",
+        "embeddings": "Embeddings",
+        "controlnet": "ControlNet",
+        "upscale_models": "ESRGAN",
+    }
+    comfy_aliases = {v: k for k, v in shared_aliases.items()}
+
+    if _using_shared_models_root():
+        if value in _STABILITY_MODEL_SUBFOLDERS:
+            return value
+        return shared_aliases.get(value)
+
+    if value in _COMFY_MODEL_SUBFOLDERS:
+        return value
+    return comfy_aliases.get(value)
 
 
 def _comfy_models_root() -> Path | None:
@@ -1045,15 +1100,27 @@ def _scan_local_models() -> list[dict]:
     if not models_root.exists() or not models_root.is_dir():
         return []
     results: list[dict] = []
-    for folder in _COMFY_MODEL_SUBFOLDERS:
+    if _using_shared_models_root():
+        folders_to_scan = sorted(set(_STABILITY_MODEL_SUBFOLDERS + _COMFY_MODEL_SUBFOLDERS))
+    else:
+        folders_to_scan = _COMFY_MODEL_SUBFOLDERS
+
+    seen_paths: set[str] = set()
+    for folder in folders_to_scan:
         folder_path = models_root / folder
         if not folder_path.is_dir():
             continue
         for f in folder_path.iterdir():
             if f.is_file() and f.suffix.lower() in {".safetensors", ".ckpt", ".pt", ".pth", ".bin"}:
+                resolved_path = str(f.resolve())
+                if resolved_path in seen_paths:
+                    continue
+                seen_paths.add(resolved_path)
+
+                normalized_folder = _normalize_model_folder(folder) or folder
                 results.append({
                     "name": f.name,
-                    "folder": folder,
+                    "folder": normalized_folder,
                     "size_bytes": f.stat().st_size,
                     "path": str(f),
                 })
@@ -1102,7 +1169,7 @@ def _civitai_search(query: str, model_type: str, page: int) -> dict:
             "file_name": primary_file.get("name", ""),
             "file_size_bytes": primary_file.get("sizeKB", 0) * 1024,
             "download_url": primary_file.get("downloadUrl", ""),
-            "model_type_folder": _CIVITAI_TYPE_TO_FOLDER.get(model.get("type", ""), "checkpoints"),
+            "model_type_folder": _preferred_model_folder_for_type(model.get("type", "")),
         })
     return {
         "items": items,
@@ -1184,14 +1251,16 @@ def api_models_download():
     body = request.get_json(silent=True) or {}
     url = (body.get("url") or "").strip()
     file_name = (body.get("file_name") or "").strip()
-    folder = (body.get("folder") or "checkpoints").strip()
+    folder_raw = (body.get("folder") or _preferred_model_folder_for_type("Checkpoint")).strip()
+    folder = _normalize_model_folder(folder_raw)
 
     if not url:
         return jsonify({"error": "url is required"}), 400
     if not file_name or Path(file_name).name != file_name:
         return jsonify({"error": "invalid file_name"}), 400
-    if folder not in _COMFY_MODEL_SUBFOLDERS:
-        return jsonify({"error": f"folder must be one of: {', '.join(_COMFY_MODEL_SUBFOLDERS)}"}), 400
+    allowed_folders = _STABILITY_MODEL_SUBFOLDERS if _using_shared_models_root() else _COMFY_MODEL_SUBFOLDERS
+    if folder is None or folder not in allowed_folders:
+        return jsonify({"error": f"folder must be one of: {', '.join(allowed_folders)}"}), 400
 
     models_root = _comfy_models_root()
     if models_root is None:
@@ -1246,12 +1315,14 @@ def api_models_delete_local():
     """Delete a locally installed model file."""
     body = request.get_json(silent=True) or {}
     file_name = (body.get("file_name") or "").strip()
-    folder = (body.get("folder") or "").strip()
+    folder_raw = (body.get("folder") or "").strip()
+    folder = _normalize_model_folder(folder_raw)
 
     if not file_name or Path(file_name).name != file_name:
         return jsonify({"error": "invalid file_name"}), 400
-    if folder not in _COMFY_MODEL_SUBFOLDERS:
-        return jsonify({"error": f"folder must be one of: {', '.join(_COMFY_MODEL_SUBFOLDERS)}"}), 400
+    allowed_folders = _STABILITY_MODEL_SUBFOLDERS if _using_shared_models_root() else _COMFY_MODEL_SUBFOLDERS
+    if folder is None or folder not in allowed_folders:
+        return jsonify({"error": f"folder must be one of: {', '.join(allowed_folders)}"}), 400
 
     models_root = _comfy_models_root()
     if models_root is None:

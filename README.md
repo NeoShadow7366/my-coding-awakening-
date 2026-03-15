@@ -67,6 +67,9 @@ To run an interactive path setup step (Ollama, ComfyUI, and shared model root pa
 ./scripts/preflight.ps1 -ConfigurePaths
 ```
 
+When a shared model root is configured, the app auto-creates Stability Matrix style folders:
+`StableDiffusion`, `Lora`, `VAE`, `Embeddings`, `ControlNet`, `ESRGAN`.
+
 To run the same checks and launch the app only if Flask is down:
 
 ```powershell
