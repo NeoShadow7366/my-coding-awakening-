@@ -828,6 +828,20 @@ function renderWsTransportStatus() {
 	wsTransportStatus.textContent = 'Preview transport: polling fallback ready';
 }
 
+function startWsTransportStatusTicker() {
+	if (wsTransportStatusTimer) return;
+	wsTransportStatusTimer = window.setInterval(() => {
+		if (document.hidden) return;
+		renderWsTransportStatus();
+	}, 1000);
+}
+
+function stopWsTransportStatusTicker() {
+	if (!wsTransportStatusTimer) return;
+	window.clearInterval(wsTransportStatusTimer);
+	wsTransportStatusTimer = null;
+}
+
 function syncBackgroundPollingOwnership() {
 	const hadOwnership = hasBackgroundPollingOwnership;
 	hasBackgroundPollingOwnership = refreshBackgroundPollingOwnership() || claimBackgroundPollingOwnership();
@@ -3437,6 +3451,7 @@ let comfyWsReconnectTimer = null;
 let comfyWsFailCount = 0;
 let comfyWsCooldownNotified = false;
 let comfyWsNextRetryAt = 0;
+let wsTransportStatusTimer = null;
 const COMFY_WS_MAX_RETRIES = 4;
 const COMFY_WS_COOLDOWN_KEY = 'comfyWsCooldownUntil';
 const COMFY_WS_COOLDOWN_MS = 30 * 60 * 1000;
@@ -3503,6 +3518,7 @@ if (_isComfyWsCooldownActive()) {
 } else {
 	setPreviewTransportMode('polling');
 }
+startWsTransportStatusTicker();
 
 function _revokeComfyPreviewUrl() {
 	if (comfyWsPreviewUrl) {
@@ -3629,6 +3645,7 @@ function connectComfyWebSocket() {
 }
 
 document.addEventListener('visibilitychange', () => {
+	renderWsTransportStatus();
 	if (!document.hidden && !comfyWs) {
 		if (_isComfyWsCooldownActive()) {
 			const minsLeft = _getComfyWsCooldownMinutesLeft();
@@ -6867,5 +6884,6 @@ window.addEventListener('storage', (event) => {
 });
 
 window.addEventListener('beforeunload', () => {
+	stopWsTransportStatusTicker();
 	releaseBackgroundPollingOwnership();
 });

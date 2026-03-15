@@ -392,6 +392,11 @@ def test_preview_transport_diagnostics_line_shows_retry_and_cooldown_state():
     assert "Preview transport: retry in ${secsLeft}s (${comfyWsFailCount}/${COMFY_WS_MAX_RETRIES})" in content
     assert "Preview transport: websocket connected" in content
     assert "renderWsTransportStatus();" in content
+    assert "let wsTransportStatusTimer = null;" in content
+    assert "function startWsTransportStatusTicker() {" in content
+    assert "wsTransportStatusTimer = window.setInterval(() => {" in content
+    assert "function stopWsTransportStatusTicker() {" in content
+    assert "stopWsTransportStatusTicker();" in content
 
 
 def test_model_modal_preserves_search_result_type_when_details_are_less_specific():
