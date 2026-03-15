@@ -30,6 +30,8 @@ def test_service_config_get_defaults(client):
         "ollama_path": "",
         "comfyui_path": "",
         "shared_models_path": "",
+        "civitai_api_key": "",
+        "huggingface_api_key": "",
         "updated_at": "",
     }
 
@@ -41,6 +43,8 @@ def test_service_config_post_persists_paths(client):
             "ollama_path": " C:/Ollama/ollama.exe ",
             "comfyui_path": " D:/ComfyUI ",
             "shared_models_path": " E:/AI/models ",
+            "civitai_api_key": " civitai-key-123 ",
+            "huggingface_api_key": " hf_token_abc ",
         },
     )
     read_resp = client.get("/api/config/services")
@@ -53,6 +57,8 @@ def test_service_config_post_persists_paths(client):
     assert read_data["ollama_path"] == "C:/Ollama/ollama.exe"
     assert read_data["comfyui_path"] == "D:/ComfyUI"
     assert read_data["shared_models_path"] == "E:/AI/models"
+    assert read_data["civitai_api_key"] == "civitai-key-123"
+    assert read_data["huggingface_api_key"] == "hf_token_abc"
     assert read_data["updated_at"]
 
 

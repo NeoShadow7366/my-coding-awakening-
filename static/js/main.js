@@ -4367,6 +4367,12 @@ function setModelModalDownloadStatus(message, level = '') {
 	mbModelModalDownloadStatus.hidden = false;
 }
 
+function setModelSearchStatus(message = '', isVisible = false) {
+	if (!mbSearchStatus) return;
+	mbSearchStatus.textContent = message;
+	mbSearchStatus.hidden = !isVisible;
+}
+
 function applyModelBrowserClientFilters(items) {
 	let filtered = Array.isArray(items) ? items.slice() : [];
 	const baseModelFilter = mbBaseModel ? String(mbBaseModel.value || '').trim().toLowerCase() : '';
@@ -5554,10 +5560,7 @@ async function runCivitaiSearch(page) {
 	if (mbCurrentPage <= 1) {
 		mbCursorByPage = { 1: '' };
 	}
-	if (mbSearchStatus) {
-		mbSearchStatus.textContent = provider === 'huggingface' ? 'Searching Hugging Face…' : 'Searching CivitAI…';
-		mbSearchStatus.hidden = false;
-	}
+	setModelSearchStatus(provider === 'huggingface' ? 'Searching Hugging Face…' : 'Searching CivitAI…', true);
 	if (mbResultsCount) mbResultsCount.textContent = '';
 	mbResultsGrid.innerHTML = '';
 	if (mbResultsSection) mbResultsSection.hidden = false;
@@ -5597,24 +5600,27 @@ async function runCivitaiSearch(page) {
 			mbCursorByPage = { 1: '' };
 		}
 		mbLastSearchItems = data.items || [];
-		renderSearchResults(mbLastSearchItems, data.total_items);
+		const hasProviderTotal = Object.prototype.hasOwnProperty.call(data || {}, 'total_items');
+		renderSearchResults(mbLastSearchItems, data.total_items, hasProviderTotal);
 	} catch (err) {
 		mbHasNextPage = false;
 		if (mbPagination) mbPagination.hidden = true;
-		if (mbSearchStatus) { mbSearchStatus.textContent = 'Search failed: ' + err.message; mbSearchStatus.hidden = false; }
+		setModelSearchStatus('Search failed: ' + err.message, true);
 	}
 }
 
-function renderSearchResults(items, totalItems) {
+function renderSearchResults(items, totalItems, hasProviderTotal = false) {
 	if (!mbResultsGrid) return;
 	mbResultsGrid.innerHTML = '';
-	if (mbSearchStatus) mbSearchStatus.hidden = true;
+	setModelSearchStatus('', false);
 	if (mbPagination) mbPagination.hidden = false;
 	const displayItems = applyModelBrowserClientFilters(items || []);
 	if (mbResultsCount) {
 		const shown = displayItems.length.toLocaleString();
 		if (totalItems != null) {
 			mbResultsCount.textContent = `(${shown} shown / ${totalItems.toLocaleString()} total)`;
+		} else if (hasProviderTotal) {
+			mbResultsCount.textContent = `(${shown} shown - total unavailable)`;
 		} else {
 			mbResultsCount.textContent = `(${shown} shown)`;
 		}

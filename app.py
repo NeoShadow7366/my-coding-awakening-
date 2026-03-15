@@ -8,6 +8,7 @@ The app uses:
 import json
 import logging
 import os
+import re
 import shlex
 import subprocess
 import sys
@@ -16,9 +17,10 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 from random import randint
+from urllib.parse import quote
 
 import requests
-from flask import Flask, Response, jsonify, render_template, request, stream_with_context
+from flask import Flask, Response, jsonify, render_template, request, send_file, stream_with_context
 
 # ---------------------------------------------------------------------------
 # App setup
@@ -56,6 +58,7 @@ SERVICE_PORTS = {
 _history_lock = threading.Lock()
 _service_config_lock = threading.Lock()
 _service_log_lock = threading.Lock()
+_model_metadata_lock = threading.Lock()
 _migration_jobs_lock = threading.Lock()
 _migration_jobs: dict[str, dict] = {}
 _service_processes: dict[str, subprocess.Popen | None] = {
@@ -178,6 +181,26 @@ def _image_models() -> list[str]:
     return []
 
 
+def _image_lora_models() -> list[str]:
+    """Return available LoRA names from ComfyUI."""
+    data = _comfy_get_object_info("LoraLoader")
+    required = data.get("LoraLoader", {}).get("input", {}).get("required", {})
+    names = required.get("lora_name", [[]])
+    if names and isinstance(names[0], list):
+        return names[0]
+    return []
+
+
+def _image_controlnet_models() -> list[str]:
+    """Return available ControlNet names from ComfyUI."""
+    data = _comfy_get_object_info("ControlNetLoader")
+    required = data.get("ControlNetLoader", {}).get("input", {}).get("required", {})
+    names = required.get("control_net_name", [[]])
+    if names and isinstance(names[0], list):
+        return names[0]
+    return []
+
+
 def _clamp_float(value: float, low: float, high: float) -> float:
     return max(low, min(high, value))
 
@@ -209,6 +232,8 @@ def _default_service_config() -> dict:
         "ollama_path": "",
         "comfyui_path": "",
         "shared_models_path": "",
+        "civitai_api_key": "",
+        "huggingface_api_key": "",
         "updated_at": "",
     }
 
@@ -262,6 +287,8 @@ def _load_service_config() -> dict:
             config["ollama_path"] = str(raw.get("ollama_path") or "").strip()
             config["comfyui_path"] = str(raw.get("comfyui_path") or "").strip()
             config["shared_models_path"] = str(raw.get("shared_models_path") or "").strip()
+            config["civitai_api_key"] = str(raw.get("civitai_api_key") or "").strip()
+            config["huggingface_api_key"] = str(raw.get("huggingface_api_key") or "").strip()
             config["updated_at"] = str(raw.get("updated_at") or "").strip()
 
         SERVICE_CONFIG_FILE.write_text(json.dumps(config, ensure_ascii=True, indent=2), encoding="utf-8")
@@ -274,6 +301,8 @@ def _save_service_config(config: dict) -> dict:
         "ollama_path": str(config.get("ollama_path") or "").strip(),
         "comfyui_path": str(config.get("comfyui_path") or "").strip(),
         "shared_models_path": str(config.get("shared_models_path") or "").strip(),
+        "civitai_api_key": str(config.get("civitai_api_key") or "").strip(),
+        "huggingface_api_key": str(config.get("huggingface_api_key") or "").strip(),
         "updated_at": _service_config_timestamp(),
     }
 
@@ -561,6 +590,751 @@ def _save_history(items: list[dict]) -> None:
     _ensure_history_store()
     with _history_lock:
         HISTORY_FILE.write_text(json.dumps(items, ensure_ascii=True, indent=2), encoding="utf-8")
+
+
+def _model_metadata_path() -> Path:
+    return DATA_DIR / "model_metadata.json"
+
+
+def _ensure_model_metadata_store() -> None:
+    path = _model_metadata_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if not path.exists():
+        path.write_text("{}", encoding="utf-8")
+
+
+def _load_model_metadata() -> dict[str, dict]:
+    _ensure_model_metadata_store()
+    path = _model_metadata_path()
+    with _model_metadata_lock:
+        try:
+            raw = json.loads(path.read_text(encoding="utf-8"))
+            return raw if isinstance(raw, dict) else {}
+        except json.JSONDecodeError:
+            logger.warning("Model metadata store was invalid JSON, resetting.")
+            path.write_text("{}", encoding="utf-8")
+            return {}
+
+
+def _save_model_metadata(items: dict[str, dict]) -> None:
+    _ensure_model_metadata_store()
+    path = _model_metadata_path()
+    with _model_metadata_lock:
+        path.write_text(json.dumps(items, ensure_ascii=True, indent=2), encoding="utf-8")
+
+
+def _sanitize_optional_preview_url(value: str) -> str:
+    url = str(value or "").strip()
+    if not url:
+        return ""
+    if url.startswith("/"):
+        return url
+    if url.startswith("http://") or url.startswith("https://"):
+        return url
+    return ""
+
+
+def _sanitize_preview_urls(values) -> list[str]:
+    urls: list[str] = []
+    if not isinstance(values, list):
+        return urls
+    for value in values:
+        cleaned = _sanitize_optional_preview_url(value)
+        if cleaned and cleaned not in urls:
+            urls.append(cleaned)
+    return urls
+
+
+def _extract_preview_urls_from_images(images: list[dict]) -> list[str]:
+    urls: list[str] = []
+    for image in images or []:
+        if not isinstance(image, dict):
+            continue
+        cleaned = _sanitize_optional_preview_url(image.get("url") or "")
+        if cleaned and cleaned not in urls:
+            urls.append(cleaned)
+    return urls
+
+
+def _upsert_model_download_metadata(file_name: str, folder: str, body: dict, provider: str, model_id: str) -> None:
+    key = f"{str(folder or '').strip().lower()}/{str(file_name or '').strip().lower()}"
+    if not key.strip("/"):
+        return
+
+    metadata_map = _load_model_metadata()
+    existing = metadata_map.get(key) if isinstance(metadata_map.get(key), dict) else {}
+    preview_from_body = _sanitize_optional_preview_url(body.get("preview_url") or "")
+    preview_from_existing = _sanitize_optional_preview_url(existing.get("preview_url") or "")
+    preview_urls_from_body = _sanitize_preview_urls(body.get("preview_urls") or [])
+    preview_urls_from_existing = _sanitize_preview_urls(existing.get("preview_urls") or [])
+    merged_preview_urls = preview_urls_from_body or preview_urls_from_existing
+    if preview_from_body and preview_from_body not in merged_preview_urls:
+        merged_preview_urls.insert(0, preview_from_body)
+    if not preview_from_body and preview_from_existing and preview_from_existing not in merged_preview_urls:
+        merged_preview_urls.insert(0, preview_from_existing)
+
+    def _pick_value(new_value: str, fallback_value: str) -> str:
+        new_text = str(new_value or "").strip()
+        return new_text if new_text else str(fallback_value or "").strip()
+
+    metadata_map[key] = {
+        "file_name": _pick_value(file_name, existing.get("file_name") or ""),
+        "folder": _pick_value(folder, existing.get("folder") or ""),
+        "provider": _pick_value(provider, existing.get("provider") or ""),
+        "model_id": _pick_value(model_id or body.get("model_id") or "", existing.get("model_id") or ""),
+        "model_name": _pick_value(body.get("model_name") or "", existing.get("model_name") or ""),
+        "version_name": _pick_value(body.get("version_name") or "", existing.get("version_name") or ""),
+        "model_type": _pick_value(body.get("model_type") or "", existing.get("model_type") or ""),
+        "base_model": _pick_value(body.get("base_model") or "", existing.get("base_model") or ""),
+        "model_url": _pick_value(body.get("model_url") or "", existing.get("model_url") or ""),
+        "preview_url": preview_from_body or preview_from_existing,
+        "preview_urls": merged_preview_urls,
+        "updated_at": int(time.time()),
+    }
+    _save_model_metadata(metadata_map)
+
+
+def _lookup_model_download_metadata(metadata_map: dict[str, dict], file_name: str, folder: str) -> dict:
+    key = f"{str(folder or '').strip().lower()}/{str(file_name or '').strip().lower()}"
+    exact = metadata_map.get(key)
+    if isinstance(exact, dict):
+        return exact
+
+    file_name_lc = str(file_name or "").strip().lower()
+    if not file_name_lc:
+        return {}
+    for item in metadata_map.values():
+        if not isinstance(item, dict):
+            continue
+        if str(item.get("file_name") or "").strip().lower() == file_name_lc:
+            return item
+    return {}
+
+
+def _is_civitai_video_preview(image: dict) -> bool:
+    """Return True if a CivitAI image dict is a video (not usable as <img> src)."""
+    img_type = str(image.get("type") or "").strip().lower()
+    url = str(image.get("url") or "").strip().lower()
+    return img_type == "video" or any(url.endswith(ext) for ext in (".mp4", ".webm", ".mov", ".avi"))
+
+
+def _pick_civitai_preview_url(images: list[dict]) -> str:
+    """Pick a safer preview URL from CivitAI image payloads with a practical fallback."""
+    safe = []
+    fallback = []
+    for image in images or []:
+        url = str(image.get("url") or "").strip()
+        if not url:
+            continue
+        if _is_civitai_video_preview(image):
+            continue
+        fallback.append(url)
+        nsfw_flag = image.get("nsfw")
+        nsfw_level = image.get("nsfwLevel")
+        is_safe_flag = nsfw_flag is False
+        is_safe_level = False
+        if nsfw_level is not None:
+            try:
+                is_safe_level = int(nsfw_level) <= 1
+            except (TypeError, ValueError):
+                is_safe_level = False
+        if is_safe_flag or is_safe_level:
+            safe.append(url)
+    if safe:
+        return safe[0]
+    return fallback[0] if fallback else ""
+
+
+def _normalized_name_for_match(value: str) -> str:
+    value = str(value or "").strip().lower()
+    if not value:
+        return ""
+    return re.sub(r"[^a-z0-9]+", "", value)
+
+
+def _candidate_name_matches_local_file(local_file_name: str, *candidate_names: str) -> bool:
+    local_file_name = str(local_file_name or "").strip()
+    if not local_file_name:
+        return False
+
+    local_file_name_lc = local_file_name.lower()
+    local_stem_lc = Path(local_file_name).stem.lower()
+    normalized_local_file = _normalized_name_for_match(local_file_name_lc)
+    normalized_local_stem = _normalized_name_for_match(local_stem_lc)
+
+    for candidate_name in candidate_names:
+        candidate_text = str(candidate_name or "").strip()
+        if not candidate_text:
+            continue
+        candidate_name_lc = Path(candidate_text).name.lower()
+        candidate_stem_lc = Path(candidate_name_lc).stem.lower()
+        if candidate_name_lc == local_file_name_lc or candidate_stem_lc == local_stem_lc:
+            return True
+
+        normalized_values = {
+            _normalized_name_for_match(candidate_text),
+            _normalized_name_for_match(candidate_name_lc),
+            _normalized_name_for_match(candidate_stem_lc),
+        }
+        normalized_values.discard("")
+        if normalized_local_file in normalized_values or normalized_local_stem in normalized_values:
+            return True
+    return False
+
+
+def _score_local_metadata_candidate(
+    local_file_name: str,
+    *,
+    file_candidate: str = "",
+    version_name: str = "",
+    model_name: str = "",
+    query_index: int = 0,
+    type_bonus: int = 0,
+) -> int:
+    """Score candidate confidence so compare prefers the strongest metadata match."""
+    local_file_name_lc = str(local_file_name or "").strip().lower()
+    local_stem_lc = Path(local_file_name_lc).stem
+    local_norm = _normalized_name_for_match(local_stem_lc)
+
+    score = 0
+    score += max(0, 4 - max(0, int(query_index)))
+    score += max(0, int(type_bonus))
+
+    candidate_name_lc = Path(str(file_candidate or "").strip().lower()).name
+    candidate_stem_lc = Path(candidate_name_lc).stem if candidate_name_lc else ""
+    candidate_norm = _normalized_name_for_match(candidate_stem_lc)
+
+    if candidate_name_lc and candidate_name_lc == local_file_name_lc:
+        score += 120
+    elif candidate_stem_lc and candidate_stem_lc == local_stem_lc:
+        score += 100
+    elif local_norm and candidate_norm and (candidate_norm in local_norm or local_norm in candidate_norm):
+        score += 70
+
+    normalized_version = _normalized_name_for_match(version_name)
+    if normalized_version and local_norm and normalized_version in local_norm:
+        score += 24
+
+    normalized_model_name = _normalized_name_for_match(model_name)
+    if normalized_model_name and local_norm:
+        if normalized_model_name in local_norm:
+            score += 32
+        elif local_norm in normalized_model_name:
+            score += 20
+
+    return score
+
+
+def _build_local_model_query_candidates(file_name: str) -> list[str]:
+    raw_name = Path(str(file_name or "").strip()).name
+    raw_stem = Path(raw_name).stem.strip()
+    spaced_stem = re.sub(r"[_\-.]+", " ", raw_stem).strip()
+    stripped_stem = re.sub(r"(?i)(?:[-_. ]v\d+(?:\.\d+)*)$", "", raw_stem).strip("-_. ")
+    stripped_spaced_stem = re.sub(r"[_\-.]+", " ", stripped_stem).strip()
+
+    candidates: list[str] = []
+    for candidate in [raw_stem, raw_name, spaced_stem, stripped_stem, stripped_spaced_stem]:
+        text = str(candidate or "").strip()
+        if not text or text in candidates:
+            continue
+        candidates.append(text)
+    return candidates
+
+
+def _sidecar_metadata_candidates_for_model_file(model_path: Path) -> list[Path]:
+    """Return likely sidecar metadata files adjacent to a model file."""
+    stem = model_path.stem
+    parent = model_path.parent
+    return [
+        parent / f"{stem}.civitai.info",
+        parent / f"{stem}.json",
+    ]
+
+
+def _extract_local_sidecar_model_metadata(model_path: Path) -> dict:
+    """Extract best-effort model metadata from adjacent sidecar files."""
+    model_name = model_path.name
+    model_stem = model_path.stem
+
+    def extract_payload_metadata(payload: dict, is_fallback: bool = False) -> dict:
+        if not isinstance(payload, dict):
+            return {}
+
+        model_id = str(payload.get("modelId") or payload.get("model_id") or payload.get("id") or "").strip()
+        model_name_field = str(payload.get("name") or payload.get("modelName") or "").strip()
+        version_name = str(payload.get("modelVersionName") or payload.get("versionName") or payload.get("version") or "").strip()
+        model_type = str(payload.get("type") or payload.get("modelType") or "").strip()
+        base_model = str(payload.get("baseModel") or payload.get("base_model") or "").strip()
+        model_url = str(payload.get("modelUrl") or payload.get("model_url") or "").strip()
+        if not model_url and model_id:
+            model_url = f"https://civitai.com/models/{model_id}"
+
+        images = payload.get("images") or payload.get("modelImages") or []
+        if not isinstance(images, list):
+            images = []
+        preview_url = _pick_civitai_preview_url(images)
+        preview_urls = _extract_preview_urls_from_images(images)
+
+        if is_fallback and not (model_id or model_name_field or preview_url or model_url):
+            return {}
+
+        return {
+            "provider": "civitai" if (model_id or model_url or preview_url) else "",
+            "model_id": model_id,
+            "model_name": model_name_field,
+            "version_name": version_name,
+            "model_type": model_type,
+            "base_model": base_model,
+            "model_url": model_url,
+            "preview_url": _sanitize_optional_preview_url(preview_url),
+            "preview_urls": preview_urls,
+        }
+
+    def payload_matches_model_file(payload: dict) -> bool:
+        files = payload.get("files") or payload.get("modelFiles") or []
+        for file_obj in files or []:
+            if isinstance(file_obj, str):
+                candidate = file_obj
+            elif isinstance(file_obj, dict):
+                candidate = str(file_obj.get("name") or file_obj.get("fileName") or file_obj.get("filename") or "")
+            else:
+                candidate = ""
+            candidate = candidate.strip()
+            if not candidate:
+                continue
+            candidate_name = Path(candidate).name.lower()
+            if candidate_name == model_name.lower() or Path(candidate_name).stem == model_stem.lower():
+                return True
+        return False
+
+    inspected: list[Path] = []
+    for candidate in _sidecar_metadata_candidates_for_model_file(model_path):
+        if not candidate.is_file():
+            continue
+        inspected.append(candidate.resolve())
+        try:
+            payload = json.loads(candidate.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        if payload_matches_model_file(payload):
+            return extract_payload_metadata(payload)
+        meta = extract_payload_metadata(payload, is_fallback=True)
+        if meta:
+            return meta
+
+    # Broader fallback for repos where sidecar file naming does not match local file naming.
+    for candidate in sorted(model_path.parent.glob("*.civitai.info")):
+        resolved = candidate.resolve()
+        if resolved in inspected:
+            continue
+        try:
+            payload = json.loads(candidate.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        if payload_matches_model_file(payload):
+            return extract_payload_metadata(payload)
+    return {}
+
+
+def _find_civitai_match_for_local_file(item: dict) -> dict:
+    """Find best-effort CivitAI metadata match for a local model file."""
+    file_name = str(item.get("name") or "").strip()
+    model_type = str(item.get("type") or "").strip()
+    if not file_name:
+        return {}
+
+    query_candidates = _build_local_model_query_candidates(file_name)
+    if not query_candidates:
+        return {}
+
+    best_match: dict = {}
+    best_score = -1
+
+    for query_index, query in enumerate(query_candidates):
+        type_candidates = [model_type] if model_type in _CIVITAI_MODEL_TYPES else []
+        type_candidates.append("")
+        for type_candidate in type_candidates:
+            params: dict[str, str | int] = {
+                "query": query,
+                "limit": 8,
+                "sort": "Highest Rated",
+                "nsfw": "false",
+            }
+            if type_candidate:
+                params["types"] = type_candidate
+
+            resp = requests.get(
+                f"{_CIVITAI_API}/models",
+                params=params,
+                headers=_external_api_headers("civitai"),
+                timeout=15,
+            )
+            resp.raise_for_status()
+            raw = resp.json() or {}
+            items = raw.get("items") or []
+            if not items:
+                continue
+
+            for model in items:
+                model_name = str(model.get("name") or "").strip()
+                versions = model.get("modelVersions") or []
+                for version in versions:
+                    version_name = str(version.get("name") or "").strip()
+                    files = version.get("files") or []
+                    combined_names = []
+                    if model_name and version_name:
+                        combined_names.extend([
+                            f"{model_name} {version_name}",
+                            f"{version_name} {model_name}",
+                        ])
+                    for file_obj in files:
+                        candidate_name = str(file_obj.get("name") or "").strip()
+                        if not candidate_name:
+                            continue
+                        if not _candidate_name_matches_local_file(
+                            file_name,
+                            candidate_name,
+                            version_name,
+                            model_name,
+                            *combined_names,
+                        ):
+                            continue
+                        model_id = str(model.get("id") or "").strip()
+                        preview_url = _pick_civitai_preview_url(version.get("images") or model.get("images") or [])
+                        type_bonus = 12 if type_candidate and str(model.get("type") or "").strip() == type_candidate else 0
+                        score = _score_local_metadata_candidate(
+                            file_name,
+                            file_candidate=candidate_name,
+                            version_name=version_name,
+                            model_name=model_name,
+                            query_index=query_index,
+                            type_bonus=type_bonus,
+                        )
+                        if score <= best_score:
+                            continue
+                        best_score = score
+                        best_match = {
+                            "provider": "civitai",
+                            "model_id": model_id,
+                            "model_name": model_name,
+                            "version_name": version_name,
+                            "model_type": str(model.get("type") or model_type).strip(),
+                            "base_model": str(version.get("baseModel") or "").strip(),
+                            "model_url": str(model.get("url") or f"https://civitai.com/models/{model_id}").strip(),
+                            "preview_url": preview_url,
+                        }
+    return best_match
+
+
+def _find_huggingface_match_for_local_file(item: dict) -> dict:
+    """Find best-effort Hugging Face metadata match for a local model file."""
+    file_name = str(item.get("name") or "").strip()
+    if not file_name:
+        return {}
+
+    query_candidates = _build_local_model_query_candidates(file_name)
+    if not query_candidates:
+        return {}
+
+    best_match: dict = {}
+    best_score = -1
+
+    for query_index, query in enumerate(query_candidates):
+        resp = requests.get(
+            f"{_HUGGINGFACE_API}/models",
+            params={
+                "search": query,
+                "limit": 12,
+                "full": "true",
+                "sort": "downloads",
+                "direction": -1,
+            },
+            headers=_external_api_headers("huggingface"),
+            timeout=20,
+        )
+        resp.raise_for_status()
+        raw_items = resp.json() or []
+
+        for model in raw_items:
+            model_id = str(model.get("id") or "").strip()
+            version_name = str(model.get("sha") or "")[:8] if model.get("sha") else ""
+            model_short_name = model_id.split("/")[-1] if model_id else ""
+            combined_names = []
+            if model_short_name and version_name:
+                combined_names.extend([
+                    f"{model_short_name} {version_name}",
+                    f"{version_name} {model_short_name}",
+                ])
+            siblings = model.get("siblings") or []
+            for sibling in siblings:
+                candidate_name = str(sibling.get("rfilename") or "").strip()
+                candidate_basename = Path(candidate_name).name
+                if not candidate_basename or not _is_huggingface_model_file(candidate_basename):
+                    continue
+                if not _candidate_name_matches_local_file(
+                    file_name,
+                    candidate_basename,
+                    model_short_name,
+                    model_id,
+                    version_name,
+                    *combined_names,
+                ):
+                    continue
+
+                card_data = model.get("cardData") or {}
+                preview_url = _sanitize_optional_preview_url(
+                    model.get("thumbnail")
+                    or model.get("thumbnailUrl")
+                    or model.get("preview_url")
+                    or ""
+                )
+                score = _score_local_metadata_candidate(
+                    file_name,
+                    file_candidate=candidate_basename,
+                    version_name=version_name,
+                    model_name=model_short_name,
+                    query_index=query_index,
+                )
+                if score <= best_score:
+                    continue
+                best_score = score
+                best_match = {
+                    "provider": "huggingface",
+                    "model_id": model_id,
+                    "model_name": model_id,
+                    "version_name": version_name,
+                    "model_type": _infer_huggingface_model_type(model),
+                    "base_model": str(card_data.get("base_model") or card_data.get("baseModel") or "").strip(),
+                    "model_url": f"https://huggingface.co/{model_id}" if model_id else "",
+                    "preview_url": preview_url,
+                }
+    return best_match
+
+
+def _compare_local_model_metadata_with_providers(
+    limit: int = 80,
+    providers: list[str] | None = None,
+    overwrite: bool = False,
+) -> dict:
+    """Backfill missing metadata for local models by comparing names across providers."""
+    models = _scan_local_models()
+    metadata_map = _load_model_metadata()
+    allowed_providers = {"civitai", "huggingface"}
+    provider_order = [
+        provider
+        for provider in [str(p).strip().lower() for p in (providers or ["civitai", "huggingface"])]
+        if provider in allowed_providers
+    ]
+    if not provider_order:
+        provider_order = ["civitai", "huggingface"]
+
+    updated = 0
+    skipped = 0
+    failed = 0
+    scanned = 0
+    skip_reasons: dict[str, int] = {
+        "already_has_metadata": 0,
+        "missing_folder_or_name": 0,
+        "no_provider_match": 0,
+    }
+    failure_reasons: dict[str, int] = {
+        "request_error": 0,
+    }
+    matched_by_provider: dict[str, int] = {
+        "civitai": 0,
+        "huggingface": 0,
+    }
+    updated_samples: list[dict[str, str]] = []
+    skipped_samples: list[dict[str, str]] = []
+    failed_samples: list[dict[str, str]] = []
+
+    def _remember_sample(sample_list: list, sample: dict[str, str], cap: int = 8) -> None:
+        if len(sample_list) < cap:
+            sample_list.append(sample)
+
+    def _has_missing_metadata(item: dict, existing: dict) -> bool:
+        provider_value = str(existing.get("provider") or item.get("provider") or "").strip()
+        model_id_value = str(existing.get("model_id") or item.get("model_id") or "").strip()
+        version_name_value = str(existing.get("version_name") or item.get("version_name") or "").strip()
+        model_url_value = str(existing.get("model_url") or item.get("model_url") or "").strip()
+        model_type_value = str(existing.get("model_type") or item.get("type") or "").strip()
+        base_model_value = str(existing.get("base_model") or item.get("base_model") or "").strip()
+        preview_value = _sanitize_optional_preview_url(existing.get("preview_url") or item.get("preview_url") or "")
+        return not (provider_value and model_id_value and version_name_value and model_url_value and model_type_value and base_model_value and preview_value)
+
+    for item in models:
+        if scanned >= max(1, int(limit)):
+            break
+
+        folder = str(item.get("folder") or "").strip()
+        file_name = str(item.get("name") or "").strip()
+        if not folder or not file_name:
+            skipped += 1
+            skip_reasons["missing_folder_or_name"] += 1
+            _remember_sample(skipped_samples, {"file": file_name or "<unknown>", "reason": "missing_folder_or_name"})
+            continue
+
+        existing = _lookup_model_download_metadata(metadata_map, file_name, folder)
+        if not overwrite and not _has_missing_metadata(item, existing):
+            skipped += 1
+            skip_reasons["already_has_metadata"] += 1
+            _remember_sample(skipped_samples, {"file": file_name, "reason": "already_has_metadata"})
+            continue
+
+        scanned += 1
+        match: dict = {}
+        matched_provider = ""
+        request_errors: list[str] = []
+
+        for provider in provider_order:
+            try:
+                if provider == "civitai":
+                    candidate = _find_civitai_match_for_local_file(item)
+                elif provider == "huggingface":
+                    candidate = _find_huggingface_match_for_local_file(item)
+                else:
+                    candidate = {}
+            except requests.RequestException as exc:
+                request_errors.append(f"{provider}: {exc}")
+                continue
+
+            if candidate:
+                match = candidate
+                matched_provider = provider
+                break
+
+        if not match:
+            if request_errors:
+                failed += 1
+                failure_reasons["request_error"] += 1
+                _remember_sample(
+                    failed_samples,
+                    {
+                        "file": file_name,
+                        "reason": "request_error",
+                        "error": request_errors[0],
+                    },
+                )
+            else:
+                skipped += 1
+                skip_reasons["no_provider_match"] += 1
+                _remember_sample(skipped_samples, {"file": file_name, "reason": "no_provider_match"})
+            continue
+
+        _upsert_model_download_metadata(
+            file_name=file_name,
+            folder=folder,
+            body=match,
+            provider=matched_provider,
+            model_id=str(match.get("model_id") or ""),
+        )
+        updated += 1
+        matched_by_provider[matched_provider] = matched_by_provider.get(matched_provider, 0) + 1
+        _remember_sample(
+            updated_samples,
+            {
+                "file": f"{folder}/{file_name}",
+                "provider": matched_provider,
+                "version_name": str(match.get("version_name") or "").strip(),
+            },
+        )
+
+    return {
+        "scanned": scanned,
+        "updated": updated,
+        "skipped": skipped,
+        "failed": failed,
+        "providers": provider_order,
+        "skip_reasons": skip_reasons,
+        "failure_reasons": failure_reasons,
+        "matched_by_provider": matched_by_provider,
+        "updated_samples": updated_samples,
+        "skipped_samples": skipped_samples,
+        "failed_samples": failed_samples,
+    }
+
+
+def _enrich_local_model_metadata_with_civitai(limit: int = 40) -> dict:
+    """Backfill missing local model metadata by querying CivitAI using local filenames."""
+    models = _scan_local_models()
+    metadata_map = _load_model_metadata()
+
+    updated = 0
+    skipped = 0
+    failed = 0
+    scanned = 0
+    skip_reasons: dict[str, int] = {
+        "already_has_preview": 0,
+        "missing_folder_or_name": 0,
+        "no_civitai_match": 0,
+    }
+    failure_reasons: dict[str, int] = {
+        "request_error": 0,
+    }
+    updated_samples: list[str] = []
+    skipped_samples: list[dict[str, str]] = []
+    failed_samples: list[dict[str, str]] = []
+
+    def _remember_sample(sample_list: list, sample: str | dict[str, str], cap: int = 8) -> None:
+        if len(sample_list) < cap:
+            sample_list.append(sample)
+
+    for item in models:
+        if scanned >= max(1, int(limit)):
+            break
+        if str(item.get("preview_url") or "").strip():
+            skipped += 1
+            skip_reasons["already_has_preview"] += 1
+            sample_name = str(item.get("name") or "").strip()
+            if sample_name:
+                _remember_sample(skipped_samples, {"file": sample_name, "reason": "already_has_preview"})
+            continue
+
+        folder = str(item.get("folder") or "").strip()
+        file_name = str(item.get("name") or "").strip()
+        if not folder or not file_name:
+            skipped += 1
+            skip_reasons["missing_folder_or_name"] += 1
+            _remember_sample(skipped_samples, {"file": file_name or "<unknown>", "reason": "missing_folder_or_name"})
+            continue
+
+        scanned += 1
+        try:
+            match = _find_civitai_match_for_local_file(item)
+        except requests.RequestException as exc:
+            logger.warning("CivitAI enrichment failed for %s: %s", file_name, exc)
+            failed += 1
+            failure_reasons["request_error"] += 1
+            _remember_sample(failed_samples, {"file": file_name, "reason": "request_error", "error": str(exc)})
+            continue
+
+        if not match:
+            skipped += 1
+            skip_reasons["no_civitai_match"] += 1
+            _remember_sample(skipped_samples, {"file": file_name, "reason": "no_civitai_match"})
+            continue
+
+        _upsert_model_download_metadata(
+            file_name=file_name,
+            folder=folder,
+            body=match,
+            provider="civitai",
+            model_id=str(match.get("model_id") or ""),
+        )
+        updated += 1
+        _remember_sample(updated_samples, f"{folder}/{file_name}")
+
+    return {
+        "scanned": scanned,
+        "updated": updated,
+        "skipped": skipped,
+        "failed": failed,
+        "skip_reasons": skip_reasons,
+        "failure_reasons": failure_reasons,
+        "updated_samples": updated_samples,
+        "skipped_samples": skipped_samples,
+        "failed_samples": failed_samples,
+    }
 
 
 def _history_image_key(item: dict) -> tuple[str, str, tuple[tuple[str, str, str], ...]] | None:
@@ -1051,6 +1825,15 @@ def _build_txt2img_workflow(body: dict) -> tuple[dict, dict]:
     width = _clamp_int(int(body.get("width", DEFAULT_IMAGE_WIDTH)), 256, 2048)
     height = _clamp_int(int(body.get("height", DEFAULT_IMAGE_HEIGHT)), 256, 2048)
     batch_size = _clamp_int(int(body.get("batch_size", 1)), 1, 8)
+    lora_name = (body.get("lora") or "").strip()
+    lora_strength = _clamp_float(float(body.get("lora_strength", 0.8)), 0.0, 2.0)
+    controlnet_model = (body.get("controlnet_model") or "").strip()
+    controlnet_image_name = (body.get("controlnet_image_name") or "").strip()
+    controlnet_weight = _clamp_float(float(body.get("controlnet_weight", 1.0)), 0.0, 2.0)
+    controlnet_start = _clamp_float(float(body.get("controlnet_start", 0.0)), 0.0, 1.0)
+    controlnet_end = _clamp_float(float(body.get("controlnet_end", 1.0)), 0.0, 1.0)
+    if controlnet_start > controlnet_end:
+        controlnet_start, controlnet_end = controlnet_end, controlnet_start
 
     if not model:
         models = _image_models()
@@ -1068,14 +1851,26 @@ def _build_txt2img_workflow(body: dict) -> tuple[dict, dict]:
         "width": width,
         "height": height,
         "batch_size": batch_size,
+        "lora": lora_name,
+        "lora_strength": lora_strength,
+        "controlnet_model": controlnet_model,
+        "controlnet_image_name": controlnet_image_name,
+        "controlnet_weight": controlnet_weight,
+        "controlnet_start": controlnet_start,
+        "controlnet_end": controlnet_end,
     }
+
+    model_ref: list = ["1", 0]
+    clip_ref: list = ["1", 1]
+    positive_ref: list = ["2", 0]
+    negative_ref: list = ["3", 0]
 
     workflow = {
         "1": {"class_type": "CheckpointLoaderSimple", "inputs": {"ckpt_name": model}},
-        "2": {"class_type": "CLIPTextEncode", "inputs": {"text": prompt, "clip": ["1", 1]}},
+        "2": {"class_type": "CLIPTextEncode", "inputs": {"text": prompt, "clip": clip_ref}},
         "3": {
             "class_type": "CLIPTextEncode",
-            "inputs": {"text": negative, "clip": ["1", 1]},
+            "inputs": {"text": negative, "clip": clip_ref},
         },
         "4": {
             "class_type": "EmptyLatentImage",
@@ -1090,9 +1885,9 @@ def _build_txt2img_workflow(body: dict) -> tuple[dict, dict]:
                 "sampler_name": sampler,
                 "scheduler": scheduler,
                 "denoise": 1.0,
-                "model": ["1", 0],
-                "positive": ["2", 0],
-                "negative": ["3", 0],
+                "model": model_ref,
+                "positive": positive_ref,
+                "negative": negative_ref,
                 "latent_image": ["4", 0],
             },
         },
@@ -1102,6 +1897,50 @@ def _build_txt2img_workflow(body: dict) -> tuple[dict, dict]:
             "inputs": {"images": ["6", 0], "filename_prefix": "links-awakening"},
         },
     }
+
+    if lora_name:
+        workflow["8"] = {
+            "class_type": "LoraLoader",
+            "inputs": {
+                "lora_name": lora_name,
+                "strength_model": lora_strength,
+                "strength_clip": lora_strength,
+                "model": model_ref,
+                "clip": clip_ref,
+            },
+        }
+        model_ref = ["8", 0]
+        clip_ref = ["8", 1]
+        workflow["2"]["inputs"]["clip"] = clip_ref
+        workflow["3"]["inputs"]["clip"] = clip_ref
+        workflow["5"]["inputs"]["model"] = model_ref
+
+    if controlnet_model and controlnet_image_name:
+        workflow["9"] = {
+            "class_type": "ControlNetLoader",
+            "inputs": {"control_net_name": controlnet_model},
+        }
+        workflow["10"] = {
+            "class_type": "LoadImage",
+            "inputs": {"image": controlnet_image_name},
+        }
+        workflow["11"] = {
+            "class_type": "ControlNetApplyAdvanced",
+            "inputs": {
+                "positive": positive_ref,
+                "negative": negative_ref,
+                "control_net": ["9", 0],
+                "image": ["10", 0],
+                "strength": controlnet_weight,
+                "start_percent": controlnet_start,
+                "end_percent": controlnet_end,
+            },
+        }
+        positive_ref = ["11", 0]
+        negative_ref = ["11", 1]
+        workflow["5"]["inputs"]["positive"] = positive_ref
+        workflow["5"]["inputs"]["negative"] = negative_ref
+
     return workflow, meta
 
 
@@ -1133,6 +1972,15 @@ def _build_img2img_workflow(body: dict, uploaded_name: str) -> tuple[dict, dict]
     steps = _clamp_int(int(body.get("steps", DEFAULT_IMAGE_STEPS)), MIN_STEPS, MAX_STEPS)
     cfg = _clamp_float(float(body.get("cfg", DEFAULT_IMAGE_CFG)), MIN_CFG, MAX_CFG)
     denoise = _clamp_float(float(body.get("denoise", DEFAULT_IMAGE_DENOISE)), 0.05, 1.0)
+    lora_name = (body.get("lora") or "").strip()
+    lora_strength = _clamp_float(float(body.get("lora_strength", 0.8)), 0.0, 2.0)
+    controlnet_model = (body.get("controlnet_model") or "").strip()
+    controlnet_image_name = (body.get("controlnet_image_name") or "").strip()
+    controlnet_weight = _clamp_float(float(body.get("controlnet_weight", 1.0)), 0.0, 2.0)
+    controlnet_start = _clamp_float(float(body.get("controlnet_start", 0.0)), 0.0, 1.0)
+    controlnet_end = _clamp_float(float(body.get("controlnet_end", 1.0)), 0.0, 1.0)
+    if controlnet_start > controlnet_end:
+        controlnet_start, controlnet_end = controlnet_end, controlnet_start
 
     if not model:
         models = _image_models()
@@ -1149,14 +1997,26 @@ def _build_img2img_workflow(body: dict, uploaded_name: str) -> tuple[dict, dict]
         "cfg": cfg,
         "denoise": denoise,
         "image": uploaded_name,
+        "lora": lora_name,
+        "lora_strength": lora_strength,
+        "controlnet_model": controlnet_model,
+        "controlnet_image_name": controlnet_image_name,
+        "controlnet_weight": controlnet_weight,
+        "controlnet_start": controlnet_start,
+        "controlnet_end": controlnet_end,
     }
+
+    model_ref: list = ["1", 0]
+    clip_ref: list = ["1", 1]
+    positive_ref: list = ["2", 0]
+    negative_ref: list = ["3", 0]
 
     workflow = {
         "1": {"class_type": "CheckpointLoaderSimple", "inputs": {"ckpt_name": model}},
-        "2": {"class_type": "CLIPTextEncode", "inputs": {"text": prompt, "clip": ["1", 1]}},
+        "2": {"class_type": "CLIPTextEncode", "inputs": {"text": prompt, "clip": clip_ref}},
         "3": {
             "class_type": "CLIPTextEncode",
-            "inputs": {"text": negative, "clip": ["1", 1]},
+            "inputs": {"text": negative, "clip": clip_ref},
         },
         "4": {"class_type": "LoadImage", "inputs": {"image": uploaded_name}},
         "5": {"class_type": "VAEEncode", "inputs": {"pixels": ["4", 0], "vae": ["1", 2]}},
@@ -1169,9 +2029,9 @@ def _build_img2img_workflow(body: dict, uploaded_name: str) -> tuple[dict, dict]
                 "sampler_name": sampler,
                 "scheduler": scheduler,
                 "denoise": denoise,
-                "model": ["1", 0],
-                "positive": ["2", 0],
-                "negative": ["3", 0],
+                "model": model_ref,
+                "positive": positive_ref,
+                "negative": negative_ref,
                 "latent_image": ["5", 0],
             },
         },
@@ -1181,6 +2041,50 @@ def _build_img2img_workflow(body: dict, uploaded_name: str) -> tuple[dict, dict]
             "inputs": {"images": ["7", 0], "filename_prefix": "links-awakening-img2img"},
         },
     }
+
+    if lora_name:
+        workflow["9"] = {
+            "class_type": "LoraLoader",
+            "inputs": {
+                "lora_name": lora_name,
+                "strength_model": lora_strength,
+                "strength_clip": lora_strength,
+                "model": model_ref,
+                "clip": clip_ref,
+            },
+        }
+        model_ref = ["9", 0]
+        clip_ref = ["9", 1]
+        workflow["2"]["inputs"]["clip"] = clip_ref
+        workflow["3"]["inputs"]["clip"] = clip_ref
+        workflow["6"]["inputs"]["model"] = model_ref
+
+    if controlnet_model and controlnet_image_name:
+        workflow["10"] = {
+            "class_type": "ControlNetLoader",
+            "inputs": {"control_net_name": controlnet_model},
+        }
+        workflow["11"] = {
+            "class_type": "LoadImage",
+            "inputs": {"image": controlnet_image_name},
+        }
+        workflow["12"] = {
+            "class_type": "ControlNetApplyAdvanced",
+            "inputs": {
+                "positive": positive_ref,
+                "negative": negative_ref,
+                "control_net": ["10", 0],
+                "image": ["11", 0],
+                "strength": controlnet_weight,
+                "start_percent": controlnet_start,
+                "end_percent": controlnet_end,
+            },
+        }
+        positive_ref = ["12", 0]
+        negative_ref = ["12", 1]
+        workflow["6"]["inputs"]["positive"] = positive_ref
+        workflow["6"]["inputs"]["negative"] = negative_ref
+
     return workflow, meta
 
 
@@ -1206,6 +2110,7 @@ _model_downloads: dict[str, dict] = {}      # download_id → state dict
 _model_downloads_lock = threading.Lock()
 
 _CIVITAI_API = "https://civitai.com/api/v1"
+_HUGGINGFACE_API = "https://huggingface.co/api"
 _CIVITAI_MODEL_TYPES = {"Checkpoint", "LORA", "VAE", "TextualInversion", "ControlNet", "Upscaler"}
 
 # Maps CivitAI model type → ComfyUI subfolder name
@@ -1230,6 +2135,135 @@ _CIVITAI_TYPE_TO_STABILITY_FOLDER: dict[str, str] = {
 
 _COMFY_MODEL_SUBFOLDERS = sorted(set(_CIVITAI_TYPE_TO_COMFY_FOLDER.values()))
 _STABILITY_MODEL_SUBFOLDERS = sorted(set(_CIVITAI_TYPE_TO_STABILITY_FOLDER.values()))
+
+
+def _external_api_headers(provider: str) -> dict[str, str]:
+    config = _load_service_config()
+    key = ""
+    if provider == "civitai":
+        key = str(config.get("civitai_api_key") or "").strip()
+    elif provider == "huggingface":
+        key = str(config.get("huggingface_api_key") or "").strip()
+
+    if not key:
+        return {}
+    return {"Authorization": f"Bearer {key}"}
+
+
+def _infer_huggingface_model_type(item: dict) -> str:
+    tags = [str(t).lower() for t in (item.get("tags") or [])]
+    model_id = str(item.get("id") or "").lower()
+    joined = " ".join(tags + [model_id])
+    if "controlnet" in joined:
+        return "ControlNet"
+    if "textual-inversion" in joined or "textual inversion" in joined or "embedding" in joined:
+        return "TextualInversion"
+    if "vae" in joined:
+        return "VAE"
+    if "lora" in joined or "lycoris" in joined:
+        return "LORA"
+    if "upscaler" in joined or "esrgan" in joined:
+        return "Upscaler"
+    return "Checkpoint"
+
+
+def _find_primary_huggingface_file(files: list[dict]) -> str:
+    preferred_name = ""
+    for file_obj in files or []:
+        name = str(file_obj.get("rfilename") or "")
+        if name:
+            preferred_name = name
+            if str(file_obj.get("primary") or "").lower() in {"1", "true", "yes"}:
+                break
+
+    resolved = _pick_huggingface_download_file(files, preferred_name=preferred_name)
+    if resolved:
+        return resolved
+
+    if files:
+        return str(files[0].get("rfilename") or "")
+    return ""
+
+
+def _is_huggingface_model_file(file_name: str) -> bool:
+    name = (file_name or "").strip().lower()
+    if not name:
+        return False
+    if "/" in name:
+        return False
+    blocked_suffixes = (
+        ".json",
+        ".md",
+        ".txt",
+        ".jpg",
+        ".jpeg",
+        ".png",
+        ".webp",
+        ".gif",
+        ".yaml",
+        ".yml",
+        ".toml",
+        ".license",
+        ".gitattributes",
+    )
+    if name.endswith(blocked_suffixes):
+        return False
+    blocked_tokens = (
+        "tokenizer",
+        "vocab",
+        "merges",
+        "scheduler",
+        "feature_extractor",
+        "preprocessor_config",
+        "special_tokens_map",
+        "config",
+    )
+    return not any(token in name for token in blocked_tokens)
+
+
+def _pick_huggingface_download_file(files: list[dict], preferred_name: str = "") -> str:
+    ranked_exts = (".safetensors", ".ckpt", ".pt", ".pth", ".bin")
+    candidates = [str(f.get("rfilename") or "") for f in (files or [])]
+    candidates = [name for name in candidates if _is_huggingface_model_file(name)]
+    if not candidates:
+        return ""
+
+    preferred = (preferred_name or "").strip()
+    if preferred and preferred in candidates:
+        return preferred
+
+    for ext in ranked_exts:
+        hit = next((name for name in candidates if name.lower().endswith(ext)), None)
+        if hit:
+            return hit
+    return candidates[0]
+
+
+def _build_huggingface_download_url(model_id: str, file_name: str) -> str:
+    safe_model_id = quote((model_id or "").strip(), safe="/")
+    safe_file_name = quote((file_name or "").strip(), safe="")
+    if not safe_model_id or not safe_file_name:
+        return ""
+    return f"https://huggingface.co/{safe_model_id}/resolve/main/{safe_file_name}"
+
+
+def _resolve_huggingface_download_target(model_id: str, preferred_file_name: str = "") -> tuple[str, str]:
+    safe_model_id = (model_id or "").strip()
+    if not safe_model_id:
+        raise ValueError("model_id is required for huggingface downloads")
+
+    resp = requests.get(
+        f"{_HUGGINGFACE_API}/models/{safe_model_id}",
+        headers=_external_api_headers("huggingface"),
+        timeout=20,
+    )
+    resp.raise_for_status()
+    raw = resp.json() or {}
+    selected_file = _pick_huggingface_download_file(raw.get("siblings") or [], preferred_name=preferred_file_name)
+    if not selected_file:
+        raise ValueError("No compatible downloadable model file was found for this Hugging Face repository")
+
+    return selected_file, _build_huggingface_download_url(safe_model_id, selected_file)
 
 
 def _using_shared_models_root() -> bool:
@@ -1280,6 +2314,44 @@ def _comfy_models_root() -> Path | None:
     return root / "models"
 
 
+def _infer_local_model_type(folder: str) -> str:
+    """Map local model folder names to model-browser type labels."""
+    value = str(folder or "").strip().lower()
+    if not value:
+        return "Checkpoint"
+    if "lora" in value:
+        return "LORA"
+    if "vae" in value:
+        return "VAE"
+    if "embedding" in value:
+        return "TextualInversion"
+    if "controlnet" in value:
+        return "ControlNet"
+    if "upscale" in value or "esrgan" in value:
+        return "Upscaler"
+    return "Checkpoint"
+
+
+def _infer_local_base_model(file_name: str) -> str:
+    """Best-effort local base-model label inference from file naming conventions."""
+    value = str(file_name or "").strip().lower()
+    if not value:
+        return ""
+    if "sdxl" in value and "turbo" in value:
+        return "SDXL Turbo"
+    if "sdxl" in value:
+        return "SDXL 1.0"
+    if "pony" in value:
+        return "Pony"
+    if "flux" in value and ("schnell" in value or "flux.1-s" in value or "flux1-s" in value or "flux_1_s" in value):
+        return "Flux.1 S"
+    if "flux" in value:
+        return "Flux.1 D"
+    if any(token in value for token in ("sd15", "sd_15", "sd-15", "sd 1.5", "v1-5", "v1_5", "v1.5")):
+        return "SD 1.5"
+    return ""
+
+
 def _scan_local_models() -> list[dict]:
     """Walk all ComfyUI model subdirectories and return file metadata."""
     models_root = _comfy_models_root()
@@ -1292,8 +2364,11 @@ def _scan_local_models() -> list[dict]:
         folders_to_scan = sorted(set(_STABILITY_MODEL_SUBFOLDERS + _COMFY_MODEL_SUBFOLDERS))
     else:
         folders_to_scan = _COMFY_MODEL_SUBFOLDERS
+    metadata_map = _load_model_metadata()
 
     seen_paths: set[str] = set()
+    root_resolved = models_root.resolve()
+    preview_extensions = (".png", ".jpg", ".jpeg", ".webp")
     for folder in folders_to_scan:
         folder_path = models_root / folder
         if not folder_path.is_dir():
@@ -1306,9 +2381,57 @@ def _scan_local_models() -> list[dict]:
                 seen_paths.add(resolved_path)
 
                 normalized_folder = _normalize_model_folder(folder) or folder
+                preview_url = ""
+                local_preview_urls: list[str] = []
+                for ext in preview_extensions:
+                    preview_candidate = f.with_suffix(ext)
+                    if not preview_candidate.is_file():
+                        continue
+                    try:
+                        preview_rel = preview_candidate.resolve().relative_to(root_resolved).as_posix()
+                    except ValueError:
+                        continue
+                    preview_url = f"/api/models/local-preview?path={quote(preview_rel)}"
+                    local_preview_urls.append(preview_url)
+                    break
+                metadata = _lookup_model_download_metadata(metadata_map, f.name, normalized_folder)
+                sidecar_metadata = _extract_local_sidecar_model_metadata(f)
+                metadata_preview_urls = _sanitize_preview_urls(metadata.get("preview_urls") or [])
+                sidecar_preview_urls = _sanitize_preview_urls(sidecar_metadata.get("preview_urls") or [])
+                if not preview_url:
+                    preview_url = _sanitize_optional_preview_url(metadata.get("preview_url") or "")
+                if not preview_url:
+                    preview_url = _sanitize_optional_preview_url(sidecar_metadata.get("preview_url") or "")
+
+                preview_urls: list[str] = []
+                for candidate in local_preview_urls + metadata_preview_urls + sidecar_preview_urls:
+                    if candidate and candidate not in preview_urls:
+                        preview_urls.append(candidate)
+                if preview_url and preview_url not in preview_urls:
+                    preview_urls.insert(0, preview_url)
+                if not preview_url and preview_urls:
+                    preview_url = preview_urls[0]
+
+                provider = str(metadata.get("provider") or sidecar_metadata.get("provider") or "")
+                model_id = str(metadata.get("model_id") or sidecar_metadata.get("model_id") or "")
+                model_url = str(metadata.get("model_url") or sidecar_metadata.get("model_url") or "")
+                version_name = str(metadata.get("version_name") or sidecar_metadata.get("version_name") or "")
+                inferred_type = _infer_local_model_type(normalized_folder)
+                inferred_base_model = _infer_local_base_model(f.name)
+                resolved_type = str(sidecar_metadata.get("model_type") or inferred_type or "")
+                resolved_base_model = str(sidecar_metadata.get("base_model") or inferred_base_model or "")
+
                 results.append({
                     "name": f.name,
                     "folder": normalized_folder,
+                    "type": resolved_type,
+                    "base_model": resolved_base_model,
+                    "preview_url": preview_url,
+                    "preview_urls": preview_urls,
+                    "provider": provider,
+                    "model_id": model_id,
+                    "model_url": model_url,
+                    "version_name": version_name,
                     "size_bytes": f.stat().st_size,
                     "path": str(f),
                 })
@@ -1316,21 +2439,72 @@ def _scan_local_models() -> list[dict]:
     return results
 
 
-def _civitai_search(query: str, model_type: str, page: int) -> dict:
+def _civitai_search(
+    query: str,
+    model_type: str,
+    page: int,
+    cursor: str = "",
+    sort: str = "Highest Rated",
+    nsfw: bool = False,
+    base_model: str = "",
+    limit: int = 20,
+) -> dict:
     """Call CivitAI models API and return sanitised results."""
-    params: dict = {
-        "limit": 20,
-        "page": page,
-        "sort": "Highest Rated",
-        "nsfw": "false",
+    headers = _external_api_headers("civitai")
+    per_page = max(1, min(100, int(limit or 20)))
+    base_params: dict = {
+        "limit": per_page,
+        "sort": sort if sort in {"Highest Rated", "Most Downloaded", "Newest"} else "Highest Rated",
+        "nsfw": "true" if nsfw else "false",
     }
+    if base_model:
+        base_params["baseModels"] = base_model
+
+    raw: dict = {}
+    current_page = max(1, page)
+
+    # CivitAI rejects query + page together and requires cursor pagination.
     if query:
+        params = dict(base_params)
         params["query"] = query
-    if model_type and model_type in _CIVITAI_MODEL_TYPES:
-        params["types"] = model_type
-    resp = requests.get(f"{_CIVITAI_API}/models", params=params, timeout=15)
-    resp.raise_for_status()
-    raw = resp.json() or {}
+        if model_type and model_type in _CIVITAI_MODEL_TYPES:
+            params["types"] = model_type
+
+        # Preferred mode: client supplies cursor for requested page.
+        if cursor:
+            params["cursor"] = cursor
+            resp = requests.get(f"{_CIVITAI_API}/models", params=params, headers=headers, timeout=15)
+            resp.raise_for_status()
+            raw = resp.json() or {}
+        else:
+            # Compatibility mode: derive requested page by walking cursors.
+            walk_cursor = None
+            resolved_page = 1
+            for requested_page in range(1, current_page + 1):
+                walk_params = dict(params)
+                if walk_cursor:
+                    walk_params["cursor"] = walk_cursor
+                resp = requests.get(f"{_CIVITAI_API}/models", params=walk_params, headers=headers, timeout=15)
+                resp.raise_for_status()
+                raw = resp.json() or {}
+                resolved_page = requested_page
+                walk_cursor = (raw.get("metadata") or {}).get("nextCursor")
+                if requested_page < current_page and not walk_cursor:
+                    break
+            current_page = resolved_page
+    else:
+        params = dict(base_params)
+        params["page"] = current_page
+        if model_type and model_type in _CIVITAI_MODEL_TYPES:
+            params["types"] = model_type
+        resp = requests.get(f"{_CIVITAI_API}/models", params=params, headers=headers, timeout=15)
+        resp.raise_for_status()
+        raw = resp.json() or {}
+
+    metadata = raw.get("metadata") or {}
+    next_cursor = metadata.get("nextCursor") or ""
+    has_next_cursor = bool(next_cursor)
+
     items = []
     for model in raw.get("items", []):
         versions = model.get("modelVersions") or []
@@ -1339,39 +2513,62 @@ def _civitai_search(query: str, model_type: str, page: int) -> dict:
         primary_file = next((f for f in files if f.get("primary")), files[0] if files else {})
         preview_images = latest.get("images") or []
         preview_url = ""
-        for img in preview_images:
-            if img.get("nsfwLevel", 0) == 0 or img.get("nsfw") is False:
-                preview_url = img.get("url", "")
-                break
+        if preview_images:
+            # Filter out videos first - they cannot render as <img> src.
+            still_images = [img for img in preview_images if not _is_civitai_video_preview(img)]
+            pool = still_images if still_images else []
+            safe_candidates = [
+                img
+                for img in pool
+                if img.get("nsfw") is False or int(img.get("nsfwLevel") or 0) <= 1
+            ]
+            chosen_preview = safe_candidates[0] if safe_candidates else (pool[0] if pool else None)
+            preview_url = str(chosen_preview.get("url") or "") if chosen_preview else ""
         items.append({
+            "provider": "civitai",
             "id": model.get("id"),
             "name": model.get("name", ""),
             "type": model.get("type", ""),
             "creator": (model.get("creator") or {}).get("username", ""),
             "description": (model.get("description") or "")[:300],
             "rating": (model.get("stats") or {}).get("rating", 0),
+            "likes": (model.get("stats") or {}).get("thumbsUpCount")
+            or (model.get("stats") or {}).get("favoriteCount")
+            or 0,
             "download_count": (model.get("stats") or {}).get("downloadCount", 0),
             "preview_url": preview_url,
             "version_id": latest.get("id"),
             "version_name": latest.get("name", ""),
+            "base_model": latest.get("baseModel", ""),
+            "published_at": latest.get("publishedAt") or model.get("publishedAt") or "",
+            "is_early_access": bool(
+                latest.get("earlyAccessDeadline")
+                or latest.get("earlyAccessEndsAt")
+                or latest.get("availability") == "EarlyAccess"
+            ),
+            "is_nsfw": bool(model.get("nsfw") or latest.get("nsfw")),
             "file_name": primary_file.get("name", ""),
             "file_size_bytes": primary_file.get("sizeKB", 0) * 1024,
             "download_url": primary_file.get("downloadUrl", ""),
+            "model_url": f"https://civitai.com/models/{model.get('id')}" if model.get("id") else "",
             "model_type_folder": _preferred_model_folder_for_type(model.get("type", "")),
         })
     return {
         "items": items,
-        "total_pages": (raw.get("metadata") or {}).get("totalPages", 1),
-        "current_page": page,
+        "total_items": metadata.get("totalItems"),
+        "total_pages": metadata.get("totalPages") or (current_page + 1 if has_next_cursor else current_page),
+        "current_page": current_page,
+        "has_next": has_next_cursor,
+        "next_cursor": next_cursor,
     }
 
 
-def _do_download(download_id: str, url: str, dest_path: Path) -> None:
+def _do_download(download_id: str, url: str, dest_path: Path, headers: dict[str, str] | None = None) -> None:
     """Background thread: stream a file from url to dest_path, updating state."""
     dest_path.parent.mkdir(parents=True, exist_ok=True)
     tmp_path = dest_path.with_suffix(dest_path.suffix + ".tmp")
     try:
-        with requests.get(url, stream=True, timeout=30) as r:
+        with requests.get(url, headers=headers or {}, stream=True, timeout=30) as r:
             r.raise_for_status()
             total = int(r.headers.get("content-length", 0))
             downloaded = 0
@@ -1402,10 +2599,15 @@ def _do_download(download_id: str, url: str, dest_path: Path) -> None:
         if tmp_path.exists():
             tmp_path.unlink(missing_ok=True)
         logger.error("Model download %s failed: %s", download_id, exc)
+        error_text = str(exc)
+        if isinstance(exc, requests.HTTPError):
+            status_code = getattr(getattr(exc, "response", None), "status_code", None)
+            if status_code == 401:
+                error_text = "Unauthorized (401). Check your API key for this provider in Configurations."
         with _model_downloads_lock:
             if download_id in _model_downloads:
                 _model_downloads[download_id]["status"] = "error"
-                _model_downloads[download_id]["error"] = str(exc)
+                _model_downloads[download_id]["error"] = error_text
 
 
 @app.route("/api/models/library")
@@ -1416,31 +2618,543 @@ def api_models_library():
     return jsonify({"models": models, "models_root": str(root) if root else None})
 
 
+@app.route("/api/models/library/enrich-previews", methods=["POST"])
+def api_models_library_enrich_previews():
+    """Backfill missing local model preview metadata using CivitAI search."""
+    body = request.get_json(silent=True) or {}
+    try:
+        limit = int(body.get("limit", 40))
+    except (TypeError, ValueError):
+        limit = 40
+    limit = max(1, min(limit, 200))
+
+    try:
+        result = _enrich_local_model_metadata_with_civitai(limit=limit)
+    except requests.RequestException as exc:
+        logger.error("Local preview enrichment request failed: %s", exc)
+        return jsonify({"ok": False, "error": str(exc)}), 502
+
+    return jsonify({"ok": True, **result})
+
+
+@app.route("/api/models/library/compare-metadata", methods=["POST"])
+def api_models_library_compare_metadata():
+    """Compare local model names against providers to fill missing metadata."""
+    body = request.get_json(silent=True) or {}
+    try:
+        limit = int(body.get("limit", 80))
+    except (TypeError, ValueError):
+        limit = 80
+    limit = max(1, min(limit, 300))
+
+    providers_raw = body.get("providers")
+    if isinstance(providers_raw, list):
+        providers = [str(provider).strip().lower() for provider in providers_raw]
+    else:
+        providers = ["civitai", "huggingface"]
+
+    overwrite = bool(body.get("overwrite", False))
+
+    result = _compare_local_model_metadata_with_providers(limit=limit, providers=providers, overwrite=overwrite)
+    return jsonify({"ok": True, **result})
+
+
+@app.route("/api/models/library/recover-metadata", methods=["POST"])
+def api_models_library_recover_metadata():
+    """Run metadata compare and preview enrichment in one recovery pass."""
+    body = request.get_json(silent=True) or {}
+    try:
+        compare_limit = int(body.get("compare_limit", body.get("limit", 80)))
+    except (TypeError, ValueError):
+        compare_limit = 80
+    compare_limit = max(1, min(compare_limit, 300))
+
+    try:
+        preview_limit = int(body.get("preview_limit", body.get("enrich_limit", 40)))
+    except (TypeError, ValueError):
+        preview_limit = 40
+    preview_limit = max(1, min(preview_limit, 200))
+
+    providers_raw = body.get("providers")
+    if isinstance(providers_raw, list):
+        providers = [str(provider).strip().lower() for provider in providers_raw]
+    else:
+        providers = ["civitai", "huggingface"]
+
+    overwrite = bool(body.get("overwrite", False))
+
+    try:
+        compare_result = _compare_local_model_metadata_with_providers(
+            limit=compare_limit,
+            providers=providers,
+            overwrite=overwrite,
+        )
+        preview_result = _enrich_local_model_metadata_with_civitai(limit=preview_limit)
+    except requests.RequestException as exc:
+        logger.error("Local metadata recovery request failed: %s", exc)
+        return jsonify({"ok": False, "error": str(exc)}), 502
+
+    return jsonify(
+        {
+            "ok": True,
+            "compare": compare_result,
+            "preview": preview_result,
+            "updated_total": int(compare_result.get("updated") or 0) + int(preview_result.get("updated") or 0),
+            "skipped_total": int(compare_result.get("skipped") or 0) + int(preview_result.get("skipped") or 0),
+            "failed_total": int(compare_result.get("failed") or 0) + int(preview_result.get("failed") or 0),
+        }
+    )
+
+
+@app.route("/api/models/library/update-version-metadata", methods=["POST"])
+def api_models_library_update_version_metadata():
+    """Refresh local metadata and preview set for installed files of a selected model version."""
+    body = request.get_json(silent=True) or {}
+
+    provider = str(body.get("provider") or "").strip().lower()
+    model_id = str(body.get("model_id") or "").strip()
+    model_name = str(body.get("model_name") or "").strip()
+    model_type = str(body.get("model_type") or "").strip()
+    base_model = str(body.get("base_model") or "").strip()
+    model_url = str(body.get("model_url") or "").strip()
+    version_name = str(body.get("version_name") or "").strip()
+
+    installed_files_raw = body.get("installed_files")
+    installed_files = [
+        str(file_name).strip()
+        for file_name in (installed_files_raw if isinstance(installed_files_raw, list) else [])
+        if str(file_name).strip()
+    ]
+    if not installed_files:
+        return jsonify({"ok": False, "error": "installed_files is required"}), 400
+
+    preview_urls = _sanitize_preview_urls(body.get("preview_urls") or [])
+    preview_url = _sanitize_optional_preview_url(body.get("preview_url") or "")
+    if not preview_url and preview_urls:
+        preview_url = preview_urls[0]
+    if preview_url and preview_url not in preview_urls:
+        preview_urls.insert(0, preview_url)
+
+    local_models = _scan_local_models()
+    installed_lookup = {name.lower() for name in installed_files}
+    updated_files: list[str] = []
+
+    for item in local_models:
+        file_name = str(item.get("name") or "").strip()
+        folder = str(item.get("folder") or "").strip()
+        if not file_name or not folder:
+            continue
+        if file_name.lower() not in installed_lookup:
+            continue
+
+        _upsert_model_download_metadata(
+            file_name=file_name,
+            folder=folder,
+            body={
+                "model_id": model_id,
+                "model_name": model_name,
+                "version_name": version_name,
+                "model_type": model_type,
+                "base_model": base_model,
+                "model_url": model_url,
+                "preview_url": preview_url,
+                "preview_urls": preview_urls,
+            },
+            provider=provider,
+            model_id=model_id,
+        )
+        updated_files.append(f"{folder}/{file_name}")
+
+    return jsonify(
+        {
+            "ok": True,
+            "updated": len(updated_files),
+            "updated_files": updated_files,
+            "preview_count": len(preview_urls),
+            "version_name": version_name,
+        }
+    )
+
+
+@app.route("/api/models/local-preview")
+def api_models_local_preview():
+    """Serve preview images for local model files from the configured models root."""
+    rel_path = (request.args.get("path") or "").strip()
+    if not rel_path:
+        return jsonify({"ok": False, "error": "Missing path"}), 400
+
+    models_root = _comfy_models_root()
+    if models_root is None:
+        return jsonify({"ok": False, "error": "Models root not configured"}), 400
+
+    root_resolved = models_root.resolve()
+    candidate = (models_root / rel_path).resolve()
+    try:
+        candidate.relative_to(root_resolved)
+    except ValueError:
+        return jsonify({"ok": False, "error": "Invalid preview path"}), 400
+
+    if candidate.suffix.lower() not in {".png", ".jpg", ".jpeg", ".webp"}:
+        return jsonify({"ok": False, "error": "Unsupported preview format"}), 400
+    if not candidate.is_file():
+        return jsonify({"ok": False, "error": "Preview not found"}), 404
+
+    return send_file(candidate)
+
+
 @app.route("/api/models/civitai/search")
 def api_models_civitai_search():
     """Search CivitAI for models."""
     query = (request.args.get("query") or "").strip()
     model_type = (request.args.get("type") or "").strip()
+    sort = (request.args.get("sort") or "Highest Rated").strip()
+    base_model = (request.args.get("base_model") or "").strip()
+    nsfw_raw = (request.args.get("nsfw") or "false").strip().lower()
+    nsfw = nsfw_raw in {"1", "true", "yes", "on"}
+    cursor = (request.args.get("cursor") or "").strip()
     try:
         page = max(1, int(request.args.get("page", 1)))
     except (TypeError, ValueError):
         page = 1
     try:
-        results = _civitai_search(query, model_type, page)
+        limit = max(1, min(100, int(request.args.get("limit", 20))))
+    except (TypeError, ValueError):
+        limit = 20
+    try:
+        results = _civitai_search(query, model_type, page, cursor, sort, nsfw, base_model, limit)
         return jsonify({"ok": True, **results})
     except requests.RequestException as exc:
         logger.error("CivitAI search failed: %s", exc)
-        return jsonify({"ok": False, "error": str(exc), "items": [], "total_pages": 1, "current_page": 1}), 502
+        return jsonify({"ok": False, "error": str(exc), "items": [], "total_items": 0, "total_pages": 1, "current_page": 1}), 502
+
+
+@app.route("/api/models/civitai/model/<int:model_id>")
+def api_models_civitai_model(model_id: int):
+    """Fetch and sanitize CivitAI model details for the details modal."""
+    try:
+        resp = requests.get(
+            f"{_CIVITAI_API}/models/{model_id}",
+            headers=_external_api_headers("civitai"),
+            timeout=20,
+        )
+        resp.raise_for_status()
+        raw = resp.json() or {}
+    except requests.RequestException as exc:
+        logger.error("CivitAI model details failed for %s: %s", model_id, exc)
+        return jsonify({"ok": False, "error": str(exc)}), 502
+
+    versions: list[dict] = []
+    for version in raw.get("modelVersions") or []:
+        files = []
+        for f in version.get("files") or []:
+            size_kb = f.get("sizeKB") or 0
+            try:
+                size_bytes = int(float(size_kb) * 1024)
+            except (TypeError, ValueError):
+                size_bytes = 0
+            files.append(
+                {
+                    "id": f.get("id"),
+                    "name": f.get("name", ""),
+                    "size_bytes": size_bytes,
+                    "type": f.get("type", ""),
+                    "format": f.get("format", ""),
+                    "fp": f.get("fp", ""),
+                    "primary": bool(f.get("primary")),
+                    "download_url": f.get("downloadUrl", ""),
+                }
+            )
+
+        images = []
+        for img in version.get("images") or []:
+            images.append(
+                {
+                    "url": img.get("url", ""),
+                    "type": img.get("type", ""),
+                    "nsfw_level": img.get("nsfwLevel", 0),
+                    "width": img.get("width"),
+                    "height": img.get("height"),
+                }
+            )
+
+        meta = version.get("meta") or {}
+        defaults = {
+            "sampler": meta.get("sampler") or version.get("sampler") or "",
+            "steps": meta.get("steps") or version.get("steps") or "",
+            "cfg": meta.get("cfgScale") or version.get("cfgScale") or "",
+            "clip_skip": meta.get("clipSkip") or version.get("clipSkip") or "",
+            "base_model": version.get("baseModel", ""),
+            "trained_words": version.get("trainedWords") or [],
+        }
+
+        versions.append(
+            {
+                "id": version.get("id"),
+                "name": version.get("name", ""),
+                "description": (version.get("description") or "")[:1200],
+                "created_at": version.get("createdAt") or "",
+                "base_model": version.get("baseModel") or "",
+                "is_early_access": bool(
+                    version.get("earlyAccessDeadline")
+                    or version.get("earlyAccessEndsAt")
+                    or version.get("availability") == "EarlyAccess"
+                ),
+                "images": images,
+                "files": files,
+                "defaults": defaults,
+            }
+        )
+
+    payload = {
+        "ok": True,
+        "provider": "civitai",
+        "id": raw.get("id"),
+        "name": raw.get("name", ""),
+        "type": raw.get("type", ""),
+        "description": (raw.get("description") or "")[:2000],
+        "creator": (raw.get("creator") or {}).get("username", ""),
+        "tags": raw.get("tags") or [],
+        "stats": {
+            "rating": (raw.get("stats") or {}).get("rating", 0),
+            "downloads": (raw.get("stats") or {}).get("downloadCount", 0),
+            "likes": (raw.get("stats") or {}).get("thumbsUpCount")
+            or (raw.get("stats") or {}).get("favoriteCount")
+            or 0,
+        },
+        "versions": versions,
+        "model_url": f"https://civitai.com/models/{raw.get('id')}" if raw.get("id") else "",
+    }
+    return jsonify(payload)
+
+
+def _huggingface_search(query: str, model_type: str, page: int, sort: str = "Highest Rated", limit: int = 20) -> dict:
+    """Search Hugging Face models and map to shared model card structure."""
+    current_page = max(1, page)
+    per_page = max(1, min(100, int(limit or 20)))
+    hf_sort = "likes"
+    if sort == "Most Downloaded":
+        hf_sort = "downloads"
+    elif sort == "Newest":
+        hf_sort = "createdAt"
+
+    params: dict = {
+        "search": query,
+        "limit": per_page,
+        "sort": hf_sort,
+        "direction": -1,
+        "full": "true",
+        "offset": (current_page - 1) * per_page,
+    }
+
+    if model_type == "LORA":
+        params["search"] = f"{query} lora".strip()
+    elif model_type == "ControlNet":
+        params["search"] = f"{query} controlnet".strip()
+    elif model_type == "VAE":
+        params["search"] = f"{query} vae".strip()
+
+    resp = requests.get(
+        f"{_HUGGINGFACE_API}/models",
+        params=params,
+        headers=_external_api_headers("huggingface"),
+        timeout=20,
+    )
+    resp.raise_for_status()
+    raw_items = resp.json() or []
+    total_items = None
+    try:
+        total_header = getattr(resp, "headers", {}).get("x-total-count")
+        if total_header is not None:
+            total_items = max(0, int(total_header))
+    except (TypeError, ValueError):
+        total_items = None
+
+    items = []
+    for model in raw_items:
+        model_id = str(model.get("id") or "")
+        files = model.get("siblings") or []
+        file_name = _find_primary_huggingface_file(files)
+        download_url = _build_huggingface_download_url(model_id, file_name)
+        inferred_type = _infer_huggingface_model_type(model)
+        if model_type and model_type in _CIVITAI_MODEL_TYPES and inferred_type != model_type:
+            continue
+
+        card_data = model.get("cardData") or {}
+        base_model = str(card_data.get("base_model") or card_data.get("baseModel") or "")
+        items.append(
+            {
+                "provider": "huggingface",
+                "id": model_id,
+                "name": model_id,
+                "type": inferred_type,
+                "creator": model_id.split("/")[0] if "/" in model_id else "",
+                "description": str(card_data.get("summary") or card_data.get("description") or "")[:300],
+                "rating": float(model.get("likes") or 0),
+                "likes": int(model.get("likes") or 0),
+                "download_count": int(model.get("downloads") or 0),
+                "preview_url": "",
+                "version_id": str(model.get("sha") or "")[:12],
+                "version_name": str(model.get("sha") or "")[:8] if model.get("sha") else "",
+                "base_model": base_model,
+                "published_at": str(model.get("createdAt") or ""),
+                "is_early_access": False,
+                "is_nsfw": any("nsfw" in str(t).lower() for t in (model.get("tags") or [])),
+                "file_name": file_name,
+                "file_size_bytes": 0,
+                "download_url": download_url,
+                "model_url": f"https://huggingface.co/{model_id}" if model_id else "",
+                "model_type_folder": _preferred_model_folder_for_type(inferred_type),
+            }
+        )
+
+    has_next = len(raw_items) >= per_page
+    return {
+        "items": items,
+        "total_items": total_items,
+        "total_pages": current_page + 1 if has_next else current_page,
+        "current_page": current_page,
+        "has_next": has_next,
+    }
+
+
+@app.route("/api/models/huggingface/search")
+def api_models_huggingface_search():
+    """Search Hugging Face repositories for model candidates."""
+    query = (request.args.get("query") or "").strip()
+    model_type = (request.args.get("type") or "").strip()
+    sort = (request.args.get("sort") or "Highest Rated").strip()
+    try:
+        page = max(1, int(request.args.get("page", 1)))
+    except (TypeError, ValueError):
+        page = 1
+    try:
+        limit = max(1, min(100, int(request.args.get("limit", 20))))
+    except (TypeError, ValueError):
+        limit = 20
+
+    try:
+        results = _huggingface_search(query, model_type, page, sort, limit)
+        return jsonify({"ok": True, **results})
+    except requests.RequestException as exc:
+        logger.error("Hugging Face search failed: %s", exc)
+        return jsonify({"ok": False, "error": str(exc), "items": [], "total_items": 0, "total_pages": 1, "current_page": 1}), 502
+
+
+@app.route("/api/models/huggingface/model/<path:model_id>")
+def api_models_huggingface_model(model_id: str):
+    """Fetch and sanitize Hugging Face model details for the details modal."""
+    safe_model_id = (model_id or "").strip()
+    if not safe_model_id:
+        return jsonify({"ok": False, "error": "model id required"}), 400
+
+    try:
+        resp = requests.get(
+            f"{_HUGGINGFACE_API}/models/{safe_model_id}",
+            headers=_external_api_headers("huggingface"),
+            timeout=20,
+        )
+        resp.raise_for_status()
+        raw = resp.json() or {}
+    except requests.RequestException as exc:
+        logger.error("Hugging Face model details failed for %s: %s", safe_model_id, exc)
+        return jsonify({"ok": False, "error": str(exc)}), 502
+
+    siblings = raw.get("siblings") or []
+    primary_file = _find_primary_huggingface_file(siblings)
+    files = []
+    for sibling in siblings:
+        filename = str(sibling.get("rfilename") or "")
+        if not filename or not _is_huggingface_model_file(filename):
+            continue
+        files.append(
+            {
+                "id": filename,
+                "name": filename,
+                "size_bytes": 0,
+                "type": "Model",
+                "format": "",
+                "fp": "",
+                "primary": filename == primary_file,
+                "download_url": _build_huggingface_download_url(safe_model_id, filename),
+            }
+        )
+
+    card_data = raw.get("cardData") or {}
+    tags = raw.get("tags") or []
+    defaults = {
+        "sampler": "",
+        "steps": "",
+        "cfg": "",
+        "clip_skip": "",
+        "base_model": str(card_data.get("base_model") or card_data.get("baseModel") or ""),
+        "trained_words": [],
+    }
+
+    versions = [
+        {
+            "id": raw.get("sha") or safe_model_id,
+            "name": str(raw.get("sha") or "main")[:12],
+            "description": str(card_data.get("description") or card_data.get("summary") or "")[:1200],
+            "created_at": raw.get("createdAt") or "",
+            "base_model": defaults["base_model"],
+            "is_early_access": False,
+            "images": [],
+            "files": files,
+            "defaults": defaults,
+        }
+    ]
+
+    payload = {
+        "ok": True,
+        "provider": "huggingface",
+        "id": safe_model_id,
+        "name": safe_model_id,
+        "type": _infer_huggingface_model_type(raw),
+        "description": str(card_data.get("description") or card_data.get("summary") or "")[:2000],
+        "creator": safe_model_id.split("/")[0] if "/" in safe_model_id else "",
+        "tags": tags,
+        "stats": {
+            "rating": float(raw.get("likes") or 0),
+            "downloads": int(raw.get("downloads") or 0),
+            "likes": int(raw.get("likes") or 0),
+        },
+        "versions": versions,
+        "model_url": f"https://huggingface.co/{safe_model_id}",
+    }
+    return jsonify(payload)
 
 
 @app.route("/api/models/download", methods=["POST"])
 def api_models_download():
     """Start downloading a model file into the ComfyUI models directory."""
     body = request.get_json(silent=True) or {}
+    provider = str(body.get("provider") or "").strip().lower()
+    model_id = (body.get("model_id") or "").strip()
     url = (body.get("url") or "").strip()
     file_name = (body.get("file_name") or "").strip()
     folder_raw = (body.get("folder") or _preferred_model_folder_for_type("Checkpoint")).strip()
     folder = _normalize_model_folder(folder_raw)
+    download_headers: dict[str, str] = {}
+
+    if provider == "huggingface":
+        try:
+            resolved_file_name, resolved_url = _resolve_huggingface_download_target(model_id, preferred_file_name=file_name)
+            if not file_name:
+                file_name = resolved_file_name
+            if not url:
+                url = resolved_url
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
+        except requests.RequestException as exc:
+            logger.error("Hugging Face download target resolution failed for %s: %s", model_id, exc)
+            return jsonify({"error": str(exc)}), 502
+        download_headers = _external_api_headers("huggingface")
+    elif provider == "civitai":
+        download_headers = _external_api_headers("civitai")
+
+    if not download_headers and "civitai.com" in url.lower():
+        # Some CivitAI download URLs require auth even when the provider field is absent.
+        download_headers = _external_api_headers("civitai")
 
     if not url:
         return jsonify({"error": "url is required"}), 400
@@ -1458,9 +3172,12 @@ def api_models_download():
     if dest_path.exists():
         return jsonify({"error": f"{file_name} already exists in {folder}"}), 409
 
+    _upsert_model_download_metadata(file_name=file_name, folder=folder, body=body, provider=provider, model_id=model_id)
+
     download_id = f"{int(time.time() * 1000)}-{file_name}"
     state = {
         "id": download_id,
+        "provider": provider,
         "file_name": file_name,
         "folder": folder,
         "status": "downloading",
@@ -1471,9 +3188,9 @@ def api_models_download():
     with _model_downloads_lock:
         _model_downloads[download_id] = state
 
-    t = threading.Thread(target=_do_download, args=(download_id, url, dest_path), daemon=True)
+    t = threading.Thread(target=_do_download, args=(download_id, url, dest_path, download_headers), daemon=True)
     t.start()
-    return jsonify({"ok": True, "download_id": download_id})
+    return jsonify({"ok": True, "download_id": download_id, "file_name": file_name, "folder": folder, "provider": provider})
 
 
 @app.route("/api/models/download/<download_id>")
@@ -1527,6 +3244,46 @@ def api_models_delete_local():
 
     return jsonify({"ok": True, "deleted": file_name})
 
+
+@app.route("/api/dev/slow-download-source")
+def api_dev_slow_download_source():
+    """Stream bytes slowly for deterministic local download/cancel testing."""
+    def _bounded_int(name: str, default: int, low: int, high: int) -> int:
+        raw = (request.args.get(name) or "").strip()
+        if not raw:
+            return default
+        try:
+            value = int(raw)
+        except ValueError:
+            return default
+        return max(low, min(high, value))
+
+    total_bytes = _bounded_int("total_bytes", default=8 * 1024 * 1024, low=1024, high=100 * 1024 * 1024)
+    chunk_bytes = _bounded_int("chunk_bytes", default=128 * 1024, low=1024, high=1024 * 1024)
+    delay_ms = _bounded_int("delay_ms", default=120, low=0, high=2000)
+    delay_seconds = delay_ms / 1000.0
+
+    def generate():
+        pattern = b"copilot-slow-download-source-"
+        remaining = total_bytes
+        while remaining > 0:
+            size = min(chunk_bytes, remaining)
+            repeats = (size // len(pattern)) + 1
+            yield (pattern * repeats)[:size]
+            remaining -= size
+            if remaining > 0 and delay_seconds > 0:
+                time.sleep(delay_seconds)
+
+    return Response(
+        stream_with_context(generate()),
+        mimetype="application/octet-stream",
+        headers={
+            "Content-Length": str(total_bytes),
+            "Cache-Control": "no-store",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
+
 @app.route("/api/status")
 def api_status():
     """Return the health status of both inference backends."""
@@ -1578,6 +3335,8 @@ def api_config_services():
             "ollama_path": body.get("ollama_path"),
             "comfyui_path": body.get("comfyui_path"),
             "shared_models_path": body.get("shared_models_path"),
+            "civitai_api_key": body.get("civitai_api_key"),
+            "huggingface_api_key": body.get("huggingface_api_key"),
         }
     )
     return jsonify({"ok": True, "config": config})
@@ -1878,6 +3637,40 @@ def api_image_samplers():
     return jsonify({"samplers": _image_samplers()})
 
 
+@app.route("/api/image/lora-models")
+def api_image_lora_models():
+    """List ComfyUI LoRA names."""
+    if not _comfy_available():
+        return jsonify({"loras": [], "error": "ComfyUI is not available"}), 503
+    return jsonify({"loras": _image_lora_models()})
+
+
+@app.route("/api/image/controlnet-models")
+def api_image_controlnet_models():
+    """List ComfyUI ControlNet model names."""
+    if not _comfy_available():
+        return jsonify({"models": [], "error": "ComfyUI is not available"}), 503
+    return jsonify({"models": _image_controlnet_models()})
+
+
+@app.route("/api/image/upload-image", methods=["POST"])
+def api_image_upload_image():
+    """Upload an input image to ComfyUI and return the stored filename."""
+    if not _comfy_available():
+        return jsonify({"error": "ComfyUI is not running. Start ComfyUI first."}), 503
+    image = request.files.get("image")
+    if not image:
+        return jsonify({"error": "image is required"}), 400
+    try:
+        uploaded_name = _upload_image_to_comfy(image)
+        if not uploaded_name:
+            return jsonify({"error": "Failed to upload image to ComfyUI"}), 502
+        return jsonify({"ok": True, "name": uploaded_name})
+    except requests.RequestException as exc:
+        logger.error("ComfyUI upload image failed: %s", exc)
+        return jsonify({"error": str(exc)}), 502
+
+
 @app.route("/api/image/generate", methods=["POST"])
 def api_image_generate():
     """Submit a txt2img prompt to ComfyUI queue."""
@@ -1927,6 +3720,13 @@ def api_image_img2img():
         "negative_prompt": request.form.get("negative_prompt", ""),
         "model": request.form.get("model", ""),
         "sampler": request.form.get("sampler", "euler"),
+        "lora": request.form.get("lora", ""),
+        "lora_strength": request.form.get("lora_strength", 0.8),
+        "controlnet_model": request.form.get("controlnet_model", ""),
+        "controlnet_image_name": request.form.get("controlnet_image_name", ""),
+        "controlnet_weight": request.form.get("controlnet_weight", 1.0),
+        "controlnet_start": request.form.get("controlnet_start", 0.0),
+        "controlnet_end": request.form.get("controlnet_end", 1.0),
         "scheduler": request.form.get("scheduler", "normal"),
         "seed": request.form.get("seed", ""),
         "steps": request.form.get("steps", DEFAULT_IMAGE_STEPS),

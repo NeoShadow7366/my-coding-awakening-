@@ -17,15 +17,15 @@
     <div class="header-inner">
       <span class="logo" aria-label="Local AI home">🤖 Local AI</span>
 
-      <nav class="tab-nav" role="navigation" aria-label="Model type">
+      <nav class="tab-nav" role="tablist" aria-label="Model type">
         <a href="#" class="tab-btn {% block nav_gen %}{% endblock %}" id="nav-generative"
-           role="tab" aria-controls="panel-generative">Generative</a>
+           role="tab" aria-controls="panel-generative" aria-selected="true" tabindex="0">Generative</a>
         <a href="#" class="tab-btn {% block nav_disc %}{% endblock %}" id="nav-image"
-          role="tab" aria-controls="panel-image">Image</a>
+          role="tab" aria-controls="panel-image" aria-selected="false" tabindex="-1">Image</a>
         <a href="#" class="tab-btn" id="nav-config"
-          role="tab" aria-controls="panel-config">Configurations</a>
+          role="tab" aria-controls="panel-config" aria-selected="false" tabindex="-1">Configurations</a>
         <a href="#" class="tab-btn" id="nav-models"
-          role="tab" aria-controls="panel-models">Models</a>
+          role="tab" aria-controls="panel-models" aria-selected="false" tabindex="-1">Models</a>
       </nav>
 
       <div class="header-actions">

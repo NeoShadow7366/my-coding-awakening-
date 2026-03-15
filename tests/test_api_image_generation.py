@@ -149,6 +149,97 @@ def test_img2img_success_returns_prompt_metadata(client, monkeypatch):
     assert data["meta"] == {"prompt": "forest", "image": "uploaded-in.png", "mode": "img2img"}
 
 
+def test_image_lora_models_endpoint(client, monkeypatch):
+    monkeypatch.setattr(app_module, "_comfy_available", lambda: True)
+    monkeypatch.setattr(app_module, "_image_lora_models", lambda: ["detail-tweaker.safetensors"])
+
+    resp = client.get("/api/image/lora-models")
+
+    assert resp.status_code == 200
+    assert resp.get_json()["loras"] == ["detail-tweaker.safetensors"]
+
+
+def test_image_controlnet_models_endpoint(client, monkeypatch):
+    monkeypatch.setattr(app_module, "_comfy_available", lambda: True)
+    monkeypatch.setattr(app_module, "_image_controlnet_models", lambda: ["control_v11p_sd15_canny.safetensors"])
+
+    resp = client.get("/api/image/controlnet-models")
+
+    assert resp.status_code == 200
+    assert resp.get_json()["models"] == ["control_v11p_sd15_canny.safetensors"]
+
+
+def test_image_upload_image_requires_file(client, monkeypatch):
+    monkeypatch.setattr(app_module, "_comfy_available", lambda: True)
+
+    resp = client.post("/api/image/upload-image", data={}, content_type="multipart/form-data")
+
+    assert resp.status_code == 400
+    assert resp.get_json()["error"] == "image is required"
+
+
+def test_image_upload_image_success(client, monkeypatch):
+    monkeypatch.setattr(app_module, "_comfy_available", lambda: True)
+    monkeypatch.setattr(app_module, "_upload_image_to_comfy", lambda _file: "uploaded-control.png")
+
+    resp = client.post(
+        "/api/image/upload-image",
+        data={"image": (BytesIO(b"control-image"), "control.png")},
+        content_type="multipart/form-data",
+    )
+
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["ok"] is True
+    assert data["name"] == "uploaded-control.png"
+
+
+def test_build_txt2img_workflow_includes_lora_node(monkeypatch):
+    monkeypatch.setattr(app_module, "_image_models", lambda: ["base.safetensors"])
+
+    workflow, meta = app_module._build_txt2img_workflow(
+        {
+            "prompt": "ruins",
+            "negative_prompt": "",
+            "model": "base.safetensors",
+            "sampler": "euler",
+            "lora": "detail-tweaker.safetensors",
+            "lora_strength": 0.75,
+        }
+    )
+
+    assert workflow["8"]["class_type"] == "LoraLoader"
+    assert workflow["8"]["inputs"]["lora_name"] == "detail-tweaker.safetensors"
+    assert workflow["5"]["inputs"]["model"] == ["8", 0]
+    assert meta["lora"] == "detail-tweaker.safetensors"
+
+
+def test_build_txt2img_workflow_includes_controlnet_nodes(monkeypatch):
+    monkeypatch.setattr(app_module, "_image_models", lambda: ["base.safetensors"])
+
+    workflow, meta = app_module._build_txt2img_workflow(
+        {
+            "prompt": "ruins",
+            "negative_prompt": "",
+            "model": "base.safetensors",
+            "sampler": "euler",
+            "controlnet_model": "control_v11p_sd15_canny.safetensors",
+            "controlnet_image_name": "cn-input.png",
+            "controlnet_weight": 1.0,
+            "controlnet_start": 0.0,
+            "controlnet_end": 0.9,
+        }
+    )
+
+    assert workflow["9"]["class_type"] == "ControlNetLoader"
+    assert workflow["10"]["class_type"] == "LoadImage"
+    assert workflow["10"]["inputs"]["image"] == "cn-input.png"
+    assert workflow["11"]["class_type"] == "ControlNetApplyAdvanced"
+    assert workflow["5"]["inputs"]["positive"] == ["11", 0]
+    assert workflow["5"]["inputs"]["negative"] == ["11", 1]
+    assert meta["controlnet_model"] == "control_v11p_sd15_canny.safetensors"
+
+
 def test_image_prompt_suggestions_requires_all_fields(client, monkeypatch):
     monkeypatch.setattr(app_module, "_ollama_available", lambda: True)
 
