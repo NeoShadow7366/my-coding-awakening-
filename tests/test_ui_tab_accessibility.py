@@ -339,9 +339,14 @@ def test_model_search_cancel_button_is_wired_to_abort_active_request():
     assert "if (mbCancelSearchBtn) {" in content
     assert "mbCancelSearchBtn.addEventListener('click', cancelModelSearch);" in content
     assert "if (mbCancelSearchBtn) mbCancelSearchBtn.disabled = !mbSearchInFlight;" in content
-    assert "if (e.key === 'Escape') {" in content
-    assert "if (mbSearchInFlight) {" in content
+    assert "if (event.key !== 'Escape') return;" in content
+    assert "if (!mbSearchInFlight) return;" in content
     assert "cancelModelSearch();" in content
+    assert "function onModelSearchControlKeydown(event) {" in content
+    assert "if (event.key !== 'Escape') return;" in content
+    assert "mbSearchType.addEventListener('keydown', onModelSearchControlKeydown);" in content
+    assert "mbProvider.addEventListener('keydown', onModelSearchControlKeydown);" in content
+    assert "mbSort.addEventListener('keydown', onModelSearchControlKeydown);" in content
 
 
 def test_model_search_disables_pagination_controls_while_request_is_active():
@@ -351,6 +356,18 @@ def test_model_search_disables_pagination_controls_while_request_is_active():
     assert "mbPrevPage.disabled = mbSearchInFlight || mbCurrentPage <= 1;" in content
     assert "mbNextPage.disabled = mbSearchInFlight || (mbQueryMode ? !mbHasNextPage : (mbCurrentPage >= mbTotalPages));" in content
     assert "if (mbSearchInFlight) return;" in content
+
+
+def test_model_search_cancel_status_is_auto_cleared_after_delay():
+    js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
+    content = js_path.read_text(encoding="utf-8")
+
+    assert "let mbSearchStatusTimer = null;" in content
+    assert "const MB_CANCEL_STATUS_CLEAR_MS = 2500;" in content
+    assert "if (message === 'Search cancelled.' && isVisible) {" in content
+    assert "mbSearchStatusTimer = setTimeout(() => {" in content
+    assert "if (mbSearchStatus.textContent !== 'Search cancelled.') return;" in content
+    assert "setModelSearchStatus('', false);" in content
 
 
 def test_model_modal_preserves_search_result_type_when_details_are_less_specific():

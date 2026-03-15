@@ -4020,7 +4020,9 @@ let mbSearchAbortController = null;
 let mbSearchRequestSeq = 0;
 let mbSearchInFlight = false;
 let mbSearchCancelRequested = false;
+let mbSearchStatusTimer = null;
 const MB_SEARCH_TIMEOUT_MS = 25000;
+const MB_CANCEL_STATUS_CLEAR_MS = 2500;
 
 function updateModelSearchControls() {
 	if (mbSearchBtn) mbSearchBtn.disabled = mbSearchInFlight;
@@ -4031,6 +4033,13 @@ function cancelModelSearch() {
 	if (!mbSearchInFlight || !mbSearchAbortController) return;
 	mbSearchCancelRequested = true;
 	mbSearchAbortController.abort();
+}
+
+function onModelSearchControlKeydown(event) {
+	if (event.key !== 'Escape') return;
+	if (!mbSearchInFlight) return;
+	event.preventDefault();
+	cancelModelSearch();
 }
 
 if (mbLocalQuery) {
@@ -4386,8 +4395,20 @@ function setModelModalDownloadStatus(message, level = '') {
 
 function setModelSearchStatus(message = '', isVisible = false) {
 	if (!mbSearchStatus) return;
+	if (mbSearchStatusTimer) {
+		clearTimeout(mbSearchStatusTimer);
+		mbSearchStatusTimer = null;
+	}
 	mbSearchStatus.textContent = message;
 	mbSearchStatus.hidden = !isVisible;
+	if (message === 'Search cancelled.' && isVisible) {
+		mbSearchStatusTimer = setTimeout(() => {
+			if (!mbSearchStatus) return;
+			if (mbSearchInFlight) return;
+			if (mbSearchStatus.textContent !== 'Search cancelled.') return;
+			setModelSearchStatus('', false);
+		}, MB_CANCEL_STATUS_CLEAR_MS);
+	}
 }
 
 function applyModelBrowserClientFilters(items) {
@@ -6065,35 +6086,33 @@ if (mbSearchQuery) {
 		localStorage.setItem('mbSearchQuery', mbSearchQuery.value || '');
 	});
 	mbSearchQuery.addEventListener('keydown', (e) => {
-		if (e.key === 'Escape') {
-			if (mbSearchInFlight) {
-				e.preventDefault();
-				cancelModelSearch();
-			}
-			return;
-		}
+		if (e.key === 'Escape') return onModelSearchControlKeydown(e);
 		if (e.key === 'Enter') runCivitaiSearch(1);
 	});
 }
 if (mbSearchType) {
+	mbSearchType.addEventListener('keydown', onModelSearchControlKeydown);
 	mbSearchType.addEventListener('change', () => {
 		localStorage.setItem('mbSearchType', mbSearchType.value || '');
 		rerunModelBrowserSearchIfVisible();
 	});
 }
 if (mbProvider) {
+	mbProvider.addEventListener('keydown', onModelSearchControlKeydown);
 	mbProvider.addEventListener('change', () => {
 		localStorage.setItem('mbProvider', mbProvider.value || 'civitai');
 		rerunModelBrowserSearchIfVisible();
 	});
 }
 if (mbBaseModel) {
+	mbBaseModel.addEventListener('keydown', onModelSearchControlKeydown);
 	mbBaseModel.addEventListener('change', () => {
 		localStorage.setItem('mbBaseModel', mbBaseModel.value || '');
 		rerunModelBrowserSearchIfVisible();
 	});
 }
 if (mbSort) {
+	mbSort.addEventListener('keydown', onModelSearchControlKeydown);
 	mbSort.addEventListener('change', () => {
 		localStorage.setItem('mbSort', mbSort.value || 'highest-rated');
 		if ((mbSort.value || '').toString() === 'highest-rated' || (mbSort.value || '').toString() === 'most-downloaded' || (mbSort.value || '').toString() === 'newest') {
@@ -6104,6 +6123,7 @@ if (mbSort) {
 	});
 }
 if (mbPageSize) {
+	mbPageSize.addEventListener('keydown', onModelSearchControlKeydown);
 	mbPageSize.addEventListener('change', () => {
 		localStorage.setItem('mbPageSize', String(getMbPageSize()));
 		rerunModelBrowserSearchIfVisible();
