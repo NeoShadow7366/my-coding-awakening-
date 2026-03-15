@@ -807,6 +807,11 @@ function renderWsTransportStatus() {
 		wsTransportStatus.textContent = `Preview transport: cooldown (${minsLeft}m left), retries ${comfyWsFailCount}/${COMFY_WS_MAX_RETRIES}`;
 		return;
 	}
+	if (_isComfyWsBlockedActive()) {
+		const secsLeft = _getComfyWsBlockedSecondsLeft();
+		wsTransportStatus.textContent = `Preview transport: websocket blocked (${secsLeft}s left), polling active`;
+		return;
+	}
 	if (comfyWsNextRetryAt > Date.now()) {
 		const secsLeft = Math.max(1, Math.ceil((comfyWsNextRetryAt - Date.now()) / 1000));
 		wsTransportStatus.textContent = `Preview transport: retry in ${secsLeft}s (${comfyWsFailCount}/${COMFY_WS_MAX_RETRIES})`;
@@ -3451,10 +3456,16 @@ let comfyWsReconnectTimer = null;
 let comfyWsFailCount = 0;
 let comfyWsCooldownNotified = false;
 let comfyWsNextRetryAt = 0;
+let comfyWsBlockedUntil = 0;
+let comfyWsQuickCloseCount = 0;
+let comfyWsLastConnectStartedAt = 0;
 let wsTransportStatusTimer = null;
 const COMFY_WS_MAX_RETRIES = 4;
 const COMFY_WS_COOLDOWN_KEY = 'comfyWsCooldownUntil';
 const COMFY_WS_COOLDOWN_MS = 30 * 60 * 1000;
+const COMFY_WS_BLOCKED_COOLDOWN_MS = 5 * 60 * 1000;
+const COMFY_WS_QUICK_CLOSE_MS = 1500;
+const COMFY_WS_QUICK_CLOSE_THRESHOLD = 3;
 const comfyWsProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
 const comfyWsHost = window.location.hostname || 'localhost';
 const COMFY_WS_URL = `${comfyWsProtocol}://${comfyWsHost}:8188/ws?clientId=${tabInstanceId}`;
@@ -3489,6 +3500,15 @@ function _getComfyWsCooldownMinutesLeft() {
 	const until = _getComfyWsCooldownUntil();
 	if (until <= Date.now()) return 0;
 	return Math.max(1, Math.ceil((until - Date.now()) / 60000));
+}
+
+function _isComfyWsBlockedActive() {
+	return comfyWsBlockedUntil > Date.now();
+}
+
+function _getComfyWsBlockedSecondsLeft() {
+	if (comfyWsBlockedUntil <= Date.now()) return 0;
+	return Math.max(1, Math.ceil((comfyWsBlockedUntil - Date.now()) / 1000));
 }
 
 function setPreviewTransportMode(mode, titleText = '') {
@@ -3551,6 +3571,11 @@ function connectComfyWebSocket() {
 		setPreviewTransportMode('polling', `ComfyUI WebSocket cooldown active (${minsLeft}m left). HTTP polling fallback is active.`);
 		return;
 	}
+	if (_isComfyWsBlockedActive()) {
+		const secsLeft = _getComfyWsBlockedSecondsLeft();
+		setPreviewTransportMode('polling', `ComfyUI WebSocket appears blocked (${secsLeft}s left). HTTP polling fallback is active.`);
+		return;
+	}
 	if (comfyWsNextRetryAt > Date.now()) {
 		const secsLeft = Math.max(1, Math.ceil((comfyWsNextRetryAt - Date.now()) / 1000));
 		setPreviewTransportMode('polling', `ComfyUI WebSocket retry scheduled in ${secsLeft}s. HTTP polling fallback is active.`);
@@ -3566,6 +3591,7 @@ function connectComfyWebSocket() {
 	}
 	setPreviewTransportMode('polling', 'Attempting ComfyUI WebSocket connection. HTTP polling fallback is active until connected.');
 	try {
+		comfyWsLastConnectStartedAt = Date.now();
 		comfyWs = new WebSocket(COMFY_WS_URL);
 		comfyWs.binaryType = 'arraybuffer';
 
@@ -3606,14 +3632,32 @@ function connectComfyWebSocket() {
 		comfyWs.onopen = () => {
 			comfyWsFailCount = 0;
 			comfyWsNextRetryAt = 0;
+			comfyWsBlockedUntil = 0;
+			comfyWsQuickCloseCount = 0;
+			comfyWsLastConnectStartedAt = 0;
 			_setComfyWsCooldownUntil(0);
 			comfyWsCooldownNotified = false;
 			setPreviewTransportMode('websocket');
 		};
 		comfyWs.onerror = () => { /* errors handled in onclose */ };
-		comfyWs.onclose = () => {
+		comfyWs.onclose = (event) => {
 			comfyWs = null;
 			comfyWsFailCount++;
+			const closedQuickly = comfyWsLastConnectStartedAt > 0 && (Date.now() - comfyWsLastConnectStartedAt) <= COMFY_WS_QUICK_CLOSE_MS;
+			comfyWsLastConnectStartedAt = 0;
+			if (closedQuickly) {
+				comfyWsQuickCloseCount += 1;
+			} else {
+				comfyWsQuickCloseCount = 0;
+			}
+			const likelyBlocked = Boolean(event?.code === 1006 && comfyWsQuickCloseCount >= COMFY_WS_QUICK_CLOSE_THRESHOLD);
+			if (likelyBlocked) {
+				comfyWsBlockedUntil = Date.now() + COMFY_WS_BLOCKED_COOLDOWN_MS;
+				comfyWsNextRetryAt = 0;
+				setPreviewTransportMode('polling', 'ComfyUI WebSocket appears blocked (likely 403/forbidden). HTTP polling fallback is active.');
+				appendDiagnosticsConsoleLine('ComfyUI websocket appears blocked (likely 403/forbidden); pausing websocket retries while polling fallback stays active.', 'warn');
+				return;
+			}
 			if (comfyWsFailCount >= COMFY_WS_MAX_RETRIES) {
 				comfyWsNextRetryAt = 0;
 				_setComfyWsCooldownUntil(Date.now() + COMFY_WS_COOLDOWN_MS);
@@ -3652,9 +3696,15 @@ document.addEventListener('visibilitychange', () => {
 			setPreviewTransportMode('polling', `ComfyUI WebSocket cooldown active (${minsLeft}m left). HTTP polling fallback is active.`);
 			return;
 		}
+		if (_isComfyWsBlockedActive()) {
+			const secsLeft = _getComfyWsBlockedSecondsLeft();
+			setPreviewTransportMode('polling', `ComfyUI WebSocket appears blocked (${secsLeft}s left). HTTP polling fallback is active.`);
+			return;
+		}
 		// Reset failure count on tab re-focus so it can retry after a long pause
 		comfyWsFailCount = 0;
 		comfyWsNextRetryAt = 0;
+		comfyWsQuickCloseCount = 0;
 		connectComfyWebSocket();
 	}
 });

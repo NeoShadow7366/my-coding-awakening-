@@ -376,8 +376,16 @@ def test_preview_websocket_retry_backoff_is_respected_between_attempts():
     content = js_path.read_text(encoding="utf-8")
 
     assert "let comfyWsNextRetryAt = 0;" in content
+    assert "let comfyWsBlockedUntil = 0;" in content
+    assert "let comfyWsQuickCloseCount = 0;" in content
+    assert "const COMFY_WS_BLOCKED_COOLDOWN_MS = 5 * 60 * 1000;" in content
+    assert "const COMFY_WS_QUICK_CLOSE_THRESHOLD = 3;" in content
+    assert "function _isComfyWsBlockedActive() {" in content
     assert "if (comfyWsNextRetryAt > Date.now()) {" in content
     assert "ComfyUI WebSocket retry scheduled in ${secsLeft}s. HTTP polling fallback is active." in content
+    assert "ComfyUI WebSocket appears blocked (${secsLeft}s left). HTTP polling fallback is active." in content
+    assert "const likelyBlocked = Boolean(event?.code === 1006 && comfyWsQuickCloseCount >= COMFY_WS_QUICK_CLOSE_THRESHOLD);" in content
+    assert "ComfyUI WebSocket appears blocked (likely 403/forbidden). HTTP polling fallback is active." in content
     assert "comfyWsNextRetryAt = Date.now() + delay;" in content
     assert "comfyWsNextRetryAt = 0;" in content
 
@@ -389,6 +397,7 @@ def test_preview_transport_diagnostics_line_shows_retry_and_cooldown_state():
     assert "const wsTransportStatus = document.getElementById('ws-transport-status');" in content
     assert "function renderWsTransportStatus() {" in content
     assert "Preview transport: cooldown (${minsLeft}m left), retries ${comfyWsFailCount}/${COMFY_WS_MAX_RETRIES}" in content
+    assert "Preview transport: websocket blocked (${secsLeft}s left), polling active" in content
     assert "Preview transport: retry in ${secsLeft}s (${comfyWsFailCount}/${COMFY_WS_MAX_RETRIES})" in content
     assert "Preview transport: websocket connected" in content
     assert "renderWsTransportStatus();" in content
