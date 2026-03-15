@@ -3,6 +3,7 @@ param(
     [string]$OllamaUrl = 'http://localhost:11434/api/tags',
     [string]$ComfyUrl = 'http://localhost:8188/system_stats',
     [switch]$StartApp,
+    [switch]$ConfigurePaths,
     [switch]$NoKillPort,
     [switch]$Json
 )
@@ -12,6 +13,84 @@ $ErrorActionPreference = 'Stop'
 $appUrl = "http://127.0.0.1:$Port/api/status"
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot '..')
 $starterScript = Join-Path $PSScriptRoot 'start_app.ps1'
+$configPath = Join-Path $repoRoot 'data\service_config.json'
+
+function Load-ServiceConfig {
+    if (-not (Test-Path $configPath)) {
+        return @{
+            ollama_path = ''
+            comfyui_path = ''
+            shared_models_path = ''
+            updated_at = ''
+        }
+    }
+
+    try {
+        $raw = Get-Content -Path $configPath -Raw | ConvertFrom-Json
+    }
+    catch {
+        return @{
+            ollama_path = ''
+            comfyui_path = ''
+            shared_models_path = ''
+            updated_at = ''
+        }
+    }
+
+    return @{
+        ollama_path = [string]$raw.ollama_path
+        comfyui_path = [string]$raw.comfyui_path
+        shared_models_path = [string]$raw.shared_models_path
+        updated_at = [string]$raw.updated_at
+    }
+}
+
+function Save-ServiceConfig {
+    param(
+        [string]$OllamaPath,
+        [string]$ComfyPath,
+        [string]$SharedModelsPath
+    )
+
+    $parent = Split-Path -Parent $configPath
+    if (-not (Test-Path $parent)) {
+        New-Item -ItemType Directory -Path $parent -Force | Out-Null
+    }
+
+    $payload = [ordered]@{
+        ollama_path = ([string]$OllamaPath).Trim()
+        comfyui_path = ([string]$ComfyPath).Trim()
+        shared_models_path = ([string]$SharedModelsPath).Trim()
+        updated_at = (Get-Date).ToUniversalTime().ToString('o')
+    }
+
+    $payload | ConvertTo-Json -Depth 6 | Set-Content -Path $configPath -Encoding UTF8
+}
+
+if ($ConfigurePaths) {
+    if ($Json) {
+        throw 'Cannot run -ConfigurePaths with -Json because path setup is interactive.'
+    }
+
+    $current = Load-ServiceConfig
+    Write-Host "\n=== Path Configuration ===" -ForegroundColor Cyan
+    Write-Host "Press Enter to keep current values." -ForegroundColor DarkGray
+
+    $ollamaPrompt = "Ollama path [$($current.ollama_path)]"
+    $comfyPrompt = "ComfyUI path [$($current.comfyui_path)]"
+    $sharedPrompt = "Shared model root path [$($current.shared_models_path)]"
+
+    $newOllama = Read-Host $ollamaPrompt
+    $newComfy = Read-Host $comfyPrompt
+    $newShared = Read-Host $sharedPrompt
+
+    if ([string]::IsNullOrWhiteSpace($newOllama)) { $newOllama = $current.ollama_path }
+    if ([string]::IsNullOrWhiteSpace($newComfy)) { $newComfy = $current.comfyui_path }
+    if ([string]::IsNullOrWhiteSpace($newShared)) { $newShared = $current.shared_models_path }
+
+    Save-ServiceConfig -OllamaPath $newOllama -ComfyPath $newComfy -SharedModelsPath $newShared
+    Write-Host "Saved path configuration to $configPath" -ForegroundColor Green
+}
 
 function Test-HttpHealth {
     param(

@@ -474,6 +474,15 @@
     </div>
 
     <div class="sidebar-section">
+      <label for="config-models-path" class="field-label">Shared Model Root Path</label>
+      <div class="config-path-row">
+        <input id="config-models-path" type="text" placeholder="e.g. E:/AI/models" />
+        <button class="btn btn-ghost btn-xs" id="config-models-browse" type="button">Browse</button>
+      </div>
+      <p class="hint">Optional. When set, model browser downloads and scans use this folder, and managed Ollama launches store models under this root.</p>
+    </div>
+
+    <div class="sidebar-section">
       <button class="btn btn-primary btn-full" id="config-save-btn" type="button">Save Paths</button>
       <p id="config-save-status" class="hint">No saved changes yet.</p>
       <p id="config-last-saved" class="hint">Last saved: never</p>

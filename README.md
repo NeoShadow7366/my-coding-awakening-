@@ -61,6 +61,12 @@ To run a quick readiness check for Ollama, ComfyUI, and Flask:
 ./scripts/preflight.ps1
 ```
 
+To run an interactive path setup step (Ollama, ComfyUI, and shared model root path):
+
+```powershell
+./scripts/preflight.ps1 -ConfigurePaths
+```
+
 To run the same checks and launch the app only if Flask is down:
 
 ```powershell
@@ -99,6 +105,7 @@ To emit machine-readable readiness output:
 - If ComfyUI is down, image endpoints return 503 with helpful error messages.
 - If Ollama is down, text generation returns 503.
 - History is stored in data/history.json.
+- Service paths (including shared model root path) are stored in data/service_config.json.
 - To deduplicate persisted image history rows, run:
 
 ```powershell

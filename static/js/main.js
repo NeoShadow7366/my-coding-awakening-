@@ -104,8 +104,10 @@ const queueSummary = document.getElementById('queue-summary');
 const queueList = document.getElementById('queue-list');
 const configOllamaPath = document.getElementById('config-ollama-path');
 const configComfyuiPath = document.getElementById('config-comfyui-path');
+const configModelsPath = document.getElementById('config-models-path');
 const configOllamaBrowseBtn = document.getElementById('config-ollama-browse');
 const configComfyuiBrowseBtn = document.getElementById('config-comfyui-browse');
+const configModelsBrowseBtn = document.getElementById('config-models-browse');
 const configSaveBtn = document.getElementById('config-save-btn');
 const configSaveStatus = document.getElementById('config-save-status');
 const configLastSaved = document.getElementById('config-last-saved');
@@ -1009,7 +1011,7 @@ function setConfigSavedTimestamp(value) {
 }
 
 async function loadServiceConfig() {
-	if (!configOllamaPath || !configComfyuiPath) return;
+	if (!configOllamaPath || !configComfyuiPath || !configModelsPath) return;
 	try {
 		const res = await fetch('/api/config/services');
 		const data = await res.json();
@@ -1019,6 +1021,7 @@ async function loadServiceConfig() {
 		}
 		configOllamaPath.value = data.ollama_path || '';
 		configComfyuiPath.value = data.comfyui_path || '';
+		configModelsPath.value = data.shared_models_path || '';
 		setConfigSavedTimestamp(data.updated_at || '');
 		setConfigStatusLine(configSaveStatus, 'Saved paths loaded.');
 	} catch {
@@ -1029,10 +1032,11 @@ async function loadServiceConfig() {
 
 async function saveServiceConfig(options = {}) {
 	const { silentSuccess = false } = options;
-	if (!configOllamaPath || !configComfyuiPath) return;
+	if (!configOllamaPath || !configComfyuiPath || !configModelsPath) return;
 	const payload = {
 		ollama_path: configOllamaPath.value.trim(),
 		comfyui_path: configComfyuiPath.value.trim(),
+		shared_models_path: configModelsPath.value.trim(),
 	};
 
 	try {
@@ -1062,8 +1066,14 @@ async function saveServiceConfig(options = {}) {
 }
 
 async function browseServicePath(service) {
-	const input = service === 'ollama' ? configOllamaPath : configComfyuiPath;
-	const button = service === 'ollama' ? configOllamaBrowseBtn : configComfyuiBrowseBtn;
+	const serviceMap = {
+		ollama: { input: configOllamaPath, button: configOllamaBrowseBtn },
+		comfyui: { input: configComfyuiPath, button: configComfyuiBrowseBtn },
+		models: { input: configModelsPath, button: configModelsBrowseBtn },
+	};
+	const mapped = serviceMap[service];
+	const input = mapped?.input;
+	const button = mapped?.button;
 	if (!input || !button) return;
 
 	button.disabled = true;
@@ -1391,6 +1401,12 @@ if (configOllamaBrowseBtn) {
 if (configComfyuiBrowseBtn) {
 	configComfyuiBrowseBtn.addEventListener('click', async () => {
 		await browseServicePath('comfyui');
+	});
+}
+
+if (configModelsBrowseBtn) {
+	configModelsBrowseBtn.addEventListener('click', async () => {
+		await browseServicePath('models');
 	});
 }
 

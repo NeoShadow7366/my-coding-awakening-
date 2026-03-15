@@ -206,6 +206,7 @@ def _default_service_config() -> dict:
     return {
         "ollama_path": "",
         "comfyui_path": "",
+        "shared_models_path": "",
         "updated_at": "",
     }
 
@@ -258,6 +259,7 @@ def _load_service_config() -> dict:
         if isinstance(raw, dict):
             config["ollama_path"] = str(raw.get("ollama_path") or "").strip()
             config["comfyui_path"] = str(raw.get("comfyui_path") or "").strip()
+            config["shared_models_path"] = str(raw.get("shared_models_path") or "").strip()
             config["updated_at"] = str(raw.get("updated_at") or "").strip()
 
         SERVICE_CONFIG_FILE.write_text(json.dumps(config, ensure_ascii=True, indent=2), encoding="utf-8")
@@ -269,6 +271,7 @@ def _save_service_config(config: dict) -> dict:
     sanitized = {
         "ollama_path": str(config.get("ollama_path") or "").strip(),
         "comfyui_path": str(config.get("comfyui_path") or "").strip(),
+        "shared_models_path": str(config.get("shared_models_path") or "").strip(),
         "updated_at": _service_config_timestamp(),
     }
     with _service_config_lock:
@@ -280,6 +283,13 @@ def _normalize_service_name(name: str) -> str:
     value = (name or "").strip().lower()
     if value not in SERVICE_PORTS:
         raise ValueError("service must be 'ollama' or 'comfyui'")
+    return value
+
+
+def _normalize_path_picker_target(name: str) -> str:
+    value = (name or "").strip().lower()
+    if value not in {"ollama", "comfyui", "models"}:
+        raise ValueError("service must be 'ollama', 'comfyui', or 'models'")
     return value
 
 
@@ -367,15 +377,24 @@ def _kill_process_on_port(port: int) -> bool:
         return False
 
 
-def _spawn_service_process(service: str, command: list[str], cwd: Path | None = None) -> subprocess.Popen:
+def _spawn_service_process(
+    service: str,
+    command: list[str],
+    cwd: Path | None = None,
+    env_overrides: dict[str, str] | None = None,
+) -> subprocess.Popen:
     log_path = _service_log_path(service)
     log_fh = log_path.open("a", encoding="utf-8", errors="replace")
+    env = os.environ.copy()
+    if env_overrides:
+        env.update({k: str(v) for k, v in env_overrides.items() if v is not None})
     kwargs = {
         "cwd": str(cwd) if cwd else None,
         "stdout": log_fh,
         "stderr": log_fh,
         "stdin": subprocess.DEVNULL,
         "start_new_session": True,
+        "env": env,
     }
     if os.name == "nt":
         kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
@@ -387,18 +406,24 @@ def _spawn_service_process(service: str, command: list[str], cwd: Path | None = 
 
 
 def _start_configured_service(service: str, config: dict) -> tuple[bool, str, int | None]:
+    env_overrides: dict[str, str] = {}
     if service == "ollama":
         path_value = config.get("ollama_path") or ""
         if not path_value:
             raise ValueError("Set an Ollama install path in Configurations before launching.")
         command, cwd = _resolve_ollama_launch(path_value)
+        shared_root_raw = str(config.get("shared_models_path") or "").strip()
+        if shared_root_raw:
+            shared_ollama = Path(shared_root_raw).expanduser() / "ollama"
+            shared_ollama.mkdir(parents=True, exist_ok=True)
+            env_overrides["OLLAMA_MODELS"] = str(shared_ollama)
     else:
         path_value = config.get("comfyui_path") or ""
         if not path_value:
             raise ValueError("Set a ComfyUI install path in Configurations before launching.")
         command, cwd = _resolve_comfyui_launch(path_value)
 
-    proc = _spawn_service_process(service, command, cwd=cwd)
+    proc = _spawn_service_process(service, command, cwd=cwd, env_overrides=env_overrides)
     _service_processes[service] = proc
     _append_service_log_marker(service, f"Launch command: {' '.join(command)}")
     _last_service_errors[service] = ""
@@ -493,6 +518,12 @@ def _pick_path_dialog(service: str, initial_path: str = "") -> str:
                 title="Select Ollama executable",
                 initialdir=initial_dir or None,
                 filetypes=[("Executable", "*.exe"), ("All files", "*.*")],
+            )
+        elif service == "models":
+            selected = filedialog.askdirectory(
+                title="Select shared model root folder",
+                initialdir=initial_dir or None,
+                mustexist=False,
             )
         else:
             selected = filedialog.askdirectory(
@@ -718,6 +749,19 @@ def _resolve_comfy_root_dir() -> Path | None:
     if candidate.is_file():
         return candidate.parent
     return None
+
+
+def _resolve_shared_models_root_dir() -> Path | None:
+    """Resolve a shared model root directory from saved service config."""
+    config = _load_service_config()
+    raw_path = str(config.get("shared_models_path") or "").strip()
+    if not raw_path:
+        return None
+
+    candidate = Path(raw_path).expanduser()
+    if candidate.is_file():
+        return None
+    return candidate
 
 
 def _normalize_image_ref(body: dict) -> dict:
@@ -982,18 +1026,23 @@ _COMFY_MODEL_SUBFOLDERS = list(_CIVITAI_TYPE_TO_FOLDER.values())
 
 
 def _comfy_models_root() -> Path | None:
-    """Return the ComfyUI models/ directory or None if not configured."""
+    """Return the effective model root directory from shared path or ComfyUI path."""
+    shared_root = _resolve_shared_models_root_dir()
+    if shared_root is not None:
+        return shared_root
+
     root = _resolve_comfy_root_dir()
     if root is None:
         return None
-    candidate = root / "models"
-    return candidate if candidate.is_dir() else None
+    return root / "models"
 
 
 def _scan_local_models() -> list[dict]:
     """Walk all ComfyUI model subdirectories and return file metadata."""
     models_root = _comfy_models_root()
     if models_root is None:
+        return []
+    if not models_root.exists() or not models_root.is_dir():
         return []
     results: list[dict] = []
     for folder in _COMFY_MODEL_SUBFOLDERS:
@@ -1146,7 +1195,7 @@ def api_models_download():
 
     models_root = _comfy_models_root()
     if models_root is None:
-        return jsonify({"error": "Set a ComfyUI path in Configurations before downloading models"}), 400
+        return jsonify({"error": "Set a shared model path or ComfyUI path in Configurations before downloading models"}), 400
 
     dest_path = _safe_child_path(models_root, folder, file_name)
     if dest_path.exists():
@@ -1206,7 +1255,7 @@ def api_models_delete_local():
 
     models_root = _comfy_models_root()
     if models_root is None:
-        return jsonify({"error": "Set a ComfyUI path in Configurations before managing models"}), 400
+        return jsonify({"error": "Set a shared model path or ComfyUI path in Configurations before managing models"}), 400
 
     file_path = _safe_child_path(models_root, folder, file_name)
     if not file_path.exists():
@@ -1269,6 +1318,7 @@ def api_config_services():
         {
             "ollama_path": body.get("ollama_path"),
             "comfyui_path": body.get("comfyui_path"),
+            "shared_models_path": body.get("shared_models_path"),
         }
     )
     return jsonify({"ok": True, "config": config})
@@ -1280,7 +1330,7 @@ def api_config_pick_path():
     body = request.get_json(silent=True) or {}
     service = (body.get("service") or "").strip().lower()
     try:
-        service_name = _normalize_service_name(service)
+        service_name = _normalize_path_picker_target(service)
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
 

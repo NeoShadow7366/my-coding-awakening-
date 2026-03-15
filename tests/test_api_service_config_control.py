@@ -25,13 +25,22 @@ def test_service_config_get_defaults(client):
     resp = client.get("/api/config/services")
 
     assert resp.status_code == 200
-    assert resp.get_json() == {"ollama_path": "", "comfyui_path": "", "updated_at": ""}
+    assert resp.get_json() == {
+        "ollama_path": "",
+        "comfyui_path": "",
+        "shared_models_path": "",
+        "updated_at": "",
+    }
 
 
 def test_service_config_post_persists_paths(client):
     save_resp = client.post(
         "/api/config/services",
-        json={"ollama_path": " C:/Ollama/ollama.exe ", "comfyui_path": " D:/ComfyUI "},
+        json={
+            "ollama_path": " C:/Ollama/ollama.exe ",
+            "comfyui_path": " D:/ComfyUI ",
+            "shared_models_path": " E:/AI/models ",
+        },
     )
     read_resp = client.get("/api/config/services")
 
@@ -42,6 +51,7 @@ def test_service_config_post_persists_paths(client):
     read_data = read_resp.get_json()
     assert read_data["ollama_path"] == "C:/Ollama/ollama.exe"
     assert read_data["comfyui_path"] == "D:/ComfyUI"
+    assert read_data["shared_models_path"] == "E:/AI/models"
     assert read_data["updated_at"]
 
 
@@ -125,3 +135,18 @@ def test_app_restart_reports_helper_error(client, monkeypatch):
 
     assert resp.status_code == 500
     assert "helper failed" in resp.get_json()["error"]
+
+
+def test_comfy_models_root_prefers_shared_path(client, tmp_path):
+    shared_root = tmp_path / "shared-models"
+    client.post(
+        "/api/config/services",
+        json={
+            "ollama_path": "C:/Ollama/ollama.exe",
+            "comfyui_path": "D:/ComfyUI",
+            "shared_models_path": str(shared_root),
+        },
+    )
+
+    resolved = app_module._comfy_models_root()
+    assert resolved == shared_root
