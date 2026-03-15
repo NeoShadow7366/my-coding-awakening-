@@ -807,40 +807,92 @@ function renderPollOwnerStatus() {
 }
 
 function renderWsTransportStatus() {
-	if (!wsTransportStatus) return;
+	if (!wsTransportStatus) {
+		renderWsRetryButtonState();
+		return;
+	}
 	if (document.hidden) {
 		wsTransportStatus.textContent = 'Preview transport: hidden tab';
+		renderWsRetryButtonState();
 		return;
 	}
 	if (_isComfyWsCooldownActive()) {
 		const minsLeft = _getComfyWsCooldownMinutesLeft();
 		wsTransportStatus.textContent = `Preview transport: cooldown (${minsLeft}m left), retries ${comfyWsFailCount}/${COMFY_WS_MAX_RETRIES}`;
+		renderWsRetryButtonState();
 		return;
 	}
 	if (_isComfyWsBlockedActive()) {
 		const secsLeft = _getComfyWsBlockedSecondsLeft();
 		wsTransportStatus.textContent = `Preview transport: websocket blocked (${secsLeft}s left), polling active`;
+		renderWsRetryButtonState();
 		return;
 	}
 	if (comfyWsNextRetryAt > Date.now()) {
 		const secsLeft = Math.max(1, Math.ceil((comfyWsNextRetryAt - Date.now()) / 1000));
 		wsTransportStatus.textContent = `Preview transport: retry in ${secsLeft}s (${comfyWsFailCount}/${COMFY_WS_MAX_RETRIES})`;
+		renderWsRetryButtonState();
 		return;
 	}
 	if (comfyWs && comfyWs.readyState === WebSocket.OPEN) {
 		wsTransportStatus.textContent = 'Preview transport: websocket connected';
+		renderWsRetryButtonState();
 		return;
 	}
 	if (comfyWs && comfyWs.readyState === WebSocket.CONNECTING) {
 		const attempt = Math.max(1, Math.min(comfyWsFailCount + 1, COMFY_WS_MAX_RETRIES));
 		wsTransportStatus.textContent = `Preview transport: websocket connecting (attempt ${attempt}/${COMFY_WS_MAX_RETRIES})`;
+		renderWsRetryButtonState();
 		return;
 	}
 	if (comfyWsFailCount > 0) {
 		wsTransportStatus.textContent = `Preview transport: polling fallback (ws retries ${comfyWsFailCount}/${COMFY_WS_MAX_RETRIES})`;
+		renderWsRetryButtonState();
 		return;
 	}
 	wsTransportStatus.textContent = 'Preview transport: polling fallback ready';
+	renderWsRetryButtonState();
+}
+
+function renderWsRetryButtonState() {
+	if (!diagWsRetryBtn) return;
+	const isConnecting = Boolean(comfyWs && comfyWs.readyState === WebSocket.CONNECTING);
+	if (isComfyWsOpen()) {
+		diagWsRetryBtn.disabled = true;
+		diagWsRetryBtn.textContent = 'WS Connected';
+		diagWsRetryBtn.title = 'ComfyUI WebSocket is connected.';
+		return;
+	}
+	if (isConnecting) {
+		diagWsRetryBtn.disabled = true;
+		diagWsRetryBtn.textContent = 'Connecting...';
+		diagWsRetryBtn.title = 'ComfyUI WebSocket connection attempt is in progress.';
+		return;
+	}
+	if (_isComfyWsBlockedActive()) {
+		const secsLeft = _getComfyWsBlockedSecondsLeft();
+		diagWsRetryBtn.disabled = false;
+		diagWsRetryBtn.textContent = `Retry WS (${secsLeft}s)`;
+		diagWsRetryBtn.title = 'WebSocket appears blocked; click to force a retry now.';
+		return;
+	}
+	if (_isComfyWsCooldownActive()) {
+		const minsLeft = _getComfyWsCooldownMinutesLeft();
+		diagWsRetryBtn.disabled = false;
+		diagWsRetryBtn.textContent = `Retry WS (${minsLeft}m)`;
+		diagWsRetryBtn.title = 'WebSocket cooldown is active; click to force a retry now.';
+		return;
+	}
+	if (comfyWsNextRetryAt > Date.now()) {
+		const secsLeft = Math.max(1, Math.ceil((comfyWsNextRetryAt - Date.now()) / 1000));
+		diagWsRetryBtn.disabled = false;
+		diagWsRetryBtn.textContent = `Retry WS (${secsLeft}s)`;
+		diagWsRetryBtn.title = 'WebSocket retry is scheduled; click to force a retry now.';
+		return;
+	}
+	diagWsRetryBtn.disabled = false;
+	diagWsRetryBtn.textContent = 'Retry WS';
+	diagWsRetryBtn.title = 'Retry ComfyUI WebSocket connection now.';
 }
 
 function startWsTransportStatusTicker() {

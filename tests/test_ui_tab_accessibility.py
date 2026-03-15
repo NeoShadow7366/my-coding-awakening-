@@ -181,6 +181,7 @@ def test_diagnostics_drawer_keyboard_handler_wiring_present_in_js_bundle():
     assert "if (command === 'ws-status') {" in content
     assert "if (command === 'ws-retry') {" in content
     assert "function forceRetryComfyWebSocket(sourceLabel = 'manual') {" in content
+    assert "function renderWsRetryButtonState() {" in content
     assert "diagWsRetryBtn.addEventListener('click', () => {" in content
     assert "diagDrawer.setAttribute('aria-hidden', isOpen ? 'false' : 'true');" in content
     assert "diagDrawer.addEventListener('keydown', (event) => {" in content
@@ -406,6 +407,11 @@ def test_preview_transport_diagnostics_line_shows_retry_and_cooldown_state():
     assert "Preview transport: websocket blocked (${secsLeft}s left), polling active" in content
     assert "Preview transport: retry in ${secsLeft}s (${comfyWsFailCount}/${COMFY_WS_MAX_RETRIES})" in content
     assert "Preview transport: websocket connected" in content
+    assert "diagWsRetryBtn.textContent = 'WS Connected';" in content
+    assert "diagWsRetryBtn.textContent = 'Connecting...';" in content
+    assert "diagWsRetryBtn.textContent = `Retry WS (${secsLeft}s)`;" in content
+    assert "diagWsRetryBtn.textContent = `Retry WS (${minsLeft}m)`;" in content
+    assert "diagWsRetryBtn.textContent = 'Retry WS';" in content
     assert "renderWsTransportStatus();" in content
     assert "let wsTransportStatusTimer = null;" in content
     assert "function startWsTransportStatusTicker() {" in content
