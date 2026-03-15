@@ -3386,6 +3386,7 @@ let comfyWs = null;
 let comfyWsPreviewUrl = null;
 let comfyWsReconnectTimer = null;
 let comfyWsFailCount = 0;
+let comfyWsCooldownNotified = false;
 const COMFY_WS_MAX_RETRIES = 4;
 const COMFY_WS_COOLDOWN_KEY = 'comfyWsCooldownUntil';
 const COMFY_WS_COOLDOWN_MS = 30 * 60 * 1000;
@@ -3485,6 +3486,7 @@ function connectComfyWebSocket() {
 		comfyWs.onopen = () => {
 			comfyWsFailCount = 0;
 			_setComfyWsCooldownUntil(0);
+			comfyWsCooldownNotified = false;
 		};
 		comfyWs.onerror = () => { /* errors handled in onclose */ };
 		comfyWs.onclose = () => {
@@ -3492,6 +3494,10 @@ function connectComfyWebSocket() {
 			comfyWsFailCount++;
 			if (comfyWsFailCount >= COMFY_WS_MAX_RETRIES) {
 				_setComfyWsCooldownUntil(Date.now() + COMFY_WS_COOLDOWN_MS);
+				if (!comfyWsCooldownNotified) {
+					comfyWsCooldownNotified = true;
+					appendDiagnosticsConsoleLine('ComfyUI websocket preview unavailable; switched to HTTP polling fallback for live preview updates.', 'warn');
+				}
 				// ComfyUI WS unavailable (likely cross-origin 403); HTTP polling covers live preview
 				return;
 			}
