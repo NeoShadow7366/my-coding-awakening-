@@ -239,7 +239,10 @@
     <div class="sidebar-section diagnostics-panel" aria-label="System diagnostics">
       <div class="diagnostics-head">
         <p class="field-label">Diagnostics</p>
-        <button class="btn btn-ghost btn-xs" id="diagnostics-run-btn" type="button">Run checks</button>
+        <div class="config-actions-row" role="group" aria-label="Diagnostics actions">
+          <button class="btn btn-ghost btn-xs" id="diag-ws-retry-btn" type="button">Retry WS</button>
+          <button class="btn btn-ghost btn-xs" id="diagnostics-run-btn" type="button">Run checks</button>
+        </div>
       </div>
       <p id="diagnostics-summary" class="hint">Checking local services...</p>
       <ul class="diagnostics-list" id="diagnostics-list">
@@ -513,7 +516,7 @@
     <div id="diag-drawer-output" class="diag-drawer-output" role="log" aria-live="polite" aria-label="Diagnostics output"></div>
     <form id="diag-drawer-command-form" class="diag-drawer-input-line" autocomplete="off">
       <span class="diag-drawer-prompt">$</span>
-      <input id="diag-drawer-command" type="text" placeholder="help | status | checks | queue | clear" aria-label="Diagnostics command input" />
+      <input id="diag-drawer-command" type="text" placeholder="help | status | ws-status | ws-retry | checks | queue | clear" aria-label="Diagnostics command input" />
     </form>
   </section>
 </section>

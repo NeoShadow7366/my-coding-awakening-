@@ -168,6 +168,7 @@ def test_index_diagnostics_drawer_semantics():
     assert 'id="diag-drawer-toggle"' in html
     assert 'aria-expanded="false"' in html
     assert 'id="diag-drawer" class="diag-drawer" hidden aria-hidden="true" aria-label="Diagnostics console"' in html
+    assert 'id="diag-ws-retry-btn"' in html
     assert 'id="ws-transport-status"' in html
 
 
@@ -176,6 +177,11 @@ def test_diagnostics_drawer_keyboard_handler_wiring_present_in_js_bundle():
     content = js_path.read_text(encoding="utf-8")
 
     assert "function setDiagnosticsDrawerOpen(isOpen)" in content
+    assert "const diagWsRetryBtn = document.getElementById('diag-ws-retry-btn');" in content
+    assert "if (command === 'ws-status') {" in content
+    assert "if (command === 'ws-retry') {" in content
+    assert "function forceRetryComfyWebSocket(sourceLabel = 'manual') {" in content
+    assert "diagWsRetryBtn.addEventListener('click', () => {" in content
     assert "diagDrawer.setAttribute('aria-hidden', isOpen ? 'false' : 'true');" in content
     assert "diagDrawer.addEventListener('keydown', (event) => {" in content
     assert "if (event.key !== 'Escape') return;" in content

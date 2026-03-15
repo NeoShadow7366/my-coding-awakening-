@@ -200,6 +200,7 @@ const tagEditorList = document.getElementById('tag-editor-list');
 const tagManagerStatus = document.getElementById('tag-manager-status');
 const tagResetDefaultsBtn = document.getElementById('tag-reset-defaults-btn');
 const diagnosticsRunBtn = document.getElementById('diagnostics-run-btn');
+const diagWsRetryBtn = document.getElementById('diag-ws-retry-btn');
 const diagnosticsSummary = document.getElementById('diagnostics-summary');
 const diagnosticsHint = document.getElementById('diagnostics-hint');
 const diagTextStatus = document.getElementById('diag-text-status');
@@ -439,11 +440,20 @@ async function runDiagnosticsConsoleCommand(rawInput) {
 	appendDiagnosticsConsoleLine(`$ ${rawInput}`, 'command');
 
 	if (command === 'help') {
-		appendDiagnosticsConsoleLine('Commands: help, status, checks, logs, queue, poll, clear');
+		appendDiagnosticsConsoleLine('Commands: help, status, ws-status, ws-retry, checks, logs, queue, poll, clear');
 		return;
 	}
 	if (command === 'status') {
 		appendDiagnosticsConsoleLine(getDiagnosticsStatusSnapshotText());
+		return;
+	}
+	if (command === 'ws-status') {
+		appendDiagnosticsConsoleLine(wsTransportStatus?.textContent || 'Preview transport status unavailable');
+		return;
+	}
+	if (command === 'ws-retry') {
+		const attempted = forceRetryComfyWebSocket('diagnostics console');
+		appendDiagnosticsConsoleLine(attempted ? 'Triggered ComfyUI websocket retry attempt.' : 'ComfyUI websocket already connected.');
 		return;
 	}
 	if (command === 'queue') {
@@ -1713,6 +1723,19 @@ async function checkStatus() {
 if (diagnosticsRunBtn) {
 	diagnosticsRunBtn.addEventListener('click', async () => {
 		await runDiagnosticsChecks(true);
+	});
+}
+
+if (diagWsRetryBtn) {
+	diagWsRetryBtn.addEventListener('click', () => {
+		const attempted = forceRetryComfyWebSocket('diagnostics panel');
+		if (attempted) {
+			appendDiagnosticsConsoleLine('Triggered ComfyUI websocket retry attempt.', 'info');
+			showToast('WebSocket retry requested.', 'pos');
+		} else {
+			appendDiagnosticsConsoleLine('ComfyUI websocket already connected.', 'info');
+			showToast('WebSocket already connected.', 'pos');
+		}
 	});
 }
 
@@ -3509,6 +3532,28 @@ function _isComfyWsBlockedActive() {
 function _getComfyWsBlockedSecondsLeft() {
 	if (comfyWsBlockedUntil <= Date.now()) return 0;
 	return Math.max(1, Math.ceil((comfyWsBlockedUntil - Date.now()) / 1000));
+}
+
+function forceRetryComfyWebSocket(sourceLabel = 'manual') {
+	if (isComfyWsOpen()) {
+		setPreviewTransportMode('websocket', 'ComfyUI WebSocket already connected.');
+		renderWsTransportStatus();
+		return false;
+	}
+	if (comfyWsReconnectTimer) {
+		window.clearTimeout(comfyWsReconnectTimer);
+		comfyWsReconnectTimer = null;
+	}
+	comfyWsFailCount = 0;
+	comfyWsNextRetryAt = 0;
+	comfyWsBlockedUntil = 0;
+	comfyWsQuickCloseCount = 0;
+	comfyWsLastConnectStartedAt = 0;
+	comfyWsCooldownNotified = false;
+	_setComfyWsCooldownUntil(0);
+	setPreviewTransportMode('polling', `Manual websocket retry requested via ${sourceLabel}. HTTP polling fallback is active until connected.`);
+	connectComfyWebSocket();
+	return true;
 }
 
 function setPreviewTransportMode(mode, titleText = '') {
