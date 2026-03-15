@@ -3387,9 +3387,37 @@ let comfyWsPreviewUrl = null;
 let comfyWsReconnectTimer = null;
 let comfyWsFailCount = 0;
 const COMFY_WS_MAX_RETRIES = 4;
+const COMFY_WS_COOLDOWN_KEY = 'comfyWsCooldownUntil';
+const COMFY_WS_COOLDOWN_MS = 30 * 60 * 1000;
 const comfyWsProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
 const comfyWsHost = window.location.hostname || 'localhost';
 const COMFY_WS_URL = `${comfyWsProtocol}://${comfyWsHost}:8188/ws?clientId=${tabInstanceId}`;
+
+function _getComfyWsCooldownUntil() {
+	try {
+		const raw = localStorage.getItem(COMFY_WS_COOLDOWN_KEY);
+		const value = Number(raw || 0);
+		return Number.isFinite(value) ? value : 0;
+	} catch {
+		return 0;
+	}
+}
+
+function _setComfyWsCooldownUntil(untilEpochMs) {
+	try {
+		if (untilEpochMs > Date.now()) {
+			localStorage.setItem(COMFY_WS_COOLDOWN_KEY, String(untilEpochMs));
+		} else {
+			localStorage.removeItem(COMFY_WS_COOLDOWN_KEY);
+		}
+	} catch {
+		// Ignore localStorage failures; polling still covers preview updates.
+	}
+}
+
+function _isComfyWsCooldownActive() {
+	return _getComfyWsCooldownUntil() > Date.now();
+}
 
 function _revokeComfyPreviewUrl() {
 	if (comfyWsPreviewUrl) {
@@ -3410,6 +3438,7 @@ function _showComfyStepPreview(blobUrl) {
 
 function connectComfyWebSocket() {
 	if (comfyWs && (comfyWs.readyState === WebSocket.OPEN || comfyWs.readyState === WebSocket.CONNECTING)) return;
+	if (_isComfyWsCooldownActive()) return;
 	if (comfyWsFailCount >= COMFY_WS_MAX_RETRIES) return; // gave up; reset on tab focus
 	if (comfyWsReconnectTimer) {
 		window.clearTimeout(comfyWsReconnectTimer);
@@ -3453,12 +3482,16 @@ function connectComfyWebSocket() {
 			}
 		};
 
-		comfyWs.onopen = () => { comfyWsFailCount = 0; };
+		comfyWs.onopen = () => {
+			comfyWsFailCount = 0;
+			_setComfyWsCooldownUntil(0);
+		};
 		comfyWs.onerror = () => { /* errors handled in onclose */ };
 		comfyWs.onclose = () => {
 			comfyWs = null;
 			comfyWsFailCount++;
 			if (comfyWsFailCount >= COMFY_WS_MAX_RETRIES) {
+				_setComfyWsCooldownUntil(Date.now() + COMFY_WS_COOLDOWN_MS);
 				// ComfyUI WS unavailable (likely cross-origin 403); HTTP polling covers live preview
 				return;
 			}
@@ -3473,6 +3506,7 @@ function connectComfyWebSocket() {
 
 document.addEventListener('visibilitychange', () => {
 	if (!document.hidden && !comfyWs) {
+		if (_isComfyWsCooldownActive()) return;
 		// Reset failure count on tab re-focus so it can retry after a long pause
 		comfyWsFailCount = 0;
 		connectComfyWebSocket();
