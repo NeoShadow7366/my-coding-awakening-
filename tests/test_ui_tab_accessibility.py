@@ -168,6 +168,7 @@ def test_index_diagnostics_drawer_semantics():
     assert 'id="diag-drawer-toggle"' in html
     assert 'aria-expanded="false"' in html
     assert 'id="diag-drawer" class="diag-drawer" hidden aria-hidden="true" aria-label="Diagnostics console"' in html
+    assert 'id="ws-transport-status"' in html
 
 
 def test_diagnostics_drawer_keyboard_handler_wiring_present_in_js_bundle():
@@ -379,6 +380,18 @@ def test_preview_websocket_retry_backoff_is_respected_between_attempts():
     assert "ComfyUI WebSocket retry scheduled in ${secsLeft}s. HTTP polling fallback is active." in content
     assert "comfyWsNextRetryAt = Date.now() + delay;" in content
     assert "comfyWsNextRetryAt = 0;" in content
+
+
+def test_preview_transport_diagnostics_line_shows_retry_and_cooldown_state():
+    js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
+    content = js_path.read_text(encoding="utf-8")
+
+    assert "const wsTransportStatus = document.getElementById('ws-transport-status');" in content
+    assert "function renderWsTransportStatus() {" in content
+    assert "Preview transport: cooldown (${minsLeft}m left), retries ${comfyWsFailCount}/${COMFY_WS_MAX_RETRIES}" in content
+    assert "Preview transport: retry in ${secsLeft}s (${comfyWsFailCount}/${COMFY_WS_MAX_RETRIES})" in content
+    assert "Preview transport: websocket connected" in content
+    assert "renderWsTransportStatus();" in content
 
 
 def test_model_modal_preserves_search_result_type_when_details_are_less_specific():

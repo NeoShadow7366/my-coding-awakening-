@@ -208,6 +208,7 @@ const diagCheckpoints = document.getElementById('diag-checkpoints');
 const diagSamplers = document.getElementById('diag-samplers');
 const diagLastRun = document.getElementById('diag-last-run');
 const pollOwnerStatus = document.getElementById('poll-owner-status');
+const wsTransportStatus = document.getElementById('ws-transport-status');
 const diagDrawer = document.getElementById('diag-drawer');
 const diagDrawerToggle = document.getElementById('diag-drawer-toggle');
 const diagStatusBadge = document.getElementById('diag-status-badge');
@@ -795,6 +796,38 @@ function renderPollOwnerStatus() {
 	pollOwnerStatus.classList.add('standby');
 }
 
+function renderWsTransportStatus() {
+	if (!wsTransportStatus) return;
+	if (document.hidden) {
+		wsTransportStatus.textContent = 'Preview transport: hidden tab';
+		return;
+	}
+	if (_isComfyWsCooldownActive()) {
+		const minsLeft = _getComfyWsCooldownMinutesLeft();
+		wsTransportStatus.textContent = `Preview transport: cooldown (${minsLeft}m left), retries ${comfyWsFailCount}/${COMFY_WS_MAX_RETRIES}`;
+		return;
+	}
+	if (comfyWsNextRetryAt > Date.now()) {
+		const secsLeft = Math.max(1, Math.ceil((comfyWsNextRetryAt - Date.now()) / 1000));
+		wsTransportStatus.textContent = `Preview transport: retry in ${secsLeft}s (${comfyWsFailCount}/${COMFY_WS_MAX_RETRIES})`;
+		return;
+	}
+	if (comfyWs && comfyWs.readyState === WebSocket.OPEN) {
+		wsTransportStatus.textContent = 'Preview transport: websocket connected';
+		return;
+	}
+	if (comfyWs && comfyWs.readyState === WebSocket.CONNECTING) {
+		const attempt = Math.max(1, Math.min(comfyWsFailCount + 1, COMFY_WS_MAX_RETRIES));
+		wsTransportStatus.textContent = `Preview transport: websocket connecting (attempt ${attempt}/${COMFY_WS_MAX_RETRIES})`;
+		return;
+	}
+	if (comfyWsFailCount > 0) {
+		wsTransportStatus.textContent = `Preview transport: polling fallback (ws retries ${comfyWsFailCount}/${COMFY_WS_MAX_RETRIES})`;
+		return;
+	}
+	wsTransportStatus.textContent = 'Preview transport: polling fallback ready';
+}
+
 function syncBackgroundPollingOwnership() {
 	const hadOwnership = hasBackgroundPollingOwnership;
 	hasBackgroundPollingOwnership = refreshBackgroundPollingOwnership() || claimBackgroundPollingOwnership();
@@ -807,6 +840,7 @@ function syncBackgroundPollingOwnership() {
 			setPreviewTransportMode('polling', 'Polling fallback is active in another tab that owns the lease.');
 		}
 		renderPollOwnerStatus();
+		renderWsTransportStatus();
 		return;
 	}
 
@@ -825,6 +859,7 @@ function syncBackgroundPollingOwnership() {
 	}
 
 	renderPollOwnerStatus();
+	renderWsTransportStatus();
 }
 
 function startPollingLeaseHeartbeat() {
@@ -3448,15 +3483,18 @@ function setPreviewTransportMode(mode, titleText = '') {
 	if (nextMode === 'websocket') {
 		previewTransportBadge.textContent = 'WebSocket';
 		previewTransportBadge.title = titleText || 'Live preview is connected to ComfyUI WebSocket.';
+		renderWsTransportStatus();
 		return;
 	}
 	if (nextMode === 'offline') {
 		previewTransportBadge.textContent = 'Preview offline';
 		previewTransportBadge.title = titleText || 'ComfyUI is offline, so live preview updates are unavailable.';
+		renderWsTransportStatus();
 		return;
 	}
 	previewTransportBadge.textContent = 'Polling fallback';
 	previewTransportBadge.title = titleText || 'Live preview is using HTTP polling fallback.';
+	renderWsTransportStatus();
 }
 
 if (_isComfyWsCooldownActive()) {
