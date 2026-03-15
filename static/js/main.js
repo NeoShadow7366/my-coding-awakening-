@@ -22,17 +22,67 @@ const panelImage = document.getElementById('panel-image');
 const panelConfig = document.getElementById('panel-config');
 const panelModels = document.getElementById('panel-models');
 const mbSearchBtn = document.getElementById('mb-search-btn');
+const mbProvider = document.getElementById('mb-provider');
 const mbSearchQuery = document.getElementById('mb-search-query');
 const mbSearchType = document.getElementById('mb-search-type');
+const mbBaseModel = document.getElementById('mb-base-model');
+const mbSort = document.getElementById('mb-sort');
+const mbPageSize = document.getElementById('mb-page-size');
+const mbHideInstalledToggle = document.getElementById('mb-hide-installed');
+const mbShowInstalledOnlyToggle = document.getElementById('mb-show-installed-only');
+const mbHideEarlyAccessToggle = document.getElementById('mb-hide-early-access');
+const mbShowNsfwToggle = document.getElementById('mb-show-nsfw');
+const mbTypeInfoBtn = document.getElementById('mb-type-info-btn');
+const mbTypeInfoPanel = document.getElementById('mb-type-info-panel');
+const mbViewSearchBtn = document.getElementById('mb-view-search-btn');
+const mbViewLibraryBtn = document.getElementById('mb-view-library-btn');
+const mbRemoteControls = document.getElementById('mb-remote-controls');
+const mbLocalControls = document.getElementById('mb-local-controls');
+const mbRemoteView = document.getElementById('mb-remote-view');
+const mbLocalView = document.getElementById('mb-local-view');
 const mbLibraryRefreshBtn = document.getElementById('mb-library-refresh-btn');
+const mbLibraryEnrichPreviewsBtn = document.getElementById('mb-library-enrich-previews-btn');
+const mbLibraryRecoverMetadataBtn = document.getElementById('mb-library-recover-metadata-btn');
+const mbCompareProviderCivitai = document.getElementById('mb-compare-provider-civitai');
+const mbCompareProviderHuggingface = document.getElementById('mb-compare-provider-huggingface');
+const mbLibraryCompareMetadataBtn = document.getElementById('mb-library-compare-metadata-btn');
 const mbLibraryGrid = document.getElementById('mb-library-grid');
 const mbLibraryStatus = document.getElementById('mb-library-status');
+const mbLocalQuery = document.getElementById('mb-local-query');
+const mbLocalType = document.getElementById('mb-local-type');
+const mbLocalBaseModel = document.getElementById('mb-local-base-model');
+const mbLocalSort = document.getElementById('mb-local-sort');
+const mbLocalHideEmbeddings = document.getElementById('mb-local-hide-embeddings');
+const mbLocalMatchedOnly = document.getElementById('mb-local-matched-only');
+const mbResetFiltersBtn = document.getElementById('mb-reset-filters-btn');
+const mbResetStatus = document.getElementById('mb-reset-status');
+const mbLibraryActionReport = document.getElementById('mb-library-action-report');
+const mbLibraryActionReportClear = document.getElementById('mb-library-action-report-clear');
 const mbResultsSection = document.getElementById('mb-results-section');
 const mbResultsGrid = document.getElementById('mb-results-grid');
 const mbResultsCount = document.getElementById('mb-results-count');
 const mbSearchStatus = document.getElementById('mb-search-status');
+const mbPagination = document.getElementById('mb-pagination');
+const mbModelModal = document.getElementById('mb-model-modal');
+const mbModelModalClose = document.getElementById('mb-model-modal-close');
+const mbModelModalTitle = document.getElementById('mb-model-modal-title');
+const mbModelModalMeta = document.getElementById('mb-model-modal-meta');
+const mbModelModalDescription = document.getElementById('mb-model-modal-description');
+const mbModelModalPreview = document.getElementById('mb-model-modal-preview');
+const mbModelModalPreviewVideo = document.getElementById('mb-model-modal-preview-video');
+const mbModelModalThumbs = document.getElementById('mb-model-modal-thumbs');
+const mbModelModalVersion = document.getElementById('mb-model-modal-version');
+const mbModelModalVersionStatus = document.getElementById('mb-model-modal-version-status');
+const mbModelModalDownloadStatus = document.getElementById('mb-model-modal-download-status');
+const mbModelModalFiles = document.getElementById('mb-model-modal-files');
+const mbModelModalDefaults = document.getElementById('mb-model-modal-defaults');
+const mbSearchBulkRefreshInstalledBtn = document.getElementById('mb-search-bulk-refresh-installed-btn');
 const mbDownloadsSection = document.getElementById('mb-downloads-section');
+const mbDownloadsBody = document.getElementById('mb-downloads-body');
 const mbDownloadsList = document.getElementById('mb-downloads-list');
+const mbDownloadsCounter = document.getElementById('mb-downloads-counter');
+const mbDownloadsToggleBtn = document.getElementById('mb-downloads-toggle');
+const mbClearFinishedDownloadsBtn = document.getElementById('mb-clear-finished-downloads');
 const mbPrevPage = document.getElementById('mb-prev-page');
 const mbNextPage = document.getElementById('mb-next-page');
 const mbPageInfo = document.getElementById('mb-page-info');
@@ -58,6 +108,17 @@ const clearChat = document.getElementById('clear-chat');
 // Image panel
 const imageModelSelect = document.getElementById('image-model-select');
 const imageSamplerSelect = document.getElementById('image-sampler-select');
+const loraModelSelect = document.getElementById('lora-model-select');
+const loraStrength = document.getElementById('lora-strength');
+const loraStrengthVal = document.getElementById('lora-strength-val');
+const controlnetModelSelect = document.getElementById('controlnet-model-select');
+const controlnetImageUpload = document.getElementById('controlnet-image-upload');
+const controlnetWeight = document.getElementById('controlnet-weight');
+const controlnetWeightVal = document.getElementById('controlnet-weight-val');
+const controlnetStart = document.getElementById('controlnet-start');
+const controlnetStartVal = document.getElementById('controlnet-start-val');
+const controlnetEnd = document.getElementById('controlnet-end');
+const controlnetEndVal = document.getElementById('controlnet-end-val');
 const imageSeed = document.getElementById('image-seed');
 const imageRandomSeed = document.getElementById('image-random-seed');
 const imageProfileSelect = document.getElementById('image-profile-select');
@@ -75,6 +136,13 @@ const imageEngineStatus = document.getElementById('image-engine-status');
 const imageForm = document.getElementById('image-form');
 const imagePrompt = document.getElementById('image-prompt');
 const promptRandomizeBtn = document.getElementById('prompt-randomize-btn');
+const promptRecentBtn = document.getElementById('prompt-recent-btn');
+const promptRecentDropdown = document.getElementById('prompt-recent-dropdown');
+const promptSavedName = document.getElementById('prompt-saved-name');
+const promptSaveBtn = document.getElementById('prompt-save-btn');
+const promptSavedSelect = document.getElementById('prompt-saved-select');
+const promptLoadBtn = document.getElementById('prompt-load-btn');
+const promptDeleteSavedBtn = document.getElementById('prompt-delete-saved-btn');
 const normalPromptWrap = document.getElementById('normal-prompt-wrap');
 const promptModeHint = document.getElementById('prompt-mode-hint');
 const enhancedPromptToggle = document.getElementById('enhanced-prompt-toggle');
@@ -105,6 +173,8 @@ const queueList = document.getElementById('queue-list');
 const configOllamaPath = document.getElementById('config-ollama-path');
 const configComfyuiPath = document.getElementById('config-comfyui-path');
 const configModelsPath = document.getElementById('config-models-path');
+const configCivitaiKey = document.getElementById('config-civitai-key');
+const configHuggingfaceKey = document.getElementById('config-huggingface-key');
 const configOllamaBrowseBtn = document.getElementById('config-ollama-browse');
 const configComfyuiBrowseBtn = document.getElementById('config-comfyui-browse');
 const configModelsBrowseBtn = document.getElementById('config-models-browse');
@@ -287,6 +357,7 @@ let lastDiagnosticsLogKey = '';
 const diagHistory = [];
 let diagHistoryIndex = -1;
 let diagHistoryDraft = '';
+let diagDrawerLastFocus = null;
 
 function appendDiagnosticsConsoleLine(text, level = 'info') {
 	if (!diagDrawerOutput) return;
@@ -302,12 +373,27 @@ function appendDiagnosticsConsoleLine(text, level = 'info') {
 
 function setDiagnosticsDrawerOpen(isOpen) {
 	if (!diagDrawer) return;
+	if (isOpen) {
+		diagDrawerLastFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+	}
 	diagDrawer.hidden = !isOpen;
+	diagDrawer.setAttribute('aria-hidden', isOpen ? 'false' : 'true');
 	if (diagDrawerToggle) {
 		diagDrawerToggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
 	}
 	if (isOpen && diagDrawerCommandInput) {
 		diagDrawerCommandInput.focus();
+		return;
+	}
+	if (!isOpen) {
+		const active = document.activeElement;
+		if (active instanceof HTMLElement && diagDrawer.contains(active) && diagDrawerToggle) {
+			diagDrawerToggle.focus();
+			return;
+		}
+		if (diagDrawerLastFocus && document.contains(diagDrawerLastFocus)) {
+			diagDrawerLastFocus.focus();
+		}
 	}
 }
 
@@ -489,11 +575,50 @@ themeToggle.addEventListener('click', () => {
 /* --------------------------------------------------------------------------
 	 Tab navigation
 	 -------------------------------------------------------------------------- */
+function getTopNavTabs() {
+	return [navGenerative, navImage, navConfig, navModels].filter(Boolean);
+}
+
+function panelForTopNavTab(tab) {
+	if (tab === navImage) return 'image';
+	if (tab === navConfig) return 'config';
+	if (tab === navModels) return 'models';
+	return 'generative';
+}
+
+function onTopNavTabKeydown(event) {
+	const tabs = getTopNavTabs();
+	if (!tabs.length) return;
+	const currentIndex = tabs.indexOf(event.currentTarget);
+	if (currentIndex < 0) return;
+	const key = event.key;
+	if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(key)) return;
+	event.preventDefault();
+	let nextIndex = currentIndex;
+	if (key === 'Home') {
+		nextIndex = 0;
+	} else if (key === 'End') {
+		nextIndex = tabs.length - 1;
+	} else if (key === 'ArrowRight') {
+		nextIndex = (currentIndex + 1) % tabs.length;
+	} else if (key === 'ArrowLeft') {
+		nextIndex = (currentIndex - 1 + tabs.length) % tabs.length;
+	}
+	const nextTab = tabs[nextIndex];
+	if (!nextTab) return;
+	nextTab.focus();
+	showPanel(panelForTopNavTab(nextTab));
+}
+
 function showPanel(panel) {
 	const allPanels = [panelGen, panelImage, panelConfig, panelModels].filter(Boolean);
-	const allNavs = [navGenerative, navImage, navConfig, navModels].filter(Boolean);
+	const allNavs = getTopNavTabs();
 	allPanels.forEach(p => { p.hidden = true; p.classList.remove('active'); });
-	allNavs.forEach(n => { n.classList.remove('active'); n.setAttribute('aria-selected', 'false'); });
+	allNavs.forEach(n => {
+		n.classList.remove('active');
+		n.setAttribute('aria-selected', 'false');
+		n.setAttribute('tabindex', '-1');
+	});
 
 	let targetPanel = panelGen;
 	let targetNav = navGenerative;
@@ -502,7 +627,11 @@ function showPanel(panel) {
 	else if (panel === 'models') { targetPanel = panelModels; targetNav = navModels; }
 
 	if (targetPanel) { targetPanel.hidden = false; targetPanel.classList.add('active'); }
-	if (targetNav) { targetNav.classList.add('active'); targetNav.setAttribute('aria-selected', 'true'); }
+	if (targetNav) {
+		targetNav.classList.add('active');
+		targetNav.setAttribute('aria-selected', 'true');
+		targetNav.setAttribute('tabindex', '0');
+	}
 
 	if (panel === 'models') mbOnTabActivate();
 	localStorage.setItem('activePanel', panel);
@@ -512,21 +641,25 @@ navGenerative.addEventListener('click', (e) => {
 	e.preventDefault();
 	showPanel('generative');
 });
+navGenerative.addEventListener('keydown', onTopNavTabKeydown);
 navImage.addEventListener('click', (e) => {
 	e.preventDefault();
 	showPanel('image');
 });
+navImage.addEventListener('keydown', onTopNavTabKeydown);
 if (navConfig) {
 	navConfig.addEventListener('click', (e) => {
 		e.preventDefault();
 		showPanel('config');
 	});
+	navConfig.addEventListener('keydown', onTopNavTabKeydown);
 }
 if (navModels) {
 	navModels.addEventListener('click', (e) => {
 		e.preventDefault();
 		showPanel('models');
 	});
+	navModels.addEventListener('keydown', onTopNavTabKeydown);
 }
 
 (function initPanel() {
@@ -720,6 +853,12 @@ function getCurrentImageSettings() {
 	return {
 		model: imageModelSelect.value,
 		sampler: imageSamplerSelect.value,
+		lora: loraModelSelect?.value || '',
+		lora_strength: Number(loraStrength?.value || 0.8),
+		controlnet_model: controlnetModelSelect?.value || '',
+		controlnet_weight: Number(controlnetWeight?.value || 1),
+		controlnet_start: Number(controlnetStart?.value || 0),
+		controlnet_end: Number(controlnetEnd?.value || 1),
 		seed: imageSeed.value,
 		steps: Number(imageSteps.value),
 		cfg: Number(imageCfg.value),
@@ -738,6 +877,16 @@ function applyImageSettings(settings) {
 	if (settings.sampler && [...imageSamplerSelect.options].some((o) => o.value === settings.sampler)) {
 		imageSamplerSelect.value = settings.sampler;
 	}
+	if (settings.lora && loraModelSelect && [...loraModelSelect.options].some((o) => o.value === settings.lora)) {
+		loraModelSelect.value = settings.lora;
+	}
+	if (Number.isFinite(settings.lora_strength) && loraStrength) loraStrength.value = String(settings.lora_strength);
+	if (settings.controlnet_model && controlnetModelSelect && [...controlnetModelSelect.options].some((o) => o.value === settings.controlnet_model)) {
+		controlnetModelSelect.value = settings.controlnet_model;
+	}
+	if (Number.isFinite(settings.controlnet_weight) && controlnetWeight) controlnetWeight.value = String(settings.controlnet_weight);
+	if (Number.isFinite(settings.controlnet_start) && controlnetStart) controlnetStart.value = String(settings.controlnet_start);
+	if (Number.isFinite(settings.controlnet_end) && controlnetEnd) controlnetEnd.value = String(settings.controlnet_end);
 	if (settings.seed !== undefined && settings.seed !== null) imageSeed.value = String(settings.seed);
 	if (Number.isFinite(settings.steps)) imageSteps.value = String(settings.steps);
 	if (Number.isFinite(settings.cfg)) imageCfg.value = String(settings.cfg);
@@ -1023,10 +1172,12 @@ async function loadServiceConfig() {
 		configOllamaPath.value = data.ollama_path || '';
 		configComfyuiPath.value = data.comfyui_path || '';
 		configModelsPath.value = data.shared_models_path || '';
+		if (configCivitaiKey) configCivitaiKey.value = data.civitai_api_key || '';
+		if (configHuggingfaceKey) configHuggingfaceKey.value = data.huggingface_api_key || '';
 		setConfigSavedTimestamp(data.updated_at || '');
-		setConfigStatusLine(configSaveStatus, 'Saved paths loaded.');
+		setConfigStatusLine(configSaveStatus, 'Saved configuration loaded.');
 	} catch {
-		setConfigStatusLine(configSaveStatus, 'Could not load saved paths.', 'error');
+		setConfigStatusLine(configSaveStatus, 'Could not load saved configuration.', 'error');
 		setConfigSavedTimestamp('');
 	}
 }
@@ -1038,6 +1189,8 @@ async function saveServiceConfig(options = {}) {
 		ollama_path: configOllamaPath.value.trim(),
 		comfyui_path: configComfyuiPath.value.trim(),
 		shared_models_path: configModelsPath.value.trim(),
+		civitai_api_key: configCivitaiKey ? configCivitaiKey.value.trim() : '',
+		huggingface_api_key: configHuggingfaceKey ? configHuggingfaceKey.value.trim() : '',
 	};
 
 	try {
@@ -1049,18 +1202,18 @@ async function saveServiceConfig(options = {}) {
 		});
 		const data = await res.json();
 		if (!res.ok) {
-			setConfigStatusLine(configSaveStatus, data.error || 'Could not save paths.', 'error');
-			showToast('Could not save configuration paths.', 'neg');
+			setConfigStatusLine(configSaveStatus, data.error || 'Could not save configuration.', 'error');
+			showToast('Could not save configuration.', 'neg');
 			return;
 		}
 		setConfigSavedTimestamp(data.config?.updated_at || '');
-		setConfigStatusLine(configSaveStatus, 'Paths saved.', 'ok');
+		setConfigStatusLine(configSaveStatus, 'Configuration saved.', 'ok');
 		if (!silentSuccess) {
-			showToast('Configuration paths saved.', 'pos');
+			showToast('Configuration saved.', 'pos');
 		}
 	} catch {
-		setConfigStatusLine(configSaveStatus, 'Could not save paths.', 'error');
-		showToast('Could not save configuration paths.', 'neg');
+		setConfigStatusLine(configSaveStatus, 'Could not save configuration.', 'error');
+		showToast('Could not save configuration.', 'neg');
 	} finally {
 		if (configSaveBtn) configSaveBtn.disabled = false;
 	}
@@ -1267,6 +1420,8 @@ async function controlService(service, action, statusNode, buttonGroup = []) {
 		} else {
 			await loadImageModels();
 			await loadImageSamplers();
+			await loadImageLoraModels();
+			await loadControlnetModels();
 		}
 	} catch {
 		setConfigStatusLine(statusNode, `${service} ${action} failed.`, 'error');
@@ -1340,6 +1495,7 @@ async function loadImageModels() {
 		const currentOption = options.find((o) => o.value === current);
 		if (currentOption && !currentOption.disabled) {
 			imageModelSelect.value = current;
+			updateControlnetCompatibilityHint();
 			return;
 		}
 
@@ -1347,6 +1503,7 @@ async function loadImageModels() {
 		if (firstSupported) {
 			imageModelSelect.value = firstSupported.value;
 		}
+		updateControlnetCompatibilityHint();
 	} catch {
 		setImageModelMessage('Could not fetch checkpoints');
 	}
@@ -1370,6 +1527,44 @@ async function loadImageSamplers() {
 			.join('');
 	} catch {
 		imageSamplerSelect.innerHTML = '<option value="euler">euler</option>';
+	}
+}
+
+async function loadImageLoraModels() {
+	if (!loraModelSelect) return;
+	try {
+		const res = await fetch('/api/image/lora-models');
+		const data = await res.json().catch(() => ({}));
+		const models = Array.isArray(data.loras) ? data.loras : [];
+		const current = loraModelSelect.value;
+		loraModelSelect.innerHTML = '<option value="">None</option>' + models
+			.map((name) => `<option value="${escHtml(name)}">${escHtml(name)}</option>`)
+			.join('');
+		if (current && [...loraModelSelect.options].some((o) => o.value === current)) {
+			loraModelSelect.value = current;
+		}
+	} catch {
+		loraModelSelect.innerHTML = '<option value="">None</option>';
+	}
+}
+
+async function loadControlnetModels() {
+	if (!controlnetModelSelect) return;
+	try {
+		const res = await fetch('/api/image/controlnet-models');
+		const data = await res.json().catch(() => ({}));
+		const models = Array.isArray(data.models) ? data.models : [];
+		const current = controlnetModelSelect.value;
+		controlnetModelSelect.innerHTML = '<option value="">None</option>' + models
+			.map((name) => `<option value="${escHtml(name)}">${escHtml(name)}</option>`)
+			.join('');
+		if (current && [...controlnetModelSelect.options].some((o) => o.value === current)) {
+			controlnetModelSelect.value = current;
+		}
+		updateControlnetCompatibilityHint();
+	} catch {
+		controlnetModelSelect.innerHTML = '<option value="">None</option>';
+		updateControlnetCompatibilityHint();
 	}
 }
 
@@ -1403,11 +1598,15 @@ async function checkStatus() {
 			imageEngineStatus.style.color = 'var(--clr-accent-pos)';
 			await loadImageModels();
 			await loadImageSamplers();
+			await loadImageLoraModels();
+			await loadControlnetModels();
 			connectComfyWebSocket();
 		} else {
 			imageEngineStatus.textContent = 'ComfyUI offline - start server at localhost:8188';
 			imageEngineStatus.style.color = 'var(--clr-accent-neg)';
 			setImageModelMessage('ComfyUI unavailable');
+			if (loraModelSelect) loraModelSelect.innerHTML = '<option value="">None</option>';
+			if (controlnetModelSelect) controlnetModelSelect.innerHTML = '<option value="">None</option>';
 		}
 
 		renderDiagnosticsSnapshot({
@@ -1460,6 +1659,15 @@ if (diagDrawerClose) {
 	diagDrawerClose.addEventListener('click', () => setDiagnosticsDrawerOpen(false));
 }
 
+if (diagDrawer) {
+	diagDrawer.addEventListener('keydown', (event) => {
+		if (event.key !== 'Escape') return;
+		event.preventDefault();
+		event.stopPropagation();
+		setDiagnosticsDrawerOpen(false);
+	});
+}
+
 if (diagDrawerCommandForm && diagDrawerCommandInput) {
 	diagDrawerCommandForm.addEventListener('submit', async (event) => {
 		event.preventDefault();
@@ -1481,6 +1689,7 @@ if (diagDrawerCommandForm && diagDrawerCommandInput) {
 			if (diagHistoryIndex === -1) diagHistoryDraft = diagDrawerCommandInput.value;
 			diagHistoryIndex = Math.min(diagHistoryIndex + 1, diagHistory.length - 1);
 			diagDrawerCommandInput.value = diagHistory[diagHistory.length - 1 - diagHistoryIndex];
+			diagDrawerCommandInput.setSelectionRange(diagDrawerCommandInput.value.length, diagDrawerCommandInput.value.length);
 		} else if (event.key === 'ArrowDown') {
 			event.preventDefault();
 			if (diagHistoryIndex <= 0) {
@@ -1490,6 +1699,19 @@ if (diagDrawerCommandForm && diagDrawerCommandInput) {
 				diagHistoryIndex--;
 				diagDrawerCommandInput.value = diagHistory[diagHistory.length - 1 - diagHistoryIndex];
 			}
+			diagDrawerCommandInput.setSelectionRange(diagDrawerCommandInput.value.length, diagDrawerCommandInput.value.length);
+		} else if (event.key === 'Home' && event.ctrlKey) {
+			event.preventDefault();
+			if (diagHistory.length === 0) return;
+			if (diagHistoryIndex === -1) diagHistoryDraft = diagDrawerCommandInput.value;
+			diagHistoryIndex = diagHistory.length - 1;
+			diagDrawerCommandInput.value = diagHistory[0];
+			diagDrawerCommandInput.setSelectionRange(diagDrawerCommandInput.value.length, diagDrawerCommandInput.value.length);
+		} else if (event.key === 'End' && event.ctrlKey) {
+			event.preventDefault();
+			diagHistoryIndex = -1;
+			diagDrawerCommandInput.value = diagHistoryDraft;
+			diagDrawerCommandInput.setSelectionRange(diagDrawerCommandInput.value.length, diagDrawerCommandInput.value.length);
 		}
 	});
 }
@@ -1524,44 +1746,82 @@ if (configModelsBrowseBtn) {
 	});
 }
 
+function onConfigServiceControlsKeydown(event) {
+	const key = event.key;
+	if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(key)) return;
+	const target = event.currentTarget;
+	if (!(target instanceof HTMLElement)) return;
+	let buttons = [];
+	if (target.id.startsWith('config-ollama-')) {
+		buttons = [configOllamaStartBtn, configOllamaRestartBtn, configOllamaStopBtn].filter(Boolean);
+	} else if (target.id.startsWith('config-comfy-')) {
+		buttons = [configComfyStartBtn, configComfyRestartBtn, configComfyStopBtn].filter(Boolean);
+	} else {
+		buttons = [configFlaskRestartBtn].filter(Boolean);
+	}
+	if (buttons.length < 2) return;
+	const currentIndex = buttons.indexOf(target);
+	if (currentIndex < 0) return;
+	event.preventDefault();
+	let nextIndex = currentIndex;
+	if (key === 'Home') {
+		nextIndex = 0;
+	} else if (key === 'End') {
+		nextIndex = buttons.length - 1;
+	} else if (key === 'ArrowRight') {
+		nextIndex = (currentIndex + 1) % buttons.length;
+	} else if (key === 'ArrowLeft') {
+		nextIndex = (currentIndex - 1 + buttons.length) % buttons.length;
+	}
+	const nextButton = buttons[nextIndex];
+	if (nextButton) nextButton.focus();
+}
+
 if (configOllamaStartBtn) {
 	configOllamaStartBtn.addEventListener('click', async () => {
 		await controlService('ollama', 'start', configOllamaStatus, [configOllamaStartBtn, configOllamaRestartBtn, configOllamaStopBtn]);
 	});
+	configOllamaStartBtn.addEventListener('keydown', onConfigServiceControlsKeydown);
 }
 
 if (configOllamaRestartBtn) {
 	configOllamaRestartBtn.addEventListener('click', async () => {
 		await controlService('ollama', 'restart', configOllamaStatus, [configOllamaStartBtn, configOllamaRestartBtn, configOllamaStopBtn]);
 	});
+	configOllamaRestartBtn.addEventListener('keydown', onConfigServiceControlsKeydown);
 }
 
 if (configOllamaStopBtn) {
 	configOllamaStopBtn.addEventListener('click', async () => {
 		await controlService('ollama', 'stop', configOllamaStatus, [configOllamaStartBtn, configOllamaRestartBtn, configOllamaStopBtn]);
 	});
+	configOllamaStopBtn.addEventListener('keydown', onConfigServiceControlsKeydown);
 }
 
 if (configComfyStartBtn) {
 	configComfyStartBtn.addEventListener('click', async () => {
 		await controlService('comfyui', 'start', configComfyStatus, [configComfyStartBtn, configComfyRestartBtn, configComfyStopBtn]);
 	});
+	configComfyStartBtn.addEventListener('keydown', onConfigServiceControlsKeydown);
 }
 
 if (configComfyRestartBtn) {
 	configComfyRestartBtn.addEventListener('click', async () => {
 		await controlService('comfyui', 'restart', configComfyStatus, [configComfyStartBtn, configComfyRestartBtn, configComfyStopBtn]);
 	});
+	configComfyRestartBtn.addEventListener('keydown', onConfigServiceControlsKeydown);
 }
 
 if (configComfyStopBtn) {
 	configComfyStopBtn.addEventListener('click', async () => {
 		await controlService('comfyui', 'stop', configComfyStatus, [configComfyStartBtn, configComfyRestartBtn, configComfyStopBtn]);
 	});
+	configComfyStopBtn.addEventListener('keydown', onConfigServiceControlsKeydown);
 }
 
 if (configFlaskRestartBtn) {
 	configFlaskRestartBtn.addEventListener('click', restartFlaskApp);
+	configFlaskRestartBtn.addEventListener('keydown', onConfigServiceControlsKeydown);
 }
 
 if (tagCategorySelect) {
@@ -1596,6 +1856,34 @@ if (tagAddBtn && tagNewInput) {
 }
 
 if (tagEditorList) {
+	tagEditorList.addEventListener('keydown', (event) => {
+		const target = event.target;
+		if (!(target instanceof HTMLElement)) return;
+		const hasTagAction = target.hasAttribute('data-tag-save') || target.hasAttribute('data-tag-delete');
+		if (!hasTagAction) return;
+		const key = event.key;
+		if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(key)) return;
+		const row = target.closest('.tag-editor-row');
+		if (!row) return;
+		const actions = Array.from(row.querySelectorAll('[data-tag-save], [data-tag-delete]'));
+		if (actions.length < 2) return;
+		const currentIndex = actions.indexOf(target);
+		if (currentIndex < 0) return;
+		event.preventDefault();
+		let nextIndex = currentIndex;
+		if (key === 'Home') {
+			nextIndex = 0;
+		} else if (key === 'End') {
+			nextIndex = actions.length - 1;
+		} else if (key === 'ArrowRight') {
+			nextIndex = (currentIndex + 1) % actions.length;
+		} else if (key === 'ArrowLeft') {
+			nextIndex = (currentIndex - 1 + actions.length) % actions.length;
+		}
+		const next = actions[nextIndex];
+		if (next) next.focus();
+	});
+
 	tagEditorList.addEventListener('click', (event) => {
 		const target = event.target;
 		if (!(target instanceof HTMLElement)) return;
@@ -1794,12 +2082,22 @@ function syncImageControlLabels() {
 	imageStepsVal.textContent = String(Number(imageSteps.value));
 	imageCfgVal.textContent = Number(imageCfg.value).toFixed(1);
 	imageDenoiseVal.textContent = Number(imageDenoise.value).toFixed(2);
+	if (loraStrengthVal && loraStrength) loraStrengthVal.textContent = Number(loraStrength.value).toFixed(2);
+	if (controlnetWeightVal && controlnetWeight) controlnetWeightVal.textContent = Number(controlnetWeight.value).toFixed(2);
+	if (controlnetStartVal && controlnetStart) controlnetStartVal.textContent = Number(controlnetStart.value).toFixed(2);
+	if (controlnetEndVal && controlnetEnd) controlnetEndVal.textContent = Number(controlnetEnd.value).toFixed(2);
 }
 
 imageSteps.addEventListener('input', syncImageControlLabels);
 imageCfg.addEventListener('input', syncImageControlLabels);
 imageDenoise.addEventListener('input', syncImageControlLabels);
+if (loraStrength) loraStrength.addEventListener('input', syncImageControlLabels);
+if (controlnetWeight) controlnetWeight.addEventListener('input', syncImageControlLabels);
+if (controlnetStart) controlnetStart.addEventListener('input', syncImageControlLabels);
+if (controlnetEnd) controlnetEnd.addEventListener('input', syncImageControlLabels);
 syncImageControlLabels();
+if (imageModelSelect) imageModelSelect.addEventListener('change', updateControlnetCompatibilityHint);
+if (controlnetModelSelect) controlnetModelSelect.addEventListener('change', updateControlnetCompatibilityHint);
 
 imageRandomSeed.addEventListener('click', () => {
 	imageSeed.value = randomSeed();
@@ -1822,9 +2120,54 @@ function applyImagePreset(preset) {
 	syncImageControlLabels();
 }
 
+function setActiveImagePresetButton(activePreset) {
+	if (!imagePresetButtons || !imagePresetButtons.length) return;
+	imagePresetButtons.forEach((btn, index) => {
+		const isActive = (btn.dataset.imagePreset || '') === activePreset;
+		btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+		btn.setAttribute('tabindex', isActive ? '0' : '-1');
+		if (!activePreset && index === 0) {
+			btn.setAttribute('tabindex', '0');
+		}
+	});
+}
+
+function onImagePresetKeydown(event) {
+	if (!imagePresetButtons || !imagePresetButtons.length) return;
+	const key = event.key;
+	if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(key)) return;
+	const buttons = Array.from(imagePresetButtons);
+	const currentIndex = buttons.indexOf(event.currentTarget);
+	if (currentIndex < 0) return;
+	event.preventDefault();
+	let nextIndex = currentIndex;
+	if (key === 'Home') {
+		nextIndex = 0;
+	} else if (key === 'End') {
+		nextIndex = buttons.length - 1;
+	} else if (key === 'ArrowRight') {
+		nextIndex = (currentIndex + 1) % buttons.length;
+	} else if (key === 'ArrowLeft') {
+		nextIndex = (currentIndex - 1 + buttons.length) % buttons.length;
+	}
+	const nextButton = buttons[nextIndex];
+	if (!nextButton) return;
+	const preset = nextButton.dataset.imagePreset || '';
+	applyImagePreset(preset);
+	setActiveImagePresetButton(preset);
+	nextButton.focus();
+}
+
 imagePresetButtons.forEach((btn) => {
-	btn.addEventListener('click', () => applyImagePreset(btn.dataset.imagePreset));
+	btn.addEventListener('click', () => {
+		const preset = btn.dataset.imagePreset || '';
+		applyImagePreset(preset);
+		setActiveImagePresetButton(preset);
+	});
+	btn.addEventListener('keydown', onImagePresetKeydown);
 });
+
+setActiveImagePresetButton('');
 
 if (imageProfileSelect) {
 	imageProfileSelect.addEventListener('change', () => {
@@ -2184,6 +2527,33 @@ async function processAutoRetries() {
 	}
 }
 
+function onQueueActionKeydown(event) {
+	const target = event.target;
+	if (!(target instanceof HTMLElement)) return;
+	if (!target.classList.contains('queue-action')) return;
+	const key = event.key;
+	if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(key)) return;
+	const row = target.closest('.queue-item');
+	if (!row) return;
+	const actions = Array.from(row.querySelectorAll('.queue-action'));
+	if (actions.length < 2) return;
+	const currentIndex = actions.indexOf(target);
+	if (currentIndex < 0) return;
+	event.preventDefault();
+	let nextIndex = currentIndex;
+	if (key === 'Home') {
+		nextIndex = 0;
+	} else if (key === 'End') {
+		nextIndex = actions.length - 1;
+	} else if (key === 'ArrowRight') {
+		nextIndex = (currentIndex + 1) % actions.length;
+	} else if (key === 'ArrowLeft') {
+		nextIndex = (currentIndex - 1 + actions.length) % actions.length;
+	}
+	const nextAction = actions[nextIndex];
+	if (nextAction) nextAction.focus();
+}
+
 queueList.addEventListener('click', async (e) => {
 	const target = e.target;
 	if (!(target instanceof HTMLElement)) return;
@@ -2211,6 +2581,8 @@ queueList.addEventListener('click', async (e) => {
 		await rerunImageJob(promptId);
 	}
 });
+
+queueList.addEventListener('keydown', onQueueActionKeydown);
 
 if (clearFailedQueueBtn) {
 	clearFailedQueueBtn.addEventListener('click', async () => {
@@ -2552,6 +2924,34 @@ function setSelectValueIfOptionExists(selectEl, value) {
 	selectEl.value = value;
 }
 
+function inferImageModelRole(typeValue = '', folderValue = '') {
+	const raw = `${String(typeValue || '')} ${String(folderValue || '')}`.toLowerCase();
+	if (raw.includes('lora') || raw.includes('lycoris')) return 'lora';
+	return 'checkpoint';
+}
+
+function useModelInImageGen(modelLike) {
+	if (!modelLike) return;
+	showPanel('image');
+
+	const role = inferImageModelRole(modelLike.type, modelLike.folder);
+	const name = String(modelLike.name || '').trim();
+	if (!name) return;
+
+	if (role === 'lora') {
+		if (!loraModelSelect) {
+			showToast('LoRA selector is unavailable in this view.', 'neg');
+			return;
+		}
+		setSelectValueIfOptionExists(loraModelSelect, name);
+		showToast(`Selected LoRA: ${name}`, 'pos');
+		return;
+	}
+
+	setSelectValueIfOptionExists(imageModelSelect, name);
+	showToast(`Selected checkpoint: ${name}`, 'pos');
+}
+
 function setNumericInputIfFinite(inputEl, value) {
 	if (!inputEl) return;
 	const n = Number(value);
@@ -2568,10 +2968,16 @@ function applyGalleryPayloadToImageForm(payload) {
 
 	setSelectValueIfOptionExists(imageModelSelect, payload.model);
 	setSelectValueIfOptionExists(imageSamplerSelect, payload.sampler);
+	setSelectValueIfOptionExists(loraModelSelect, payload.lora);
+	setSelectValueIfOptionExists(controlnetModelSelect, payload.controlnet_model);
 
 	if (payload.seed !== null && payload.seed !== undefined && payload.seed !== '') {
 		imageSeed.value = String(payload.seed);
 	}
+	setNumericInputIfFinite(loraStrength, payload.lora_strength);
+	setNumericInputIfFinite(controlnetWeight, payload.controlnet_weight);
+	setNumericInputIfFinite(controlnetStart, payload.controlnet_start);
+	setNumericInputIfFinite(controlnetEnd, payload.controlnet_end);
 	setNumericInputIfFinite(imageSteps, payload.steps);
 	setNumericInputIfFinite(imageCfg, payload.cfg);
 	setNumericInputIfFinite(imageDenoise, payload.denoise);
@@ -2792,6 +3198,10 @@ document.addEventListener('keydown', (event) => {
 			closeGalleryContextMenu();
 			return;
 		}
+		if (mbModelModal && !mbModelModal.hidden) {
+			setModelModalOpen(false);
+			return;
+		}
 		if (!galleryLightbox || galleryLightbox.hidden) return;
 		closeGalleryLightbox();
 		return;
@@ -2841,6 +3251,28 @@ if (gallerySearch) {
 	});
 }
 
+function onGalleryToolbarButtonKeydown(event) {
+	const key = event.key;
+	if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(key)) return;
+	const buttons = [galleryViewToggle, refreshGalleryBtn].filter(Boolean);
+	if (buttons.length < 2) return;
+	const currentIndex = buttons.indexOf(event.currentTarget);
+	if (currentIndex < 0) return;
+	event.preventDefault();
+	let nextIndex = currentIndex;
+	if (key === 'Home') {
+		nextIndex = 0;
+	} else if (key === 'End') {
+		nextIndex = buttons.length - 1;
+	} else if (key === 'ArrowRight') {
+		nextIndex = (currentIndex + 1) % buttons.length;
+	} else if (key === 'ArrowLeft') {
+		nextIndex = (currentIndex - 1 + buttons.length) % buttons.length;
+	}
+	const nextButton = buttons[nextIndex];
+	if (nextButton) nextButton.focus();
+}
+
 if (galleryViewToggle) {
 	galleryViewToggle.addEventListener('click', () => {
 		galleryViewMode = galleryViewMode === 'grid' ? 'list' : 'grid';
@@ -2849,8 +3281,13 @@ if (galleryViewToggle) {
 		galleryViewToggle.setAttribute('aria-pressed', String(galleryViewMode === 'grid'));
 		galleryGrid.classList.toggle('is-grid-mode', galleryViewMode === 'grid');
 	});
+	galleryViewToggle.addEventListener('keydown', onGalleryToolbarButtonKeydown);
 	galleryViewToggle.textContent = galleryViewMode === 'grid' ? 'List' : 'Grid';
 	galleryViewToggle.setAttribute('aria-pressed', String(galleryViewMode === 'grid'));
+}
+
+if (refreshGalleryBtn) {
+	refreshGalleryBtn.addEventListener('keydown', onGalleryToolbarButtonKeydown);
 }
 
 if (galleryLightboxPrev) {
@@ -3066,6 +3503,10 @@ refreshGalleryBtn.addEventListener('click', loadGallery);
 async function pollQueue() {
 	const ids = Array.from(trackedPromptIds);
 	if (!ids.length) {
+		if (imageGenerateBtn) {
+			imageGenerateBtn.disabled = false;
+			imageGenerateBtn.textContent = 'Generate Image';
+		}
 		renderQueueStatus([], [], new Set());
 		stopQueuePolling();
 		return;
@@ -3144,12 +3585,58 @@ function stopQueuePolling() {
 	queuePollTimer = null;
 }
 
+function inferCheckpointFamily(modelName) {
+	const value = String(modelName || '').toLowerCase();
+	if (!value) return '';
+	if (value.includes('sdxl') || value.includes('xl') || value.includes('pony') || value.includes('illustrious')) {
+		return 'sdxl';
+	}
+	if (value.includes('sd15') || value.includes('1.5') || value.includes('v1-5') || value.includes('1_5')) {
+		return 'sd15';
+	}
+	return '';
+}
+
+function inferControlnetFamily(controlnetName) {
+	const value = String(controlnetName || '').toLowerCase();
+	if (!value) return '';
+	if (value.includes('xl') || value.includes('sdxl')) return 'sdxl';
+	if (value.includes('sd15') || value.includes('1.5') || value.includes('v1-5') || value.includes('1_5')) return 'sd15';
+	return '';
+}
+
+function getControlnetCompatibilityMessage(modelName, controlnetName) {
+	if (!controlnetName) return '';
+	const checkpointFamily = inferCheckpointFamily(modelName);
+	const controlnetFamily = inferControlnetFamily(controlnetName);
+	if (!checkpointFamily || !controlnetFamily || checkpointFamily === controlnetFamily) {
+		return '';
+	}
+	const checkpointLabel = checkpointFamily.toUpperCase();
+	const controlnetLabel = controlnetFamily.toUpperCase();
+	return `Selected checkpoint appears to be ${checkpointLabel}, but ControlNet model looks ${controlnetLabel}. Choose matching families to avoid queue stalls/failures.`;
+}
+
+function updateControlnetCompatibilityHint() {
+	if (!controlnetModelSelect) return;
+	const warning = getControlnetCompatibilityMessage(imageModelSelect?.value || '', controlnetModelSelect.value || '');
+	const titleText = warning || 'Pick a ControlNet model that matches your checkpoint family (SD1.5 vs SDXL) for best reliability.';
+	controlnetModelSelect.title = titleText;
+	if (warning && queueSummary && !trackedPromptIds.size) {
+		queueSummary.textContent = `Warning: ${warning}`;
+	}
+}
+
 function validateImageInputs(common) {
 	if (!common.model) {
 		return 'Select a checkpoint model before generating.';
 	}
 	if (/flux/i.test(common.model)) {
 		return 'Selected model appears to be a FLUX checkpoint, which is not supported by the current workflow. Choose a non-FLUX checkpoint (SD/SDXL) for now.';
+	}
+	const compatibilityWarning = getControlnetCompatibilityMessage(common.model, common.controlnet_model);
+	if (compatibilityWarning) {
+		return compatibilityWarning;
 	}
 	if (common.width < 256 || common.width > 2048 || common.height < 256 || common.height > 2048) {
 		return 'Width and height must be between 256 and 2048.';
@@ -3168,6 +3655,21 @@ function validateImageInputs(common) {
 	}
 	if (common.denoise < 0.05 || common.denoise > 1) {
 		return 'Denoise must be between 0.05 and 1.0.';
+	}
+	if (common.lora_strength != null && (common.lora_strength < 0 || common.lora_strength > 2)) {
+		return 'LoRA strength must be between 0 and 2.';
+	}
+	if (common.controlnet_weight != null && (common.controlnet_weight < 0 || common.controlnet_weight > 2)) {
+		return 'ControlNet weight must be between 0 and 2.';
+	}
+	if (common.controlnet_start != null && (common.controlnet_start < 0 || common.controlnet_start > 1)) {
+		return 'ControlNet start must be between 0 and 1.';
+	}
+	if (common.controlnet_end != null && (common.controlnet_end < 0 || common.controlnet_end > 1)) {
+		return 'ControlNet end must be between 0 and 1.';
+	}
+	if (common.controlnet_start != null && common.controlnet_end != null && common.controlnet_start > common.controlnet_end) {
+		return 'ControlNet start cannot be greater than end.';
 	}
 	return '';
 }
@@ -3351,8 +3853,10 @@ function renderTagEditorList() {
 			return `
 				<div class="tag-editor-row" data-tag-row="${index}">
 					<input type="text" value="${escHtml(tag)}" data-tag-input="${index}" aria-label="Tag ${index + 1}" />
-					<button class="btn btn-ghost btn-xs" type="button" data-tag-save="${index}">Save</button>
-					<button class="btn btn-ghost btn-xs" type="button" data-tag-delete="${index}">Delete</button>
+					<span class="tag-editor-actions" role="group" aria-label="Tag ${index + 1} actions">
+						<button class="btn btn-ghost btn-xs" type="button" data-tag-save="${index}">Save</button>
+						<button class="btn btn-ghost btn-xs" type="button" data-tag-delete="${index}">Delete</button>
+					</span>
 				</div>
 			`;
 		})
@@ -3386,7 +3890,266 @@ function bindSuggestionTagCollapsers() {
 
 let mbCurrentPage = 1;
 let mbTotalPages  = 1;
+let mbHasNextPage = false;
+let mbQueryMode = false;
+let mbCursorByPage = { 1: '' };
 let mbPollTimer   = null;
+let mbDownloadsMinimized = false;
+let mbLocalInstalledNames = new Set();
+let mbLastSearchItems = [];
+let mbLibraryAllModels = [];
+let mbLibraryRoot = '';
+var mbActiveView = localStorage.getItem('mbActiveView') === 'library' ? 'library' : 'search';
+let mbCurrentModelDetails = null;
+let mbCurrentVersionIndex = 0;
+let mbResetStatusTimer = null;
+let mbModelModalLastFocus = null;
+let mbReportTargetTimer = null;
+
+if (mbLocalQuery) {
+	mbLocalQuery.value = localStorage.getItem('mbLocalQuery') || '';
+}
+if (mbLocalType) {
+	const savedType = localStorage.getItem('mbLocalType') || '';
+	mbLocalType.value = Array.from(mbLocalType.options).some((opt) => opt.value === savedType) ? savedType : '';
+}
+if (mbLocalBaseModel) {
+	const savedBaseModel = localStorage.getItem('mbLocalBaseModel') || '';
+	mbLocalBaseModel.value = Array.from(mbLocalBaseModel.options).some((opt) => opt.value === savedBaseModel) ? savedBaseModel : '';
+}
+if (mbLocalSort) {
+	const savedSort = localStorage.getItem('mbLocalSort') || 'name-asc';
+	mbLocalSort.value = Array.from(mbLocalSort.options).some((opt) => opt.value === savedSort) ? savedSort : 'name-asc';
+}
+if (mbLocalHideEmbeddings) {
+	mbLocalHideEmbeddings.setAttribute('aria-pressed', localStorage.getItem('mbLocalHideEmbeddings') === '1' ? 'true' : 'false');
+}
+if (mbLocalMatchedOnly) {
+	mbLocalMatchedOnly.setAttribute('aria-pressed', localStorage.getItem('mbLocalMatchedOnly') === '1' ? 'true' : 'false');
+}
+if (mbCompareProviderCivitai) {
+	mbCompareProviderCivitai.checked = localStorage.getItem('mbCompareProviderCivitai') !== '0';
+}
+if (mbCompareProviderHuggingface) {
+	mbCompareProviderHuggingface.checked = localStorage.getItem('mbCompareProviderHuggingface') !== '0';
+}
+if (mbProvider) {
+	const savedProvider = localStorage.getItem('mbProvider') || 'civitai';
+	mbProvider.value = Array.from(mbProvider.options).some((opt) => opt.value === savedProvider) ? savedProvider : 'civitai';
+}
+if (mbSearchQuery) {
+	mbSearchQuery.value = localStorage.getItem('mbSearchQuery') || '';
+}
+if (mbSearchType) {
+	const savedType = localStorage.getItem('mbSearchType') || '';
+	mbSearchType.value = Array.from(mbSearchType.options).some((opt) => opt.value === savedType) ? savedType : '';
+}
+if (mbBaseModel) {
+	const savedBaseModel = localStorage.getItem('mbBaseModel') || '';
+	mbBaseModel.value = Array.from(mbBaseModel.options).some((opt) => opt.value === savedBaseModel) ? savedBaseModel : '';
+}
+if (mbSort) {
+	const savedSort = localStorage.getItem('mbSort') || 'highest-rated';
+	mbSort.value = Array.from(mbSort.options).some((opt) => opt.value === savedSort) ? savedSort : 'highest-rated';
+}
+if (mbPageSize) {
+	const savedPageSize = localStorage.getItem('mbPageSize') || '20';
+	mbPageSize.value = Array.from(mbPageSize.options).some((opt) => opt.value === savedPageSize) ? savedPageSize : '20';
+}
+if (mbHideInstalledToggle) {
+	mbHideInstalledToggle.setAttribute('aria-pressed', localStorage.getItem('mbHideInstalled') === '1' ? 'true' : 'false');
+}
+if (mbShowInstalledOnlyToggle) {
+	mbShowInstalledOnlyToggle.setAttribute('aria-pressed', localStorage.getItem('mbShowInstalledOnly') === '1' ? 'true' : 'false');
+}
+if (mbHideEarlyAccessToggle) {
+	mbHideEarlyAccessToggle.setAttribute('aria-pressed', localStorage.getItem('mbHideEarlyAccess') === '1' ? 'true' : 'false');
+}
+if (mbShowNsfwToggle) {
+	mbShowNsfwToggle.setAttribute('aria-pressed', localStorage.getItem('mbShowNsfw') === '1' ? 'true' : 'false');
+}
+
+function setModelBrowserView(view) {
+	const savedView = localStorage.getItem('mbActiveView') === 'library' ? 'library' : 'search';
+	const nextView = view === 'library' || view === 'search' ? view : savedView;
+	mbActiveView = nextView;
+	localStorage.setItem('mbActiveView', mbActiveView);
+	if (mbViewSearchBtn) {
+		const selected = nextView === 'search';
+		mbViewSearchBtn.classList.toggle('is-active', selected);
+		mbViewSearchBtn.setAttribute('aria-selected', selected ? 'true' : 'false');
+		mbViewSearchBtn.setAttribute('tabindex', selected ? '0' : '-1');
+	}
+	if (mbViewLibraryBtn) {
+		const selected = nextView === 'library';
+		mbViewLibraryBtn.classList.toggle('is-active', selected);
+		mbViewLibraryBtn.setAttribute('aria-selected', selected ? 'true' : 'false');
+		mbViewLibraryBtn.setAttribute('tabindex', selected ? '0' : '-1');
+	}
+	if (mbRemoteControls) mbRemoteControls.hidden = nextView !== 'search';
+	if (mbLocalControls) mbLocalControls.hidden = nextView !== 'library';
+	if (mbRemoteView) mbRemoteView.hidden = nextView !== 'search';
+	if (mbLocalView) mbLocalView.hidden = nextView !== 'library';
+}
+
+function onModelBrowserViewTabKeydown(event) {
+	if (!mbViewSearchBtn || !mbViewLibraryBtn) return;
+	const key = event.key;
+	if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(key)) return;
+	event.preventDefault();
+	if (key === 'ArrowLeft' || key === 'Home') {
+		setModelBrowserView('search');
+		mbViewSearchBtn.focus();
+		return;
+	}
+	setModelBrowserView('library');
+	mbViewLibraryBtn.focus();
+}
+
+function setModelBrowserResetStatus(message) {
+	if (!mbResetStatus) return;
+	if (mbResetStatusTimer) {
+		clearTimeout(mbResetStatusTimer);
+		mbResetStatusTimer = null;
+	}
+	if (!message) {
+		mbResetStatus.hidden = true;
+		mbResetStatus.textContent = '';
+		return;
+	}
+	mbResetStatus.textContent = message;
+	mbResetStatus.hidden = false;
+	mbResetStatusTimer = setTimeout(() => {
+		mbResetStatus.hidden = true;
+	}, 2400);
+}
+
+function onModelBrowserFilterTogglesKeydown(event) {
+	const key = event.key;
+	if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(key)) return;
+	const toggles = [mbHideInstalledToggle, mbShowInstalledOnlyToggle, mbHideEarlyAccessToggle, mbShowNsfwToggle].filter(Boolean);
+	if (toggles.length < 2) return;
+	const currentIndex = toggles.indexOf(event.currentTarget);
+	if (currentIndex < 0) return;
+	event.preventDefault();
+	let nextIndex = currentIndex;
+	if (key === 'Home') {
+		nextIndex = 0;
+	} else if (key === 'End') {
+		nextIndex = toggles.length - 1;
+	} else if (key === 'ArrowRight') {
+		nextIndex = (currentIndex + 1) % toggles.length;
+	} else if (key === 'ArrowLeft') {
+		nextIndex = (currentIndex - 1 + toggles.length) % toggles.length;
+	}
+	const nextToggle = toggles[nextIndex];
+	if (nextToggle) nextToggle.focus();
+}
+
+function onLocalLibraryQuickFiltersKeydown(event) {
+	const key = event.key;
+	if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(key)) return;
+	const toggles = [mbLocalHideEmbeddings, mbLocalMatchedOnly].filter(Boolean);
+	if (toggles.length < 2) return;
+	const currentIndex = toggles.indexOf(event.currentTarget);
+	if (currentIndex < 0) return;
+	event.preventDefault();
+	let nextIndex = currentIndex;
+	if (key === 'Home') {
+		nextIndex = 0;
+	} else if (key === 'End') {
+		nextIndex = toggles.length - 1;
+	} else if (key === 'ArrowRight') {
+		nextIndex = (currentIndex + 1) % toggles.length;
+	} else if (key === 'ArrowLeft') {
+		nextIndex = (currentIndex - 1 + toggles.length) % toggles.length;
+	}
+	const nextToggle = toggles[nextIndex];
+	if (nextToggle) nextToggle.focus();
+}
+
+function onModelPaginationKeydown(event) {
+	const key = event.key;
+	if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(key)) return;
+	const actions = [mbPrevPage, mbNextPage].filter((btn) => btn && !btn.disabled);
+	if (actions.length < 2) return;
+	const currentIndex = actions.indexOf(event.currentTarget);
+	if (currentIndex < 0) return;
+	event.preventDefault();
+	let nextIndex = currentIndex;
+	if (key === 'Home') {
+		nextIndex = 0;
+	} else if (key === 'End') {
+		nextIndex = actions.length - 1;
+	} else if (key === 'ArrowRight') {
+		nextIndex = (currentIndex + 1) % actions.length;
+	} else if (key === 'ArrowLeft') {
+		nextIndex = (currentIndex - 1 + actions.length) % actions.length;
+	}
+	const nextAction = actions[nextIndex];
+	if (nextAction) nextAction.focus();
+}
+
+function resetModelBrowserFilters() {
+	const keys = [
+		'mbProvider',
+		'mbSearchQuery',
+		'mbSearchType',
+		'mbBaseModel',
+		'mbSort',
+		'mbPageSize',
+		'mbHideInstalled',
+		'mbShowInstalledOnly',
+		'mbHideEarlyAccess',
+		'mbShowNsfw',
+		'mbLocalQuery',
+		'mbLocalType',
+		'mbLocalBaseModel',
+		'mbLocalSort',
+		'mbLocalHideEmbeddings',
+		'mbLocalMatchedOnly',
+		'mbCompareProviderCivitai',
+		'mbCompareProviderHuggingface',
+	];
+	keys.forEach((key) => localStorage.removeItem(key));
+
+	if (mbProvider) mbProvider.value = 'civitai';
+	if (mbSearchQuery) mbSearchQuery.value = '';
+	if (mbSearchType) mbSearchType.value = '';
+	if (mbBaseModel) mbBaseModel.value = '';
+	if (mbSort) mbSort.value = 'highest-rated';
+	if (mbPageSize) mbPageSize.value = '20';
+	setMbToggleState(mbHideInstalledToggle, false);
+	setMbToggleState(mbShowInstalledOnlyToggle, false);
+	setMbToggleState(mbHideEarlyAccessToggle, false);
+	setMbToggleState(mbShowNsfwToggle, false);
+
+	if (mbLocalQuery) mbLocalQuery.value = '';
+	if (mbLocalType) mbLocalType.value = '';
+	if (mbLocalBaseModel) mbLocalBaseModel.value = '';
+	if (mbLocalSort) mbLocalSort.value = 'name-asc';
+	setMbToggleState(mbLocalHideEmbeddings, false);
+	setMbToggleState(mbLocalMatchedOnly, false);
+	if (mbCompareProviderCivitai) mbCompareProviderCivitai.checked = true;
+	if (mbCompareProviderHuggingface) mbCompareProviderHuggingface.checked = true;
+
+	if (mbActiveView === 'search') {
+		if (mbResultsSection && !mbResultsSection.hidden) {
+			runCivitaiSearch(1);
+		} else {
+			renderSearchResults(mbLastSearchItems, null);
+		}
+	} else {
+		renderLocalLibraryFromState();
+	}
+}
+
+function getSelectedCompareProviders() {
+	const providers = [];
+	if (mbCompareProviderCivitai && mbCompareProviderCivitai.checked) providers.push('civitai');
+	if (mbCompareProviderHuggingface && mbCompareProviderHuggingface.checked) providers.push('huggingface');
+	return providers;
+}
 
 function formatBytes(bytes) {
 	if (!bytes || bytes === 0) return '—';
@@ -3397,7 +4160,657 @@ function formatBytes(bytes) {
 	return v.toFixed(i === 0 ? 0 : 1) + ' ' + units[i];
 }
 
+function mbToggleIsOn(toggleBtn) {
+	return !!toggleBtn && toggleBtn.getAttribute('aria-pressed') === 'true';
+}
+
+function setMbToggleState(toggleBtn, isOn) {
+	if (!toggleBtn) return;
+	toggleBtn.setAttribute('aria-pressed', isOn ? 'true' : 'false');
+}
+
+function getMbServerSortLabel() {
+	const value = mbSort ? String(mbSort.value || 'highest-rated') : 'highest-rated';
+	if (value === 'most-downloaded') return 'Most Downloaded';
+	if (value === 'newest') return 'Newest';
+	return 'Highest Rated';
+}
+
+function getMbPageSize() {
+	const value = mbPageSize ? Number(mbPageSize.value || '20') : 20;
+	if (!Number.isFinite(value)) return 20;
+	return Math.max(20, Math.min(80, Math.trunc(value)));
+}
+
+function modelPublishedTs(item) {
+	const raw = String(item?.published_at || '');
+	const ts = raw ? Date.parse(raw) : NaN;
+	return Number.isNaN(ts) ? 0 : ts;
+}
+
+function modelIsInstalled(item) {
+	const fileName = String(item?.file_name || '').toLowerCase();
+	return isInstalledFileName(fileName);
+}
+
+function isInstalledFileName(fileName) {
+	const raw = String(fileName || '').trim().toLowerCase();
+	if (!raw) return false;
+	if (mbLocalInstalledNames.has(raw)) return true;
+	const normalized = raw.replace(/\\/g, '/');
+	if (!normalized.includes('/')) return false;
+	const baseName = normalized.split('/').pop() || '';
+	return !!baseName && mbLocalInstalledNames.has(baseName);
+}
+
+function inferModelFolderFromTypeLabel(typeLabel) {
+	const value = String(typeLabel || '').toLowerCase();
+	if (!value) return '';
+	if (value.includes('lora')) return 'Lora';
+	if (value.includes('vae')) return 'VAE';
+	if (value.includes('textualinversion') || value.includes('embedding')) return 'Embeddings';
+	if (value.includes('controlnet')) return 'ControlNet';
+	if (value.includes('upscaler') || value.includes('esrgan')) return 'ESRGAN';
+	if (value.includes('checkpoint')) return 'StableDiffusion';
+	return '';
+}
+
+function inferModelFolderFromFileName(fileName) {
+	const name = String(fileName || '').toLowerCase();
+	if (!name) return '';
+	if (name.includes('lora')) return 'Lora';
+	if (name.includes('vae')) return 'VAE';
+	if (name.includes('embedding') || name.endsWith('.pt') || name.endsWith('.bin')) {
+		if (name.includes('control')) return 'ControlNet';
+		if (name.includes('upscale') || name.includes('esrgan') || name.includes('4x')) return 'ESRGAN';
+		if (name.includes('textual') || name.includes('embedding') || name.includes('negative')) return 'Embeddings';
+	}
+	if (name.includes('controlnet') || name.includes('control_') || name.includes('_control_')) return 'ControlNet';
+	if (name.includes('upscale') || name.includes('esrgan')) return 'ESRGAN';
+	if (name.endsWith('.ckpt') || name.endsWith('.safetensors') || name.endsWith('.gguf')) return 'StableDiffusion';
+	return '';
+}
+
+function getVersionFileDownloadTarget(item, version, file) {
+	const folderFromFileType = inferModelFolderFromTypeLabel(file?.type || '');
+	if (folderFromFileType) return folderFromFileType;
+	const folderFromModelType = inferModelFolderFromTypeLabel(item?.type || '');
+	if (folderFromModelType) return folderFromModelType;
+	const folderFromVersionType = inferModelFolderFromTypeLabel(version?.base_model || '');
+	if (folderFromVersionType) return folderFromVersionType;
+	const folderFromName = inferModelFolderFromFileName(file?.name || '');
+	if (folderFromName) return folderFromName;
+	return String(item?.model_type_folder || 'StableDiffusion');
+}
+
+function setModelModalDownloadStatus(message, level = '') {
+	if (!mbModelModalDownloadStatus) return;
+	mbModelModalDownloadStatus.classList.remove('is-ok', 'is-error');
+	if (!message) {
+		mbModelModalDownloadStatus.textContent = '';
+		mbModelModalDownloadStatus.hidden = true;
+		return;
+	}
+	if (level === 'ok') mbModelModalDownloadStatus.classList.add('is-ok');
+	if (level === 'error') mbModelModalDownloadStatus.classList.add('is-error');
+	mbModelModalDownloadStatus.textContent = message;
+	mbModelModalDownloadStatus.hidden = false;
+}
+
+function applyModelBrowserClientFilters(items) {
+	let filtered = Array.isArray(items) ? items.slice() : [];
+	const baseModelFilter = mbBaseModel ? String(mbBaseModel.value || '').trim().toLowerCase() : '';
+	if (baseModelFilter) {
+		filtered = filtered.filter((item) => String(item.base_model || '').toLowerCase().includes(baseModelFilter));
+	}
+	if (mbToggleIsOn(mbHideInstalledToggle)) {
+		filtered = filtered.filter((item) => !modelIsInstalled(item));
+	}
+	if (mbToggleIsOn(mbShowInstalledOnlyToggle)) {
+		filtered = filtered.filter((item) => modelIsInstalled(item));
+	}
+	if (mbToggleIsOn(mbHideEarlyAccessToggle)) {
+		filtered = filtered.filter((item) => !item.is_early_access);
+	}
+
+	const sortValue = mbSort ? String(mbSort.value || 'highest-rated') : 'highest-rated';
+	if (sortValue === 'installed') {
+		filtered.sort((a, b) => Number(modelIsInstalled(b)) - Number(modelIsInstalled(a)) || String(a.name || '').localeCompare(String(b.name || '')));
+	} else if (sortValue === 'favorites') {
+		filtered.sort((a, b) => Number(b.likes || 0) - Number(a.likes || 0));
+	} else if (sortValue === 'type') {
+		filtered.sort((a, b) => String(a.type || '').localeCompare(String(b.type || '')) || String(a.name || '').localeCompare(String(b.name || '')));
+	} else if (sortValue === 'newest') {
+		filtered.sort((a, b) => modelPublishedTs(b) - modelPublishedTs(a));
+	}
+
+	return filtered;
+}
+
+function setModelModalOpen(isOpen) {
+	if (!mbModelModal) return;
+	if (isOpen) {
+		mbModelModalLastFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+	}
+	mbModelModal.hidden = !isOpen;
+	mbModelModal.setAttribute('aria-hidden', isOpen ? 'false' : 'true');
+	if (isOpen) {
+		document.body.classList.add('gallery-lightbox-open');
+		if (mbModelModalClose) mbModelModalClose.focus();
+	} else {
+		document.body.classList.remove('gallery-lightbox-open');
+		const active = document.activeElement;
+		if (active instanceof HTMLElement && mbModelModal.contains(active) && mbModelModalLastFocus && document.contains(mbModelModalLastFocus)) {
+			mbModelModalLastFocus.focus();
+		}
+	}
+}
+
+function isVideoUrl(url) {
+	const u = String(url || '').toLowerCase().split('?')[0];
+	return u.endsWith('.mp4') || u.endsWith('.webm') || u.endsWith('.mov') || u.endsWith('.avi');
+}
+
+function renderModelModalPreview(images, selectedIndex = 0) {
+	if (!mbModelModalPreview || !mbModelModalThumbs) return;
+	const safeImages = Array.isArray(images) ? images.filter((img) => img && img.url) : [];
+	if (!safeImages.length) {
+		mbModelModalPreview.src = '';
+		mbModelModalPreview.alt = 'No preview available';
+		if (mbModelModalPreviewVideo) { mbModelModalPreviewVideo.src = ''; mbModelModalPreviewVideo.hidden = true; }
+		mbModelModalPreview.hidden = false;
+		mbModelModalThumbs.innerHTML = '<p class="hint">No example images.</p>';
+		return;
+	}
+	const idx = Math.max(0, Math.min(selectedIndex, safeImages.length - 1));
+	const selectedUrl = safeImages[idx].url;
+	const selectedIsVideo = isVideoUrl(selectedUrl);
+	if (selectedIsVideo && mbModelModalPreviewVideo) {
+		mbModelModalPreviewVideo.src = selectedUrl;
+		mbModelModalPreviewVideo.hidden = false;
+		mbModelModalPreview.src = '';
+		mbModelModalPreview.hidden = true;
+	} else {
+		mbModelModalPreview.src = selectedUrl;
+		mbModelModalPreview.alt = 'Model example image';
+		mbModelModalPreview.hidden = false;
+		if (mbModelModalPreviewVideo) { mbModelModalPreviewVideo.src = ''; mbModelModalPreviewVideo.hidden = true; }
+	}
+	mbModelModalThumbs.innerHTML = safeImages.map((img, i) => {
+		const isVid = isVideoUrl(img.url);
+		const activeClass = i === idx ? 'is-active' : '';
+		if (isVid) {
+			return `<div class="mb-model-modal-thumb mb-model-modal-thumb-video ${activeClass}" data-index="${i}" role="button" tabindex="0" aria-label="Video preview ${i + 1}">▶</div>`;
+		}
+		return `<img class="mb-model-modal-thumb ${activeClass}" src="${escHtml(img.url)}" alt="Model example ${i + 1}" data-index="${i}">`;
+	}).join('');
+	mbModelModalThumbs.querySelectorAll('.mb-model-modal-thumb').forEach((thumb) => {
+		const activate = () => renderModelModalPreview(safeImages, Number(thumb.dataset.index || 0));
+		thumb.addEventListener('click', activate);
+		if (thumb.tagName !== 'IMG') {
+			thumb.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); activate(); } });
+		}
+	});
+}
+
+function getVersionPreviewUrls(version, fallbackPreview = '') {
+	const urls = [];
+	const images = Array.isArray(version?.images) ? version.images : [];
+	images.forEach((img) => {
+		const url = String(img?.url || '').trim();
+		if (!url || urls.includes(url)) return;
+		urls.push(url);
+	});
+	const fallback = String(fallbackPreview || '').trim();
+	if (fallback && !urls.includes(fallback)) {
+		urls.unshift(fallback);
+	}
+	return urls;
+}
+
+async function bulkUpdateInstalledSearchMetadata() {
+	if (mbSearchBulkRefreshInstalledBtn) mbSearchBulkRefreshInstalledBtn.disabled = true;
+	if (mbSearchStatus) {
+		mbSearchStatus.textContent = 'Scanning installed models in current search results...';
+		mbSearchStatus.hidden = false;
+	}
+
+	const searchItems = Array.isArray(mbLastSearchItems) ? mbLastSearchItems : [];
+	const installedItems = searchItems.filter((item) => modelIsInstalled(item));
+	if (!installedItems.length) {
+		showToast('No installed models were found in current search results.', 'neg');
+		if (mbSearchStatus) {
+			mbSearchStatus.textContent = 'No installed models found in current search results.';
+			mbSearchStatus.hidden = false;
+		}
+		if (mbSearchBulkRefreshInstalledBtn) mbSearchBulkRefreshInstalledBtn.disabled = false;
+		return;
+	}
+
+	let updatedModels = 0;
+	let updatedFiles = 0;
+	let failedModels = 0;
+	const updatedModelNames = [];
+	const failedModelNames = [];
+
+	for (const item of installedItems) {
+		const provider = String(item?.provider || 'civitai').toLowerCase();
+		const modelId = String(item?.id || '').trim();
+		if (!modelId) {
+			failedModels += 1;
+			failedModelNames.push(String(item?.name || 'unknown model'));
+			continue;
+		}
+
+		try {
+			const detailsPath = provider === 'huggingface'
+				? '/api/models/huggingface/model/'
+				: '/api/models/civitai/model/';
+			const detailsResp = await fetch(detailsPath + encodeURIComponent(modelId));
+			const details = await detailsResp.json();
+			if (!detailsResp.ok || !details.ok) throw new Error(details.error || detailsResp.statusText);
+
+			const versions = Array.isArray(details.versions) ? details.versions : [];
+			let modelUpdated = false;
+
+			for (const version of versions) {
+				const files = Array.isArray(version?.files) ? version.files : [];
+				const installedFileNames = files
+					.map((f) => String(f?.name || '').trim())
+					.filter((name) => isInstalledFileName(name));
+				if (!installedFileNames.length) continue;
+
+				const previewUrls = getVersionPreviewUrls(version, details.preview_url || item.preview_url || '');
+				const updateResp = await fetch('/api/models/library/update-version-metadata', {
+					method: 'POST',
+					headers: {'Content-Type': 'application/json'},
+					body: JSON.stringify({
+						provider,
+						model_id: modelId,
+						model_name: String(details.name || item.name || ''),
+						model_type: String(details.type || item.type || ''),
+						base_model: String(version?.base_model || details.base_model || item.base_model || ''),
+						model_url: String(details.model_url || item.model_url || ''),
+						version_name: String(version?.name || ''),
+						preview_url: previewUrls[0] || '',
+						preview_urls: previewUrls,
+						installed_files: installedFileNames,
+					}),
+				});
+				const updatePayload = await updateResp.json();
+				if (!updateResp.ok || !updatePayload.ok) throw new Error(updatePayload.error || updateResp.statusText);
+				const changed = Number(updatePayload.updated || 0);
+				if (changed > 0) {
+					updatedFiles += changed;
+					modelUpdated = true;
+				}
+			}
+
+			if (modelUpdated) {
+				updatedModels += 1;
+				updatedModelNames.push(String(item?.name || modelId));
+			}
+		} catch (err) {
+			failedModels += 1;
+			failedModelNames.push(String(item?.name || modelId));
+		}
+	}
+
+	const summary = `Bulk installed update complete: ${updatedModels} model(s), ${updatedFiles} file record(s) updated, ${failedModels} failed.`;
+	showToast(summary, failedModels > 0 ? 'neg' : 'pos');
+	renderLocalLibraryActionReport('Search Bulk Installed Update', summary, [
+		{
+			label: 'Updated Models',
+			items: buildReportItemsFromSamples(updatedModelNames, (sample) => {
+				const name = String(sample || '').trim();
+				return createReportItem(name, name);
+			}),
+		},
+		{
+			label: 'Failed Models',
+			items: buildReportItemsFromSamples(failedModelNames, (sample) => {
+				const name = String(sample || '').trim();
+				return createReportItem(name, name);
+			}),
+		},
+	]);
+
+	if (mbSearchStatus) {
+		mbSearchStatus.textContent = summary;
+		mbSearchStatus.hidden = false;
+	}
+
+	await loadModelLibrary();
+	if (mbSearchBulkRefreshInstalledBtn) mbSearchBulkRefreshInstalledBtn.disabled = false;
+}
+
+async function refreshInstalledVersionMetadata(version, installedFiles, btn) {
+	const provider = String(mbCurrentModelDetails?.provider || 'civitai').toLowerCase();
+	const modelId = String(mbCurrentModelDetails?.id || '');
+	if (!provider || !modelId || !Array.isArray(installedFiles) || installedFiles.length === 0) {
+		setModelModalDownloadStatus('No installed files found for this version.', 'error');
+		return;
+	}
+	if (btn) btn.disabled = true;
+	const versionLabel = String(version?.name || 'Selected version');
+	setModelModalDownloadStatus(`Updating local metadata and previews for ${versionLabel}...`);
+	try {
+		const previewUrls = getVersionPreviewUrls(version, mbCurrentModelDetails?.preview_url || '');
+		const resp = await fetch('/api/models/library/update-version-metadata', {
+			method: 'POST',
+			headers: {'Content-Type': 'application/json'},
+			body: JSON.stringify({
+				provider,
+				model_id: modelId,
+				model_name: String(mbCurrentModelDetails?.name || ''),
+				model_type: String(mbCurrentModelDetails?.type || ''),
+				base_model: String(version?.base_model || mbCurrentModelDetails?.base_model || ''),
+				model_url: String(mbCurrentModelDetails?.model_url || ''),
+				version_name: versionLabel,
+				preview_url: previewUrls[0] || '',
+				preview_urls: previewUrls,
+				installed_files: installedFiles,
+			}),
+		});
+		const data = await resp.json();
+		if (!resp.ok || !data.ok) throw new Error(data.error || resp.statusText);
+		setModelModalDownloadStatus(`Updated ${Number(data.updated || 0)} local file(s) with ${Number(data.preview_count || 0)} preview image(s).`, 'ok');
+		await loadModelLibrary();
+	} catch (err) {
+		setModelModalDownloadStatus('Failed to update preview + metadata: ' + err.message, 'error');
+	} finally {
+		if (btn) btn.disabled = false;
+	}
+}
+
+function renderModelVersionDetails(version) {
+	if (!version || !mbModelModalFiles || !mbModelModalDefaults || !mbModelModalVersionStatus) return;
+	const files = Array.isArray(version.files) ? version.files : [];
+	const versionInstalled = files.some((f) => isInstalledFileName(f.name || ''));
+	const installedFileNames = files
+		.map((f) => String(f.name || '').trim())
+		.filter((name) => isInstalledFileName(name));
+	const provider = String(mbCurrentModelDetails?.provider || 'civitai').toLowerCase();
+	const modelId = String(mbCurrentModelDetails?.id || '');
+	const previewUrl = (() => {
+		if (Array.isArray(version.images) && version.images.length && version.images[0] && version.images[0].url) {
+			return String(version.images[0].url || '');
+		}
+		return String(mbCurrentModelDetails?.preview_url || '');
+	})();
+	mbModelModalVersionStatus.textContent = versionInstalled ? 'Installed version detected' : 'Not installed';
+
+	if (!files.length) {
+		mbModelModalFiles.innerHTML = `
+			<div class="mb-model-modal-file">
+				<div class="mb-model-modal-file-main">
+					<span class="mb-model-modal-file-name">Apply this model to Image Gen</span>
+					<span class="mb-model-modal-file-meta">Use this selection in the Image tab controls.</span>
+				</div>
+				<div class="mb-model-modal-file-actions">
+					<button class="btn btn-sm btn-ghost mb-model-modal-use-btn" data-name="${escHtml(String(mbCurrentModelDetails?.name || ''))}" data-type="${escHtml(String(mbCurrentModelDetails?.type || ''))}">Use in Image Gen</button>
+				</div>
+			</div>
+			<p class="hint">No files listed for this version.</p>`;
+	} else {
+		mbModelModalFiles.innerHTML = `
+			<div class="mb-model-modal-file">
+				<div class="mb-model-modal-file-main">
+					<span class="mb-model-modal-file-name">Apply this model to Image Gen</span>
+					<span class="mb-model-modal-file-meta">Use this selection in the Image tab controls.</span>
+				</div>
+				<div class="mb-model-modal-file-actions">
+					<button class="btn btn-sm btn-ghost mb-model-modal-use-btn" data-name="${escHtml(String(mbCurrentModelDetails?.name || ''))}" data-type="${escHtml(String(mbCurrentModelDetails?.type || ''))}">Use in Image Gen</button>
+				</div>
+			</div>
+		` + files.map((f) => {
+			const installed = isInstalledFileName(f.name || '');
+			const sizeLabel = formatBytes(f.size_bytes || 0);
+			const targetFolder = getVersionFileDownloadTarget(mbCurrentModelDetails, version, f);
+			const canDownload = Boolean(f.download_url) || provider === 'huggingface';
+			const buttonLabel = installed ? 'Installed' : 'Download';
+			const disabledReason = installed ? 'Already installed' : (!canDownload ? 'No download URL available' : '');
+			const disabledAttrs = disabledReason ? `disabled title="${escHtml(disabledReason)}"` : '';
+			return `
+				<div class="mb-model-modal-file">
+					<div class="mb-model-modal-file-main">
+						<span class="mb-model-modal-file-name">${escHtml(f.name || 'unnamed file')}</span>
+						<span class="mb-model-modal-file-meta">${escHtml(f.type || 'model')} · ${escHtml(sizeLabel)} · ${escHtml(targetFolder)}${installed ? ' · Installed' : ''}</span>
+					</div>
+					<div class="mb-model-modal-file-actions">
+						<button
+							class="btn btn-sm btn-primary mb-model-modal-download-btn"
+							data-url="${escHtml(f.download_url || '')}"
+							data-name="${escHtml(f.name || '')}"
+							data-folder="${escHtml(targetFolder)}"
+							data-version-name="${escHtml(version.name || 'Selected version')}"
+							data-provider="${escHtml(provider)}"
+							data-model-id="${escHtml(modelId)}"
+							data-model-name="${escHtml(String(mbCurrentModelDetails?.name || ''))}"
+							data-model-type="${escHtml(String(mbCurrentModelDetails?.type || ''))}"
+							data-base-model="${escHtml(String(version.base_model || mbCurrentModelDetails?.base_model || ''))}"
+							data-model-url="${escHtml(String(mbCurrentModelDetails?.model_url || ''))}"
+							data-preview-url="${escHtml(previewUrl)}"
+							${disabledAttrs}>
+							${buttonLabel}
+						</button>
+						${installed ? '<button class="btn btn-sm btn-ghost mb-model-modal-refresh-btn" type="button">Update Preview + Metadata</button>' : ''}
+					</div>
+				</div>`;
+		}).join('');
+
+		mbModelModalFiles.querySelectorAll('.mb-model-modal-download-btn').forEach((btn) => {
+			btn.addEventListener('click', () => {
+				const versionName = btn.dataset.versionName || 'Selected version';
+				const fileLabel = btn.dataset.name || 'file';
+				setModelModalDownloadStatus(`Queueing ${fileLabel} from ${versionName}...`);
+				startModelDownload(
+					btn.dataset.url,
+					btn.dataset.name,
+					btn.dataset.folder,
+					btn,
+					btn.dataset.provider,
+					btn.dataset.modelId,
+					versionName,
+					btn.dataset.modelName,
+					btn.dataset.modelType,
+					btn.dataset.baseModel,
+					btn.dataset.modelUrl,
+					btn.dataset.previewUrl,
+				);
+			});
+		});
+
+		mbModelModalFiles.querySelectorAll('.mb-model-modal-refresh-btn').forEach((btn) => {
+			btn.addEventListener('click', () => {
+				refreshInstalledVersionMetadata(version, installedFileNames, btn);
+			});
+		});
+	}
+
+	mbModelModalFiles.querySelectorAll('.mb-model-modal-use-btn').forEach((btn) => {
+		btn.addEventListener('click', () => {
+			useModelInImageGen({
+				name: btn.dataset.name || '',
+				type: btn.dataset.type || '',
+				folder: '',
+			});
+		});
+	});
+
+	const defaults = version.defaults || {};
+	const trainedWords = Array.isArray(defaults.trained_words) ? defaults.trained_words.slice(0, 12).join(', ') : '';
+	const rows = [
+		['Base model', defaults.base_model || version.base_model || 'Not provided'],
+		['Sampler', defaults.sampler || 'Not provided'],
+		['Steps', defaults.steps || 'Not provided'],
+		['CFG', defaults.cfg || 'Not provided'],
+		['Clip skip', defaults.clip_skip || 'Not provided'],
+		['Trained words', trainedWords || 'Not provided'],
+	];
+	mbModelModalDefaults.innerHTML = rows.map(([label, value]) => (
+		`<div class="mb-model-modal-file"><span class="mb-model-modal-file-name">${escHtml(String(label))}</span><span>${escHtml(String(value))}</span></div>`
+	)).join('');
+
+	renderModelModalPreview(version.images || [], 0);
+}
+
+function openLocalModelDetailsModal(item) {
+	if (!item || !mbModelModal) return;
+	const typeLabel = String(item.type || item.folder || 'Model');
+	const folderLabel = String(item.folder || 'Unknown');
+	const sizeLabel = formatBytes(item.size_bytes || 0);
+	const baseModelLabel = String(item.base_model || 'Not provided');
+	const versionLabel = String(item.version_name || '');
+	const pathLabel = String(item.path || 'Not provided');
+
+	mbCurrentModelDetails = null;
+	mbCurrentVersionIndex = 0;
+	setModelModalOpen(true);
+	if (mbModelModalTitle) mbModelModalTitle.textContent = item.name || 'Local model details';
+	if (mbModelModalMeta) mbModelModalMeta.textContent = `${typeLabel} · Local library · ${folderLabel}${versionLabel ? ` · ${versionLabel}` : ''}`;
+	if (mbModelModalDescription) {
+		mbModelModalDescription.textContent = versionLabel
+			? `Installed local model file in ${folderLabel}. Matched version: ${versionLabel}.`
+			: `Installed local model file in ${folderLabel}.`;
+	}
+	if (mbModelModalVersion) {
+		mbModelModalVersion.disabled = true;
+		mbModelModalVersion.innerHTML = '<option value="0">Local file</option>';
+	}
+	if (mbModelModalVersionStatus) mbModelModalVersionStatus.textContent = 'Installed local model';
+	setModelModalDownloadStatus('');
+
+	if (mbModelModalFiles) {
+		mbModelModalFiles.innerHTML = `
+			<div class="mb-model-modal-file">
+				<div class="mb-model-modal-file-main">
+					<span class="mb-model-modal-file-name">${escHtml(item.name || 'unnamed file')}</span>
+					<span class="mb-model-modal-file-meta">${escHtml(typeLabel)} · ${escHtml(sizeLabel)} · ${escHtml(folderLabel)}</span>
+				</div>
+				<div class="mb-model-modal-file-actions">
+					<button class="btn btn-sm btn-ghost mb-local-modal-use-btn" data-name="${escHtml(item.name || '')}" data-type="${escHtml(item.type || '')}" data-folder="${escHtml(item.folder || '')}">Use in Image Gen</button>
+					<button class="btn btn-sm btn-danger mb-local-modal-delete-btn" data-name="${escHtml(item.name || '')}" data-folder="${escHtml(item.folder || '')}">Delete</button>
+				</div>
+			</div>`;
+		const useBtn = mbModelModalFiles.querySelector('.mb-local-modal-use-btn');
+		if (useBtn) {
+			useBtn.addEventListener('click', () => {
+				useModelInImageGen({
+					name: useBtn.dataset.name || '',
+					type: useBtn.dataset.type || '',
+					folder: useBtn.dataset.folder || '',
+				});
+			});
+		}
+		const deleteBtn = mbModelModalFiles.querySelector('.mb-local-modal-delete-btn');
+		if (deleteBtn) {
+			deleteBtn.addEventListener('click', async () => {
+				await deleteLocalModel(deleteBtn.dataset.name || '', deleteBtn.dataset.folder || '', deleteBtn);
+				setModelModalOpen(false);
+			});
+		}
+	}
+
+	if (mbModelModalDefaults) {
+		const rows = [
+			['Folder', folderLabel],
+			['Type', typeLabel],
+			['Matched version', versionLabel || 'Not provided'],
+			['Base model', baseModelLabel],
+			['File size', sizeLabel],
+			['Path', pathLabel],
+		];
+		mbModelModalDefaults.innerHTML = rows.map(([label, value]) => (
+			`<div class="mb-model-modal-file"><span class="mb-model-modal-file-name">${escHtml(String(label))}</span><span>${escHtml(String(value))}</span></div>`
+		)).join('');
+	}
+
+	const previewUrls = Array.isArray(item.preview_urls)
+		? item.preview_urls.map((url) => String(url || '').trim()).filter(Boolean)
+		: [];
+	const previewItems = previewUrls.length
+		? previewUrls.map((url) => ({url}))
+		: (item.preview_url ? [{url: item.preview_url}] : []);
+	renderModelModalPreview(previewItems, 0);
+}
+
+async function openModelDetailsModal(item) {
+	if (!item || !item.id || !mbModelModal) return;
+	const provider = String(item.provider || 'civitai').toLowerCase();
+	setModelModalOpen(true);
+	if (mbModelModalTitle) mbModelModalTitle.textContent = item.name || 'Model details';
+	if (mbModelModalMeta) mbModelModalMeta.textContent = 'Loading model details...';
+	if (mbModelModalDescription) mbModelModalDescription.textContent = '';
+	if (mbModelModalFiles) mbModelModalFiles.innerHTML = '<p class="hint">Loading files...</p>';
+	if (mbModelModalDefaults) mbModelModalDefaults.innerHTML = '<p class="hint">Loading defaults...</p>';
+	if (mbModelModalVersion) {
+		mbModelModalVersion.disabled = false;
+		mbModelModalVersion.innerHTML = '';
+	}
+	if (mbModelModalThumbs) mbModelModalThumbs.innerHTML = '';
+	setModelModalDownloadStatus('');
+
+	try {
+		const detailsPath = provider === 'huggingface'
+			? '/api/models/huggingface/model/'
+			: '/api/models/civitai/model/';
+		const resp = await fetch(detailsPath + encodeURIComponent(String(item.id)));
+		const data = await resp.json();
+		if (!resp.ok || !data.ok) throw new Error(data.error || resp.statusText);
+
+		const fallbackType = String(item?.type || '');
+		const resolvedType = data.type && data.type !== 'Checkpoint'
+			? data.type
+			: (fallbackType || data.type || 'Checkpoint');
+		mbCurrentModelDetails = {
+			...data,
+			type: resolvedType,
+			preview_url: data.preview_url || item?.preview_url || '',
+			model_type_folder: data.model_type_folder || item?.model_type_folder || '',
+		};
+		mbCurrentVersionIndex = 0;
+		if (mbModelModalTitle) mbModelModalTitle.textContent = data.name || item.name || 'Model details';
+		if (mbModelModalMeta) {
+			const rating = Number(data?.stats?.rating || 0).toFixed(1);
+			const likes = Number(data?.stats?.likes || 0).toLocaleString();
+			const downloads = Number(data?.stats?.downloads || 0).toLocaleString();
+			mbModelModalMeta.textContent = `${resolvedType || ''} · by ${data.creator || 'unknown'} · ★ ${rating} · ❤ ${likes} · ${downloads} downloads`;
+		}
+		if (mbModelModalDescription) {
+			mbModelModalDescription.textContent = data.description || 'No model description provided.';
+		}
+
+		const versions = Array.isArray(data.versions) ? data.versions : [];
+		if (mbModelModalVersion) {
+			mbModelModalVersion.innerHTML = versions.map((v, idx) => {
+				const installed = Array.isArray(v.files) && v.files.some((f) => isInstalledFileName(f.name || ''));
+				const suffix = installed ? ' (installed)' : '';
+				return `<option value="${idx}">${escHtml((v.name || `Version ${idx + 1}`) + suffix)}</option>`;
+			}).join('');
+		}
+
+		if (!versions.length) {
+			if (mbModelModalVersionStatus) mbModelModalVersionStatus.textContent = 'No versions available';
+			if (mbModelModalFiles) mbModelModalFiles.innerHTML = '<p class="hint">No files listed for this model.</p>';
+			if (mbModelModalDefaults) mbModelModalDefaults.innerHTML = '<p class="hint">No defaults available.</p>';
+			setModelModalDownloadStatus('');
+			renderModelModalPreview([], 0);
+			return;
+		}
+
+		renderModelVersionDetails(versions[0]);
+	} catch (err) {
+		if (mbModelModalMeta) mbModelModalMeta.textContent = `Failed to load model details: ${err.message}`;
+		if (mbModelModalFiles) mbModelModalFiles.innerHTML = '<p class="hint">Could not load files.</p>';
+		if (mbModelModalDefaults) mbModelModalDefaults.innerHTML = '<p class="hint">Could not load defaults.</p>';
+		setModelModalDownloadStatus('Could not load version download options.', 'error');
+		renderModelModalPreview([], 0);
+	}
+}
+
 function mbOnTabActivate() {
+	setModelBrowserView(mbActiveView);
 	loadModelLibrary();
 }
 
@@ -3409,15 +4822,492 @@ async function loadModelLibrary() {
 		const resp = await fetch('/api/models/library');
 		const data = await resp.json();
 		if (!resp.ok) throw new Error(data.error || resp.statusText);
-		renderLocalLibrary(data.models || [], data.models_root || '');
+		mbLibraryAllModels = Array.isArray(data.models) ? data.models : [];
+		mbLibraryRoot = String(data.models_root || '');
+		renderLocalLibraryFromState();
 	} catch (err) {
 		if (mbLibraryStatus) { mbLibraryStatus.textContent = 'Could not load local models: ' + err.message; mbLibraryStatus.hidden = false; }
 	}
 }
 
+async function enrichLocalLibraryPreviews() {
+	if (mbLibraryEnrichPreviewsBtn) mbLibraryEnrichPreviewsBtn.disabled = true;
+	if (mbLibraryStatus) {
+		mbLibraryStatus.textContent = 'Looking up missing previews…';
+		mbLibraryStatus.hidden = false;
+	}
+	try {
+		const resp = await fetch('/api/models/library/enrich-previews', {
+			method: 'POST',
+			headers: {'Content-Type': 'application/json'},
+			body: JSON.stringify({limit: 40}),
+		});
+		const data = await resp.json();
+		if (!resp.ok || !data.ok) throw new Error(data.error || resp.statusText);
+		const updated = Number(data.updated || 0);
+		const failed = Number(data.failed || 0);
+		const skipped = Number(data.skipped || 0);
+		const noMatchSkips = Number(((data.skip_reasons || {}).no_civitai_match) || 0);
+		const toastMessage = `Preview lookup complete: ${updated} updated, ${failed} failed, ${skipped} skipped (${noMatchSkips} no match).`;
+		showToast(toastMessage, failed > 0 ? 'neg' : 'pos');
+		renderLocalLibraryActionReport('Preview Lookup', toastMessage, [
+			{
+				label: 'Updated',
+				items: buildReportItemsFromSamples(data.updated_samples, (sample) => {
+					const fileName = String(sample || '').trim();
+					return createReportItem(fileName, fileName);
+				}),
+			},
+			{
+				label: 'Skipped',
+				items: buildReportItemsFromSamples(data.skipped_samples, (sample) => {
+					if (!sample || typeof sample !== 'object') return '';
+					const fileName = String(sample.file || '').trim();
+					return createReportItem(`${fileName} (${formatReportReason(sample.reason)})`, fileName);
+				}),
+			},
+			{
+				label: 'Failed',
+				items: buildReportItemsFromSamples(data.failed_samples, (sample) => {
+					if (!sample || typeof sample !== 'object') return '';
+					const fileName = String(sample.file || '').trim();
+					const errorText = String(sample.error || '').trim();
+					return createReportItem(`${fileName}${errorText ? ` (${errorText})` : ''}`, fileName);
+				}),
+			},
+		]);
+		if (mbLibraryStatus) {
+			mbLibraryStatus.textContent = toastMessage;
+			mbLibraryStatus.hidden = false;
+		}
+		await loadModelLibrary();
+	} catch (err) {
+		showToast('Preview lookup failed: ' + err.message, 'neg');
+		renderLocalLibraryActionReport('Preview Lookup', 'Preview lookup failed: ' + err.message, []);
+		if (mbLibraryStatus) {
+			mbLibraryStatus.textContent = 'Could not enrich local previews: ' + err.message;
+			mbLibraryStatus.hidden = false;
+		}
+	} finally {
+		if (mbLibraryEnrichPreviewsBtn) mbLibraryEnrichPreviewsBtn.disabled = false;
+	}
+}
+
+async function compareLocalLibraryMetadata() {
+	if (mbLibraryCompareMetadataBtn) mbLibraryCompareMetadataBtn.disabled = true;
+	if (mbLibraryStatus) {
+		mbLibraryStatus.textContent = 'Comparing missing metadata with providers…';
+		mbLibraryStatus.hidden = false;
+	}
+	let providerSummary = '';
+	try {
+		const selectedProviders = getSelectedCompareProviders();
+		if (!selectedProviders.length) throw new Error('Select at least one provider for compare.');
+		providerSummary = selectedProviders
+			.map((p) => p === 'civitai' ? 'CivitAI' : 'Hugging Face')
+			.join(', ');
+		const resp = await fetch('/api/models/library/compare-metadata', {
+			method: 'POST',
+			headers: {'Content-Type': 'application/json'},
+			body: JSON.stringify({limit: 80, providers: selectedProviders, overwrite: false}),
+		});
+		const data = await resp.json();
+		if (!resp.ok || !data.ok) throw new Error(data.error || resp.statusText);
+		const updated = Number(data.updated || 0);
+		const failed = Number(data.failed || 0);
+		const skipped = Number(data.skipped || 0);
+		const civitaiHits = Number(((data.matched_by_provider || {}).civitai) || 0);
+		const huggingfaceHits = Number(((data.matched_by_provider || {}).huggingface) || 0);
+		const toastMessage = `Metadata compare complete (${providerSummary}): ${updated} updated (${civitaiHits} CivitAI, ${huggingfaceHits} Hugging Face), ${failed} failed, ${skipped} skipped.`;
+		showToast(toastMessage, failed > 0 ? 'neg' : 'pos');
+		renderLocalLibraryActionReport('Metadata Compare', toastMessage, [
+			{
+				label: 'Updated',
+				items: buildReportItemsFromSamples(data.updated_samples, (sample) => {
+					if (!sample || typeof sample !== 'object') return '';
+					const fileName = String(sample.file || '').trim();
+					const provider = String(sample.provider || '').trim();
+					const versionName = String(sample.version_name || '').trim();
+					const details = [provider, versionName].filter(Boolean).join(' · ');
+					return createReportItem(`${fileName}${details ? ` (${details})` : ''}`, fileName);
+				}),
+			},
+			{
+				label: 'Skipped',
+				items: buildReportItemsFromSamples(data.skipped_samples, (sample) => {
+					if (!sample || typeof sample !== 'object') return '';
+					const fileName = String(sample.file || '').trim();
+					return createReportItem(`${fileName} (${formatReportReason(sample.reason)})`, fileName);
+				}),
+			},
+			{
+				label: 'Failed',
+				items: buildReportItemsFromSamples(data.failed_samples, (sample) => {
+					if (!sample || typeof sample !== 'object') return '';
+					const fileName = String(sample.file || '').trim();
+					const errorText = String(sample.error || '').trim();
+					return createReportItem(`${fileName}${errorText ? ` (${errorText})` : ''}`, fileName);
+				}),
+			},
+		]);
+		if (mbLibraryStatus) {
+			mbLibraryStatus.textContent = toastMessage;
+			mbLibraryStatus.hidden = false;
+		}
+		await loadModelLibrary();
+	} catch (err) {
+		const errorPrefix = providerSummary ? `Metadata compare failed (${providerSummary}): ` : 'Metadata compare failed: ';
+		showToast(errorPrefix + err.message, 'neg');
+		renderLocalLibraryActionReport('Metadata Compare', errorPrefix + err.message, []);
+		if (mbLibraryStatus) {
+			mbLibraryStatus.textContent = (providerSummary ? `Could not compare metadata (${providerSummary}): ` : 'Could not compare metadata: ') + err.message;
+			mbLibraryStatus.hidden = false;
+		}
+	} finally {
+		if (mbLibraryCompareMetadataBtn) mbLibraryCompareMetadataBtn.disabled = false;
+	}
+}
+
+async function recoverLocalLibraryMetadataAndPreviews() {
+	if (mbLibraryRecoverMetadataBtn) mbLibraryRecoverMetadataBtn.disabled = true;
+	if (mbLibraryCompareMetadataBtn) mbLibraryCompareMetadataBtn.disabled = true;
+	if (mbLibraryEnrichPreviewsBtn) mbLibraryEnrichPreviewsBtn.disabled = true;
+	if (mbLibraryStatus) {
+		mbLibraryStatus.textContent = 'Recovering missing metadata and previews…';
+		mbLibraryStatus.hidden = false;
+	}
+	let providerSummary = '';
+	try {
+		const selectedProviders = getSelectedCompareProviders();
+		if (!selectedProviders.length) throw new Error('Select at least one provider for recovery.');
+		providerSummary = selectedProviders
+			.map((p) => p === 'civitai' ? 'CivitAI' : 'Hugging Face')
+			.join(', ');
+		const resp = await fetch('/api/models/library/recover-metadata', {
+			method: 'POST',
+			headers: {'Content-Type': 'application/json'},
+			body: JSON.stringify({
+				compare_limit: 80,
+				preview_limit: 40,
+				providers: selectedProviders,
+				overwrite: false,
+			}),
+		});
+		const data = await resp.json();
+		if (!resp.ok || !data.ok) throw new Error(data.error || resp.statusText);
+
+		const compare = data.compare || {};
+		const preview = data.preview || {};
+		const compareUpdated = Number(compare.updated || 0);
+		const compareFailed = Number(compare.failed || 0);
+		const compareSkipped = Number(compare.skipped || 0);
+		const previewUpdated = Number(preview.updated || 0);
+		const previewFailed = Number(preview.failed || 0);
+		const previewSkipped = Number(preview.skipped || 0);
+		const failedTotal = Number(data.failed_total || 0);
+
+		const summary = `Recovery complete (${providerSummary}): metadata ${compareUpdated} updated, ${compareFailed} failed, ${compareSkipped} skipped; previews ${previewUpdated} updated, ${previewFailed} failed, ${previewSkipped} skipped.`;
+		showToast(summary, failedTotal > 0 ? 'neg' : 'pos');
+		renderLocalLibraryActionReport('Metadata + Preview Recovery', summary, [
+			{
+				label: 'Metadata Updated',
+				items: buildReportItemsFromSamples(compare.updated_samples, (sample) => {
+					if (!sample || typeof sample !== 'object') return '';
+					const fileName = String(sample.file || '').trim();
+					const provider = String(sample.provider || '').trim();
+					const versionName = String(sample.version_name || '').trim();
+					const details = [provider, versionName].filter(Boolean).join(' · ');
+					return createReportItem(`${fileName}${details ? ` (${details})` : ''}`, fileName);
+				}),
+			},
+			{
+				label: 'Metadata Skipped',
+				items: buildReportItemsFromSamples(compare.skipped_samples, (sample) => {
+					if (!sample || typeof sample !== 'object') return '';
+					const fileName = String(sample.file || '').trim();
+					return createReportItem(`${fileName} (${formatReportReason(sample.reason)})`, fileName);
+				}),
+			},
+			{
+				label: 'Metadata Failed',
+				items: buildReportItemsFromSamples(compare.failed_samples, (sample) => {
+					if (!sample || typeof sample !== 'object') return '';
+					const fileName = String(sample.file || '').trim();
+					const errorText = String(sample.error || '').trim();
+					return createReportItem(`${fileName}${errorText ? ` (${errorText})` : ''}`, fileName);
+				}),
+			},
+			{
+				label: 'Previews Updated',
+				items: buildReportItemsFromSamples(preview.updated_samples, (sample) => {
+					const fileName = String(sample || '').trim();
+					return createReportItem(fileName, fileName);
+				}),
+			},
+			{
+				label: 'Previews Skipped',
+				items: buildReportItemsFromSamples(preview.skipped_samples, (sample) => {
+					if (!sample || typeof sample !== 'object') return '';
+					const fileName = String(sample.file || '').trim();
+					return createReportItem(`${fileName} (${formatReportReason(sample.reason)})`, fileName);
+				}),
+			},
+			{
+				label: 'Previews Failed',
+				items: buildReportItemsFromSamples(preview.failed_samples, (sample) => {
+					if (!sample || typeof sample !== 'object') return '';
+					const fileName = String(sample.file || '').trim();
+					const errorText = String(sample.error || '').trim();
+					return createReportItem(`${fileName}${errorText ? ` (${errorText})` : ''}`, fileName);
+				}),
+			},
+		]);
+		if (mbLibraryStatus) {
+			mbLibraryStatus.textContent = summary;
+			mbLibraryStatus.hidden = false;
+		}
+		await loadModelLibrary();
+	} catch (err) {
+		const errorPrefix = providerSummary ? `Recovery failed (${providerSummary}): ` : 'Recovery failed: ';
+		showToast(errorPrefix + err.message, 'neg');
+		renderLocalLibraryActionReport('Metadata + Preview Recovery', errorPrefix + err.message, []);
+		if (mbLibraryStatus) {
+			mbLibraryStatus.textContent = (providerSummary ? `Could not recover metadata and previews (${providerSummary}): ` : 'Could not recover metadata and previews: ') + err.message;
+			mbLibraryStatus.hidden = false;
+		}
+	} finally {
+		if (mbLibraryRecoverMetadataBtn) mbLibraryRecoverMetadataBtn.disabled = false;
+		if (mbLibraryCompareMetadataBtn) mbLibraryCompareMetadataBtn.disabled = false;
+		if (mbLibraryEnrichPreviewsBtn) mbLibraryEnrichPreviewsBtn.disabled = false;
+	}
+}
+
+function applyLocalLibraryClientFilters(models) {
+	let filtered = Array.isArray(models) ? models.slice() : [];
+	const query = mbLocalQuery ? String(mbLocalQuery.value || '').trim().toLowerCase() : '';
+	const type = mbLocalType ? String(mbLocalType.value || '').trim().toLowerCase() : '';
+	const baseModel = mbLocalBaseModel ? String(mbLocalBaseModel.value || '').trim().toLowerCase() : '';
+	const hideEmbeddings = mbToggleIsOn(mbLocalHideEmbeddings);
+	const matchedOnly = mbToggleIsOn(mbLocalMatchedOnly);
+	if (query) {
+		filtered = filtered.filter((item) => {
+			const name = String(item.name || '').toLowerCase();
+			const folder = String(item.folder || '').toLowerCase();
+			const itemType = String(item.type || '').toLowerCase();
+			const itemBaseModel = String(item.base_model || '').toLowerCase();
+			const itemProvider = String(item.provider || '').toLowerCase();
+			const itemModelId = String(item.model_id || '').toLowerCase();
+			const itemModelName = String(item.model_name || '').toLowerCase();
+			const itemVersionName = String(item.version_name || '').toLowerCase();
+			return name.includes(query)
+				|| folder.includes(query)
+				|| itemType.includes(query)
+				|| itemBaseModel.includes(query)
+				|| itemProvider.includes(query)
+				|| itemModelId.includes(query)
+				|| itemModelName.includes(query)
+				|| itemVersionName.includes(query);
+		});
+	}
+	if (type) {
+		filtered = filtered.filter((item) => String(item.type || '').toLowerCase() === type);
+	}
+	if (baseModel) {
+		filtered = filtered.filter((item) => String(item.base_model || '').toLowerCase().includes(baseModel));
+	}
+	if (hideEmbeddings) {
+		filtered = filtered.filter((item) => !String(item.folder || '').toLowerCase().includes('embedding') && !String(item.type || '').toLowerCase().includes('textualinversion'));
+	}
+	if (matchedOnly) {
+		filtered = filtered.filter((item) => {
+			const provider = String(item.provider || '').trim();
+			const modelId = String(item.model_id || '').trim();
+			const modelName = String(item.model_name || '').trim();
+			const versionName = String(item.version_name || '').trim();
+			return Boolean(provider || modelId || modelName || versionName);
+		});
+	}
+	const sort = mbLocalSort ? String(mbLocalSort.value || 'name-asc') : 'name-asc';
+	if (sort === 'name-desc') {
+		filtered.sort((a, b) => String(b.name || '').localeCompare(String(a.name || '')));
+	} else if (sort === 'size-desc') {
+		filtered.sort((a, b) => Number(b.size_bytes || 0) - Number(a.size_bytes || 0));
+	} else if (sort === 'size-asc') {
+		filtered.sort((a, b) => Number(a.size_bytes || 0) - Number(b.size_bytes || 0));
+	} else if (sort === 'folder') {
+		filtered.sort((a, b) => String(a.folder || '').localeCompare(String(b.folder || '')) || String(a.name || '').localeCompare(String(b.name || '')));
+	} else {
+		filtered.sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
+	}
+	return filtered;
+}
+
+function refreshLocalBaseModelOptions(models) {
+	if (!mbLocalBaseModel) return;
+	const STATIC_VALUES = new Set(['', 'SD 1.5', 'SDXL 1.0', 'SDXL Turbo', 'Pony', 'Flux.1 D', 'Flux.1 S']);
+	const currentValue = mbLocalBaseModel.value;
+	// remove previously-added dynamic options
+	Array.from(mbLocalBaseModel.options).forEach((opt) => {
+		if (!STATIC_VALUES.has(opt.value)) opt.remove();
+	});
+	// collect unique non-static base models from the full library
+	const seen = new Set(STATIC_VALUES);
+	const dynamic = [];
+	(models || []).forEach((m) => {
+		const bm = String(m.base_model || '').trim();
+		if (bm && !seen.has(bm)) { seen.add(bm); dynamic.push(bm); }
+	});
+	dynamic.sort((a, b) => a.localeCompare(b));
+	dynamic.forEach((bm) => {
+		const opt = document.createElement('option');
+		opt.value = bm;
+		opt.textContent = bm;
+		mbLocalBaseModel.appendChild(opt);
+	});
+	// restore selected value if still available
+	if (Array.from(mbLocalBaseModel.options).some((o) => o.value === currentValue)) {
+		mbLocalBaseModel.value = currentValue;
+	}
+}
+
+function renderLocalLibraryFromState() {
+	renderLocalLibrary(mbLibraryAllModels, mbLibraryRoot);
+}
+
+function formatReportReason(reason) {
+	const raw = String(reason || '').trim();
+	if (!raw) return 'unknown';
+	return raw.replace(/_/g, ' ');
+}
+
+function createReportItem(label, file = '') {
+	const itemLabel = String(label || '').trim();
+	if (!itemLabel) return null;
+	return {
+		label: itemLabel,
+		file: String(file || '').trim(),
+	};
+}
+
+function buildReportItemsFromSamples(samples, mapper) {
+	if (!Array.isArray(samples)) return [];
+	return samples
+		.map((sample) => mapper(sample))
+		.filter((item) => {
+			if (!item) return false;
+			if (typeof item === 'object') {
+				return Boolean(String(item.label || item.file || '').trim());
+			}
+			return Boolean(String(item).trim());
+		})
+		.slice(0, 5);
+}
+
+function focusLocalLibraryReportItem(fileName) {
+	const targetName = String(fileName || '').trim();
+	if (!targetName) return;
+	setModelBrowserView('library');
+	if (mbLocalQuery) {
+		mbLocalQuery.value = targetName;
+		localStorage.setItem('mbLocalQuery', targetName);
+	}
+	if (mbLocalType) {
+		mbLocalType.value = '';
+		localStorage.setItem('mbLocalType', '');
+	}
+	if (mbLocalBaseModel) {
+		mbLocalBaseModel.value = '';
+		localStorage.setItem('mbLocalBaseModel', '');
+	}
+	if (mbLocalHideEmbeddings) {
+		setMbToggleState(mbLocalHideEmbeddings, false);
+		localStorage.setItem('mbLocalHideEmbeddings', '0');
+	}
+	if (mbLocalMatchedOnly) {
+		setMbToggleState(mbLocalMatchedOnly, false);
+		localStorage.setItem('mbLocalMatchedOnly', '0');
+	}
+	renderLocalLibraryFromState();
+	if (!mbLibraryGrid) return;
+	const targetKey = targetName.toLowerCase();
+	const targetCard = Array.from(mbLibraryGrid.querySelectorAll('.mb-local-card')).find((card) => (
+		String(card.dataset.modelName || '').toLowerCase() === targetKey
+	));
+	if (!targetCard) {
+		if (mbLibraryStatus) {
+			mbLibraryStatus.textContent = `Filtered Local Library to report item: ${targetName}`;
+			mbLibraryStatus.hidden = false;
+		}
+		return;
+	}
+	if (mbReportTargetTimer) {
+		window.clearTimeout(mbReportTargetTimer);
+		mbReportTargetTimer = null;
+	}
+	mbLibraryGrid.querySelectorAll('.mb-local-card.is-report-target').forEach((card) => {
+		card.classList.remove('is-report-target');
+	});
+	targetCard.classList.add('is-report-target');
+	targetCard.scrollIntoView({behavior: 'smooth', block: 'center'});
+	targetCard.focus();
+	if (mbLibraryStatus) {
+		mbLibraryStatus.textContent = `Focused report item in Local Library: ${targetName}`;
+		mbLibraryStatus.hidden = false;
+	}
+	mbReportTargetTimer = window.setTimeout(() => {
+		targetCard.classList.remove('is-report-target');
+		mbReportTargetTimer = null;
+	}, 2200);
+}
+
+function renderLocalLibraryActionReport(title, summary, groups = []) {
+	if (!mbLibraryActionReport) return;
+	if (!summary && (!Array.isArray(groups) || !groups.length)) {
+		mbLibraryActionReport.hidden = true;
+		return;
+	}
+	const groupMarkup = (Array.isArray(groups) ? groups : [])
+		.filter((group) => group && group.label && Array.isArray(group.items) && group.items.length)
+		.map((group) => {
+			const items = group.items.map((item) => {
+				if (item && typeof item === 'object') {
+					const label = String(item.label || item.file || '').trim();
+					const file = String(item.file || '').trim();
+					if (file) {
+						return `<li><button class="mb-library-action-report-link" type="button" data-report-file="${escHtml(file)}">${escHtml(label)}</button></li>`;
+					}
+					return `<li>${escHtml(label)}</li>`;
+				}
+				return `<li>${escHtml(String(item || ''))}</li>`;
+			}).join('');
+			return `
+				<div class="mb-library-action-report-group">
+					<div class="mb-library-action-report-label">${escHtml(String(group.label || ''))}</div>
+					<ul class="mb-library-action-report-list">${items}</ul>
+				</div>`;
+		}).join('');
+	mbLibraryActionReport.innerHTML = `
+		<div class="mb-library-action-report-head">
+			<button class="btn btn-ghost btn-xs" id="mb-library-action-report-clear" type="button">Clear Report</button>
+		</div>
+		<p class="mb-library-action-report-title">${escHtml(String(title || 'Local library action'))}</p>
+		<p class="mb-library-action-report-summary">${escHtml(String(summary || ''))}</p>
+		${groupMarkup}`;
+	const clearBtn = document.getElementById('mb-library-action-report-clear');
+	if (clearBtn) {
+		clearBtn.addEventListener('click', () => renderLocalLibraryActionReport('', '', []));
+	}
+	mbLibraryActionReport.querySelectorAll('.mb-library-action-report-link').forEach((button) => {
+		button.addEventListener('click', () => focusLocalLibraryReportItem(button.dataset.reportFile || ''));
+	});
+	mbLibraryActionReport.hidden = false;
+}
+
 function renderLocalLibrary(models, root) {
 	if (!mbLibraryGrid) return;
 	mbLibraryGrid.innerHTML = '';
+	mbLocalInstalledNames = new Set((models || []).map((m) => String(m.name || '').toLowerCase()));
+	refreshLocalBaseModelOptions(models);
 	if (models.length === 0) {
 		if (mbLibraryStatus) {
 			mbLibraryStatus.textContent = root ? 'No models found in ' + root : 'ComfyUI path not configured — set it on the Configurations tab.';
@@ -3425,20 +5315,101 @@ function renderLocalLibrary(models, root) {
 		}
 		return;
 	}
-	if (mbLibraryStatus) mbLibraryStatus.hidden = true;
-	models.forEach(m => {
+	const displayModels = applyLocalLibraryClientFilters(models);
+	if (!displayModels.length) {
+		if (mbLibraryStatus) {
+			mbLibraryStatus.textContent = 'No local files match your filters.';
+			mbLibraryStatus.hidden = false;
+		}
+		return;
+	}
+	if (mbLibraryStatus) {
+		mbLibraryStatus.textContent = `Showing ${displayModels.length} of ${models.length} local files`;
+		mbLibraryStatus.hidden = false;
+	}
+	displayModels.forEach(m => {
 		const card = document.createElement('div');
-		card.className = 'mb-local-card';
+		card.className = 'mb-result-card mb-local-card';
+		card.dataset.modelName = String(m.name || '');
+		card.setAttribute('role', 'button');
+		card.setAttribute('tabindex', '0');
+		card.setAttribute('aria-label', `Open local model ${m.name || 'details'}`);
+		const previewUrls = Array.isArray(m.preview_urls)
+			? m.preview_urls.map((url) => String(url || '').trim()).filter(Boolean)
+			: [];
+		const cardPreviewUrls = previewUrls.slice();
+		if (m.preview_url && !cardPreviewUrls.includes(String(m.preview_url))) {
+			cardPreviewUrls.unshift(String(m.preview_url));
+		}
+		const activePreview = cardPreviewUrls[0] || '';
+		const thumb = activePreview
+			? `<img class="mb-result-thumb" src="${escHtml(activePreview)}" alt="" loading="lazy" data-preview-main="1">`
+			: '<div class="mb-result-thumb-placeholder" role="img" aria-label="No preview available"><span class="mb-result-thumb-placeholder-badge">Local model</span></div>';
+		const previewStrip = cardPreviewUrls.length > 1
+			? `<div class="mb-local-card-preview-strip">${cardPreviewUrls.slice(0, 6).map((url, idx) => (`<button class="mb-local-card-preview-thumb ${idx === 0 ? 'is-active' : ''}" type="button" data-preview-src="${escHtml(url)}" aria-label="Show preview ${idx + 1}"><img src="${escHtml(url)}" alt="" loading="lazy"></button>`)).join('')}</div>`
+			: '';
+		const sizeLabel = formatBytes(m.size_bytes);
+		const filePath = String(m.path || '');
+		const versionLabel = String(m.version_name || '').trim();
 		card.innerHTML = `
-			<div class="mb-local-card-name" title="${escHtml(m.name)}">${escHtml(m.name)}</div>
-			<div class="mb-local-card-meta">${escHtml(m.folder)} &middot; ${formatBytes(m.size_bytes)}</div>
-			<div class="mb-local-card-actions">
-				<button class="btn btn-sm btn-danger mb-delete-btn" data-name="${escHtml(m.name)}" data-folder="${escHtml(m.folder)}">Delete</button>
+			${thumb}
+			${previewStrip}
+			<div class="mb-result-body">
+				<div class="mb-result-name-row">
+					<div class="mb-result-name" title="${escHtml(m.name)}">${escHtml(m.name)}</div>
+				</div>
+				<div class="mb-result-meta">
+					<span class="mb-result-type-chip">Local</span>
+					<span class="mb-result-type-chip">${escHtml(m.type || m.folder || 'Model')}</span>
+					${m.base_model ? `<span>${escHtml(m.base_model)}</span>` : ''}
+					<span>${escHtml(sizeLabel)}</span>
+				</div>
+				${versionLabel ? `<div class="mb-local-card-version" title="Matched provider version">Matched version: ${escHtml(versionLabel)}</div>` : ''}
+				${filePath ? `<div class="mb-result-version" title="${escHtml(filePath)}">${escHtml(filePath)}</div>` : ''}
+				<div class="mb-local-card-actions">
+					<button class="btn btn-sm btn-ghost mb-use-image-btn" data-name="${escHtml(m.name || '')}" data-type="${escHtml(m.type || '')}" data-folder="${escHtml(m.folder || '')}">Use in Image Gen</button>
+					<button class="btn btn-sm btn-danger mb-delete-btn" data-name="${escHtml(m.name)}" data-folder="${escHtml(m.folder)}">Delete</button>
+				</div>
 			</div>`;
 		mbLibraryGrid.appendChild(card);
+		card.addEventListener('click', (event) => {
+			const target = event.target;
+			if (!(target instanceof HTMLElement)) return;
+			if (target.closest('.mb-delete-btn')) return;
+			openLocalModelDetailsModal(m);
+		});
+		card.addEventListener('keydown', (event) => {
+			if (event.key !== 'Enter' && event.key !== ' ') return;
+			event.preventDefault();
+			openLocalModelDetailsModal(m);
+		});
+		card.querySelectorAll('.mb-local-card-preview-thumb').forEach((thumbBtn) => {
+			thumbBtn.addEventListener('click', (event) => {
+				event.preventDefault();
+				event.stopPropagation();
+				const targetSrc = String(thumbBtn.dataset.previewSrc || '').trim();
+				if (!targetSrc) return;
+				const mainPreview = card.querySelector('[data-preview-main="1"]');
+				if (mainPreview instanceof HTMLImageElement) {
+					mainPreview.src = targetSrc;
+				}
+				card.querySelectorAll('.mb-local-card-preview-thumb').forEach((node) => node.classList.remove('is-active'));
+				thumbBtn.classList.add('is-active');
+			});
+		});
 	});
 	mbLibraryGrid.querySelectorAll('.mb-delete-btn').forEach(btn => {
 		btn.addEventListener('click', () => deleteLocalModel(btn.dataset.name, btn.dataset.folder, btn));
+	});
+	mbLibraryGrid.querySelectorAll('.mb-use-image-btn').forEach((btn) => {
+		btn.addEventListener('click', (event) => {
+			event.stopPropagation();
+			useModelInImageGen({
+				name: btn.dataset.name || '',
+				type: btn.dataset.type || '',
+				folder: btn.dataset.folder || '',
+			});
+		});
 	});
 }
 
@@ -3462,23 +5433,64 @@ async function deleteLocalModel(fileName, folder, btn) {
 
 async function runCivitaiSearch(page) {
 	if (!mbResultsGrid) return;
+	const provider = mbProvider ? String(mbProvider.value || 'civitai') : 'civitai';
 	const query = mbSearchQuery ? mbSearchQuery.value.trim() : '';
 	const type  = mbSearchType  ? mbSearchType.value : '';
+	const baseModel = mbBaseModel ? mbBaseModel.value.trim() : '';
+	const showNsfw = mbToggleIsOn(mbShowNsfwToggle);
+	const sortLabel = getMbServerSortLabel();
+	const isQueryMode = provider === 'civitai' && Boolean(query);
 	mbCurrentPage = page || 1;
-	if (mbSearchStatus) { mbSearchStatus.textContent = 'Searching…'; mbSearchStatus.hidden = false; }
+	if (mbCurrentPage <= 1) {
+		mbCursorByPage = { 1: '' };
+	}
+	if (mbSearchStatus) {
+		mbSearchStatus.textContent = provider === 'huggingface' ? 'Searching Hugging Face…' : 'Searching CivitAI…';
+		mbSearchStatus.hidden = false;
+	}
 	if (mbResultsCount) mbResultsCount.textContent = '';
 	mbResultsGrid.innerHTML = '';
 	if (mbResultsSection) mbResultsSection.hidden = false;
 	try {
 		const params = new URLSearchParams({page: mbCurrentPage});
+		params.set('limit', String(getMbPageSize()));
 		if (query) params.set('query', query);
 		if (type)  params.set('type', type);
-		const resp = await fetch('/api/models/civitai/search?' + params.toString());
+		if (provider === 'civitai' && baseModel) params.set('base_model', baseModel);
+		params.set('sort', sortLabel);
+		if (provider === 'civitai') params.set('nsfw', showNsfw ? 'true' : 'false');
+		if (isQueryMode) {
+			const cursor = mbCursorByPage[mbCurrentPage] || '';
+			if (cursor) params.set('cursor', cursor);
+		}
+		const endpoint = provider === 'huggingface' ? '/api/models/huggingface/search?' : '/api/models/civitai/search?';
+		const resp = await fetch(endpoint + params.toString());
 		const data = await resp.json();
 		if (!resp.ok) throw new Error(data.error || resp.statusText);
+		mbQueryMode = isQueryMode;
 		mbTotalPages = data.total_pages || 1;
-		renderSearchResults(data.items || [], data.total_items);
+		mbHasNextPage = Boolean(data.has_next);
+		if (mbQueryMode) {
+			if (data.next_cursor) {
+				mbCursorByPage[mbCurrentPage + 1] = data.next_cursor;
+			} else {
+				delete mbCursorByPage[mbCurrentPage + 1];
+			}
+			Object.keys(mbCursorByPage).forEach((k) => {
+				const n = Number(k);
+				if (!Number.isNaN(n) && n > mbCurrentPage + 1) {
+					delete mbCursorByPage[n];
+				}
+			});
+		} else {
+			mbHasNextPage = mbCurrentPage < mbTotalPages;
+			mbCursorByPage = { 1: '' };
+		}
+		mbLastSearchItems = data.items || [];
+		renderSearchResults(mbLastSearchItems, data.total_items);
 	} catch (err) {
+		mbHasNextPage = false;
+		if (mbPagination) mbPagination.hidden = true;
 		if (mbSearchStatus) { mbSearchStatus.textContent = 'Search failed: ' + err.message; mbSearchStatus.hidden = false; }
 	}
 }
@@ -3487,42 +5499,67 @@ function renderSearchResults(items, totalItems) {
 	if (!mbResultsGrid) return;
 	mbResultsGrid.innerHTML = '';
 	if (mbSearchStatus) mbSearchStatus.hidden = true;
-	if (mbResultsCount) mbResultsCount.textContent = totalItems != null ? `(${totalItems.toLocaleString()} total)` : '';
-	if (items.length === 0) {
+	if (mbPagination) mbPagination.hidden = false;
+	const displayItems = applyModelBrowserClientFilters(items || []);
+	if (mbResultsCount) {
+		const shown = displayItems.length.toLocaleString();
+		if (totalItems != null) {
+			mbResultsCount.textContent = `(${shown} shown / ${totalItems.toLocaleString()} total)`;
+		} else {
+			mbResultsCount.textContent = `(${shown} shown)`;
+		}
+	}
+	if (displayItems.length === 0) {
 		mbResultsGrid.innerHTML = '<p class="mb-library-status">No results found.</p>';
 		updatePagination();
 		return;
 	}
-	items.forEach(item => {
+	displayItems.forEach(item => {
+		const installed = modelIsInstalled(item);
+		const provider = String(item.provider || '').toLowerCase();
 		const card = document.createElement('div');
 		card.className = 'mb-result-card';
+		card.dataset.modelId = String(item.id || '');
+		card.setAttribute('role', 'button');
+		card.setAttribute('tabindex', '0');
+		card.setAttribute('aria-label', `Open model ${item.name || 'details'}`);
 		const thumb = item.preview_url
 			? `<img class="mb-result-thumb" src="${escHtml(item.preview_url)}" alt="" loading="lazy">`
-			: `<div class="mb-result-thumb-placeholder"></div>`;
+			: `<div class="mb-result-thumb-placeholder" role="img" aria-label="No preview available"><span class="mb-result-thumb-placeholder-badge">No preview</span></div>`;
+		const sourceLink = item.model_url
+			? `<a class="mb-result-source-link" href="${escHtml(item.model_url)}" target="_blank" rel="noopener noreferrer" title="Open on source site" aria-label="Open on source site">↗</a>`
+			: '';
 		card.innerHTML = `
 			${thumb}
 			<div class="mb-result-body">
-				<div class="mb-result-name" title="${escHtml(item.name)}">${escHtml(item.name)}</div>
+				<div class="mb-result-name-row">
+					<div class="mb-result-name" title="${escHtml(item.name)}">${escHtml(item.name)}</div>
+					${sourceLink}
+				</div>
 				<div class="mb-result-meta">
-					<span class="mb-type-chip">${escHtml(item.type || '')}</span>
+					${item.provider ? `<span class="mb-result-type-chip">${escHtml(item.provider)}</span>` : ''}
+					<span class="mb-result-type-chip">${escHtml(item.type || '')}</span>
+					${item.base_model ? `<span>${escHtml(item.base_model)}</span>` : ''}
 					${item.rating != null ? `<span>&#9733; ${item.rating.toFixed(1)}</span>` : ''}
+					${item.likes != null ? `<span>❤ ${Number(item.likes).toLocaleString()}</span>` : ''}
 					${item.download_count != null ? `<span>${item.download_count.toLocaleString()} downloads</span>` : ''}
+					${installed ? '<span>Installed</span>' : ''}
+					${item.is_early_access ? '<span>Early access</span>' : ''}
 				</div>
-				${item.version_name ? `<div class="mb-result-meta" style="font-size:0.78em;opacity:0.7">v: ${escHtml(item.version_name)}</div>` : ''}
-				<div class="mb-result-actions">
-					<button class="btn btn-sm btn-primary mb-dl-btn"
-						data-url="${escHtml(item.download_url || '')}"
-						data-name="${escHtml(item.file_name || item.name)}"
-						data-folder="${escHtml(item.model_type_folder || 'checkpoints')}"
-						${item.download_url ? '' : 'disabled title="No download URL available"'}>
-						Download
-					</button>
-				</div>
+				${item.version_name ? `<div class="mb-result-version">v: ${escHtml(item.version_name)}</div>` : ''}
 			</div>`;
 		mbResultsGrid.appendChild(card);
-	});
-	mbResultsGrid.querySelectorAll('.mb-dl-btn').forEach(btn => {
-		btn.addEventListener('click', () => startModelDownload(btn.dataset.url, btn.dataset.name, btn.dataset.folder, btn));
+		card.addEventListener('click', (event) => {
+			const target = event.target;
+			if (!(target instanceof HTMLElement)) return;
+			if (target.closest('.mb-result-source-link')) return;
+			openModelDetailsModal(item);
+		});
+		card.addEventListener('keydown', (event) => {
+			if (event.key !== 'Enter' && event.key !== ' ') return;
+			event.preventDefault();
+			openModelDetailsModal(item);
+		});
 	});
 	updatePagination();
 }
@@ -3530,24 +5567,49 @@ function renderSearchResults(items, totalItems) {
 function updatePagination() {
 	if (!mbPrevPage || !mbNextPage || !mbPageInfo) return;
 	mbPrevPage.disabled = mbCurrentPage <= 1;
-	mbNextPage.disabled = mbCurrentPage >= mbTotalPages;
-	mbPageInfo.textContent = `Page ${mbCurrentPage} of ${mbTotalPages}`;
+	mbNextPage.disabled = mbQueryMode ? !mbHasNextPage : (mbCurrentPage >= mbTotalPages);
+	mbPageInfo.textContent = mbQueryMode
+		? (mbHasNextPage ? `Page ${mbCurrentPage} (more available)` : `Page ${mbCurrentPage}`)
+		: `Page ${mbCurrentPage} of ${mbTotalPages}`;
 }
 
-async function startModelDownload(url, fileName, folder, btn) {
-	if (!url) return;
+async function startModelDownload(url, fileName, folder, btn, provider = 'civitai', modelId = '', versionName = '', modelName = '', modelType = '', baseModel = '', modelUrl = '', previewUrl = '') {
+	if (!url && String(provider || '').toLowerCase() !== 'huggingface') return;
 	if (btn) btn.disabled = true;
 	try {
 		const resp = await fetch('/api/models/download', {
 			method: 'POST',
 			headers: {'Content-Type': 'application/json'},
-			body: JSON.stringify({url, file_name: fileName, folder})
+			body: JSON.stringify({
+				url,
+				file_name: fileName,
+				folder,
+				provider,
+				model_id: modelId,
+				model_name: modelName,
+				model_type: modelType,
+				base_model: baseModel,
+				model_url: modelUrl,
+				preview_url: previewUrl,
+			})
 		});
 		const data = await resp.json();
 		if (!resp.ok) throw new Error(data.error || resp.statusText);
 		if (mbDownloadsSection) mbDownloadsSection.hidden = false;
+		if (data.download_id) {
+			addDownloadRow(data.download_id, data.file_name || fileName);
+		}
+		if (btn && btn.classList.contains('mb-model-modal-download-btn')) {
+			const label = data.file_name || fileName || 'file';
+			const versionLabel = versionName || 'selected version';
+			setModelModalDownloadStatus(`Queued ${label} from ${versionLabel}.`, 'ok');
+		}
 		ensureDownloadPoll();
 	} catch (err) {
+		if (btn && btn.classList.contains('mb-model-modal-download-btn')) {
+			const versionLabel = versionName || 'selected version';
+			setModelModalDownloadStatus(`Failed to queue download for ${versionLabel}: ${err.message}`, 'error');
+		}
 		alert('Download failed to start: ' + err.message);
 		if (btn) btn.disabled = false;
 	}
@@ -3580,6 +5642,90 @@ function stopDownloadPoll() {
 	if (mbPollTimer) { clearInterval(mbPollTimer); mbPollTimer = null; }
 }
 
+function setDownloadsMinimized(minimized) {
+	mbDownloadsMinimized = Boolean(minimized);
+	if (mbDownloadsSection) {
+		mbDownloadsSection.classList.toggle('is-minimized', mbDownloadsMinimized);
+	}
+	if (mbDownloadsBody) {
+		mbDownloadsBody.hidden = mbDownloadsMinimized;
+	}
+	if (mbDownloadsToggleBtn) {
+		mbDownloadsToggleBtn.textContent = mbDownloadsMinimized ? 'Expand' : 'Minimize';
+		mbDownloadsToggleBtn.setAttribute('aria-expanded', mbDownloadsMinimized ? 'false' : 'true');
+	}
+}
+
+function onModelDownloadsActionsKeydown(event) {
+	const key = event.key;
+	if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(key)) return;
+	const actions = [mbClearFinishedDownloadsBtn, mbDownloadsToggleBtn].filter(Boolean);
+	if (actions.length < 2) return;
+	const currentIndex = actions.indexOf(event.currentTarget);
+	if (currentIndex < 0) return;
+	event.preventDefault();
+	let nextIndex = currentIndex;
+	if (key === 'Home') {
+		nextIndex = 0;
+	} else if (key === 'End') {
+		nextIndex = actions.length - 1;
+	} else if (key === 'ArrowRight') {
+		nextIndex = (currentIndex + 1) % actions.length;
+	} else if (key === 'ArrowLeft') {
+		nextIndex = (currentIndex - 1 + actions.length) % actions.length;
+	}
+	const nextAction = actions[nextIndex];
+	if (nextAction) nextAction.focus();
+}
+
+function updateDownloadControlsState() {
+	if (!mbDownloadsList) return;
+	const rows = mbDownloadsList.querySelectorAll('[data-dl-id]');
+	const activeCount = Array.from(rows).filter((row) => {
+		const status = String(row.dataset.status || '').toLowerCase();
+		return status === 'downloading' || status === 'cancelling';
+	}).length;
+	const pendingCount = Array.from(rows).filter((row) => {
+		const status = String(row.dataset.status || '').toLowerCase();
+		return status === 'queued';
+	}).length;
+	if (mbClearFinishedDownloadsBtn) {
+		const hasFinished = Array.from(rows).some((row) =>
+			row.classList.contains('is-done') ||
+			row.classList.contains('is-error') ||
+			row.classList.contains('is-cancelled'));
+		mbClearFinishedDownloadsBtn.disabled = !hasFinished;
+	}
+	if (mbDownloadsCounter) {
+		const hasInFlight = (activeCount + pendingCount) > 0;
+		const hasActiveTransfer = activeCount > 0;
+		mbDownloadsCounter.textContent = hasInFlight
+			? `${activeCount} active • ${pendingCount} pending`
+			: 'Idle';
+		mbDownloadsCounter.classList.toggle('is-busy', hasInFlight);
+		mbDownloadsCounter.classList.toggle('is-active', hasActiveTransfer);
+		mbDownloadsCounter.hidden = !mbDownloadsMinimized;
+	}
+	if (mbDownloadsSection) {
+		mbDownloadsSection.hidden = rows.length === 0;
+	}
+}
+
+function clearFinishedDownloadRows() {
+	if (!mbDownloadsList) return;
+	const rows = mbDownloadsList.querySelectorAll('[data-dl-id]');
+	rows.forEach((row) => {
+		if (
+			row.classList.contains('is-done') ||
+			row.classList.contains('is-error') ||
+			row.classList.contains('is-cancelled')
+		) {
+			row.remove();
+		}
+	});
+	updateDownloadControlsState();
+}
+
 async function fetchAndRenderAllDownloads() {
 	if (!mbDownloadsList) return;
 	// We don't have a list endpoint, so just refresh existing rows
@@ -3604,6 +5750,7 @@ function addDownloadRow(downloadId, fileName) {
 	const row = document.createElement('div');
 	row.className = 'mb-download-row';
 	row.dataset.dlId = downloadId;
+	row.dataset.status = 'queued';
 	row.innerHTML = `
 		<div class="mb-download-row-head">
 			<span class="mb-download-name">${escHtml(fileName)}</span>
@@ -3613,6 +5760,7 @@ function addDownloadRow(downloadId, fileName) {
 		<div class="mb-progress"><div class="mb-progress-bar" style="width:0%"></div></div>`;
 	mbDownloadsList.appendChild(row);
 	row.querySelector('.mb-cancel-dl-btn').addEventListener('click', () => cancelDownload(downloadId, row));
+	updateDownloadControlsState();
 	ensureDownloadPoll();
 }
 
@@ -3638,40 +5786,293 @@ function updateDownloadRow(downloadId, state) {
 	const statusEl = row.querySelector('.mb-download-status');
 	const bar      = row.querySelector('.mb-progress-bar');
 	const cancelBtn = row.querySelector('.mb-cancel-dl-btn');
-	if (statusEl) statusEl.textContent = state.status === 'downloading'
-		? `${state.downloaded_bytes != null ? formatBytes(state.downloaded_bytes) : ''}${state.total_bytes ? ' / ' + formatBytes(state.total_bytes) : ''}`
-		: state.status;
+	if (statusEl) {
+		let statusText = '';
+		if (state.status === 'downloading') {
+			statusText = `${state.downloaded_bytes != null ? formatBytes(state.downloaded_bytes) : ''}${state.total_bytes ? ' / ' + formatBytes(state.total_bytes) : ''}`;
+		} else if (state.status === 'error') {
+			const reason = String(state.error || '').trim();
+			statusText = reason ? `error: ${reason}` : 'error';
+		} else {
+			statusText = state.status;
+		}
+		statusEl.textContent = statusText;
+		statusEl.title = statusText;
+	}
+	row.dataset.status = String(state.status || '').toLowerCase();
 	const pct = state.total_bytes && state.total_bytes > 0 ? (state.downloaded_bytes / state.total_bytes) * 100 : 0;
 	if (bar) bar.style.width = pct.toFixed(1) + '%';
 	row.classList.toggle('is-done',      state.status === 'done');
 	row.classList.toggle('is-error',     state.status === 'error');
 	row.classList.toggle('is-cancelled', state.status === 'cancelled');
-	if (cancelBtn) cancelBtn.hidden = (state.status !== 'downloading');
+	if (cancelBtn) {
+		const showCancel = state.status === 'downloading';
+		cancelBtn.hidden = !showCancel;
+		cancelBtn.style.display = showCancel ? '' : 'none';
+	}
 	if (state.status === 'done') loadModelLibrary();
+	updateDownloadControlsState();
 }
 
 async function cancelDownload(downloadId, row) {
+	const cancelBtn = row ? row.querySelector('.mb-cancel-dl-btn') : null;
+	const statusEl = row ? row.querySelector('.mb-download-status') : null;
+	if (cancelBtn) {
+		cancelBtn.disabled = true;
+		cancelBtn.hidden = true;
+		cancelBtn.style.display = 'none';
+	}
+	if (row) row.dataset.status = 'cancelling';
+	if (statusEl) {
+		statusEl.textContent = 'cancelling...';
+		statusEl.title = 'cancelling...';
+	}
 	try {
-		await fetch('/api/models/download/' + encodeURIComponent(downloadId) + '/cancel', {method: 'POST'});
+		const resp = await fetch('/api/models/download/' + encodeURIComponent(downloadId) + '/cancel', {method: 'POST'});
+		if (!resp.ok) throw new Error('cancel failed');
 		if (row) row.classList.add('is-cancelled');
-	} catch (_) {}
+		if (row) row.dataset.status = 'cancelled';
+		if (statusEl) {
+			statusEl.textContent = 'cancelled';
+			statusEl.title = 'cancelled';
+		}
+	} catch (_) {
+		if (cancelBtn) {
+			cancelBtn.disabled = false;
+			cancelBtn.hidden = false;
+			cancelBtn.style.display = '';
+		}
+		if (statusEl) {
+			statusEl.textContent = 'cancel failed';
+			statusEl.title = 'cancel failed';
+		}
+		if (row) row.dataset.status = 'error';
+	}
+	updateDownloadControlsState();
 }
 
 // Wire model browser events
+function rerunModelBrowserSearchIfVisible() {
+	if (mbActiveView === 'search' && mbResultsSection && !mbResultsSection.hidden) {
+		runCivitaiSearch(1);
+	}
+}
+
+if (mbViewSearchBtn) {
+	mbViewSearchBtn.addEventListener('click', () => setModelBrowserView('search'));
+	mbViewSearchBtn.addEventListener('keydown', onModelBrowserViewTabKeydown);
+}
+if (mbViewLibraryBtn) {
+	mbViewLibraryBtn.addEventListener('click', () => setModelBrowserView('library'));
+	mbViewLibraryBtn.addEventListener('keydown', onModelBrowserViewTabKeydown);
+}
+
 if (mbSearchBtn) {
 	mbSearchBtn.addEventListener('click', () => runCivitaiSearch(1));
 }
+if (mbSearchBulkRefreshInstalledBtn) {
+	mbSearchBulkRefreshInstalledBtn.addEventListener('click', bulkUpdateInstalledSearchMetadata);
+}
 if (mbSearchQuery) {
+	mbSearchQuery.addEventListener('input', () => {
+		localStorage.setItem('mbSearchQuery', mbSearchQuery.value || '');
+	});
 	mbSearchQuery.addEventListener('keydown', (e) => { if (e.key === 'Enter') runCivitaiSearch(1); });
+}
+if (mbSearchType) {
+	mbSearchType.addEventListener('change', () => {
+		localStorage.setItem('mbSearchType', mbSearchType.value || '');
+		rerunModelBrowserSearchIfVisible();
+	});
+}
+if (mbProvider) {
+	mbProvider.addEventListener('change', () => {
+		localStorage.setItem('mbProvider', mbProvider.value || 'civitai');
+		rerunModelBrowserSearchIfVisible();
+	});
+}
+if (mbBaseModel) {
+	mbBaseModel.addEventListener('change', () => {
+		localStorage.setItem('mbBaseModel', mbBaseModel.value || '');
+		rerunModelBrowserSearchIfVisible();
+	});
+}
+if (mbSort) {
+	mbSort.addEventListener('change', () => {
+		localStorage.setItem('mbSort', mbSort.value || 'highest-rated');
+		if ((mbSort.value || '').toString() === 'highest-rated' || (mbSort.value || '').toString() === 'most-downloaded' || (mbSort.value || '').toString() === 'newest') {
+			rerunModelBrowserSearchIfVisible();
+			return;
+		}
+		renderSearchResults(mbLastSearchItems, null);
+	});
+}
+if (mbPageSize) {
+	mbPageSize.addEventListener('change', () => {
+		localStorage.setItem('mbPageSize', String(getMbPageSize()));
+		rerunModelBrowserSearchIfVisible();
+	});
+}
+if (mbHideInstalledToggle) {
+	mbHideInstalledToggle.addEventListener('click', () => {
+		setMbToggleState(mbHideInstalledToggle, !mbToggleIsOn(mbHideInstalledToggle));
+		if (mbToggleIsOn(mbHideInstalledToggle) && mbShowInstalledOnlyToggle) {
+			setMbToggleState(mbShowInstalledOnlyToggle, false);
+			localStorage.setItem('mbShowInstalledOnly', '0');
+		}
+		localStorage.setItem('mbHideInstalled', mbToggleIsOn(mbHideInstalledToggle) ? '1' : '0');
+		renderSearchResults(mbLastSearchItems, null);
+	});
+	mbHideInstalledToggle.addEventListener('keydown', onModelBrowserFilterTogglesKeydown);
+}
+if (mbShowInstalledOnlyToggle) {
+	mbShowInstalledOnlyToggle.addEventListener('click', () => {
+		setMbToggleState(mbShowInstalledOnlyToggle, !mbToggleIsOn(mbShowInstalledOnlyToggle));
+		if (mbToggleIsOn(mbShowInstalledOnlyToggle) && mbHideInstalledToggle) {
+			setMbToggleState(mbHideInstalledToggle, false);
+			localStorage.setItem('mbHideInstalled', '0');
+		}
+		localStorage.setItem('mbShowInstalledOnly', mbToggleIsOn(mbShowInstalledOnlyToggle) ? '1' : '0');
+		renderSearchResults(mbLastSearchItems, null);
+	});
+	mbShowInstalledOnlyToggle.addEventListener('keydown', onModelBrowserFilterTogglesKeydown);
+}
+if (mbHideEarlyAccessToggle) {
+	mbHideEarlyAccessToggle.addEventListener('click', () => {
+		setMbToggleState(mbHideEarlyAccessToggle, !mbToggleIsOn(mbHideEarlyAccessToggle));
+		localStorage.setItem('mbHideEarlyAccess', mbToggleIsOn(mbHideEarlyAccessToggle) ? '1' : '0');
+		renderSearchResults(mbLastSearchItems, null);
+	});
+	mbHideEarlyAccessToggle.addEventListener('keydown', onModelBrowserFilterTogglesKeydown);
+}
+if (mbShowNsfwToggle) {
+	mbShowNsfwToggle.addEventListener('click', () => {
+		setMbToggleState(mbShowNsfwToggle, !mbToggleIsOn(mbShowNsfwToggle));
+		localStorage.setItem('mbShowNsfw', mbToggleIsOn(mbShowNsfwToggle) ? '1' : '0');
+		rerunModelBrowserSearchIfVisible();
+	});
+	mbShowNsfwToggle.addEventListener('keydown', onModelBrowserFilterTogglesKeydown);
+}
+if (mbTypeInfoBtn && mbTypeInfoPanel) {
+	mbTypeInfoBtn.addEventListener('click', () => {
+		const expanded = mbTypeInfoBtn.getAttribute('aria-expanded') === 'true';
+		mbTypeInfoBtn.setAttribute('aria-expanded', expanded ? 'false' : 'true');
+		mbTypeInfoPanel.hidden = expanded;
+	});
 }
 if (mbLibraryRefreshBtn) {
 	mbLibraryRefreshBtn.addEventListener('click', loadModelLibrary);
 }
+if (mbLibraryEnrichPreviewsBtn) {
+	mbLibraryEnrichPreviewsBtn.addEventListener('click', enrichLocalLibraryPreviews);
+}
+if (mbLibraryRecoverMetadataBtn) {
+	mbLibraryRecoverMetadataBtn.addEventListener('click', recoverLocalLibraryMetadataAndPreviews);
+}
+if (mbCompareProviderCivitai) {
+	mbCompareProviderCivitai.addEventListener('change', () => {
+		localStorage.setItem('mbCompareProviderCivitai', mbCompareProviderCivitai.checked ? '1' : '0');
+	});
+}
+if (mbCompareProviderHuggingface) {
+	mbCompareProviderHuggingface.addEventListener('change', () => {
+		localStorage.setItem('mbCompareProviderHuggingface', mbCompareProviderHuggingface.checked ? '1' : '0');
+	});
+}
+if (mbLibraryCompareMetadataBtn) {
+	mbLibraryCompareMetadataBtn.addEventListener('click', compareLocalLibraryMetadata);
+}
+if (mbResetFiltersBtn) {
+	mbResetFiltersBtn.addEventListener('click', () => {
+		resetModelBrowserFilters();
+		setModelBrowserResetStatus('Defaults restored.');
+		showToast('Model browser filters reset to defaults.', 'pos');
+	});
+}
+if (mbLocalQuery) {
+	mbLocalQuery.addEventListener('input', () => {
+		localStorage.setItem('mbLocalQuery', mbLocalQuery.value || '');
+		renderLocalLibraryFromState();
+	});
+}
+if (mbLocalType) {
+	mbLocalType.addEventListener('change', () => {
+		localStorage.setItem('mbLocalType', mbLocalType.value || '');
+		renderLocalLibraryFromState();
+	});
+}
+if (mbLocalBaseModel) {
+	mbLocalBaseModel.addEventListener('change', () => {
+		localStorage.setItem('mbLocalBaseModel', mbLocalBaseModel.value || '');
+		renderLocalLibraryFromState();
+	});
+}
+if (mbLocalSort) {
+	mbLocalSort.addEventListener('change', () => {
+		localStorage.setItem('mbLocalSort', mbLocalSort.value || 'name-asc');
+		renderLocalLibraryFromState();
+	});
+}
+if (mbLocalHideEmbeddings) {
+	mbLocalHideEmbeddings.addEventListener('click', () => {
+		setMbToggleState(mbLocalHideEmbeddings, !mbToggleIsOn(mbLocalHideEmbeddings));
+		localStorage.setItem('mbLocalHideEmbeddings', mbToggleIsOn(mbLocalHideEmbeddings) ? '1' : '0');
+		renderLocalLibraryFromState();
+	});
+	mbLocalHideEmbeddings.addEventListener('keydown', onLocalLibraryQuickFiltersKeydown);
+}
+if (mbLocalMatchedOnly) {
+	mbLocalMatchedOnly.addEventListener('click', () => {
+		setMbToggleState(mbLocalMatchedOnly, !mbToggleIsOn(mbLocalMatchedOnly));
+		localStorage.setItem('mbLocalMatchedOnly', mbToggleIsOn(mbLocalMatchedOnly) ? '1' : '0');
+		renderLocalLibraryFromState();
+	});
+	mbLocalMatchedOnly.addEventListener('keydown', onLocalLibraryQuickFiltersKeydown);
+}
 if (mbPrevPage) {
 	mbPrevPage.addEventListener('click', () => { if (mbCurrentPage > 1) runCivitaiSearch(mbCurrentPage - 1); });
+	mbPrevPage.addEventListener('keydown', onModelPaginationKeydown);
 }
 if (mbNextPage) {
-	mbNextPage.addEventListener('click', () => { if (mbCurrentPage < mbTotalPages) runCivitaiSearch(mbCurrentPage + 1); });
+	mbNextPage.addEventListener('click', () => {
+		if (mbQueryMode) {
+			if (mbHasNextPage) runCivitaiSearch(mbCurrentPage + 1);
+			return;
+		}
+		if (mbCurrentPage < mbTotalPages) runCivitaiSearch(mbCurrentPage + 1);
+	});
+	mbNextPage.addEventListener('keydown', onModelPaginationKeydown);
+}
+if (mbClearFinishedDownloadsBtn) {
+	mbClearFinishedDownloadsBtn.addEventListener('click', clearFinishedDownloadRows);
+	mbClearFinishedDownloadsBtn.addEventListener('keydown', onModelDownloadsActionsKeydown);
+}
+if (mbDownloadsToggleBtn) {
+	mbDownloadsToggleBtn.addEventListener('click', () => {
+		setDownloadsMinimized(!mbDownloadsMinimized);
+		updateDownloadControlsState();
+	});
+	mbDownloadsToggleBtn.addEventListener('keydown', onModelDownloadsActionsKeydown);
+}
+if (mbModelModalClose) {
+	mbModelModalClose.addEventListener('click', () => setModelModalOpen(false));
+}
+if (mbModelModal) {
+	mbModelModal.addEventListener('click', (event) => {
+		const target = event.target;
+		if (!(target instanceof HTMLElement)) return;
+		if (target.dataset.mbModalClose === 'backdrop') {
+			setModelModalOpen(false);
+		}
+	});
+}
+if (mbModelModalVersion) {
+	mbModelModalVersion.addEventListener('change', () => {
+		if (!mbCurrentModelDetails || !Array.isArray(mbCurrentModelDetails.versions)) return;
+		mbCurrentVersionIndex = Number(mbModelModalVersion.value || 0);
+		const selected = mbCurrentModelDetails.versions[mbCurrentVersionIndex];
+		if (selected) renderModelVersionDetails(selected);
+	});
 }
 
 function buildRandomPromptFromTags() {
@@ -3691,6 +6092,81 @@ function buildRandomPromptFromTags() {
 
 	return `${subject}, ${setting}, ${composition}, ${lighting}, ${style}, ${qualityTag}`;
 }
+
+// --- Prompt Recent History & Saved Presets ---
+const PROMPT_RECENT_MAX = 20;
+const PROMPT_RECENT_KEY = 'promptRecentHistory';
+const PROMPT_SAVED_KEY = 'promptSavedPresets';
+
+function loadPromptRecentHistory() {
+	try { return JSON.parse(localStorage.getItem(PROMPT_RECENT_KEY) || '[]'); }
+	catch { return []; }
+}
+function saveCurrentPromptToHistory(text) {
+	const t = String(text || '').trim();
+	if (!t) return;
+	let list = loadPromptRecentHistory().filter((p) => p !== t);
+	list.unshift(t);
+	list = list.slice(0, PROMPT_RECENT_MAX);
+	localStorage.setItem(PROMPT_RECENT_KEY, JSON.stringify(list));
+	renderPromptRecentDropdown();
+}
+function renderPromptRecentDropdown() {
+	if (!promptRecentDropdown) return;
+	const list = loadPromptRecentHistory();
+	if (!list.length) {
+		promptRecentDropdown.innerHTML = '<li class="prompt-recent-empty">No recent prompts</li>';
+		return;
+	}
+	promptRecentDropdown.innerHTML = list.map((p, i) => {
+		const preview = p.length > 80 ? p.slice(0, 80) + '\u2026' : p;
+		return `<li class="prompt-recent-item" data-index="${i}" role="option" tabindex="0">${escHtml(preview)}</li>`;
+	}).join('');
+	promptRecentDropdown.querySelectorAll('.prompt-recent-item').forEach((li) => {
+		const apply = () => {
+			imagePrompt.value = loadPromptRecentHistory()[Number(li.dataset.index)] || '';
+			promptRecentDropdown.hidden = true;
+			if (promptRecentBtn) promptRecentBtn.setAttribute('aria-expanded', 'false');
+			imagePrompt.focus();
+		};
+		li.addEventListener('click', apply);
+		li.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); apply(); } });
+	});
+}
+function loadPromptSavedPresets() {
+	try { return JSON.parse(localStorage.getItem(PROMPT_SAVED_KEY) || '{}'); }
+	catch { return {}; }
+}
+function renderPromptSavedSelect() {
+	if (!promptSavedSelect) return;
+	const presets = loadPromptSavedPresets();
+	const keys = Object.keys(presets).sort();
+	if (!keys.length) {
+		promptSavedSelect.innerHTML = '<option value="">No saved prompts</option>';
+		return;
+	}
+	promptSavedSelect.innerHTML = keys.map((k) => `<option value="${escHtml(k)}">${escHtml(k)}</option>`).join('');
+}
+function saveNamedPromptPreset(name, text) {
+	const n = String(name || '').trim();
+	const t = String(text || '').trim();
+	if (!n || !t) { showToast('Enter a preset name and prompt text.', 'neg'); return; }
+	const presets = loadPromptSavedPresets();
+	presets[n] = t;
+	localStorage.setItem(PROMPT_SAVED_KEY, JSON.stringify(presets));
+	renderPromptSavedSelect();
+	showToast(`Saved prompt preset "${n}".`, 'pos');
+}
+function deleteNamedPromptPreset(name) {
+	const n = String(name || '').trim();
+	if (!n) return;
+	const presets = loadPromptSavedPresets();
+	delete presets[n];
+	localStorage.setItem(PROMPT_SAVED_KEY, JSON.stringify(presets));
+	renderPromptSavedSelect();
+	showToast(`Deleted prompt preset "${n}".`, 'pos');
+}
+// --- End Prompt Recent History & Saved Presets ---
 
 function renderEnhancedPromptSuggestions(suggestions) {
 	enhancedPromptSuggestions = Array.isArray(suggestions) ? suggestions.filter(Boolean) : [];
@@ -3820,6 +6296,50 @@ if (promptRandomizeBtn) {
 	});
 }
 
+if (promptRecentBtn) {
+	promptRecentBtn.addEventListener('click', (e) => {
+		e.stopPropagation();
+		const isHidden = promptRecentDropdown.hidden;
+		promptRecentDropdown.hidden = !isHidden;
+		promptRecentBtn.setAttribute('aria-expanded', String(isHidden));
+		if (isHidden) renderPromptRecentDropdown();
+	});
+}
+document.addEventListener('click', (e) => {
+	if (promptRecentDropdown && !promptRecentDropdown.hidden) {
+		if (!promptRecentDropdown.contains(e.target) && e.target !== promptRecentBtn) {
+			promptRecentDropdown.hidden = true;
+			if (promptRecentBtn) promptRecentBtn.setAttribute('aria-expanded', 'false');
+		}
+	}
+});
+
+if (promptSaveBtn) {
+	promptSaveBtn.addEventListener('click', () => {
+		saveNamedPromptPreset(promptSavedName?.value, imagePrompt.value.trim());
+	});
+}
+if (promptLoadBtn) {
+	promptLoadBtn.addEventListener('click', () => {
+		if (!promptSavedSelect?.value) { showToast('Select a preset to load.', 'neg'); return; }
+		const presets = loadPromptSavedPresets();
+		if (presets[promptSavedSelect.value] !== undefined) {
+			imagePrompt.value = presets[promptSavedSelect.value];
+			imagePrompt.focus();
+			showToast(`Loaded preset "${promptSavedSelect.value}".`, 'pos');
+		}
+	});
+}
+if (promptDeleteSavedBtn) {
+	promptDeleteSavedBtn.addEventListener('click', () => {
+		if (!promptSavedSelect?.value) { showToast('Select a preset to delete.', 'neg'); return; }
+		deleteNamedPromptPreset(promptSavedSelect.value);
+	});
+}
+
+renderPromptRecentDropdown();
+renderPromptSavedSelect();
+
 if (enhancedPromptSuggestBtn) {
 	enhancedPromptSuggestBtn.addEventListener('click', suggestEnhancedPrompts);
 }
@@ -3882,10 +6402,26 @@ if (enhancedPromptUseSelectedBtn) {
 	});
 }
 
+async function uploadControlnetImageIfNeeded() {
+	if (!controlnetImageUpload || !controlnetImageUpload.files || !controlnetImageUpload.files[0]) return '';
+	const data = new FormData();
+	data.append('image', controlnetImageUpload.files[0]);
+	const res = await fetch('/api/image/upload-image', {
+		method: 'POST',
+		body: data,
+	});
+	const payload = await res.json().catch(() => ({}));
+	if (!res.ok || !payload.name) {
+		throw new Error(payload.error || 'ControlNet image upload failed');
+	}
+	return String(payload.name || '');
+}
+
 imageForm.addEventListener('submit', async (e) => {
 	e.preventDefault();
 
 	const prompt = resolvePromptForSubmission();
+	if (prompt) saveCurrentPromptToHistory(prompt);
 	if (!prompt) {
 		queueSummary.textContent = 'Enter a prompt or apply an enhanced suggestion first.';
 		if (enhancedPromptToggle?.checked) {
@@ -3900,11 +6436,38 @@ imageForm.addEventListener('submit', async (e) => {
 	imageGenerateBtn.textContent = 'Submitting...';
 
 	try {
+		const controlnetModel = controlnetModelSelect?.value || '';
+		const hasControlnetImage = Boolean(controlnetImageUpload?.files && controlnetImageUpload.files[0]);
+		if (controlnetModel && !hasControlnetImage) {
+			queueSummary.textContent = 'Error: Choose a ControlNet image when a ControlNet model is selected.';
+			imageGenerateBtn.disabled = false;
+			imageGenerateBtn.textContent = 'Generate Image';
+			return;
+		}
+		if (!controlnetModel && hasControlnetImage) {
+			queueSummary.textContent = 'Error: Choose a ControlNet model when a ControlNet image is uploaded.';
+			imageGenerateBtn.disabled = false;
+			imageGenerateBtn.textContent = 'Generate Image';
+			return;
+		}
+
+		let controlnetImageName = '';
+		if (controlnetModel && hasControlnetImage) {
+			controlnetImageName = await uploadControlnetImageIfNeeded();
+		}
+
 		const common = {
 			prompt,
 			negative_prompt: imageNegativePrompt.value.trim(),
 			model: imageModelSelect.value,
 			sampler: imageSamplerSelect.value,
+			lora: loraModelSelect?.value || '',
+			lora_strength: Number(loraStrength?.value || 0.8),
+			controlnet_model: controlnetModel,
+			controlnet_image_name: controlnetImageName,
+			controlnet_weight: Number(controlnetWeight?.value || 1),
+			controlnet_start: Number(controlnetStart?.value || 0),
+			controlnet_end: Number(controlnetEnd?.value || 1),
 			seed: imageSeed.value.trim() || null,
 			steps: Number(imageSteps.value),
 			cfg: Number(imageCfg.value),
@@ -3930,6 +6493,13 @@ imageForm.addEventListener('submit', async (e) => {
 			formData.append('negative_prompt', common.negative_prompt);
 			formData.append('model', common.model);
 			formData.append('sampler', common.sampler);
+			formData.append('lora', common.lora || '');
+			formData.append('lora_strength', String(common.lora_strength));
+			formData.append('controlnet_model', common.controlnet_model || '');
+			formData.append('controlnet_image_name', common.controlnet_image_name || '');
+			formData.append('controlnet_weight', String(common.controlnet_weight));
+			formData.append('controlnet_start', String(common.controlnet_start));
+			formData.append('controlnet_end', String(common.controlnet_end));
 			formData.append('seed', common.seed || '');
 			formData.append('steps', String(common.steps));
 			formData.append('cfg', String(common.cfg));
@@ -3962,6 +6532,12 @@ imageForm.addEventListener('submit', async (e) => {
 			prompt: common.prompt,
 			negative_prompt: common.negative_prompt,
 			model: common.model,
+			lora: common.lora,
+			lora_strength: common.lora_strength,
+			controlnet_model: common.controlnet_model,
+			controlnet_weight: common.controlnet_weight,
+			controlnet_start: common.controlnet_start,
+			controlnet_end: common.controlnet_end,
 			sampler: common.sampler,
 			seed: common.seed,
 			steps: common.steps,
