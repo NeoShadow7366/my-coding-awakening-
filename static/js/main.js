@@ -496,7 +496,14 @@ async function runDiagnosticsConsoleCommand(rawInput) {
 		return;
 	}
 
-	appendDiagnosticsConsoleLine(`Unknown command: ${command}`, 'warn');
+	const suggestions = DIAGNOSTICS_COMMAND_SUGGESTIONS
+		.filter((candidate) => candidate.startsWith(command) || candidate.includes(command))
+		.slice(0, 4);
+	if (suggestions.length) {
+		appendDiagnosticsConsoleLine(`Unknown command: ${command}. Try: ${suggestions.join(', ')}`, 'warn');
+		return;
+	}
+	appendDiagnosticsConsoleLine(`Unknown command: ${command}. Type help for commands.`, 'warn');
 }
 
 function persistQueueTelemetryState() {

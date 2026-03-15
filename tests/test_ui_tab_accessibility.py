@@ -185,6 +185,8 @@ def test_diagnostics_drawer_keyboard_handler_wiring_present_in_js_bundle():
     assert "cls: 'clear'," in content
     assert "const normalizedCommand = commandAliases[command] || command;" in content
     assert "appendDiagnosticsConsoleLine('Aliases: h/?=help, q=queue, p=poll, ws=ws-status, retry=ws-retry, cls=clear');" in content
+    assert "Unknown command: ${command}. Try: ${suggestions.join(', ')}" in content
+    assert "Unknown command: ${command}. Type help for commands." in content
     assert "if (normalizedCommand === 'ws-status') {" in content
     assert "if (normalizedCommand === 'ws-retry') {" in content
     assert "function forceRetryComfyWebSocket(sourceLabel = 'manual') {" in content
