@@ -1861,6 +1861,10 @@ if (diagDrawerCommandForm && diagDrawerCommandInput) {
 			event.preventDefault();
 			if (diagDrawerOutput) diagDrawerOutput.innerHTML = '';
 			appendDiagnosticsConsoleLine('Console cleared.');
+		} else if ((event.key === 'r' || event.key === 'R') && event.ctrlKey) {
+			event.preventDefault();
+			const attempted = forceRetryComfyWebSocket('diagnostics shortcut');
+			appendDiagnosticsConsoleLine(attempted ? 'Triggered ComfyUI websocket retry attempt.' : 'ComfyUI websocket already connected.');
 		} else if (event.key === 'ArrowDown') {
 			event.preventDefault();
 			if (diagHistoryIndex <= 0) {

@@ -191,6 +191,9 @@ def test_diagnostics_drawer_keyboard_handler_wiring_present_in_js_bundle():
     assert "if (event.key !== 'Escape') return;" in content
     assert "} else if ((event.key === 'l' || event.key === 'L') && event.ctrlKey) {" in content
     assert "appendDiagnosticsConsoleLine('Console cleared.');" in content
+    assert "} else if ((event.key === 'r' || event.key === 'R') && event.ctrlKey) {" in content
+    assert "const attempted = forceRetryComfyWebSocket('diagnostics shortcut');" in content
+    assert "appendDiagnosticsConsoleLine(attempted ? 'Triggered ComfyUI websocket retry attempt.' : 'ComfyUI websocket already connected.');" in content
     assert "} else if (event.key === 'Home' && event.ctrlKey) {" in content
     assert "} else if (event.key === 'End' && event.ctrlKey) {" in content
 
