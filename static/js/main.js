@@ -362,6 +362,10 @@ const diagHistory = [];
 let diagHistoryIndex = -1;
 let diagHistoryDraft = '';
 let diagDrawerLastFocus = null;
+const DIAGNOSTICS_COMMAND_SUGGESTIONS = [
+	'help', 'status', 'ws-status', 'ws-retry', 'checks', 'logs', 'queue', 'poll', 'clear',
+	'h', '?', 'q', 'p', 'ws', 'retry', 'cls',
+];
 
 function appendDiagnosticsConsoleLine(text, level = 'info') {
 	if (!diagDrawerOutput) return;
@@ -451,6 +455,7 @@ async function runDiagnosticsConsoleCommand(rawInput) {
 
 	if (normalizedCommand === 'help') {
 		appendDiagnosticsConsoleLine('Commands: help, status, ws-status, ws-retry, checks, logs, queue, poll, clear');
+		appendDiagnosticsConsoleLine('Aliases: h/?=help, q=queue, p=poll, ws=ws-status, retry=ws-retry, cls=clear');
 		return;
 	}
 	if (normalizedCommand === 'status') {
@@ -1867,6 +1872,19 @@ if (diagDrawerCommandForm && diagDrawerCommandInput) {
 			diagHistoryIndex = Math.min(diagHistoryIndex + 1, diagHistory.length - 1);
 			diagDrawerCommandInput.value = diagHistory[diagHistory.length - 1 - diagHistoryIndex];
 			diagDrawerCommandInput.setSelectionRange(diagDrawerCommandInput.value.length, diagDrawerCommandInput.value.length);
+		} else if (event.key === 'Tab') {
+			event.preventDefault();
+			const raw = diagDrawerCommandInput.value.trim().toLowerCase();
+			if (!raw) return;
+			const matches = DIAGNOSTICS_COMMAND_SUGGESTIONS.filter((candidate) => candidate.startsWith(raw));
+			if (matches.length === 1) {
+				diagDrawerCommandInput.value = matches[0];
+				diagDrawerCommandInput.setSelectionRange(matches[0].length, matches[0].length);
+				return;
+			}
+			if (matches.length > 1) {
+				appendDiagnosticsConsoleLine(`Matches: ${matches.join(', ')}`);
+			}
 		} else if (event.key === 'Escape') {
 			event.preventDefault();
 			diagHistoryIndex = -1;

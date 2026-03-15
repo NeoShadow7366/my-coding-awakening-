@@ -179,10 +179,12 @@ def test_diagnostics_drawer_keyboard_handler_wiring_present_in_js_bundle():
     assert "function setDiagnosticsDrawerOpen(isOpen)" in content
     assert "const diagWsRetryBtn = document.getElementById('diag-ws-retry-btn');" in content
     assert "const commandAliases = {" in content
+    assert "const DIAGNOSTICS_COMMAND_SUGGESTIONS = [" in content
     assert "ws: 'ws-status'," in content
     assert "retry: 'ws-retry'," in content
     assert "cls: 'clear'," in content
     assert "const normalizedCommand = commandAliases[command] || command;" in content
+    assert "appendDiagnosticsConsoleLine('Aliases: h/?=help, q=queue, p=poll, ws=ws-status, retry=ws-retry, cls=clear');" in content
     assert "if (normalizedCommand === 'ws-status') {" in content
     assert "if (normalizedCommand === 'ws-retry') {" in content
     assert "function forceRetryComfyWebSocket(sourceLabel = 'manual') {" in content
@@ -195,6 +197,9 @@ def test_diagnostics_drawer_keyboard_handler_wiring_present_in_js_bundle():
     assert "diagDrawer.addEventListener('keydown', (event) => {" in content
     assert "if (event.key !== 'Escape') return;" in content
     assert "} else if (event.key === 'Escape') {" in content
+    assert "} else if (event.key === 'Tab') {" in content
+    assert "const matches = DIAGNOSTICS_COMMAND_SUGGESTIONS.filter((candidate) => candidate.startsWith(raw));" in content
+    assert "appendDiagnosticsConsoleLine(`Matches: ${matches.join(', ')}`);" in content
     assert "diagHistoryIndex = -1;" in content
     assert "diagHistoryDraft = '';" in content
     assert "diagDrawerCommandInput.value = '';" in content
