@@ -182,6 +182,9 @@ def test_diagnostics_drawer_keyboard_handler_wiring_present_in_js_bundle():
     assert "if (command === 'ws-retry') {" in content
     assert "function forceRetryComfyWebSocket(sourceLabel = 'manual') {" in content
     assert "function renderWsRetryButtonState() {" in content
+    assert "function onDiagnosticsActionsKeydown(event) {" in content
+    assert "diagWsRetryBtn.addEventListener('keydown', onDiagnosticsActionsKeydown);" in content
+    assert "diagnosticsRunBtn.addEventListener('keydown', onDiagnosticsActionsKeydown);" in content
     assert "diagWsRetryBtn.addEventListener('click', () => {" in content
     assert "diagDrawer.setAttribute('aria-hidden', isOpen ? 'false' : 'true');" in content
     assert "diagDrawer.addEventListener('keydown', (event) => {" in content

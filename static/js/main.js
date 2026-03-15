@@ -623,6 +623,28 @@ function onTopNavTabKeydown(event) {
 	showPanel(panelForTopNavTab(nextTab));
 }
 
+function onDiagnosticsActionsKeydown(event) {
+	const controls = [diagWsRetryBtn, diagnosticsRunBtn].filter(Boolean);
+	if (!controls.length) return;
+	const currentIndex = controls.indexOf(event.currentTarget);
+	if (currentIndex < 0) return;
+	const key = event.key;
+	if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(key)) return;
+	event.preventDefault();
+	let nextIndex = currentIndex;
+	if (key === 'Home') {
+		nextIndex = 0;
+	} else if (key === 'End') {
+		nextIndex = controls.length - 1;
+	} else if (key === 'ArrowRight') {
+		nextIndex = (currentIndex + 1) % controls.length;
+	} else if (key === 'ArrowLeft') {
+		nextIndex = (currentIndex - 1 + controls.length) % controls.length;
+	}
+	const nextControl = controls[nextIndex];
+	if (nextControl) nextControl.focus();
+}
+
 function showPanel(panel) {
 	const allPanels = [panelGen, panelImage, panelConfig, panelModels].filter(Boolean);
 	const allNavs = getTopNavTabs();
@@ -1773,12 +1795,14 @@ async function checkStatus() {
 }
 
 if (diagnosticsRunBtn) {
+	diagnosticsRunBtn.addEventListener('keydown', onDiagnosticsActionsKeydown);
 	diagnosticsRunBtn.addEventListener('click', async () => {
 		await runDiagnosticsChecks(true);
 	});
 }
 
 if (diagWsRetryBtn) {
+	diagWsRetryBtn.addEventListener('keydown', onDiagnosticsActionsKeydown);
 	diagWsRetryBtn.addEventListener('click', () => {
 		const attempted = forceRetryComfyWebSocket('diagnostics panel');
 		if (attempted) {
