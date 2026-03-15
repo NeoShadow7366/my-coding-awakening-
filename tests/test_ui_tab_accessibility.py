@@ -178,8 +178,13 @@ def test_diagnostics_drawer_keyboard_handler_wiring_present_in_js_bundle():
 
     assert "function setDiagnosticsDrawerOpen(isOpen)" in content
     assert "const diagWsRetryBtn = document.getElementById('diag-ws-retry-btn');" in content
-    assert "if (command === 'ws-status') {" in content
-    assert "if (command === 'ws-retry') {" in content
+    assert "const commandAliases = {" in content
+    assert "ws: 'ws-status'," in content
+    assert "retry: 'ws-retry'," in content
+    assert "cls: 'clear'," in content
+    assert "const normalizedCommand = commandAliases[command] || command;" in content
+    assert "if (normalizedCommand === 'ws-status') {" in content
+    assert "if (normalizedCommand === 'ws-retry') {" in content
     assert "function forceRetryComfyWebSocket(sourceLabel = 'manual') {" in content
     assert "function renderWsRetryButtonState() {" in content
     assert "function onDiagnosticsActionsKeydown(event) {" in content

@@ -437,45 +437,55 @@ async function appendServiceDiagnosticLogs(service = 'comfyui') {
 async function runDiagnosticsConsoleCommand(rawInput) {
 	const command = rawInput.trim().toLowerCase();
 	if (!command) return;
+	const commandAliases = {
+		h: 'help',
+		'?': 'help',
+		q: 'queue',
+		p: 'poll',
+		ws: 'ws-status',
+		retry: 'ws-retry',
+		cls: 'clear',
+	};
+	const normalizedCommand = commandAliases[command] || command;
 	appendDiagnosticsConsoleLine(`$ ${rawInput}`, 'command');
 
-	if (command === 'help') {
+	if (normalizedCommand === 'help') {
 		appendDiagnosticsConsoleLine('Commands: help, status, ws-status, ws-retry, checks, logs, queue, poll, clear');
 		return;
 	}
-	if (command === 'status') {
+	if (normalizedCommand === 'status') {
 		appendDiagnosticsConsoleLine(getDiagnosticsStatusSnapshotText());
 		return;
 	}
-	if (command === 'ws-status') {
+	if (normalizedCommand === 'ws-status') {
 		appendDiagnosticsConsoleLine(wsTransportStatus?.textContent || 'Preview transport status unavailable');
 		return;
 	}
-	if (command === 'ws-retry') {
+	if (normalizedCommand === 'ws-retry') {
 		const attempted = forceRetryComfyWebSocket('diagnostics console');
 		appendDiagnosticsConsoleLine(attempted ? 'Triggered ComfyUI websocket retry attempt.' : 'ComfyUI websocket already connected.');
 		return;
 	}
-	if (command === 'queue') {
+	if (normalizedCommand === 'queue') {
 		appendDiagnosticsConsoleLine(queueSummary?.textContent || 'Queue summary unavailable');
 		return;
 	}
-	if (command === 'poll') {
+	if (normalizedCommand === 'poll') {
 		appendDiagnosticsConsoleLine(pollOwnerStatus?.textContent || 'Poll owner status unavailable');
 		return;
 	}
-	if (command === 'clear') {
+	if (normalizedCommand === 'clear') {
 		if (diagDrawerOutput) diagDrawerOutput.innerHTML = '';
 		appendDiagnosticsConsoleLine('Console cleared.');
 		return;
 	}
-	if (command === 'checks') {
+	if (normalizedCommand === 'checks') {
 		appendDiagnosticsConsoleLine('Running diagnostics checks...');
 		await runDiagnosticsChecks(true);
 		appendDiagnosticsConsoleLine(getDiagnosticsStatusSnapshotText());
 		return;
 	}
-	if (command === 'logs') {
+	if (normalizedCommand === 'logs') {
 		appendDiagnosticsConsoleLine('Fetching ComfyUI logs...');
 		await appendServiceDiagnosticLogs('comfyui');
 		return;
