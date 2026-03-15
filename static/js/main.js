@@ -3401,6 +3401,7 @@ let comfyWsPreviewUrl = null;
 let comfyWsReconnectTimer = null;
 let comfyWsFailCount = 0;
 let comfyWsCooldownNotified = false;
+let comfyWsNextRetryAt = 0;
 const COMFY_WS_MAX_RETRIES = 4;
 const COMFY_WS_COOLDOWN_KEY = 'comfyWsCooldownUntil';
 const COMFY_WS_COOLDOWN_MS = 30 * 60 * 1000;
@@ -3496,6 +3497,11 @@ function connectComfyWebSocket() {
 		setPreviewTransportMode('polling', `ComfyUI WebSocket cooldown active (${minsLeft}m left). HTTP polling fallback is active.`);
 		return;
 	}
+	if (comfyWsNextRetryAt > Date.now()) {
+		const secsLeft = Math.max(1, Math.ceil((comfyWsNextRetryAt - Date.now()) / 1000));
+		setPreviewTransportMode('polling', `ComfyUI WebSocket retry scheduled in ${secsLeft}s. HTTP polling fallback is active.`);
+		return;
+	}
 	if (comfyWsFailCount >= COMFY_WS_MAX_RETRIES) {
 		setPreviewTransportMode('polling', 'ComfyUI WebSocket unavailable after repeated failures. HTTP polling fallback is active.');
 		return; // gave up; reset on tab focus
@@ -3545,6 +3551,7 @@ function connectComfyWebSocket() {
 
 		comfyWs.onopen = () => {
 			comfyWsFailCount = 0;
+			comfyWsNextRetryAt = 0;
 			_setComfyWsCooldownUntil(0);
 			comfyWsCooldownNotified = false;
 			setPreviewTransportMode('websocket');
@@ -3554,6 +3561,7 @@ function connectComfyWebSocket() {
 			comfyWs = null;
 			comfyWsFailCount++;
 			if (comfyWsFailCount >= COMFY_WS_MAX_RETRIES) {
+				comfyWsNextRetryAt = 0;
 				_setComfyWsCooldownUntil(Date.now() + COMFY_WS_COOLDOWN_MS);
 				const minsLeft = _getComfyWsCooldownMinutesLeft();
 				setPreviewTransportMode('polling', `ComfyUI WebSocket cooldown active (${minsLeft}m left). HTTP polling fallback is active.`);
@@ -3568,10 +3576,15 @@ function connectComfyWebSocket() {
 			// Reconnect with exponential backoff if page is still visible
 			if (!document.hidden) {
 				const delay = Math.min(5000 * Math.pow(2, comfyWsFailCount - 1), 60000);
-				comfyWsReconnectTimer = window.setTimeout(connectComfyWebSocket, delay);
+				comfyWsNextRetryAt = Date.now() + delay;
+				comfyWsReconnectTimer = window.setTimeout(() => {
+					comfyWsNextRetryAt = 0;
+					connectComfyWebSocket();
+				}, delay);
 			}
 		};
 	} catch {
+		comfyWsNextRetryAt = Date.now() + 10000;
 		setPreviewTransportMode('polling', 'Browser could not open ComfyUI WebSocket. HTTP polling fallback is active.');
 		/* WebSocket unavailable — polling will cover this */
 	}
@@ -3586,6 +3599,7 @@ document.addEventListener('visibilitychange', () => {
 		}
 		// Reset failure count on tab re-focus so it can retry after a long pause
 		comfyWsFailCount = 0;
+		comfyWsNextRetryAt = 0;
 		connectComfyWebSocket();
 	}
 });

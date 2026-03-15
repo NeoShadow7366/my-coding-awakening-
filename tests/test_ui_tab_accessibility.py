@@ -370,6 +370,17 @@ def test_model_search_cancel_status_is_auto_cleared_after_delay():
     assert "setModelSearchStatus('', false);" in content
 
 
+def test_preview_websocket_retry_backoff_is_respected_between_attempts():
+    js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
+    content = js_path.read_text(encoding="utf-8")
+
+    assert "let comfyWsNextRetryAt = 0;" in content
+    assert "if (comfyWsNextRetryAt > Date.now()) {" in content
+    assert "ComfyUI WebSocket retry scheduled in ${secsLeft}s. HTTP polling fallback is active." in content
+    assert "comfyWsNextRetryAt = Date.now() + delay;" in content
+    assert "comfyWsNextRetryAt = 0;" in content
+
+
 def test_model_modal_preserves_search_result_type_when_details_are_less_specific():
     js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
     content = js_path.read_text(encoding="utf-8")
