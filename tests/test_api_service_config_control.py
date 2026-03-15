@@ -181,3 +181,32 @@ def test_model_folder_aliases_map_to_stability_names_when_shared(client, tmp_pat
     assert app_module._normalize_model_folder("checkpoints") == "StableDiffusion"
     assert app_module._normalize_model_folder("loras") == "Lora"
     assert app_module._normalize_model_folder("upscale_models") == "ESRGAN"
+
+
+def test_migrate_model_folders_requires_shared_root(client):
+    resp = client.post("/api/config/migrate-model-folders")
+
+    assert resp.status_code == 400
+    assert "Set Shared Model Root Path" in resp.get_json()["error"]
+
+
+def test_migrate_model_folders_moves_legacy_content(client, tmp_path):
+    shared_root = tmp_path / "models-root"
+    (shared_root / "checkpoints").mkdir(parents=True)
+    (shared_root / "checkpoints" / "legacy.safetensors").write_bytes(b"abc")
+    (shared_root / "loras").mkdir(parents=True)
+    (shared_root / "loras" / "style.safetensors").write_bytes(b"xyz")
+
+    client.post(
+        "/api/config/services",
+        json={"shared_models_path": str(shared_root)},
+    )
+
+    resp = client.post("/api/config/migrate-model-folders")
+
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["ok"] is True
+    assert data["moved_count"] == 2
+    assert (shared_root / "StableDiffusion" / "legacy.safetensors").exists()
+    assert (shared_root / "Lora" / "style.safetensors").exists()

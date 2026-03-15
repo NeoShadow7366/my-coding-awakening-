@@ -109,6 +109,7 @@ const configOllamaBrowseBtn = document.getElementById('config-ollama-browse');
 const configComfyuiBrowseBtn = document.getElementById('config-comfyui-browse');
 const configModelsBrowseBtn = document.getElementById('config-models-browse');
 const configSaveBtn = document.getElementById('config-save-btn');
+const configModelsMigrateBtn = document.getElementById('config-models-migrate-btn');
 const configSaveStatus = document.getElementById('config-save-status');
 const configLastSaved = document.getElementById('config-last-saved');
 const configOllamaStartBtn = document.getElementById('config-ollama-start');
@@ -1106,6 +1107,48 @@ async function browseServicePath(service) {
 	}
 }
 
+async function migrateSharedModelFolders() {
+	if (!configModelsMigrateBtn) return;
+
+	const confirmed = window.confirm('Migrate legacy folder names (checkpoints, loras, etc.) into Stability Matrix naming now?');
+	if (!confirmed) {
+		setConfigStatusLine(configSaveStatus, 'Migration canceled.');
+		return;
+	}
+
+	configModelsMigrateBtn.disabled = true;
+	setConfigStatusLine(configSaveStatus, 'Running shared model folder migration...');
+
+	try {
+		const res = await fetch('/api/config/migrate-model-folders', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({}),
+		});
+		const data = await res.json().catch(() => ({}));
+		if (!res.ok) {
+			setConfigStatusLine(configSaveStatus, data.error || 'Migration failed.', 'error');
+			showToast('Model folder migration failed.', 'neg');
+			return;
+		}
+
+		const movedCount = Number(data.moved_count || 0);
+		const skippedCount = Number(data.skipped_count || 0);
+		const errorCount = Number(data.error_count || 0);
+		const summary = `Migration complete: moved ${movedCount}, skipped ${skippedCount}, errors ${errorCount}.`;
+		setConfigStatusLine(configSaveStatus, summary, errorCount > 0 ? 'error' : 'ok');
+		showToast(summary, errorCount > 0 ? 'neg' : 'pos');
+		if (typeof loadModelLibrary === 'function') {
+			loadModelLibrary();
+		}
+	} catch {
+		setConfigStatusLine(configSaveStatus, 'Migration failed.', 'error');
+		showToast('Model folder migration failed.', 'neg');
+	} finally {
+		configModelsMigrateBtn.disabled = false;
+	}
+}
+
 async function controlService(service, action, statusNode, buttonGroup = []) {
 	const controls = buttonGroup.filter(Boolean);
 	for (const btn of controls) btn.disabled = true;
@@ -1390,6 +1433,10 @@ if (diagDrawerOutput) {
 
 if (configSaveBtn) {
 	configSaveBtn.addEventListener('click', saveServiceConfig);
+}
+
+if (configModelsMigrateBtn) {
+	configModelsMigrateBtn.addEventListener('click', migrateSharedModelFolders);
 }
 
 if (configOllamaBrowseBtn) {

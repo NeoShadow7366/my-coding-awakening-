@@ -772,6 +772,86 @@ def _resolve_shared_models_root_dir() -> Path | None:
     return candidate
 
 
+def _migrate_shared_model_folders() -> dict:
+    """Move legacy Comfy-style folder content into Stability Matrix-style shared folders."""
+    shared_root = _resolve_shared_models_root_dir()
+    if shared_root is None:
+        raise ValueError("Set Shared Model Root Path in Configurations before running migration")
+
+    shared_root.mkdir(parents=True, exist_ok=True)
+    legacy_to_stability = {
+        "checkpoints": "StableDiffusion",
+        "loras": "Lora",
+        "vae": "VAE",
+        "embeddings": "Embeddings",
+        "controlnet": "ControlNet",
+        "upscale_models": "ESRGAN",
+    }
+
+    moved: list[dict] = []
+    skipped: list[dict] = []
+    errors: list[dict] = []
+
+    for legacy_folder, target_folder in legacy_to_stability.items():
+        src_dir = shared_root / legacy_folder
+        dst_dir = shared_root / target_folder
+
+        if not src_dir.exists() or not src_dir.is_dir():
+            continue
+
+        dst_dir.mkdir(parents=True, exist_ok=True)
+
+        for src_file in src_dir.rglob("*"):
+            if not src_file.is_file():
+                continue
+            rel_path = src_file.relative_to(src_dir)
+            dest_file = dst_dir / rel_path
+            dest_file.parent.mkdir(parents=True, exist_ok=True)
+
+            src_rel = str(src_file.relative_to(shared_root)).replace("\\", "/")
+            dest_rel = str(dest_file.relative_to(shared_root)).replace("\\", "/")
+
+            if dest_file.exists():
+                skipped.append({
+                    "source": src_rel,
+                    "destination": dest_rel,
+                    "reason": "destination exists",
+                })
+                continue
+
+            try:
+                src_file.replace(dest_file)
+                moved.append({"source": src_rel, "destination": dest_rel})
+            except OSError as exc:
+                errors.append({
+                    "source": src_rel,
+                    "destination": dest_rel,
+                    "error": str(exc),
+                })
+
+        # Best-effort cleanup of emptied legacy folders.
+        for entry in sorted(src_dir.rglob("*"), reverse=True):
+            if entry.is_dir():
+                try:
+                    entry.rmdir()
+                except OSError:
+                    pass
+        try:
+            src_dir.rmdir()
+        except OSError:
+            pass
+
+    return {
+        "root": str(shared_root),
+        "moved_count": len(moved),
+        "skipped_count": len(skipped),
+        "error_count": len(errors),
+        "moved": moved,
+        "skipped": skipped,
+        "errors": errors,
+    }
+
+
 def _normalize_image_ref(body: dict) -> dict:
     """Extract a stable image reference payload from request JSON."""
     return {
@@ -1413,6 +1493,19 @@ def api_config_pick_path():
         return jsonify({"error": str(exc)}), 500
     except Exception as exc:
         logger.error("Path picker failed for %s: %s", service_name, exc)
+        return jsonify({"error": str(exc)}), 500
+
+
+@app.route("/api/config/migrate-model-folders", methods=["POST"])
+def api_config_migrate_model_folders():
+    """Move shared model files from legacy Comfy naming to Stability Matrix naming."""
+    try:
+        result = _migrate_shared_model_folders()
+        return jsonify({"ok": True, **result})
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    except Exception as exc:
+        logger.error("Shared model folder migration failed: %s", exc)
         return jsonify({"error": str(exc)}), 500
 
 
