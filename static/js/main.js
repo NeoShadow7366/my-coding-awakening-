@@ -22,6 +22,7 @@ const panelImage = document.getElementById('panel-image');
 const panelConfig = document.getElementById('panel-config');
 const panelModels = document.getElementById('panel-models');
 const mbSearchBtn = document.getElementById('mb-search-btn');
+const mbCancelSearchBtn = document.getElementById('mb-cancel-search-btn');
 const mbProvider = document.getElementById('mb-provider');
 const mbSearchQuery = document.getElementById('mb-search-query');
 const mbSearchType = document.getElementById('mb-search-type');
@@ -4018,7 +4019,19 @@ let mbReportTargetTimer = null;
 let mbSearchAbortController = null;
 let mbSearchRequestSeq = 0;
 let mbSearchInFlight = false;
+let mbSearchCancelRequested = false;
 const MB_SEARCH_TIMEOUT_MS = 25000;
+
+function updateModelSearchControls() {
+	if (mbSearchBtn) mbSearchBtn.disabled = mbSearchInFlight;
+	if (mbCancelSearchBtn) mbCancelSearchBtn.disabled = !mbSearchInFlight;
+}
+
+function cancelModelSearch() {
+	if (!mbSearchInFlight || !mbSearchAbortController) return;
+	mbSearchCancelRequested = true;
+	mbSearchAbortController.abort();
+}
 
 if (mbLocalQuery) {
 	mbLocalQuery.value = localStorage.getItem('mbLocalQuery') || '';
@@ -5562,8 +5575,9 @@ async function runCivitaiSearch(page) {
 	const { signal } = controller;
 	let timeoutHandle = null;
 	let searchTimedOut = false;
+	mbSearchCancelRequested = false;
 	mbSearchInFlight = true;
-	if (mbSearchBtn) mbSearchBtn.disabled = true;
+	updateModelSearchControls();
 	const provider = mbProvider ? String(mbProvider.value || 'civitai') : 'civitai';
 	const query = mbSearchQuery ? mbSearchQuery.value.trim() : '';
 	const type  = mbSearchType  ? mbSearchType.value : '';
@@ -5627,6 +5641,12 @@ async function runCivitaiSearch(page) {
 	} catch (err) {
 		if (requestId !== mbSearchRequestSeq) return;
 		if (err && err.name === 'AbortError') {
+			if (mbSearchCancelRequested) {
+				setModelSearchStatus('Search cancelled.', true);
+				if (mbPagination) mbPagination.hidden = true;
+				mbHasNextPage = false;
+				return;
+			}
 			if (searchTimedOut) {
 				mbHasNextPage = false;
 				if (mbPagination) mbPagination.hidden = true;
@@ -5643,8 +5663,9 @@ async function runCivitaiSearch(page) {
 		}
 		if (requestId === mbSearchRequestSeq) {
 			mbSearchInFlight = false;
+			mbSearchCancelRequested = false;
 			mbSearchAbortController = null;
-			if (mbSearchBtn) mbSearchBtn.disabled = false;
+			updateModelSearchControls();
 			updatePagination();
 		}
 	}
@@ -6032,9 +6053,13 @@ if (mbViewLibraryBtn) {
 if (mbSearchBtn) {
 	mbSearchBtn.addEventListener('click', () => runCivitaiSearch(1));
 }
+if (mbCancelSearchBtn) {
+	mbCancelSearchBtn.addEventListener('click', cancelModelSearch);
+}
 if (mbSearchBulkRefreshInstalledBtn) {
 	mbSearchBulkRefreshInstalledBtn.addEventListener('click', bulkUpdateInstalledSearchMetadata);
 }
+updateModelSearchControls();
 if (mbSearchQuery) {
 	mbSearchQuery.addEventListener('input', () => {
 		localStorage.setItem('mbSearchQuery', mbSearchQuery.value || '');

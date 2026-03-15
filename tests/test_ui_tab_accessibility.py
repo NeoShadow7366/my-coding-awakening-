@@ -212,6 +212,20 @@ def test_index_model_pagination_group_semantics():
     assert 'id="mb-next-page"' in html
 
 
+def test_index_model_search_controls_include_cancel_button():
+    app_module.app.config["TESTING"] = True
+    client = app_module.app.test_client()
+
+    resp = client.get("/")
+
+    assert resp.status_code == 200
+    html = resp.get_data(as_text=True)
+
+    assert 'id="mb-search-btn"' in html
+    assert 'id="mb-cancel-search-btn"' in html
+    assert 'id="mb-cancel-search-btn" type="button" disabled' in html
+
+
 def test_model_download_actions_keyboard_handler_wiring_present_in_js_bundle():
     js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
     content = js_path.read_text(encoding="utf-8")
@@ -289,6 +303,7 @@ def test_model_search_aborts_previous_requests_and_ignores_stale_results():
     assert "let mbSearchAbortController = null;" in content
     assert "let mbSearchRequestSeq = 0;" in content
     assert "let mbSearchInFlight = false;" in content
+    assert "let mbSearchCancelRequested = false;" in content
     assert "const MB_SEARCH_TIMEOUT_MS = 25000;" in content
     assert "const requestId = ++mbSearchRequestSeq;" in content
     assert "mbSearchAbortController.abort();" in content
@@ -300,6 +315,8 @@ def test_model_search_aborts_previous_requests_and_ignores_stale_results():
     assert "await fetch(endpoint + params.toString(), { signal });" in content
     assert "if (requestId !== mbSearchRequestSeq) return;" in content
     assert "if (err && err.name === 'AbortError') {" in content
+    assert "if (mbSearchCancelRequested) {" in content
+    assert "setModelSearchStatus('Search cancelled.', true);" in content
     assert "if (searchTimedOut) {" in content
     assert "clearTimeout(timeoutHandle);" in content
 
@@ -309,6 +326,19 @@ def test_model_search_timeout_message_is_exposed_for_stalled_requests():
     content = js_path.read_text(encoding="utf-8")
 
     assert "Search timed out after ${Math.round(MB_SEARCH_TIMEOUT_MS / 1000)}s. Please try again." in content
+
+
+def test_model_search_cancel_button_is_wired_to_abort_active_request():
+    js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
+    content = js_path.read_text(encoding="utf-8")
+
+    assert "const mbCancelSearchBtn = document.getElementById('mb-cancel-search-btn');" in content
+    assert "function cancelModelSearch() {" in content
+    assert "mbSearchCancelRequested = true;" in content
+    assert "mbSearchAbortController.abort();" in content
+    assert "if (mbCancelSearchBtn) {" in content
+    assert "mbCancelSearchBtn.addEventListener('click', cancelModelSearch);" in content
+    assert "if (mbCancelSearchBtn) mbCancelSearchBtn.disabled = !mbSearchInFlight;" in content
 
 
 def test_model_search_disables_pagination_controls_while_request_is_active():
