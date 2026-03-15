@@ -4015,6 +4015,8 @@ let mbCurrentVersionIndex = 0;
 let mbResetStatusTimer = null;
 let mbModelModalLastFocus = null;
 let mbReportTargetTimer = null;
+let mbSearchAbortController = null;
+let mbSearchRequestSeq = 0;
 
 if (mbLocalQuery) {
 	mbLocalQuery.value = localStorage.getItem('mbLocalQuery') || '';
@@ -5549,6 +5551,13 @@ async function deleteLocalModel(fileName, folder, btn) {
 
 async function runCivitaiSearch(page) {
 	if (!mbResultsGrid) return;
+	const requestId = ++mbSearchRequestSeq;
+	if (mbSearchAbortController) {
+		mbSearchAbortController.abort();
+	}
+	mbSearchAbortController = new AbortController();
+	const { signal } = mbSearchAbortController;
+	if (mbSearchBtn) mbSearchBtn.disabled = true;
 	const provider = mbProvider ? String(mbProvider.value || 'civitai') : 'civitai';
 	const query = mbSearchQuery ? mbSearchQuery.value.trim() : '';
 	const type  = mbSearchType  ? mbSearchType.value : '';
@@ -5577,8 +5586,9 @@ async function runCivitaiSearch(page) {
 			if (cursor) params.set('cursor', cursor);
 		}
 		const endpoint = provider === 'huggingface' ? '/api/models/huggingface/search?' : '/api/models/civitai/search?';
-		const resp = await fetch(endpoint + params.toString());
+		const resp = await fetch(endpoint + params.toString(), { signal });
 		const data = await resp.json();
+		if (requestId !== mbSearchRequestSeq) return;
 		if (!resp.ok) throw new Error(data.error || resp.statusText);
 		mbQueryMode = isQueryMode;
 		mbTotalPages = data.total_pages || 1;
@@ -5603,9 +5613,15 @@ async function runCivitaiSearch(page) {
 		const hasProviderTotal = Object.prototype.hasOwnProperty.call(data || {}, 'total_items');
 		renderSearchResults(mbLastSearchItems, data.total_items, hasProviderTotal);
 	} catch (err) {
+		if (requestId !== mbSearchRequestSeq) return;
+		if (err && err.name === 'AbortError') return;
 		mbHasNextPage = false;
 		if (mbPagination) mbPagination.hidden = true;
 		setModelSearchStatus('Search failed: ' + err.message, true);
+	} finally {
+		if (requestId === mbSearchRequestSeq && mbSearchBtn) {
+			mbSearchBtn.disabled = false;
+		}
 	}
 }
 

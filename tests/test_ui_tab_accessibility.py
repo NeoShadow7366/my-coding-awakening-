@@ -282,6 +282,20 @@ def test_model_search_results_count_handles_unavailable_provider_totals():
     assert "mbResultsCount.textContent = `(${shown} shown - total unavailable)`;" in content
 
 
+def test_model_search_aborts_previous_requests_and_ignores_stale_results():
+    js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
+    content = js_path.read_text(encoding="utf-8")
+
+    assert "let mbSearchAbortController = null;" in content
+    assert "let mbSearchRequestSeq = 0;" in content
+    assert "const requestId = ++mbSearchRequestSeq;" in content
+    assert "mbSearchAbortController.abort();" in content
+    assert "const { signal } = mbSearchAbortController;" in content
+    assert "await fetch(endpoint + params.toString(), { signal });" in content
+    assert "if (requestId !== mbSearchRequestSeq) return;" in content
+    assert "if (err && err.name === 'AbortError') return;" in content
+
+
 def test_model_modal_preserves_search_result_type_when_details_are_less_specific():
     js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
     content = js_path.read_text(encoding="utf-8")
