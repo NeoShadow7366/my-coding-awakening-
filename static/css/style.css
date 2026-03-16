@@ -376,6 +376,22 @@ textarea {
   white-space: nowrap;
 }
 
+.model-mode-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.model-favorite-toggle-row {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.model-stack-compat-hint {
+  border-left: 2px solid color-mix(in srgb, var(--clr-primary) 50%, var(--clr-border));
+  padding-left: 0.5rem;
+}
+
 .seed-action-row {
   grid-template-columns: 1fr 1fr;
   margin-top: var(--sp-xs);

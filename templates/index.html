@@ -134,17 +134,30 @@
       </div>
 
       <label for="image-model-select" class="field-label">Checkpoint</label>
+      <div class="model-mode-row" role="group" aria-label="Checkpoint filter mode">
+        <button class="btn btn-ghost btn-xs active" id="image-model-mode-all" type="button" data-model-mode="all" aria-pressed="true">All</button>
+        <button class="btn btn-ghost btn-xs" id="image-model-mode-recent" type="button" data-model-mode="recent" aria-pressed="false">Recent</button>
+        <button class="btn btn-ghost btn-xs" id="image-model-mode-favorites" type="button" data-model-mode="favorites" aria-pressed="false">Favorites</button>
+      </div>
       <input id="image-model-filter" type="text" class="compact-input" placeholder="Filter checkpoints..." aria-label="Filter checkpoint list" />
       <div class="select-wrapper">
         <select id="image-model-select" aria-describedby="image-model-hint">
           <option value="">- loading checkpoints -</option>
         </select>
       </div>
+      <div class="model-favorite-toggle-row" role="group" aria-label="Favorite checkpoint toggle">
+        <button class="btn btn-ghost btn-xs" id="image-model-favorite-toggle" type="button" aria-pressed="false">Favorite Selected</button>
+      </div>
       <div class="model-recent-wrap" aria-label="Recent checkpoints">
         <p class="hint model-recent-label">Recent</p>
         <div id="image-model-recent-list" class="model-recent-list" role="group" aria-label="Recent checkpoint selections"></div>
       </div>
+      <div class="model-recent-wrap" aria-label="Favorite checkpoints">
+        <p class="hint model-recent-label">Favorites</p>
+        <div id="image-model-favorite-list" class="model-recent-list" role="group" aria-label="Favorite checkpoint selections"></div>
+      </div>
       <p id="image-model-hint" class="hint">Loaded from ComfyUI CheckpointLoaderSimple</p>
+      <p id="model-stack-compat-hint" class="hint model-stack-compat-hint" aria-live="polite">Tip: keep Base, Refiner, and VAE in the same family (SD1.5 vs SDXL) when possible.</p>
 
       <label for="refiner-model-select" class="field-label">Refiner <span class="optional">(optional)</span></label>
       <div class="select-wrapper">

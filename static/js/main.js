@@ -109,8 +109,14 @@ const clearChat = document.getElementById('clear-chat');
 // Image panel
 const imageModelSelect = document.getElementById('image-model-select');
 const imageModelFilter = document.getElementById('image-model-filter');
+const imageModelModeAll = document.getElementById('image-model-mode-all');
+const imageModelModeRecent = document.getElementById('image-model-mode-recent');
+const imageModelModeFavorites = document.getElementById('image-model-mode-favorites');
+const imageModelFavoriteToggle = document.getElementById('image-model-favorite-toggle');
 const imageModelRecentList = document.getElementById('image-model-recent-list');
+const imageModelFavoriteList = document.getElementById('image-model-favorite-list');
 const modelStackBadges = document.getElementById('model-stack-badges');
+const modelStackCompatHint = document.getElementById('model-stack-compat-hint');
 const refinerModelSelect = document.getElementById('refiner-model-select');
 const vaeModelSelect = document.getElementById('vae-model-select');
 const imageSamplerSelect = document.getElementById('image-sampler-select');
@@ -285,6 +291,8 @@ let queueFilterFailedOnly = localStorage.getItem('queueFilterFailedOnly') === '1
 const IMAGE_PROFILE_STORAGE_KEY = 'imagePresetProfilesV1';
 const IMAGE_PROFILE_SELECTED_KEY = 'imagePresetProfilesSelectedV1';
 const IMAGE_RECENT_MODELS_KEY = 'imageRecentModelsV1';
+const IMAGE_FAVORITE_MODELS_KEY = 'imageFavoriteModelsV1';
+const IMAGE_MODEL_FILTER_MODE_KEY = 'imageModelFilterModeV1';
 const QUEUE_TELEMETRY_KEY = 'queueTelemetryV1';
 const BACKGROUND_POLL_OWNER_KEY = 'backgroundPollOwnerV1';
 const BACKGROUND_POLL_LEASE_MS = 10_000;
@@ -298,6 +306,10 @@ const PREVIEW_ZOOM_MIN = 0.7;
 const PREVIEW_ZOOM_MAX = 3;
 const PREVIEW_ZOOM_STEP = 0.12;
 let imageModelAllOptions = [];
+let imageModelFilterMode = localStorage.getItem(IMAGE_MODEL_FILTER_MODE_KEY) || 'all';
+if (!['all', 'recent', 'favorites'].includes(imageModelFilterMode)) {
+	imageModelFilterMode = 'all';
+}
 let currentGalleryImages = [];
 let currentFullHistory = [];
 let galleryViewMode = localStorage.getItem('galleryViewMode') || 'list';
@@ -1133,6 +1145,7 @@ function applyImageSettings(settings) {
 	if (Number.isFinite(settings.batch_size)) imageBatchSize.value = String(settings.batch_size);
 	syncImageControlLabels();
 	updateModelStackBadges();
+	updateModelStackCompatibilityHint();
 }
 
 function renderImageProfileSelect(preferredName = '') {
@@ -1735,7 +1748,10 @@ async function loadImageModels() {
 			if (firstSupported) imageModelSelect.value = firstSupported.value;
 		}
 		renderRecentImageModels();
+		renderFavoriteImageModels();
+		updateModelFavoriteToggleState();
 		updateModelStackBadges();
+		updateModelStackCompatibilityHint();
 		updateControlnetCompatibilityHint();
 	} catch {
 		setImageModelMessage('Could not fetch checkpoints');
@@ -1756,11 +1772,79 @@ function setRecentImageModels(models) {
 	localStorage.setItem(IMAGE_RECENT_MODELS_KEY, JSON.stringify(models.slice(0, 6)));
 }
 
+function getFavoriteImageModels() {
+	try {
+		const parsed = JSON.parse(localStorage.getItem(IMAGE_FAVORITE_MODELS_KEY) || '[]');
+		if (!Array.isArray(parsed)) return [];
+		return parsed.filter((m) => typeof m === 'string' && m.trim());
+	} catch {
+		return [];
+	}
+}
+
+function setFavoriteImageModels(models) {
+	localStorage.setItem(IMAGE_FAVORITE_MODELS_KEY, JSON.stringify(models.slice(0, 12)));
+}
+
+function isFavoriteImageModel(modelName) {
+	if (!modelName) return false;
+	return getFavoriteImageModels().includes(modelName);
+}
+
+function toggleFavoriteImageModel(modelName) {
+	if (!modelName) return;
+	const favorites = getFavoriteImageModels();
+	const hasModel = favorites.includes(modelName);
+	const next = hasModel
+		? favorites.filter((name) => name !== modelName)
+		: [modelName, ...favorites.filter((name) => name !== modelName)].slice(0, 12);
+	setFavoriteImageModels(next);
+	renderFavoriteImageModels();
+	updateModelFavoriteToggleState();
+	if (imageModelFilterMode === 'favorites') {
+		renderFilteredImageModels(imageModelFilter ? imageModelFilter.value : '', imageModelSelect ? imageModelSelect.value : '');
+	}
+	updateModelStackBadges();
+}
+
+function setImageModelFilterMode(mode) {
+	const nextMode = ['all', 'recent', 'favorites'].includes(mode) ? mode : 'all';
+	imageModelFilterMode = nextMode;
+	localStorage.setItem(IMAGE_MODEL_FILTER_MODE_KEY, nextMode);
+	if (imageModelModeAll) {
+		imageModelModeAll.classList.toggle('active', nextMode === 'all');
+		imageModelModeAll.setAttribute('aria-pressed', String(nextMode === 'all'));
+	}
+	if (imageModelModeRecent) {
+		imageModelModeRecent.classList.toggle('active', nextMode === 'recent');
+		imageModelModeRecent.setAttribute('aria-pressed', String(nextMode === 'recent'));
+	}
+	if (imageModelModeFavorites) {
+		imageModelModeFavorites.classList.toggle('active', nextMode === 'favorites');
+		imageModelModeFavorites.setAttribute('aria-pressed', String(nextMode === 'favorites'));
+	}
+	renderFilteredImageModels(imageModelFilter ? imageModelFilter.value : '', imageModelSelect ? imageModelSelect.value : '');
+}
+
+function getImageModelPoolForMode() {
+	const available = new Set(imageModelAllOptions);
+	if (imageModelFilterMode === 'recent') {
+		return getRecentImageModels().filter((name) => available.has(name));
+	}
+	if (imageModelFilterMode === 'favorites') {
+		return getFavoriteImageModels().filter((name) => available.has(name));
+	}
+	return imageModelAllOptions.slice();
+}
+
 function rememberRecentImageModel(modelName) {
 	if (!modelName) return;
 	const next = [modelName, ...getRecentImageModels().filter((m) => m !== modelName)].slice(0, 6);
 	setRecentImageModels(next);
 	renderRecentImageModels();
+	if (imageModelFilterMode === 'recent') {
+		renderFilteredImageModels(imageModelFilter ? imageModelFilter.value : '', modelName);
+	}
 }
 
 function renderRecentImageModels() {
@@ -1783,6 +1867,36 @@ function renderRecentImageModels() {
 	});
 }
 
+function renderFavoriteImageModels() {
+	if (!imageModelFavoriteList) return;
+	const available = new Set(imageModelAllOptions);
+	const favorites = getFavoriteImageModels().filter((m) => available.has(m));
+	if (!favorites.length) {
+		imageModelFavoriteList.innerHTML = '<span class="hint">No favorites yet.</span>';
+		return;
+	}
+	imageModelFavoriteList.innerHTML = favorites
+		.map((name) => `<button class="btn btn-ghost btn-xs model-recent-chip" type="button" data-model="${escHtml(name)}" title="Use ${escHtml(name)}">${escHtml(name)}</button>`)
+		.join('');
+	imageModelFavoriteList.querySelectorAll('.model-recent-chip').forEach((btn) => {
+		btn.addEventListener('click', () => {
+			const modelName = btn.dataset.model || '';
+			if (!modelName) return;
+			applyImageModelSelection(modelName);
+		});
+	});
+}
+
+function updateModelFavoriteToggleState() {
+	if (!imageModelFavoriteToggle) return;
+	const modelName = imageModelSelect ? imageModelSelect.value : '';
+	const isFavorite = isFavoriteImageModel(modelName);
+	imageModelFavoriteToggle.classList.toggle('active', isFavorite);
+	imageModelFavoriteToggle.setAttribute('aria-pressed', String(isFavorite));
+	imageModelFavoriteToggle.textContent = isFavorite ? 'Favorited Selected' : 'Favorite Selected';
+	imageModelFavoriteToggle.disabled = !modelName;
+}
+
 function applyImageModelSelection(modelName) {
 	if (!imageModelSelect || !modelName) return;
 	const target = [...imageModelSelect.options].find((o) => o.value === modelName && !o.disabled);
@@ -1795,7 +1909,9 @@ function applyImageModelSelection(modelName) {
 	if ([...imageModelSelect.options].some((o) => o.value === modelName && !o.disabled)) {
 		imageModelSelect.value = modelName;
 		rememberRecentImageModel(modelName);
+		updateModelFavoriteToggleState();
 		updateModelStackBadges();
+		updateModelStackCompatibilityHint();
 		updateControlnetCompatibilityHint();
 	}
 }
@@ -1804,11 +1920,23 @@ function renderFilteredImageModels(rawFilter = '', preferredValue = '') {
 	if (!imageModelSelect) return;
 	const filter = String(rawFilter || '').trim().toLowerCase();
 	const isUnsupportedFluxModel = (name) => /flux/i.test(name || '');
+	const modePool = getImageModelPoolForMode();
 	const filtered = filter
-		? imageModelAllOptions.filter((name) => String(name).toLowerCase().includes(filter))
-		: imageModelAllOptions.slice();
+		? modePool.filter((name) => String(name).toLowerCase().includes(filter))
+		: modePool.slice();
+	if (!modePool.length) {
+		const modeLabel = imageModelFilterMode === 'favorites'
+			? 'No favorite checkpoints yet.'
+			: imageModelFilterMode === 'recent'
+				? 'No recent checkpoints yet.'
+				: 'No checkpoints available';
+		imageModelSelect.innerHTML = `<option value="">${escHtml(modeLabel)}</option>`;
+		updateModelFavoriteToggleState();
+		return;
+	}
 	if (!filtered.length) {
 		imageModelSelect.innerHTML = '<option value="">No matching checkpoints</option>';
+		updateModelFavoriteToggleState();
 		return;
 	}
 	imageModelSelect.innerHTML = filtered
@@ -1820,10 +1948,12 @@ function renderFilteredImageModels(rawFilter = '', preferredValue = '') {
 		.join('');
 	if (preferredValue && [...imageModelSelect.options].some((o) => o.value === preferredValue && !o.disabled)) {
 		imageModelSelect.value = preferredValue;
+		updateModelFavoriteToggleState();
 		return;
 	}
 	const firstSupported = [...imageModelSelect.options].find((o) => !o.disabled && o.value);
 	if (firstSupported) imageModelSelect.value = firstSupported.value;
+	updateModelFavoriteToggleState();
 }
 
 function updateModelStackBadges() {
@@ -1834,6 +1964,7 @@ function updateModelStackBadges() {
 	if (vaeModelSelect?.value) badges.push(`VAE: ${vaeModelSelect.value}`);
 	const loraCount = collectLoraStack().length;
 	if (loraCount) badges.push(`LoRA x${loraCount}`);
+	if (isFavoriteImageModel(imageModelSelect?.value || '')) badges.push('Favorite');
 	if (!badges.length) {
 		modelStackBadges.innerHTML = '<span class="hint">Defaults</span>';
 		return;
@@ -2627,20 +2758,43 @@ syncImageControlLabels();
 if (imageModelSelect) {
 	imageModelSelect.addEventListener('change', () => {
 		rememberRecentImageModel(imageModelSelect.value);
+		updateModelFavoriteToggleState();
 		updateModelStackBadges();
+		updateModelStackCompatibilityHint();
 		updateControlnetCompatibilityHint();
 	});
 }
 if (imageModelFilter) {
 	imageModelFilter.addEventListener('input', () => {
 		renderFilteredImageModels(imageModelFilter.value, imageModelSelect ? imageModelSelect.value : '');
+		updateModelFavoriteToggleState();
 		updateModelStackBadges();
+		updateModelStackCompatibilityHint();
 		updateControlnetCompatibilityHint();
 	});
 }
-if (refinerModelSelect) refinerModelSelect.addEventListener('change', updateModelStackBadges);
-if (vaeModelSelect) vaeModelSelect.addEventListener('change', updateModelStackBadges);
+if (imageModelModeAll) imageModelModeAll.addEventListener('click', () => setImageModelFilterMode('all'));
+if (imageModelModeRecent) imageModelModeRecent.addEventListener('click', () => setImageModelFilterMode('recent'));
+if (imageModelModeFavorites) imageModelModeFavorites.addEventListener('click', () => setImageModelFilterMode('favorites'));
+if (imageModelFavoriteToggle) {
+	imageModelFavoriteToggle.addEventListener('click', () => {
+		toggleFavoriteImageModel(imageModelSelect ? imageModelSelect.value : '');
+	});
+}
+if (refinerModelSelect) {
+	refinerModelSelect.addEventListener('change', () => {
+		updateModelStackBadges();
+		updateModelStackCompatibilityHint();
+	});
+}
+if (vaeModelSelect) {
+	vaeModelSelect.addEventListener('change', () => {
+		updateModelStackBadges();
+		updateModelStackCompatibilityHint();
+	});
+}
 if (controlnetModelSelect) controlnetModelSelect.addEventListener('change', updateControlnetCompatibilityHint);
+setImageModelFilterMode(imageModelFilterMode);
 
 imageRandomSeed.addEventListener('click', () => {
 	imageSeed.value = randomSeed();
@@ -4421,6 +4575,40 @@ function inferCheckpointFamily(modelName) {
 		return 'sd15';
 	}
 	return '';
+}
+
+function getModelStackCompatibilityMessage(baseModel, refinerModel, vaeModel) {
+	if (!baseModel) {
+		return 'Tip: select a Base checkpoint to validate Refiner/VAE family alignment.';
+	}
+	const baseFamily = inferCheckpointFamily(baseModel);
+	const issues = [];
+	if (refinerModel) {
+		const refinerFamily = inferCheckpointFamily(refinerModel);
+		if (baseFamily && refinerFamily && baseFamily !== refinerFamily) {
+			issues.push(`Refiner looks ${refinerFamily.toUpperCase()} while Base looks ${baseFamily.toUpperCase()}.`);
+		}
+	}
+	if (vaeModel) {
+		const vaeFamily = inferCheckpointFamily(vaeModel);
+		if (baseFamily && vaeFamily && baseFamily !== vaeFamily) {
+			issues.push(`VAE looks ${vaeFamily.toUpperCase()} while Base looks ${baseFamily.toUpperCase()}.`);
+		}
+	}
+	if (issues.length) {
+		return `${issues.join(' ')} Mixing families can reduce quality or fail workflow stages.`;
+	}
+	return 'Tip: keep Base, Refiner, and VAE in the same family (SD1.5 vs SDXL) when possible.';
+}
+
+function updateModelStackCompatibilityHint() {
+	if (!modelStackCompatHint) return;
+	const message = getModelStackCompatibilityMessage(
+		imageModelSelect ? imageModelSelect.value : '',
+		refinerModelSelect ? refinerModelSelect.value : '',
+		vaeModelSelect ? vaeModelSelect.value : '',
+	);
+	modelStackCompatHint.textContent = message;
 }
 
 function inferControlnetFamily(controlnetName) {

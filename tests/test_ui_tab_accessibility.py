@@ -752,22 +752,39 @@ def test_index_image_model_stack_controls_present():
     html = resp.get_data(as_text=True)
 
     assert 'class="sidebar-section model-stack-panel"' in html
+    assert 'id="image-model-mode-all"' in html
+    assert 'id="image-model-mode-recent"' in html
+    assert 'id="image-model-mode-favorites"' in html
     assert 'id="image-model-filter"' in html
+    assert 'id="image-model-favorite-toggle"' in html
     assert 'id="image-model-recent-list"' in html
+    assert 'id="image-model-favorite-list"' in html
     assert 'id="model-stack-badges"' in html
+    assert 'id="model-stack-compat-hint"' in html
 
 
 def test_image_model_stack_filter_and_recent_wiring_present_in_js_bundle():
     js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
     content = js_path.read_text(encoding="utf-8")
 
+    assert "const imageModelModeAll = document.getElementById('image-model-mode-all');" in content
+    assert "const imageModelModeRecent = document.getElementById('image-model-mode-recent');" in content
+    assert "const imageModelModeFavorites = document.getElementById('image-model-mode-favorites');" in content
+    assert "const imageModelFavoriteToggle = document.getElementById('image-model-favorite-toggle');" in content
     assert "const imageModelFilter = document.getElementById('image-model-filter');" in content
     assert "const imageModelRecentList = document.getElementById('image-model-recent-list');" in content
+    assert "const imageModelFavoriteList = document.getElementById('image-model-favorite-list');" in content
     assert "const modelStackBadges = document.getElementById('model-stack-badges');" in content
+    assert "const modelStackCompatHint = document.getElementById('model-stack-compat-hint');" in content
     assert "function renderFilteredImageModels(rawFilter = '', preferredValue = '')" in content
     assert "function rememberRecentImageModel(modelName)" in content
+    assert "function getFavoriteImageModels()" in content
+    assert "function toggleFavoriteImageModel(modelName)" in content
+    assert "function setImageModelFilterMode(mode)" in content
     assert "function renderRecentImageModels()" in content
+    assert "function renderFavoriteImageModels()" in content
     assert "function updateModelStackBadges()" in content
+    assert "function updateModelStackCompatibilityHint()" in content
 
 
 def test_image_model_stack_styles_present_in_css():
@@ -777,4 +794,7 @@ def test_image_model_stack_styles_present_in_css():
     assert ".model-stack-panel" in content
     assert ".model-stack-badges" in content
     assert ".model-stack-chip" in content
+    assert ".model-mode-row" in content
+    assert ".model-favorite-toggle-row" in content
     assert ".model-recent-list" in content
+    assert ".model-stack-compat-hint" in content
