@@ -317,6 +317,65 @@ textarea {
   gap: var(--sp-xs);
 }
 
+.model-stack-panel {
+  border: 1px solid var(--clr-border);
+  border-radius: var(--radius);
+  padding: var(--sp-sm);
+  background: color-mix(in srgb, var(--clr-bg) 90%, var(--clr-surface));
+}
+
+.model-stack-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--sp-sm);
+}
+
+.model-stack-badges {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.25rem;
+}
+
+.model-stack-chip {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--clr-border);
+  border-radius: 999px;
+  padding: 0.05rem 0.4rem;
+  font-size: var(--fs-xs);
+  color: var(--clr-text-muted);
+  background: color-mix(in srgb, var(--clr-surface) 80%, var(--clr-primary));
+  max-width: 13rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.model-recent-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.model-recent-label {
+  margin: 0;
+}
+
+.model-recent-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.model-recent-chip {
+  max-width: 14rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .seed-action-row {
   grid-template-columns: 1fr 1fr;
   margin-top: var(--sp-xs);

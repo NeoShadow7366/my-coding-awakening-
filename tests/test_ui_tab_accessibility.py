@@ -740,3 +740,41 @@ def test_image_seed_helper_and_aspect_ratio_styles_present_in_css():
     assert ".seed-action-row" in content
     assert ".aspect-ratio-row" in content
     assert ".btn-ghost.active" in content
+
+
+def test_index_image_model_stack_controls_present():
+    app_module.app.config["TESTING"] = True
+    client = app_module.app.test_client()
+
+    resp = client.get("/")
+
+    assert resp.status_code == 200
+    html = resp.get_data(as_text=True)
+
+    assert 'class="sidebar-section model-stack-panel"' in html
+    assert 'id="image-model-filter"' in html
+    assert 'id="image-model-recent-list"' in html
+    assert 'id="model-stack-badges"' in html
+
+
+def test_image_model_stack_filter_and_recent_wiring_present_in_js_bundle():
+    js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
+    content = js_path.read_text(encoding="utf-8")
+
+    assert "const imageModelFilter = document.getElementById('image-model-filter');" in content
+    assert "const imageModelRecentList = document.getElementById('image-model-recent-list');" in content
+    assert "const modelStackBadges = document.getElementById('model-stack-badges');" in content
+    assert "function renderFilteredImageModels(rawFilter = '', preferredValue = '')" in content
+    assert "function rememberRecentImageModel(modelName)" in content
+    assert "function renderRecentImageModels()" in content
+    assert "function updateModelStackBadges()" in content
+
+
+def test_image_model_stack_styles_present_in_css():
+    css_path = Path(__file__).resolve().parents[1] / "static" / "css" / "style.css"
+    content = css_path.read_text(encoding="utf-8")
+
+    assert ".model-stack-panel" in content
+    assert ".model-stack-badges" in content
+    assert ".model-stack-chip" in content
+    assert ".model-recent-list" in content

@@ -127,17 +127,25 @@
 <section id="panel-image" class="panel" role="tabpanel" aria-labelledby="nav-image" hidden>
 
   <aside class="sidebar" aria-label="Image generation settings">
-    <div class="sidebar-section">
+    <div class="sidebar-section model-stack-panel" aria-label="Model Stack settings">
+      <div class="model-stack-head">
+        <p class="field-label">Model Stack</p>
+        <div class="model-stack-badges" id="model-stack-badges" aria-live="polite"></div>
+      </div>
+
       <label for="image-model-select" class="field-label">Checkpoint</label>
+      <input id="image-model-filter" type="text" class="compact-input" placeholder="Filter checkpoints..." aria-label="Filter checkpoint list" />
       <div class="select-wrapper">
         <select id="image-model-select" aria-describedby="image-model-hint">
           <option value="">- loading checkpoints -</option>
         </select>
       </div>
+      <div class="model-recent-wrap" aria-label="Recent checkpoints">
+        <p class="hint model-recent-label">Recent</p>
+        <div id="image-model-recent-list" class="model-recent-list" role="group" aria-label="Recent checkpoint selections"></div>
+      </div>
       <p id="image-model-hint" class="hint">Loaded from ComfyUI CheckpointLoaderSimple</p>
-    </div>
 
-    <div class="sidebar-section">
       <label for="refiner-model-select" class="field-label">Refiner <span class="optional">(optional)</span></label>
       <div class="select-wrapper">
         <select id="refiner-model-select">
@@ -145,14 +153,20 @@
         </select>
       </div>
       <p class="hint">Second-pass quality boost (SDXL refiner style).</p>
-    </div>
 
-    <div class="sidebar-section">
       <label for="vae-model-select" class="field-label">VAE <span class="optional">(optional)</span></label>
       <div class="select-wrapper">
         <select id="vae-model-select">
           <option value="">Default (embedded)</option>
         </select>
+      </div>
+
+      <div class="lora-stack-head">
+        <p class="field-label">Extra Networks <span class="optional">(LoRA / LyCORIS)</span></p>
+        <button class="btn btn-ghost btn-xs" id="lora-add-btn" type="button" aria-label="Add LoRA network">＋</button>
+      </div>
+      <div id="lora-stack-container" class="lora-stack-container" aria-label="LoRA network stack">
+        <!-- rows injected by JS -->
       </div>
     </div>
 
@@ -162,16 +176,6 @@
         <select id="image-sampler-select">
           <option value="euler">euler</option>
         </select>
-      </div>
-    </div>
-
-    <div class="sidebar-section">
-      <div class="lora-stack-head">
-        <p class="field-label">Extra Networks <span class="optional">(LoRA / LyCORIS)</span></p>
-        <button class="btn btn-ghost btn-xs" id="lora-add-btn" type="button" aria-label="Add LoRA network">＋</button>
-      </div>
-      <div id="lora-stack-container" class="lora-stack-container" aria-label="LoRA network stack">
-        <!-- rows injected by JS -->
       </div>
     </div>
 

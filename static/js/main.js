@@ -108,6 +108,9 @@ const clearChat = document.getElementById('clear-chat');
 
 // Image panel
 const imageModelSelect = document.getElementById('image-model-select');
+const imageModelFilter = document.getElementById('image-model-filter');
+const imageModelRecentList = document.getElementById('image-model-recent-list');
+const modelStackBadges = document.getElementById('model-stack-badges');
 const refinerModelSelect = document.getElementById('refiner-model-select');
 const vaeModelSelect = document.getElementById('vae-model-select');
 const imageSamplerSelect = document.getElementById('image-sampler-select');
@@ -281,6 +284,7 @@ const queueActionInFlight = new Set();
 let queueFilterFailedOnly = localStorage.getItem('queueFilterFailedOnly') === '1';
 const IMAGE_PROFILE_STORAGE_KEY = 'imagePresetProfilesV1';
 const IMAGE_PROFILE_SELECTED_KEY = 'imagePresetProfilesSelectedV1';
+const IMAGE_RECENT_MODELS_KEY = 'imageRecentModelsV1';
 const QUEUE_TELEMETRY_KEY = 'queueTelemetryV1';
 const BACKGROUND_POLL_OWNER_KEY = 'backgroundPollOwnerV1';
 const BACKGROUND_POLL_LEASE_MS = 10_000;
@@ -293,6 +297,7 @@ let previewZoomScale = 1;
 const PREVIEW_ZOOM_MIN = 0.7;
 const PREVIEW_ZOOM_MAX = 3;
 const PREVIEW_ZOOM_STEP = 0.12;
+let imageModelAllOptions = [];
 let currentGalleryImages = [];
 let currentFullHistory = [];
 let galleryViewMode = localStorage.getItem('galleryViewMode') || 'list';
@@ -1127,6 +1132,7 @@ function applyImageSettings(settings) {
 	if (Number.isFinite(settings.height)) imageHeight.value = String(settings.height);
 	if (Number.isFinite(settings.batch_size)) imageBatchSize.value = String(settings.batch_size);
 	syncImageControlLabels();
+	updateModelStackBadges();
 }
 
 function renderImageProfileSelect(preferredName = '') {
@@ -1722,32 +1728,119 @@ async function loadImageModels() {
 			setImageModelMessage('No checkpoints found in ComfyUI');
 			return;
 		}
-		const isUnsupportedFluxModel = (name) => /flux/i.test(name || '');
-		const current = imageModelSelect.value;
-		imageModelSelect.innerHTML = models
-			.map((name) => {
-				const unsupported = isUnsupportedFluxModel(name);
-				const optionLabel = unsupported ? `${name} (unsupported in current workflow)` : name;
-				return `<option value="${escHtml(name)}" ${unsupported ? 'disabled data-unsupported="true"' : ''}>${escHtml(optionLabel)}</option>`;
-			})
-			.join('');
-
-		const options = [...imageModelSelect.options];
-		const currentOption = options.find((o) => o.value === current);
-		if (currentOption && !currentOption.disabled) {
-			imageModelSelect.value = current;
-			updateControlnetCompatibilityHint();
-			return;
+		imageModelAllOptions = models.slice();
+		renderFilteredImageModels(imageModelFilter ? imageModelFilter.value : '', imageModelSelect.value);
+		if (!imageModelSelect.value) {
+			const firstSupported = [...imageModelSelect.options].find((o) => !o.disabled && o.value);
+			if (firstSupported) imageModelSelect.value = firstSupported.value;
 		}
-
-		const firstSupported = options.find((o) => !o.disabled && o.value);
-		if (firstSupported) {
-			imageModelSelect.value = firstSupported.value;
-		}
+		renderRecentImageModels();
+		updateModelStackBadges();
 		updateControlnetCompatibilityHint();
 	} catch {
 		setImageModelMessage('Could not fetch checkpoints');
 	}
+}
+
+function getRecentImageModels() {
+	try {
+		const parsed = JSON.parse(localStorage.getItem(IMAGE_RECENT_MODELS_KEY) || '[]');
+		if (!Array.isArray(parsed)) return [];
+		return parsed.filter((m) => typeof m === 'string' && m.trim());
+	} catch {
+		return [];
+	}
+}
+
+function setRecentImageModels(models) {
+	localStorage.setItem(IMAGE_RECENT_MODELS_KEY, JSON.stringify(models.slice(0, 6)));
+}
+
+function rememberRecentImageModel(modelName) {
+	if (!modelName) return;
+	const next = [modelName, ...getRecentImageModels().filter((m) => m !== modelName)].slice(0, 6);
+	setRecentImageModels(next);
+	renderRecentImageModels();
+}
+
+function renderRecentImageModels() {
+	if (!imageModelRecentList) return;
+	const available = new Set(imageModelAllOptions);
+	const recents = getRecentImageModels().filter((m) => available.has(m));
+	if (!recents.length) {
+		imageModelRecentList.innerHTML = '<span class="hint">No recent models yet.</span>';
+		return;
+	}
+	imageModelRecentList.innerHTML = recents
+		.map((name) => `<button class="btn btn-ghost btn-xs model-recent-chip" type="button" data-model="${escHtml(name)}" title="Use ${escHtml(name)}">${escHtml(name)}</button>`)
+		.join('');
+	imageModelRecentList.querySelectorAll('.model-recent-chip').forEach((btn) => {
+		btn.addEventListener('click', () => {
+			const modelName = btn.dataset.model || '';
+			if (!modelName) return;
+			applyImageModelSelection(modelName);
+		});
+	});
+}
+
+function applyImageModelSelection(modelName) {
+	if (!imageModelSelect || !modelName) return;
+	const target = [...imageModelSelect.options].find((o) => o.value === modelName && !o.disabled);
+	if (!target) {
+		if (imageModelFilter) {
+			imageModelFilter.value = '';
+			renderFilteredImageModels('', modelName);
+		}
+	}
+	if ([...imageModelSelect.options].some((o) => o.value === modelName && !o.disabled)) {
+		imageModelSelect.value = modelName;
+		rememberRecentImageModel(modelName);
+		updateModelStackBadges();
+		updateControlnetCompatibilityHint();
+	}
+}
+
+function renderFilteredImageModels(rawFilter = '', preferredValue = '') {
+	if (!imageModelSelect) return;
+	const filter = String(rawFilter || '').trim().toLowerCase();
+	const isUnsupportedFluxModel = (name) => /flux/i.test(name || '');
+	const filtered = filter
+		? imageModelAllOptions.filter((name) => String(name).toLowerCase().includes(filter))
+		: imageModelAllOptions.slice();
+	if (!filtered.length) {
+		imageModelSelect.innerHTML = '<option value="">No matching checkpoints</option>';
+		return;
+	}
+	imageModelSelect.innerHTML = filtered
+		.map((name) => {
+			const unsupported = isUnsupportedFluxModel(name);
+			const optionLabel = unsupported ? `${name} (unsupported in current workflow)` : name;
+			return `<option value="${escHtml(name)}" ${unsupported ? 'disabled data-unsupported="true"' : ''}>${escHtml(optionLabel)}</option>`;
+		})
+		.join('');
+	if (preferredValue && [...imageModelSelect.options].some((o) => o.value === preferredValue && !o.disabled)) {
+		imageModelSelect.value = preferredValue;
+		return;
+	}
+	const firstSupported = [...imageModelSelect.options].find((o) => !o.disabled && o.value);
+	if (firstSupported) imageModelSelect.value = firstSupported.value;
+}
+
+function updateModelStackBadges() {
+	if (!modelStackBadges) return;
+	const badges = [];
+	if (imageModelSelect?.value) badges.push(`Base: ${imageModelSelect.value}`);
+	if (refinerModelSelect?.value) badges.push(`Refiner: ${refinerModelSelect.value}`);
+	if (vaeModelSelect?.value) badges.push(`VAE: ${vaeModelSelect.value}`);
+	const loraCount = collectLoraStack().length;
+	if (loraCount) badges.push(`LoRA x${loraCount}`);
+	if (!badges.length) {
+		modelStackBadges.innerHTML = '<span class="hint">Defaults</span>';
+		return;
+	}
+	modelStackBadges.innerHTML = badges
+		.map((label) => `<span class="model-stack-chip" title="${escHtml(label)}">${escHtml(label)}</span>`)
+		.join('');
 }
 
 async function loadImageSamplers() {
@@ -1830,6 +1923,7 @@ function addLoraRow() {
 	const removeBtn = row.querySelector('.lora-row-remove');
 
 	sel.addEventListener('change', async () => {
+		updateModelStackBadges();
 		tagCloud.hidden = true;
 		tagHint.hidden = true;
 		tagCloud.innerHTML = '';
@@ -1863,9 +1957,11 @@ function addLoraRow() {
 
 	removeBtn.addEventListener('click', () => {
 		row.remove();
+		updateModelStackBadges();
 	});
 
 	loraStackContainer.appendChild(row);
+	updateModelStackBadges();
 }
 
 if (loraAddBtn) {
@@ -2528,7 +2624,22 @@ if (controlnetWeight) controlnetWeight.addEventListener('input', syncImageContro
 if (controlnetStart) controlnetStart.addEventListener('input', syncImageControlLabels);
 if (controlnetEnd) controlnetEnd.addEventListener('input', syncImageControlLabels);
 syncImageControlLabels();
-if (imageModelSelect) imageModelSelect.addEventListener('change', updateControlnetCompatibilityHint);
+if (imageModelSelect) {
+	imageModelSelect.addEventListener('change', () => {
+		rememberRecentImageModel(imageModelSelect.value);
+		updateModelStackBadges();
+		updateControlnetCompatibilityHint();
+	});
+}
+if (imageModelFilter) {
+	imageModelFilter.addEventListener('input', () => {
+		renderFilteredImageModels(imageModelFilter.value, imageModelSelect ? imageModelSelect.value : '');
+		updateModelStackBadges();
+		updateControlnetCompatibilityHint();
+	});
+}
+if (refinerModelSelect) refinerModelSelect.addEventListener('change', updateModelStackBadges);
+if (vaeModelSelect) vaeModelSelect.addEventListener('change', updateModelStackBadges);
 if (controlnetModelSelect) controlnetModelSelect.addEventListener('change', updateControlnetCompatibilityHint);
 
 imageRandomSeed.addEventListener('click', () => {
