@@ -2516,7 +2516,6 @@ function syncImageControlLabels() {
 	imageStepsVal.textContent = String(Number(imageSteps.value));
 	imageCfgVal.textContent = Number(imageCfg.value).toFixed(1);
 	imageDenoiseVal.textContent = Number(imageDenoise.value).toFixed(2);
-	if (loraStrengthVal && loraStrength) loraStrengthVal.textContent = Number(loraStrength.value).toFixed(2);
 	if (controlnetWeightVal && controlnetWeight) controlnetWeightVal.textContent = Number(controlnetWeight.value).toFixed(2);
 	if (controlnetStartVal && controlnetStart) controlnetStartVal.textContent = Number(controlnetStart.value).toFixed(2);
 	if (controlnetEndVal && controlnetEnd) controlnetEndVal.textContent = Number(controlnetEnd.value).toFixed(2);
@@ -2525,7 +2524,6 @@ function syncImageControlLabels() {
 imageSteps.addEventListener('input', syncImageControlLabels);
 imageCfg.addEventListener('input', syncImageControlLabels);
 imageDenoise.addEventListener('input', syncImageControlLabels);
-if (loraStrength) loraStrength.addEventListener('input', syncImageControlLabels);
 if (controlnetWeight) controlnetWeight.addEventListener('input', syncImageControlLabels);
 if (controlnetStart) controlnetStart.addEventListener('input', syncImageControlLabels);
 if (controlnetEnd) controlnetEnd.addEventListener('input', syncImageControlLabels);
@@ -2535,6 +2533,7 @@ if (controlnetModelSelect) controlnetModelSelect.addEventListener('change', upda
 
 imageRandomSeed.addEventListener('click', () => {
 	imageSeed.value = randomSeed();
+});
 
 // ---- Aspect ratio presets ------------------------------------------------
 document.querySelectorAll('[data-ar]').forEach((btn) => {
@@ -2577,7 +2576,6 @@ if (imageLockSeedBtn) {
 		}
 	});
 }
-});
 
 function applyImagePreset(preset) {
 	if (preset === 'fast') {
