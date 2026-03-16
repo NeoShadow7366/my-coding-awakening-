@@ -208,10 +208,16 @@ def test_build_txt2img_workflow_includes_lora_node(monkeypatch):
         }
     )
 
-    assert workflow["8"]["class_type"] == "LoraLoader"
-    assert workflow["8"]["inputs"]["lora_name"] == "detail-tweaker.safetensors"
-    assert workflow["5"]["inputs"]["model"] == ["8", 0]
-    assert meta["lora"] == "detail-tweaker.safetensors"
+    # Verify LoraLoader exists and is wired correctly
+    lora_nodes = {k: v for k, v in workflow.items() if v.get("class_type") == "LoraLoader"}
+    assert len(lora_nodes) == 1
+    lora_key, lora_node = next(iter(lora_nodes.items()))
+    assert lora_node["inputs"]["lora_name"] == "detail-tweaker.safetensors"
+    assert lora_node["inputs"]["strength_model"] == 0.75
+    ks_nodes = [v for v in workflow.values() if v.get("class_type") == "KSampler"]
+    assert len(ks_nodes) == 1
+    assert ks_nodes[0]["inputs"]["model"] == [lora_key, 0]
+    assert meta["loras"] == [{"name": "detail-tweaker.safetensors", "strength": 0.75}]
 
 
 def test_build_txt2img_workflow_includes_controlnet_nodes(monkeypatch):
@@ -231,12 +237,18 @@ def test_build_txt2img_workflow_includes_controlnet_nodes(monkeypatch):
         }
     )
 
-    assert workflow["9"]["class_type"] == "ControlNetLoader"
-    assert workflow["10"]["class_type"] == "LoadImage"
-    assert workflow["10"]["inputs"]["image"] == "cn-input.png"
-    assert workflow["11"]["class_type"] == "ControlNetApplyAdvanced"
-    assert workflow["5"]["inputs"]["positive"] == ["11", 0]
-    assert workflow["5"]["inputs"]["negative"] == ["11", 1]
+    cn_loaders = [v for v in workflow.values() if v.get("class_type") == "ControlNetLoader"]
+    assert len(cn_loaders) == 1
+    cn_applies = {k: v for k, v in workflow.items() if v.get("class_type") == "ControlNetApplyAdvanced"}
+    assert len(cn_applies) == 1
+    cn_apply_key, cn_apply_node = next(iter(cn_applies.items()))
+    assert cn_apply_node["inputs"]["strength"] == 1.0
+    load_images = {k: v for k, v in workflow.items() if v.get("class_type") == "LoadImage" and v["inputs"].get("image") == "cn-input.png"}
+    assert len(load_images) == 1
+    ks_nodes = [v for v in workflow.values() if v.get("class_type") == "KSampler"]
+    assert len(ks_nodes) == 1
+    assert ks_nodes[0]["inputs"]["positive"] == [cn_apply_key, 0]
+    assert ks_nodes[0]["inputs"]["negative"] == [cn_apply_key, 1]
     assert meta["controlnet_model"] == "control_v11p_sd15_canny.safetensors"
 
 

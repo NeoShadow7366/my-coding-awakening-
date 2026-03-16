@@ -1851,7 +1851,10 @@ def _prune_history_image_references(image_ref: dict) -> tuple[int, int]:
 
 
 def _build_txt2img_workflow(body: dict) -> tuple[dict, dict]:
-    """Create a minimal txt2img workflow for ComfyUI."""
+    """Create a txt2img workflow for ComfyUI.
+
+    Supports: multi-LoRA chaining, custom VAE, Refiner checkpoint, HiresFix.
+    """
     prompt = (body.get("prompt") or "").strip()
     negative = (body.get("negative_prompt") or "").strip()
     model = (body.get("model") or "").strip()
@@ -1864,8 +1867,31 @@ def _build_txt2img_workflow(body: dict) -> tuple[dict, dict]:
     width = _clamp_int(int(body.get("width", DEFAULT_IMAGE_WIDTH)), 256, 2048)
     height = _clamp_int(int(body.get("height", DEFAULT_IMAGE_HEIGHT)), 256, 2048)
     batch_size = _clamp_int(int(body.get("batch_size", 1)), 1, 8)
-    lora_name = (body.get("lora") or "").strip()
-    lora_strength = _clamp_float(float(body.get("lora_strength", 0.8)), 0.0, 2.0)
+
+    # Multi-LoRA stack: prefer loras[] array; fall back to legacy lora/lora_strength
+    raw_loras = body.get("loras")
+    if isinstance(raw_loras, list) and raw_loras:
+        loras = [
+            {
+                "name": str(e.get("name") or "").strip(),
+                "strength": _clamp_float(float(e.get("strength", 0.8)), 0.0, 2.0),
+            }
+            for e in raw_loras
+            if isinstance(e, dict) and str(e.get("name") or "").strip()
+        ]
+    else:
+        legacy_name = (body.get("lora") or "").strip()
+        loras = [{"name": legacy_name, "strength": _clamp_float(float(body.get("lora_strength", 0.8)), 0.0, 2.0)}] if legacy_name else []
+
+    custom_vae = (body.get("vae") or "").strip()
+    refiner_model = (body.get("refiner_model") or "").strip()
+
+    hiresfix_enable = bool(body.get("hiresfix_enable"))
+    hiresfix_upscaler = (body.get("hiresfix_upscaler") or "").strip()
+    hiresfix_scale = _clamp_float(float(body.get("hiresfix_scale", 2.0)), 1.1, 8.0)
+    hiresfix_steps = _clamp_int(int(body.get("hiresfix_steps", 20)), 1, 100)
+    hiresfix_denoise = _clamp_float(float(body.get("hiresfix_denoise", 0.4)), 0.05, 1.0)
+
     controlnet_model = (body.get("controlnet_model") or "").strip()
     controlnet_image_name = (body.get("controlnet_image_name") or "").strip()
     controlnet_weight = _clamp_float(float(body.get("controlnet_weight", 1.0)), 0.0, 2.0)
@@ -1890,8 +1916,14 @@ def _build_txt2img_workflow(body: dict) -> tuple[dict, dict]:
         "width": width,
         "height": height,
         "batch_size": batch_size,
-        "lora": lora_name,
-        "lora_strength": lora_strength,
+        "loras": loras,
+        "vae": custom_vae,
+        "refiner_model": refiner_model,
+        "hiresfix_enable": hiresfix_enable,
+        "hiresfix_upscaler": hiresfix_upscaler,
+        "hiresfix_scale": hiresfix_scale,
+        "hiresfix_steps": hiresfix_steps,
+        "hiresfix_denoise": hiresfix_denoise,
         "controlnet_model": controlnet_model,
         "controlnet_image_name": controlnet_image_name,
         "controlnet_weight": controlnet_weight,
@@ -1899,23 +1931,110 @@ def _build_txt2img_workflow(body: dict) -> tuple[dict, dict]:
         "controlnet_end": controlnet_end,
     }
 
+    # --- Node counter helper ------------------------------------------------
+    _node_id = [20]  # start well above reserved 1-19
+
+    def _nid() -> str:
+        _node_id[0] += 1
+        return str(_node_id[0])
+
+    # --- Backbone -----------------------------------------------------------
     model_ref: list = ["1", 0]
     clip_ref: list = ["1", 1]
-    positive_ref: list = ["2", 0]
-    negative_ref: list = ["3", 0]
+    vae_ref: list = ["1", 2]
 
-    workflow = {
+    workflow: dict = {
         "1": {"class_type": "CheckpointLoaderSimple", "inputs": {"ckpt_name": model}},
-        "2": {"class_type": "CLIPTextEncode", "inputs": {"text": prompt, "clip": clip_ref}},
-        "3": {
-            "class_type": "CLIPTextEncode",
-            "inputs": {"text": negative, "clip": clip_ref},
+    }
+
+    # Custom VAE override
+    if custom_vae:
+        vae_node = _nid()
+        workflow[vae_node] = {"class_type": "VAELoader", "inputs": {"vae_name": custom_vae}}
+        vae_ref = [vae_node, 0]
+
+    # LoRA chain
+    for lora_entry in loras:
+        lora_node = _nid()
+        workflow[lora_node] = {
+            "class_type": "LoraLoader",
+            "inputs": {
+                "lora_name": lora_entry["name"],
+                "strength_model": lora_entry["strength"],
+                "strength_clip": lora_entry["strength"],
+                "model": model_ref,
+                "clip": clip_ref,
+            },
+        }
+        model_ref = [lora_node, 0]
+        clip_ref = [lora_node, 1]
+
+    # Text conditioning
+    pos_node, neg_node = _nid(), _nid()
+    workflow[pos_node] = {"class_type": "CLIPTextEncode", "inputs": {"text": prompt, "clip": clip_ref}}
+    workflow[neg_node] = {"class_type": "CLIPTextEncode", "inputs": {"text": negative, "clip": clip_ref}}
+    positive_ref: list = [pos_node, 0]
+    negative_ref: list = [neg_node, 0]
+
+    # Latent image
+    latent_node = _nid()
+    workflow[latent_node] = {
+        "class_type": "EmptyLatentImage",
+        "inputs": {"width": width, "height": height, "batch_size": batch_size},
+    }
+    latent_ref: list = [latent_node, 0]
+
+    # ControlNet
+    if controlnet_model and controlnet_image_name:
+        cn_loader = _nid()
+        cn_img = _nid()
+        cn_apply = _nid()
+        workflow[cn_loader] = {"class_type": "ControlNetLoader", "inputs": {"control_net_name": controlnet_model}}
+        workflow[cn_img] = {"class_type": "LoadImage", "inputs": {"image": controlnet_image_name}}
+        workflow[cn_apply] = {
+            "class_type": "ControlNetApplyAdvanced",
+            "inputs": {
+                "positive": positive_ref,
+                "negative": negative_ref,
+                "control_net": [cn_loader, 0],
+                "image": [cn_img, 0],
+                "strength": controlnet_weight,
+                "start_percent": controlnet_start,
+                "end_percent": controlnet_end,
+            },
+        }
+        positive_ref = [cn_apply, 0]
+        negative_ref = [cn_apply, 1]
+
+    # Primary KSampler
+    ks_node = _nid()
+    workflow[ks_node] = {
+        "class_type": "KSampler",
+        "inputs": {
+            "seed": seed,
+            "steps": steps,
+            "cfg": cfg,
+            "sampler_name": sampler,
+            "scheduler": scheduler,
+            "denoise": 1.0,
+            "model": model_ref,
+            "positive": positive_ref,
+            "negative": negative_ref,
+            "latent_image": latent_ref,
         },
-        "4": {
-            "class_type": "EmptyLatentImage",
-            "inputs": {"width": width, "height": height, "batch_size": batch_size},
-        },
-        "5": {
+    }
+    sampled_ref: list = [ks_node, 0]
+
+    # Refiner pass (optional second KSampler with refiner checkpoint)
+    if refiner_model:
+        ref_ckpt = _nid()
+        ref_pos = _nid()
+        ref_neg = _nid()
+        ref_ks = _nid()
+        workflow[ref_ckpt] = {"class_type": "CheckpointLoaderSimple", "inputs": {"ckpt_name": refiner_model}}
+        workflow[ref_pos] = {"class_type": "CLIPTextEncode", "inputs": {"text": prompt, "clip": [ref_ckpt, 1]}}
+        workflow[ref_neg] = {"class_type": "CLIPTextEncode", "inputs": {"text": negative, "clip": [ref_ckpt, 1]}}
+        workflow[ref_ks] = {
             "class_type": "KSampler",
             "inputs": {
                 "seed": seed,
@@ -1923,62 +2042,80 @@ def _build_txt2img_workflow(body: dict) -> tuple[dict, dict]:
                 "cfg": cfg,
                 "sampler_name": sampler,
                 "scheduler": scheduler,
-                "denoise": 1.0,
+                "denoise": 0.2,
+                "model": [ref_ckpt, 0],
+                "positive": [ref_pos, 0],
+                "negative": [ref_neg, 0],
+                "latent_image": sampled_ref,
+            },
+        }
+        sampled_ref = [ref_ks, 0]
+        # Refiner provides its own VAE if none was specified
+        if not custom_vae:
+            vae_ref = [ref_ckpt, 2]
+
+    # HiresFix (upscale + second KSampler)
+    if hiresfix_enable:
+        # Decode primary latent → pixels
+        hf_decode = _nid()
+        workflow[hf_decode] = {"class_type": "VAEDecode", "inputs": {"samples": sampled_ref, "vae": vae_ref}}
+
+        # Upscale pixels
+        if hiresfix_upscaler:
+            hf_model = _nid()
+            hf_upscale = _nid()
+            workflow[hf_model] = {"class_type": "UpscaleModelLoader", "inputs": {"model_name": hiresfix_upscaler}}
+            workflow[hf_upscale] = {
+                "class_type": "ImageUpscaleWithModel",
+                "inputs": {"upscale_model": [hf_model, 0], "image": [hf_decode, 0]},
+            }
+            upscaled_img_ref: list = [hf_upscale, 0]
+        else:
+            # Fallback: simple pixel-space scale
+            hf_scale_img = _nid()
+            workflow[hf_scale_img] = {
+                "class_type": "ImageScale",
+                "inputs": {
+                    "image": [hf_decode, 0],
+                    "upscale_method": "lanczos",
+                    "width": int(width * hiresfix_scale),
+                    "height": int(height * hiresfix_scale),
+                    "crop": "disabled",
+                },
+            }
+            upscaled_img_ref = [hf_scale_img, 0]
+
+        # Re-encode to latent
+        hf_encode = _nid()
+        workflow[hf_encode] = {"class_type": "VAEEncode", "inputs": {"pixels": upscaled_img_ref, "vae": vae_ref}}
+
+        # Hi-res KSampler
+        hf_ks = _nid()
+        workflow[hf_ks] = {
+            "class_type": "KSampler",
+            "inputs": {
+                "seed": seed,
+                "steps": hiresfix_steps,
+                "cfg": cfg,
+                "sampler_name": sampler,
+                "scheduler": scheduler,
+                "denoise": hiresfix_denoise,
                 "model": model_ref,
                 "positive": positive_ref,
                 "negative": negative_ref,
-                "latent_image": ["4", 0],
+                "latent_image": [hf_encode, 0],
             },
-        },
-        "6": {"class_type": "VAEDecode", "inputs": {"samples": ["5", 0], "vae": ["1", 2]}},
-        "7": {
-            "class_type": "SaveImage",
-            "inputs": {"images": ["6", 0], "filename_prefix": "links-awakening"},
-        },
+        }
+        sampled_ref = [hf_ks, 0]
+
+    # Final decode + save
+    decode_node = _nid()
+    save_node = _nid()
+    workflow[decode_node] = {"class_type": "VAEDecode", "inputs": {"samples": sampled_ref, "vae": vae_ref}}
+    workflow[save_node] = {
+        "class_type": "SaveImage",
+        "inputs": {"images": [decode_node, 0], "filename_prefix": "links-awakening"},
     }
-
-    if lora_name:
-        workflow["8"] = {
-            "class_type": "LoraLoader",
-            "inputs": {
-                "lora_name": lora_name,
-                "strength_model": lora_strength,
-                "strength_clip": lora_strength,
-                "model": model_ref,
-                "clip": clip_ref,
-            },
-        }
-        model_ref = ["8", 0]
-        clip_ref = ["8", 1]
-        workflow["2"]["inputs"]["clip"] = clip_ref
-        workflow["3"]["inputs"]["clip"] = clip_ref
-        workflow["5"]["inputs"]["model"] = model_ref
-
-    if controlnet_model and controlnet_image_name:
-        workflow["9"] = {
-            "class_type": "ControlNetLoader",
-            "inputs": {"control_net_name": controlnet_model},
-        }
-        workflow["10"] = {
-            "class_type": "LoadImage",
-            "inputs": {"image": controlnet_image_name},
-        }
-        workflow["11"] = {
-            "class_type": "ControlNetApplyAdvanced",
-            "inputs": {
-                "positive": positive_ref,
-                "negative": negative_ref,
-                "control_net": ["9", 0],
-                "image": ["10", 0],
-                "strength": controlnet_weight,
-                "start_percent": controlnet_start,
-                "end_percent": controlnet_end,
-            },
-        }
-        positive_ref = ["11", 0]
-        negative_ref = ["11", 1]
-        workflow["5"]["inputs"]["positive"] = positive_ref
-        workflow["5"]["inputs"]["negative"] = negative_ref
 
     return workflow, meta
 
@@ -2000,7 +2137,10 @@ def _upload_image_to_comfy(file_storage) -> str:
 
 
 def _build_img2img_workflow(body: dict, uploaded_name: str) -> tuple[dict, dict]:
-    """Create a minimal img2img workflow for ComfyUI."""
+    """Create an img2img workflow for ComfyUI.
+
+    Supports: multi-LoRA chaining, custom VAE, ControlNet.
+    """
     prompt = (body.get("prompt") or "").strip()
     negative = (body.get("negative_prompt") or "").strip()
     model = (body.get("model") or "").strip()
@@ -2011,8 +2151,24 @@ def _build_img2img_workflow(body: dict, uploaded_name: str) -> tuple[dict, dict]
     steps = _clamp_int(int(body.get("steps", DEFAULT_IMAGE_STEPS)), MIN_STEPS, MAX_STEPS)
     cfg = _clamp_float(float(body.get("cfg", DEFAULT_IMAGE_CFG)), MIN_CFG, MAX_CFG)
     denoise = _clamp_float(float(body.get("denoise", DEFAULT_IMAGE_DENOISE)), 0.05, 1.0)
-    lora_name = (body.get("lora") or "").strip()
-    lora_strength = _clamp_float(float(body.get("lora_strength", 0.8)), 0.0, 2.0)
+
+    # Multi-LoRA stack (same logic as txt2img)
+    raw_loras = body.get("loras")
+    if isinstance(raw_loras, list) and raw_loras:
+        loras = [
+            {
+                "name": str(e.get("name") or "").strip(),
+                "strength": _clamp_float(float(e.get("strength", 0.8)), 0.0, 2.0),
+            }
+            for e in raw_loras
+            if isinstance(e, dict) and str(e.get("name") or "").strip()
+        ]
+    else:
+        legacy_name = (body.get("lora") or "").strip()
+        loras = [{"name": legacy_name, "strength": _clamp_float(float(body.get("lora_strength", 0.8)), 0.0, 2.0)}] if legacy_name else []
+
+    custom_vae = (body.get("vae") or "").strip()
+
     controlnet_model = (body.get("controlnet_model") or "").strip()
     controlnet_image_name = (body.get("controlnet_image_name") or "").strip()
     controlnet_weight = _clamp_float(float(body.get("controlnet_weight", 1.0)), 0.0, 2.0)
@@ -2036,8 +2192,8 @@ def _build_img2img_workflow(body: dict, uploaded_name: str) -> tuple[dict, dict]
         "cfg": cfg,
         "denoise": denoise,
         "image": uploaded_name,
-        "lora": lora_name,
-        "lora_strength": lora_strength,
+        "loras": loras,
+        "vae": custom_vae,
         "controlnet_model": controlnet_model,
         "controlnet_image_name": controlnet_image_name,
         "controlnet_weight": controlnet_weight,
@@ -2045,84 +2201,97 @@ def _build_img2img_workflow(body: dict, uploaded_name: str) -> tuple[dict, dict]
         "controlnet_end": controlnet_end,
     }
 
+    _node_id = [20]
+
+    def _nid() -> str:
+        _node_id[0] += 1
+        return str(_node_id[0])
+
     model_ref: list = ["1", 0]
     clip_ref: list = ["1", 1]
-    positive_ref: list = ["2", 0]
-    negative_ref: list = ["3", 0]
+    vae_ref: list = ["1", 2]
 
-    workflow = {
+    workflow: dict = {
         "1": {"class_type": "CheckpointLoaderSimple", "inputs": {"ckpt_name": model}},
-        "2": {"class_type": "CLIPTextEncode", "inputs": {"text": prompt, "clip": clip_ref}},
-        "3": {
-            "class_type": "CLIPTextEncode",
-            "inputs": {"text": negative, "clip": clip_ref},
-        },
-        "4": {"class_type": "LoadImage", "inputs": {"image": uploaded_name}},
-        "5": {"class_type": "VAEEncode", "inputs": {"pixels": ["4", 0], "vae": ["1", 2]}},
-        "6": {
-            "class_type": "KSampler",
-            "inputs": {
-                "seed": seed,
-                "steps": steps,
-                "cfg": cfg,
-                "sampler_name": sampler,
-                "scheduler": scheduler,
-                "denoise": denoise,
-                "model": model_ref,
-                "positive": positive_ref,
-                "negative": negative_ref,
-                "latent_image": ["5", 0],
-            },
-        },
-        "7": {"class_type": "VAEDecode", "inputs": {"samples": ["6", 0], "vae": ["1", 2]}},
-        "8": {
-            "class_type": "SaveImage",
-            "inputs": {"images": ["7", 0], "filename_prefix": "links-awakening-img2img"},
-        },
     }
 
-    if lora_name:
-        workflow["9"] = {
+    if custom_vae:
+        vae_node = _nid()
+        workflow[vae_node] = {"class_type": "VAELoader", "inputs": {"vae_name": custom_vae}}
+        vae_ref = [vae_node, 0]
+
+    for lora_entry in loras:
+        lora_node = _nid()
+        workflow[lora_node] = {
             "class_type": "LoraLoader",
             "inputs": {
-                "lora_name": lora_name,
-                "strength_model": lora_strength,
-                "strength_clip": lora_strength,
+                "lora_name": lora_entry["name"],
+                "strength_model": lora_entry["strength"],
+                "strength_clip": lora_entry["strength"],
                 "model": model_ref,
                 "clip": clip_ref,
             },
         }
-        model_ref = ["9", 0]
-        clip_ref = ["9", 1]
-        workflow["2"]["inputs"]["clip"] = clip_ref
-        workflow["3"]["inputs"]["clip"] = clip_ref
-        workflow["6"]["inputs"]["model"] = model_ref
+        model_ref = [lora_node, 0]
+        clip_ref = [lora_node, 1]
+
+    pos_node, neg_node = _nid(), _nid()
+    workflow[pos_node] = {"class_type": "CLIPTextEncode", "inputs": {"text": prompt, "clip": clip_ref}}
+    workflow[neg_node] = {"class_type": "CLIPTextEncode", "inputs": {"text": negative, "clip": clip_ref}}
+    positive_ref: list = [pos_node, 0]
+    negative_ref: list = [neg_node, 0]
+
+    # Load and encode input image
+    load_img_node = _nid()
+    vae_encode_node = _nid()
+    workflow[load_img_node] = {"class_type": "LoadImage", "inputs": {"image": uploaded_name}}
+    workflow[vae_encode_node] = {"class_type": "VAEEncode", "inputs": {"pixels": [load_img_node, 0], "vae": vae_ref}}
 
     if controlnet_model and controlnet_image_name:
-        workflow["10"] = {
-            "class_type": "ControlNetLoader",
-            "inputs": {"control_net_name": controlnet_model},
-        }
-        workflow["11"] = {
-            "class_type": "LoadImage",
-            "inputs": {"image": controlnet_image_name},
-        }
-        workflow["12"] = {
+        cn_loader = _nid()
+        cn_img = _nid()
+        cn_apply = _nid()
+        workflow[cn_loader] = {"class_type": "ControlNetLoader", "inputs": {"control_net_name": controlnet_model}}
+        workflow[cn_img] = {"class_type": "LoadImage", "inputs": {"image": controlnet_image_name}}
+        workflow[cn_apply] = {
             "class_type": "ControlNetApplyAdvanced",
             "inputs": {
                 "positive": positive_ref,
                 "negative": negative_ref,
-                "control_net": ["10", 0],
-                "image": ["11", 0],
+                "control_net": [cn_loader, 0],
+                "image": [cn_img, 0],
                 "strength": controlnet_weight,
                 "start_percent": controlnet_start,
                 "end_percent": controlnet_end,
             },
         }
-        positive_ref = ["12", 0]
-        negative_ref = ["12", 1]
-        workflow["6"]["inputs"]["positive"] = positive_ref
-        workflow["6"]["inputs"]["negative"] = negative_ref
+        positive_ref = [cn_apply, 0]
+        negative_ref = [cn_apply, 1]
+
+    ks_node = _nid()
+    workflow[ks_node] = {
+        "class_type": "KSampler",
+        "inputs": {
+            "seed": seed,
+            "steps": steps,
+            "cfg": cfg,
+            "sampler_name": sampler,
+            "scheduler": scheduler,
+            "denoise": denoise,
+            "model": model_ref,
+            "positive": positive_ref,
+            "negative": negative_ref,
+            "latent_image": [vae_encode_node, 0],
+        },
+    }
+
+    decode_node = _nid()
+    save_node = _nid()
+    workflow[decode_node] = {"class_type": "VAEDecode", "inputs": {"samples": [ks_node, 0], "vae": vae_ref}}
+    workflow[save_node] = {
+        "class_type": "SaveImage",
+        "inputs": {"images": [decode_node, 0], "filename_prefix": "links-awakening-img2img"},
+    }
 
     return workflow, meta
 
