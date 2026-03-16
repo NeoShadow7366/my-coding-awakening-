@@ -701,3 +701,42 @@ def test_local_library_filename_query_candidates_present_in_backend():
     assert "stripped_stem = re.sub" in content
     assert "for query_index, query in enumerate(query_candidates):" in content
     assert "type_candidates = [model_type] if model_type in _CIVITAI_MODEL_TYPES else []" in content
+
+
+def test_index_image_aspect_ratio_and_seed_helper_controls_present():
+    app_module.app.config["TESTING"] = True
+    client = app_module.app.test_client()
+
+    resp = client.get("/")
+
+    assert resp.status_code == 200
+    html = resp.get_data(as_text=True)
+
+    assert '<div class="aspect-ratio-row" role="group" aria-label="Aspect ratio presets">' in html
+    assert 'data-ar="1024:1024"' in html
+    assert 'data-ar="1344:768"' in html
+    assert 'data-ar="768:1344"' in html
+    assert 'id="image-use-last-seed"' in html
+    assert 'id="image-lock-seed"' in html
+
+
+def test_image_seed_helper_and_aspect_ratio_wiring_present_in_js_bundle():
+    js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
+    content = js_path.read_text(encoding="utf-8")
+
+    assert "document.querySelectorAll('[data-ar]').forEach((btn) => {" in content
+    assert "const imageUseLastSeedBtn = document.getElementById('image-use-last-seed');" in content
+    assert "const imageLockSeedBtn = document.getElementById('image-lock-seed');" in content
+    assert "let _lastGeneratedSeed = null;" in content
+    assert "let _seedLocked = false;" in content
+    assert "function setLastGeneratedSeed(seed) {" in content
+    assert "imageLockSeedBtn.setAttribute('aria-pressed', String(_seedLocked));" in content
+
+
+def test_image_seed_helper_and_aspect_ratio_styles_present_in_css():
+    css_path = Path(__file__).resolve().parents[1] / "static" / "css" / "style.css"
+    content = css_path.read_text(encoding="utf-8")
+
+    assert ".seed-action-row" in content
+    assert ".aspect-ratio-row" in content
+    assert ".btn-ghost.active" in content

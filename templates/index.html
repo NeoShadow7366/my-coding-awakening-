@@ -210,6 +210,10 @@
         <input id="image-seed" type="number" class="compact-input" placeholder="Random" />
         <button class="btn btn-ghost btn-xs" id="image-random-seed" type="button">Random</button>
       </div>
+      <div class="inline-field-row seed-action-row">
+        <button class="btn btn-ghost btn-xs" id="image-use-last-seed" type="button" disabled title="Reuse seed from last generation">Use Last</button>
+        <button class="btn btn-ghost btn-xs" id="image-lock-seed" type="button" aria-pressed="false" title="Keep seed fixed between generations">Lock</button>
+      </div>
       <div class="preset-row" role="group" aria-label="Image presets">
         <button class="btn btn-ghost btn-xs" type="button" data-image-preset="fast" aria-pressed="false">Fast</button>
         <button class="btn btn-ghost btn-xs" type="button" data-image-preset="quality" aria-pressed="false">Quality</button>
@@ -463,6 +467,15 @@
           <div class="form-field">
             <label for="image-height" class="field-label">Height</label>
             <input id="image-height" type="number" min="256" max="2048" step="64" value="1024" />
+
+                  <div class="aspect-ratio-row" role="group" aria-label="Aspect ratio presets">
+                    <button class="btn btn-ghost btn-xs" type="button" data-ar="1024:1024" title="Square 1:1 (1024×1024)">1:1</button>
+                    <button class="btn btn-ghost btn-xs" type="button" data-ar="1152:864"  title="Landscape 4:3 (1152×864)">4:3</button>
+                    <button class="btn btn-ghost btn-xs" type="button" data-ar="1216:832"  title="Photo 3:2 (1216×832)">3:2</button>
+                    <button class="btn btn-ghost btn-xs" type="button" data-ar="1344:768"  title="Wide 16:9 (1344×768)">16:9</button>
+                    <button class="btn btn-ghost btn-xs" type="button" data-ar="768:1344"  title="Portrait 9:16 (768×1344)">9:16</button>
+                    <button class="btn btn-ghost btn-xs" type="button" data-ar="832:1216"  title="Portrait 2:3 (832×1216)">2:3</button>
+                  </div>
           </div>
         </div>
 

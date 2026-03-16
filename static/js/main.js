@@ -1038,6 +1038,15 @@ function getCurrentImageSettings() {
 	return {
 		model: imageModelSelect.value,
 		sampler: imageSamplerSelect.value,
+		negative_prompt: imageNegativePrompt?.value || '',
+		loras: collectLoraStack(),
+		vae: vaeModelSelect?.value || '',
+		refiner_model: refinerModelSelect?.value || '',
+		hiresfix_enable: hiresfixEnable?.checked || false,
+		hiresfix_upscaler: hiresfixUpscalerSelect?.value || '',
+		hiresfix_scale: Number(hiresfixScale?.value || 2),
+		hiresfix_steps: Number(hiresfixSteps?.value || 20),
+		hiresfix_denoise: Number(hiresfixDenoise?.value || 0.4),
 		controlnet_model: controlnetModelSelect?.value || '',
 		controlnet_weight: Number(controlnetWeight?.value || 1),
 		controlnet_start: Number(controlnetStart?.value || 0),
@@ -1059,6 +1068,50 @@ function applyImageSettings(settings) {
 	}
 	if (settings.sampler && [...imageSamplerSelect.options].some((o) => o.value === settings.sampler)) {
 		imageSamplerSelect.value = settings.sampler;
+	}
+	if (typeof settings.negative_prompt === 'string' && imageNegativePrompt) {
+		imageNegativePrompt.value = settings.negative_prompt;
+	}
+	// Restore LoRA stack
+	if (loraStackContainer && Array.isArray(settings.loras)) {
+		loraStackContainer.innerHTML = '';
+		for (const entry of settings.loras) {
+			addLoraRow();
+			const lastRow = loraStackContainer.lastElementChild;
+			if (!lastRow) continue;
+			const sel = lastRow.querySelector('.lora-row-select');
+			const str = lastRow.querySelector('.lora-row-strength');
+			const strVal = lastRow.querySelector('.lora-strength-val');
+			if (sel && entry.name && [...sel.options].some((o) => o.value === entry.name)) sel.value = entry.name;
+			if (str && Number.isFinite(entry.strength)) {
+				str.value = String(entry.strength);
+				if (strVal) strVal.textContent = Number(entry.strength).toFixed(2);
+			}
+		}
+	}
+	if (vaeModelSelect && settings.vae !== undefined) {
+		if (!settings.vae || [...vaeModelSelect.options].some((o) => o.value === settings.vae)) {
+			vaeModelSelect.value = settings.vae || '';
+		}
+	}
+	if (refinerModelSelect && settings.refiner_model !== undefined) {
+		if (!settings.refiner_model || [...refinerModelSelect.options].some((o) => o.value === settings.refiner_model)) {
+			refinerModelSelect.value = settings.refiner_model || '';
+		}
+	}
+	if (hiresfixEnable && typeof settings.hiresfix_enable === 'boolean') {
+		hiresfixEnable.checked = settings.hiresfix_enable;
+	}
+	if (hiresfixUpscalerSelect && settings.hiresfix_upscaler !== undefined) {
+		if (!settings.hiresfix_upscaler || [...hiresfixUpscalerSelect.options].some((o) => o.value === settings.hiresfix_upscaler)) {
+			hiresfixUpscalerSelect.value = settings.hiresfix_upscaler || '';
+		}
+	}
+	if (hiresfixScale && Number.isFinite(settings.hiresfix_scale)) hiresfixScale.value = String(settings.hiresfix_scale);
+	if (hiresfixSteps && Number.isFinite(settings.hiresfix_steps)) hiresfixSteps.value = String(settings.hiresfix_steps);
+	if (hiresfixDenoise && Number.isFinite(settings.hiresfix_denoise)) {
+		hiresfixDenoise.value = String(settings.hiresfix_denoise);
+		if (hiresfixDenoiseVal) hiresfixDenoiseVal.textContent = Number(settings.hiresfix_denoise).toFixed(2);
 	}
 	if (settings.controlnet_model && controlnetModelSelect && [...controlnetModelSelect.options].some((o) => o.value === settings.controlnet_model)) {
 		controlnetModelSelect.value = settings.controlnet_model;
@@ -2482,6 +2535,48 @@ if (controlnetModelSelect) controlnetModelSelect.addEventListener('change', upda
 
 imageRandomSeed.addEventListener('click', () => {
 	imageSeed.value = randomSeed();
+
+// ---- Aspect ratio presets ------------------------------------------------
+document.querySelectorAll('[data-ar]').forEach((btn) => {
+	btn.addEventListener('click', () => {
+		const parts = (btn.dataset.ar || '').split(':').map(Number);
+		if (parts.length !== 2 || !parts[0] || !parts[1]) return;
+		if (imageWidth) imageWidth.value = String(parts[0]);
+		if (imageHeight) imageHeight.value = String(parts[1]);
+	});
+});
+
+// ---- Seed helpers: Use Last / Lock ---------------------------------------
+const imageUseLastSeedBtn = document.getElementById('image-use-last-seed');
+const imageLockSeedBtn = document.getElementById('image-lock-seed');
+let _lastGeneratedSeed = null;
+let _seedLocked = false;
+
+function setLastGeneratedSeed(seed) {
+	if (seed === null || seed === undefined) return;
+	_lastGeneratedSeed = String(seed);
+	if (imageUseLastSeedBtn) imageUseLastSeedBtn.disabled = false;
+	if (_seedLocked && imageSeed) imageSeed.value = _lastGeneratedSeed;
+}
+
+if (imageUseLastSeedBtn) {
+	imageUseLastSeedBtn.addEventListener('click', () => {
+		if (_lastGeneratedSeed && imageSeed) {
+			imageSeed.value = _lastGeneratedSeed;
+		}
+	});
+}
+
+if (imageLockSeedBtn) {
+	imageLockSeedBtn.addEventListener('click', () => {
+		_seedLocked = !_seedLocked;
+		imageLockSeedBtn.setAttribute('aria-pressed', String(_seedLocked));
+		imageLockSeedBtn.classList.toggle('active', _seedLocked);
+		if (_seedLocked && _lastGeneratedSeed && imageSeed) {
+			imageSeed.value = _lastGeneratedSeed;
+		}
+	});
+}
 });
 
 function applyImagePreset(preset) {
@@ -2808,6 +2903,10 @@ async function retryImageJob(promptId, isAuto = false) {
 		if (!res.ok) {
 			showToast(`Retry failed: ${data.error || 'Unknown error'}`, 'neg');
 			return;
+		}
+
+		if (data && data.meta && data.meta.seed !== undefined && data.meta.seed !== null) {
+			setLastGeneratedSeed(data.meta.seed);
 		}
 
 		const newPromptId = data.prompt_id;
@@ -7290,6 +7389,12 @@ imageForm.addEventListener('submit', async (e) => {
 			return;
 		}
 
+		if (data && data.meta && data.meta.seed !== undefined && data.meta.seed !== null) {
+			setLastGeneratedSeed(data.meta.seed);
+		} else if (common.seed) {
+			setLastGeneratedSeed(common.seed);
+		}
+
 		const promptId = data.prompt_id;
 		imageState.currentPromptId = promptId;
 		trackedPromptIds.add(promptId);
@@ -7325,6 +7430,7 @@ imageForm.addEventListener('submit', async (e) => {
 
 		queueSummary.textContent = `Submitted: ${promptId}`;
 		imageGenerateBtn.textContent = 'Queued';
+				if (data.meta && data.meta.seed !== undefined) setLastGeneratedSeed(data.meta.seed);
 		await pollQueue();
 	} catch (err) {
 		queueSummary.textContent = `Error: ${err.message}`;

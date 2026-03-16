@@ -317,6 +317,18 @@ textarea {
   gap: var(--sp-xs);
 }
 
+.seed-action-row {
+  grid-template-columns: 1fr 1fr;
+  margin-top: var(--sp-xs);
+}
+
+.aspect-ratio-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-xs);
+  margin-top: var(--sp-sm);
+}
+
 .slider-group {
   display: flex;
   flex-direction: column;
@@ -355,6 +367,11 @@ textarea {
   border-color: var(--clr-border);
 }
 .btn-ghost:hover:not(:disabled) { background: var(--clr-bg); color: var(--clr-text); }
+.btn-ghost.active {
+  background: color-mix(in srgb, var(--clr-primary) 18%, transparent);
+  border-color: color-mix(in srgb, var(--clr-primary) 65%, var(--clr-border));
+  color: var(--clr-text);
+}
 
 .btn-full { width: 100%; }
 .btn-xs { padding: 0.28rem 0.55rem; font-size: 0.75rem; }
