@@ -201,6 +201,42 @@ def _image_controlnet_models() -> list[str]:
     return []
 
 
+def _image_vae_models() -> list[str]:
+    """Return available VAE names from ComfyUI."""
+    data = _comfy_get_object_info("VAELoader")
+    required = data.get("VAELoader", {}).get("input", {}).get("required", {})
+    names = required.get("vae_name", [[]])
+    if names and isinstance(names[0], list):
+        return names[0]
+    return []
+
+
+def _get_lora_tags(lora_name: str) -> list[str]:
+    """Try to read trigger words for a LoRA from sidecar JSON metadata files."""
+    shared = _resolve_shared_models_root_dir()
+    search_dirs: list[Path] = []
+    if shared:
+        search_dirs.append(shared / "Lora")
+    base = Path(lora_name).stem
+    for search_dir in search_dirs:
+        for ext in (".json", ".civitai.info", ".meta.json"):
+            meta_path = search_dir / (base + ext)
+            if meta_path.exists():
+                try:
+                    meta = json.loads(meta_path.read_text(encoding="utf-8", errors="replace"))
+                    trained_words = (
+                        meta.get("trainedWords")
+                        or meta.get("trained_words")
+                        or meta.get("tags")
+                        or []
+                    )
+                    if isinstance(trained_words, list):
+                        return [str(w) for w in trained_words if w]
+                except Exception:
+                    pass
+    return []
+
+
 def _clamp_float(value: float, low: float, high: float) -> float:
     return max(low, min(high, value))
 
@@ -234,6 +270,7 @@ def _default_service_config() -> dict:
         "shared_models_path": "",
         "civitai_api_key": "",
         "huggingface_api_key": "",
+        "default_negative_prompt": "",
         "updated_at": "",
     }
 
@@ -289,6 +326,7 @@ def _load_service_config() -> dict:
             config["shared_models_path"] = str(raw.get("shared_models_path") or "").strip()
             config["civitai_api_key"] = str(raw.get("civitai_api_key") or "").strip()
             config["huggingface_api_key"] = str(raw.get("huggingface_api_key") or "").strip()
+            config["default_negative_prompt"] = str(raw.get("default_negative_prompt") or "").strip()
             config["updated_at"] = str(raw.get("updated_at") or "").strip()
 
         SERVICE_CONFIG_FILE.write_text(json.dumps(config, ensure_ascii=True, indent=2), encoding="utf-8")
@@ -303,6 +341,7 @@ def _save_service_config(config: dict) -> dict:
         "shared_models_path": str(config.get("shared_models_path") or "").strip(),
         "civitai_api_key": str(config.get("civitai_api_key") or "").strip(),
         "huggingface_api_key": str(config.get("huggingface_api_key") or "").strip(),
+        "default_negative_prompt": str(config.get("default_negative_prompt") or "").strip(),
         "updated_at": _service_config_timestamp(),
     }
 
@@ -3337,6 +3376,7 @@ def api_config_services():
             "shared_models_path": body.get("shared_models_path"),
             "civitai_api_key": body.get("civitai_api_key"),
             "huggingface_api_key": body.get("huggingface_api_key"),
+            "default_negative_prompt": body.get("default_negative_prompt"),
         }
     )
     return jsonify({"ok": True, "config": config})
@@ -3643,6 +3683,43 @@ def api_image_lora_models():
     if not _comfy_available():
         return jsonify({"loras": [], "error": "ComfyUI is not available"}), 503
     return jsonify({"loras": _image_lora_models()})
+
+
+@app.route("/api/image/vae-models")
+def api_image_vae_models():
+    """List ComfyUI VAE model names."""
+    if not _comfy_available():
+        return jsonify({"vaes": [], "error": "ComfyUI is not available"}), 503
+    return jsonify({"vaes": _image_vae_models()})
+
+
+@app.route("/api/image/upscaler-models")
+def api_image_upscaler_models():
+    """List ComfyUI upscaler model names."""
+    if not _comfy_available():
+        return jsonify({"models": [], "error": "ComfyUI is not available"}), 503
+    data = _comfy_get_object_info("UpscaleModelLoader")
+    required = data.get("UpscaleModelLoader", {}).get("input", {}).get("required", {})
+    names = required.get("model_name", [[]])
+    models = names[0] if names and isinstance(names[0], list) else []
+    return jsonify({"models": models})
+
+
+@app.route("/api/image/refiner-models")
+def api_image_refiner_models():
+    """List checkpoint models available as refiners (same source as checkpoints)."""
+    if not _comfy_available():
+        return jsonify({"models": [], "error": "ComfyUI is not available"}), 503
+    return jsonify({"models": _image_models()})
+
+
+@app.route("/api/image/lora-tags")
+def api_image_lora_tags():
+    """Return trigger words/tags for a given LoRA by reading its sidecar metadata."""
+    lora_name = request.args.get("name", "").strip()
+    if not lora_name:
+        return jsonify({"tags": []})
+    return jsonify({"tags": _get_lora_tags(lora_name)})
 
 
 @app.route("/api/image/controlnet-models")

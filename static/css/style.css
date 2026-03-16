@@ -662,6 +662,197 @@ textarea {
   margin-top: var(--sp-sm);
 }
 
+/* ── LoRA stack ─────────────────────────────────────────────── */
+.lora-stack-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--sp-xs);
+}
+
+.lora-stack-container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-sm);
+}
+
+.lora-row {
+  border: 1px solid var(--clr-border);
+  border-radius: var(--radius);
+  padding: var(--sp-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  background: color-mix(in srgb, var(--clr-bg) 90%, var(--clr-surface));
+}
+
+.lora-row-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-xs);
+}
+
+.lora-row-head .select-wrapper {
+  flex: 1;
+}
+
+.lora-row-remove {
+  flex-shrink: 0;
+  color: var(--clr-accent-neg);
+}
+
+.lora-tag-cloud {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-top: 0.25rem;
+}
+
+.lora-tag-cloud .chip {
+  cursor: pointer;
+  user-select: none;
+  border: 1px solid var(--clr-border);
+  background: color-mix(in srgb, var(--clr-surface) 80%, var(--clr-accent));
+  transition: background 0.15s;
+}
+
+.lora-tag-cloud .chip:hover {
+  background: var(--clr-accent);
+  color: #fff;
+}
+
+.lora-tag-hint {
+  font-size: var(--fs-xs);
+  color: var(--clr-text-muted);
+  font-style: italic;
+}
+
+/* ── HiresFix panel ─────────────────────────────────────────── */
+.hiresfix-panel {
+  border: 1px solid var(--clr-border);
+  border-radius: var(--radius);
+  padding: var(--sp-sm);
+  background: color-mix(in srgb, var(--clr-bg) 90%, var(--clr-surface));
+}
+
+.hiresfix-summary {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  list-style: none;
+  gap: var(--sp-sm);
+}
+
+.hiresfix-summary::-webkit-details-marker { display: none; }
+
+.hiresfix-enable-label {
+  pointer-events: auto;
+}
+
+.hiresfix-controls {
+  margin-top: var(--sp-sm);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-sm);
+}
+
+/* ── Prompt syntax popup ────────────────────────────────────── */
+.prompt-label-group {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  position: relative;
+}
+
+.prompt-syntax-popup {
+  position: absolute;
+  z-index: 200;
+  top: calc(100% + 0.35rem);
+  left: 0;
+  width: 28rem;
+  max-width: 90vw;
+  background: var(--clr-surface);
+  border: 1px solid var(--clr-border);
+  border-radius: var(--radius);
+  padding: var(--sp-md);
+  box-shadow: var(--shadow-md);
+  font-size: var(--fs-sm);
+}
+
+.prompt-syntax-popup[hidden] { display: none; }
+
+.prompt-syntax-popup-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--sp-sm);
+}
+
+.prompt-syntax-list {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.25rem 0.75rem;
+  margin: 0;
+}
+
+.prompt-syntax-list dt {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.prompt-syntax-list dd {
+  margin: 0;
+  color: var(--clr-text-muted);
+}
+
+/* ── Negative prompt label row ──────────────────────────────── */
+.neg-prompt-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.25rem;
+}
+
+/* ── Img2img drop zone ──────────────────────────────────────── */
+.img2img-drop-zone {
+  position: relative;
+  transition: box-shadow 0.15s, background 0.15s;
+}
+
+.img2img-drop-zone.is-drag-over {
+  outline: 2px dashed var(--clr-accent);
+  background: color-mix(in srgb, var(--clr-accent) 12%, var(--clr-bg));
+}
+
+.img2img-drop-hint {
+  font-size: var(--fs-xs);
+}
+
+/* ── Prompt-enhance thinking state ─────────────────────────── */
+#enhanced-prompt-suggest-btn.is-thinking {
+  opacity: 0.7;
+  cursor: wait;
+  position: relative;
+}
+
+#enhanced-prompt-suggest-btn.is-thinking::after {
+  content: '';
+  display: inline-block;
+  width: 0.7em;
+  height: 0.7em;
+  margin-left: 0.4em;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.65s linear infinite;
+  vertical-align: middle;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
 .toggle-label {
   display: inline-flex;
   align-items: center;

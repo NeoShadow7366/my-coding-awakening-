@@ -32,6 +32,7 @@ def test_service_config_get_defaults(client):
         "shared_models_path": "",
         "civitai_api_key": "",
         "huggingface_api_key": "",
+        "default_negative_prompt": "",
         "updated_at": "",
     }
 

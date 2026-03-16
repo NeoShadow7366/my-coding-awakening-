@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🤖</text></svg>" />
 </head>
-<body data-theme="light">
+<body data-theme="dark">
 
   <!-- Skip-to-content link for keyboard / screen-reader users -->
   <a class="skip-link" href="#main-content">Skip to main content</a>
@@ -19,7 +19,7 @@
 
       <nav class="tab-nav" role="tablist" aria-label="Model type">
         <a href="#" class="tab-btn {% block nav_gen %}{% endblock %}" id="nav-generative"
-           role="tab" aria-controls="panel-generative" aria-selected="true" tabindex="0">Generative</a>
+           role="tab" aria-controls="panel-generative" aria-selected="true" tabindex="0">Text Model</a>
         <a href="#" class="tab-btn {% block nav_disc %}{% endblock %}" id="nav-image"
           role="tab" aria-controls="panel-image" aria-selected="false" tabindex="-1">Image</a>
         <a href="#" class="tab-btn" id="nav-config"
@@ -37,7 +37,7 @@
         <!-- Dark/light mode toggle -->
         <button class="icon-btn" id="theme-toggle" aria-label="Toggle dark mode" title="Toggle dark / light mode">
           <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+            <path d="M12 3v1m0 16v1m8.66-9H21M3 12H2m15.07-7.07l-.71.71M6.34 17.66l-.71.71M18.37 17.66l-.71-.71M6.34 6.34l-.71-.71M12 7a5 5 0 1 0 0 10A5 5 0 0 0 12 7z"/>
           </svg>
         </button>
       </div>

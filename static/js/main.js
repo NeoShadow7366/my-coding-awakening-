@@ -108,10 +108,12 @@ const clearChat = document.getElementById('clear-chat');
 
 // Image panel
 const imageModelSelect = document.getElementById('image-model-select');
+const refinerModelSelect = document.getElementById('refiner-model-select');
+const vaeModelSelect = document.getElementById('vae-model-select');
 const imageSamplerSelect = document.getElementById('image-sampler-select');
-const loraModelSelect = document.getElementById('lora-model-select');
-const loraStrength = document.getElementById('lora-strength');
-const loraStrengthVal = document.getElementById('lora-strength-val');
+const loraAddBtn = document.getElementById('lora-add-btn');
+const loraStackContainer = document.getElementById('lora-stack-container');
+// NOTE: loraModelSelect / loraStrength / loraStrengthVal replaced by multi-LoRA stack
 const controlnetModelSelect = document.getElementById('controlnet-model-select');
 const controlnetImageUpload = document.getElementById('controlnet-image-upload');
 const controlnetWeight = document.getElementById('controlnet-weight');
@@ -135,6 +137,9 @@ const imageDenoise = document.getElementById('image-denoise');
 const imageDenoiseVal = document.getElementById('image-denoise-val');
 const imageEngineStatus = document.getElementById('image-engine-status');
 const imageForm = document.getElementById('image-form');
+const promptSyntaxInfoBtn = document.getElementById('prompt-syntax-info-btn');
+const promptSyntaxPopup = document.getElementById('prompt-syntax-popup');
+const promptSyntaxCloseBtn = document.getElementById('prompt-syntax-close-btn');
 const imagePrompt = document.getElementById('image-prompt');
 const promptRandomizeBtn = document.getElementById('prompt-randomize-btn');
 const promptRecentBtn = document.getElementById('prompt-recent-btn');
@@ -161,7 +166,16 @@ const enhancedPromptSelect = document.getElementById('enhanced-prompt-select');
 const enhancedPromptUseSelectedBtn = document.getElementById('enhanced-prompt-use-selected-btn');
 const enhancedPromptStatus = document.getElementById('enhanced-prompt-status');
 const enhancedPromptSuggestionsOutput = document.getElementById('enhanced-prompt-suggestions');
+const negativePromptDefaultBtn = document.getElementById('negative-prompt-default-btn');
 const imageNegativePrompt = document.getElementById('image-negative-prompt');
+const hiresfixEnable = document.getElementById('hiresfix-enable');
+const hiresfixUpscalerSelect = document.getElementById('hiresfix-upscaler-select');
+const hiresfixScale = document.getElementById('hiresfix-scale');
+const hiresfixSteps = document.getElementById('hiresfix-steps');
+const hiresfixDenoise = document.getElementById('hiresfix-denoise');
+const hiresfixDenoiseVal = document.getElementById('hiresfix-denoise-val');
+const img2imgDropZone = document.getElementById('img2img-drop-zone');
+const img2imgDropHint = document.getElementById('img2img-drop-hint');
 const imageWidth = document.getElementById('image-width');
 const imageHeight = document.getElementById('image-height');
 const imageBatchSize = document.getElementById('image-batch-size');
@@ -176,6 +190,7 @@ const configComfyuiPath = document.getElementById('config-comfyui-path');
 const configModelsPath = document.getElementById('config-models-path');
 const configCivitaiKey = document.getElementById('config-civitai-key');
 const configHuggingfaceKey = document.getElementById('config-huggingface-key');
+const configDefaultNegPrompt = document.getElementById('config-default-negative-prompt');
 const configOllamaBrowseBtn = document.getElementById('config-ollama-browse');
 const configComfyuiBrowseBtn = document.getElementById('config-comfyui-browse');
 const configModelsBrowseBtn = document.getElementById('config-models-browse');
@@ -600,8 +615,7 @@ function applyTheme(theme) {
 
 (function initTheme() {
 	const saved = localStorage.getItem('theme');
-	const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-	applyTheme(saved || (prefersDark ? 'dark' : 'light'));
+	applyTheme(saved || 'dark');
 })();
 
 themeToggle.addEventListener('click', () => {
@@ -1024,8 +1038,6 @@ function getCurrentImageSettings() {
 	return {
 		model: imageModelSelect.value,
 		sampler: imageSamplerSelect.value,
-		lora: loraModelSelect?.value || '',
-		lora_strength: Number(loraStrength?.value || 0.8),
 		controlnet_model: controlnetModelSelect?.value || '',
 		controlnet_weight: Number(controlnetWeight?.value || 1),
 		controlnet_start: Number(controlnetStart?.value || 0),
@@ -1048,10 +1060,6 @@ function applyImageSettings(settings) {
 	if (settings.sampler && [...imageSamplerSelect.options].some((o) => o.value === settings.sampler)) {
 		imageSamplerSelect.value = settings.sampler;
 	}
-	if (settings.lora && loraModelSelect && [...loraModelSelect.options].some((o) => o.value === settings.lora)) {
-		loraModelSelect.value = settings.lora;
-	}
-	if (Number.isFinite(settings.lora_strength) && loraStrength) loraStrength.value = String(settings.lora_strength);
 	if (settings.controlnet_model && controlnetModelSelect && [...controlnetModelSelect.options].some((o) => o.value === settings.controlnet_model)) {
 		controlnetModelSelect.value = settings.controlnet_model;
 	}
@@ -1345,6 +1353,10 @@ async function loadServiceConfig() {
 		configModelsPath.value = data.shared_models_path || '';
 		if (configCivitaiKey) configCivitaiKey.value = data.civitai_api_key || '';
 		if (configHuggingfaceKey) configHuggingfaceKey.value = data.huggingface_api_key || '';
+		if (configDefaultNegPrompt) {
+			configDefaultNegPrompt.value = data.default_negative_prompt || '';
+			localStorage.setItem('defaultNegativePrompt', data.default_negative_prompt || '');
+		}
 		setConfigSavedTimestamp(data.updated_at || '');
 		setConfigStatusLine(configSaveStatus, 'Saved configuration loaded.');
 	} catch {
@@ -1362,6 +1374,7 @@ async function saveServiceConfig(options = {}) {
 		shared_models_path: configModelsPath.value.trim(),
 		civitai_api_key: configCivitaiKey ? configCivitaiKey.value.trim() : '',
 		huggingface_api_key: configHuggingfaceKey ? configHuggingfaceKey.value.trim() : '',
+		default_negative_prompt: configDefaultNegPrompt ? configDefaultNegPrompt.value : '',
 	};
 
 	try {
@@ -1379,6 +1392,10 @@ async function saveServiceConfig(options = {}) {
 		}
 		setConfigSavedTimestamp(data.config?.updated_at || '');
 		setConfigStatusLine(configSaveStatus, 'Configuration saved.', 'ok');
+		// Update localStorage cache for the Default neg-prompt button
+		if (configDefaultNegPrompt) {
+			localStorage.setItem('defaultNegativePrompt', configDefaultNegPrompt.value);
+		}
 		if (!silentSuccess) {
 			showToast('Configuration saved.', 'pos');
 		}
@@ -1701,22 +1718,113 @@ async function loadImageSamplers() {
 	}
 }
 
+/* --------------------------------------------------------------------------
+	 Multi-LoRA stack
+	 -------------------------------------------------------------------------- */
+let loraStack = [];       // [{ id, name, strength }]
+let _loraModelsCache = []; // fetched once and reused for new rows
+let _loraRowCounter = 0;
+
 async function loadImageLoraModels() {
-	if (!loraModelSelect) return;
+	// Fetch the LoRA list once and cache it; refresh all existing rows' selects.
 	try {
 		const res = await fetch('/api/image/lora-models');
 		const data = await res.json().catch(() => ({}));
-		const models = Array.isArray(data.loras) ? data.loras : [];
-		const current = loraModelSelect.value;
-		loraModelSelect.innerHTML = '<option value="">None</option>' + models
-			.map((name) => `<option value="${escHtml(name)}">${escHtml(name)}</option>`)
-			.join('');
-		if (current && [...loraModelSelect.options].some((o) => o.value === current)) {
-			loraModelSelect.value = current;
-		}
+		_loraModelsCache = Array.isArray(data.loras) ? data.loras : [];
+		// Repopulate any existing row selects (e.g. after refresh)
+		loraStackContainer?.querySelectorAll('.lora-row-select').forEach((sel) => {
+			const cur = sel.value;
+			sel.innerHTML = _buildLoraOptions();
+			if (cur && [...sel.options].some((o) => o.value === cur)) sel.value = cur;
+		});
 	} catch {
-		loraModelSelect.innerHTML = '<option value="">None</option>';
+		_loraModelsCache = [];
 	}
+}
+
+function _buildLoraOptions() {
+	return '<option value="">None</option>' +
+		_loraModelsCache.map((n) => `<option value="${escHtml(n)}">${escHtml(n)}</option>`).join('');
+}
+
+function addLoraRow() {
+	if (!loraStackContainer) return;
+	const id = ++_loraRowCounter;
+	const row = document.createElement('div');
+	row.className = 'lora-row';
+	row.dataset.loraId = id;
+	row.innerHTML = `
+		<div class="lora-row-head">
+			<div class="select-wrapper">
+				<select class="lora-row-select" aria-label="LoRA model">
+					${_buildLoraOptions()}
+				</select>
+			</div>
+			<label class="inline-label">Str <span class="lora-strength-val">0.80</span>
+				<input class="lora-row-strength" type="range" min="0" max="2" step="0.01" value="0.8" />
+			</label>
+			<button class="lora-row-remove btn btn-ghost btn-xs" type="button" aria-label="Remove LoRA row">\u2212</button>
+		</div>
+		<div class="lora-tag-cloud" hidden></div>
+		<p class="lora-tag-hint" hidden>Click a tag to add it to your prompt.</p>
+	`;
+
+	const sel = row.querySelector('.lora-row-select');
+	const strengthRange = row.querySelector('.lora-row-strength');
+	const strengthVal = row.querySelector('.lora-strength-val');
+	const tagCloud = row.querySelector('.lora-tag-cloud');
+	const tagHint = row.querySelector('.lora-tag-hint');
+	const removeBtn = row.querySelector('.lora-row-remove');
+
+	sel.addEventListener('change', async () => {
+		tagCloud.hidden = true;
+		tagHint.hidden = true;
+		tagCloud.innerHTML = '';
+		const loraName = sel.value;
+		if (!loraName) return;
+		try {
+			const res = await fetch(`/api/image/lora-tags?name=${encodeURIComponent(loraName)}`);
+			const data = await res.json().catch(() => ({}));
+			const tags = Array.isArray(data.tags) ? data.tags : [];
+			if (tags.length) {
+				tagCloud.innerHTML = tags
+					.map((t) => `<span class="chip lora-tag-chip" title="Insert tag into prompt">${escHtml(t)}</span>`)
+					.join('');
+				tagCloud.hidden = false;
+				tagHint.hidden = false;
+				tagCloud.querySelectorAll('.lora-tag-chip').forEach((chip) => {
+					chip.addEventListener('click', () => {
+						if (!imagePrompt) return;
+						const val = imagePrompt.value;
+						imagePrompt.value = val ? `${val}, ${chip.textContent}` : chip.textContent;
+						imagePrompt.focus();
+					});
+				});
+			}
+		} catch { /* ignore tag fetch errors */ }
+	});
+
+	strengthRange.addEventListener('input', () => {
+		strengthVal.textContent = Number(strengthRange.value).toFixed(2);
+	});
+
+	removeBtn.addEventListener('click', () => {
+		row.remove();
+	});
+
+	loraStackContainer.appendChild(row);
+}
+
+if (loraAddBtn) {
+	loraAddBtn.addEventListener('click', () => addLoraRow());
+}
+
+function collectLoraStack() {
+	if (!loraStackContainer) return [];
+	return [...loraStackContainer.querySelectorAll('.lora-row')].map((row) => ({
+		name: row.querySelector('.lora-row-select')?.value || '',
+		strength: Number(row.querySelector('.lora-row-strength')?.value || 0.8),
+	})).filter((e) => e.name);
 }
 
 async function loadControlnetModels() {
@@ -1736,6 +1844,56 @@ async function loadControlnetModels() {
 	} catch {
 		controlnetModelSelect.innerHTML = '<option value="">None</option>';
 		updateControlnetCompatibilityHint();
+	}
+}
+
+async function loadRefinerModels() {
+	if (!refinerModelSelect) return;
+	try {
+		const res = await fetch('/api/image/refiner-models');
+		const data = await res.json().catch(() => ({}));
+		const models = Array.isArray(data.models) ? data.models : [];
+		const current = refinerModelSelect.value;
+		refinerModelSelect.innerHTML = '<option value="">None</option>' + models
+			.map((name) => `<option value="${escHtml(name)}">${escHtml(name)}</option>`)
+			.join('');
+		if (current && [...refinerModelSelect.options].some((o) => o.value === current)) {
+			refinerModelSelect.value = current;
+		}
+	} catch {
+		if (refinerModelSelect) refinerModelSelect.innerHTML = '<option value="">None</option>';
+	}
+}
+
+async function loadVaeModels() {
+	if (!vaeModelSelect) return;
+	try {
+		const res = await fetch('/api/image/vae-models');
+		const data = await res.json().catch(() => ({}));
+		const vaes = Array.isArray(data.vaes) ? data.vaes : [];
+		const current = vaeModelSelect.value;
+		vaeModelSelect.innerHTML = '<option value="">Default</option>' + vaes
+			.map((name) => `<option value="${escHtml(name)}">${escHtml(name)}</option>`)
+			.join('');
+		if (current && [...vaeModelSelect.options].some((o) => o.value === current)) {
+			vaeModelSelect.value = current;
+		}
+	} catch {
+		if (vaeModelSelect) vaeModelSelect.innerHTML = '<option value="">Default</option>';
+	}
+}
+
+async function loadHiresfixUpscalers() {
+	if (!hiresfixUpscalerSelect) return;
+	try {
+		const res = await fetch('/api/image/upscaler-models');
+		const data = await res.json().catch(() => ({}));
+		const models = Array.isArray(data.models) ? data.models : [];
+		hiresfixUpscalerSelect.innerHTML = '<option value="">None</option>' + models
+			.map((name) => `<option value="${escHtml(name)}">${escHtml(name)}</option>`)
+			.join('');
+	} catch {
+		if (hiresfixUpscalerSelect) hiresfixUpscalerSelect.innerHTML = '<option value="">None</option>';
 	}
 }
 
@@ -1773,15 +1931,20 @@ async function checkStatus() {
 			await loadImageModels();
 			await loadImageSamplers();
 			await loadImageLoraModels();
+			await loadRefinerModels();
+			await loadVaeModels();
 			await loadControlnetModels();
+			await loadHiresfixUpscalers();
 			connectComfyWebSocket();
 		} else {
 			imageEngineStatus.textContent = 'ComfyUI offline - start server at localhost:8188';
 			imageEngineStatus.style.color = 'var(--clr-accent-neg)';
 			setPreviewTransportMode('offline');
 			setImageModelMessage('ComfyUI unavailable');
-			if (loraModelSelect) loraModelSelect.innerHTML = '<option value="">None</option>';
 			if (controlnetModelSelect) controlnetModelSelect.innerHTML = '<option value="">None</option>';
+			if (refinerModelSelect) refinerModelSelect.innerHTML = '<option value="">None</option>';
+			if (vaeModelSelect) vaeModelSelect.innerHTML = '<option value="">Default</option>';
+			if (hiresfixUpscalerSelect) hiresfixUpscalerSelect.innerHTML = '<option value="">None</option>';
 		}
 
 		renderDiagnosticsSnapshot({
@@ -3157,12 +3320,25 @@ function useModelInImageGen(modelLike) {
 	if (!name) return;
 
 	if (role === 'lora') {
-		if (!loraModelSelect) {
-			showToast('LoRA selector is unavailable in this view.', 'neg');
+		if (!loraStackContainer) {
+			showToast('LoRA stack is unavailable in this view.', 'neg');
 			return;
 		}
-		setSelectValueIfOptionExists(loraModelSelect, name);
-		showToast(`Selected LoRA: ${name}`, 'pos');
+		// Add a new LoRA row pre-selected with this model
+		addLoraRow();
+		const lastRow = loraStackContainer.lastElementChild;
+		if (lastRow) {
+			const sel = lastRow.querySelector('.lora-row-select');
+			if (sel) {
+				const opt = document.createElement('option');
+				opt.value = name;
+				opt.textContent = name;
+				sel.appendChild(opt);
+				sel.value = name;
+				sel.dispatchEvent(new Event('change'));
+			}
+		}
+		showToast(`Added LoRA: ${name}`, 'pos');
 		return;
 	}
 
@@ -3390,6 +3566,46 @@ if (previewImage) {
 	previewImage.addEventListener('dblclick', () => {
 		if (previewImage.hidden) return;
 		resetPreviewZoom();
+	});
+}
+
+// IMG2IMG drop zone — accept gallery images dragged from gallery grid
+if (img2imgDropZone && imageUpload) {
+	img2imgDropZone.addEventListener('dragover', (event) => {
+		event.preventDefault();
+		if (event.dataTransfer) event.dataTransfer.dropEffect = 'copy';
+		img2imgDropZone.classList.add('is-drag-over');
+	});
+
+	img2imgDropZone.addEventListener('dragleave', (event) => {
+		if (!(event.relatedTarget instanceof Node) || !img2imgDropZone.contains(event.relatedTarget)) {
+			img2imgDropZone.classList.remove('is-drag-over');
+		}
+	});
+
+	img2imgDropZone.addEventListener('drop', async (event) => {
+		event.preventDefault();
+		img2imgDropZone.classList.remove('is-drag-over');
+		const rawPayload = event.dataTransfer?.getData('text/plain') || '';
+		const payload = parseGalleryPreviewPayload(rawPayload);
+		const imgUrl = payload?.image || payload?.filename || '';
+		if (!imgUrl) return;
+		try {
+			const res = await fetch(imgUrl);
+			const blob = await res.blob();
+			const ext = imgUrl.split('.').pop()?.split('?')[0] || 'png';
+			const file = new File([blob], `gallery-drop.${ext}`, { type: blob.type || 'image/png' });
+			const dt = new DataTransfer();
+			dt.items.add(file);
+			imageUpload.files = dt.files;
+			if (img2imgDropHint) {
+				img2imgDropHint.textContent = `Loaded: ${file.name}`;
+				img2imgDropHint.hidden = false;
+			}
+			showToast('Gallery image loaded as img2img input.', 'pos');
+		} catch {
+			showToast('Could not load gallery image for img2img.', 'neg');
+		}
 	});
 }
 
@@ -6750,6 +6966,7 @@ async function suggestEnhancedPrompts() {
 	}
 
 	enhancedPromptSuggestBtn.disabled = true;
+	enhancedPromptSuggestBtn.classList.add('is-thinking');
 	if (enhancedPromptUseBtn) enhancedPromptUseBtn.disabled = true;
 	if (enhancedPromptUseSelectedBtn) enhancedPromptUseSelectedBtn.disabled = true;
 	if (enhancedPromptRandomBtn) enhancedPromptRandomBtn.disabled = true;
@@ -6781,6 +6998,7 @@ async function suggestEnhancedPrompts() {
 		showToast('Enhanced prompt suggestion failed.', 'neg');
 	} finally {
 		enhancedPromptSuggestBtn.disabled = false;
+		enhancedPromptSuggestBtn.classList.remove('is-thinking');
 	}
 }
 
@@ -6790,6 +7008,38 @@ if (enhancedPromptToggle) {
 	});
 	const saved = localStorage.getItem('enhancedPromptBreakdownEnabled') === '1';
 	setEnhancedPromptBreakdownVisible(saved);
+}
+
+// Prompt syntax popup
+if (promptSyntaxInfoBtn && promptSyntaxPopup) {
+	promptSyntaxInfoBtn.addEventListener('click', () => {
+		promptSyntaxPopup.hidden = !promptSyntaxPopup.hidden;
+	});
+}
+if (promptSyntaxCloseBtn && promptSyntaxPopup) {
+	promptSyntaxCloseBtn.addEventListener('click', () => {
+		promptSyntaxPopup.hidden = true;
+	});
+}
+
+// Default negative prompt button
+if (negativePromptDefaultBtn && imageNegativePrompt) {
+	negativePromptDefaultBtn.addEventListener('click', () => {
+		const def = localStorage.getItem('defaultNegativePrompt') || '';
+		if (def) {
+			imageNegativePrompt.value = def;
+			showToast('Default negative prompt applied.', 'pos');
+		} else {
+			showToast('No default negative prompt set — configure one in Configurations.', 'neg');
+		}
+	});
+}
+
+// HiresFix denoise live display
+if (hiresfixDenoise && hiresfixDenoiseVal) {
+	hiresfixDenoise.addEventListener('input', () => {
+		hiresfixDenoiseVal.textContent = Number(hiresfixDenoise.value).toFixed(2);
+	});
 }
 
 loadSuggestionTagStore();
@@ -6971,9 +7221,10 @@ imageForm.addEventListener('submit', async (e) => {
 			prompt,
 			negative_prompt: imageNegativePrompt.value.trim(),
 			model: imageModelSelect.value,
+			refiner_model: refinerModelSelect?.value || '',
+			vae: vaeModelSelect?.value || '',
 			sampler: imageSamplerSelect.value,
-			lora: loraModelSelect?.value || '',
-			lora_strength: Number(loraStrength?.value || 0.8),
+			loras: collectLoraStack(),
 			controlnet_model: controlnetModel,
 			controlnet_image_name: controlnetImageName,
 			controlnet_weight: Number(controlnetWeight?.value || 1),
@@ -6986,6 +7237,11 @@ imageForm.addEventListener('submit', async (e) => {
 			height: Number(imageHeight.value),
 			batch_size: Number(imageBatchSize.value),
 			denoise: Number(imageDenoise.value),
+			hiresfix_enable: hiresfixEnable?.checked || false,
+			hiresfix_upscaler: hiresfixUpscalerSelect?.value || '',
+			hiresfix_scale: Number(hiresfixScale?.value || 2),
+			hiresfix_steps: Number(hiresfixSteps?.value || 20),
+			hiresfix_denoise: Number(hiresfixDenoise?.value || 0.4),
 		};
 
 		const validationError = validateImageInputs(common);
@@ -7004,8 +7260,7 @@ imageForm.addEventListener('submit', async (e) => {
 			formData.append('negative_prompt', common.negative_prompt);
 			formData.append('model', common.model);
 			formData.append('sampler', common.sampler);
-			formData.append('lora', common.lora || '');
-			formData.append('lora_strength', String(common.lora_strength));
+			formData.append('loras', JSON.stringify(common.loras));
 			formData.append('controlnet_model', common.controlnet_model || '');
 			formData.append('controlnet_image_name', common.controlnet_image_name || '');
 			formData.append('controlnet_weight', String(common.controlnet_weight));
@@ -7043,8 +7298,7 @@ imageForm.addEventListener('submit', async (e) => {
 			prompt: common.prompt,
 			negative_prompt: common.negative_prompt,
 			model: common.model,
-			lora: common.lora,
-			lora_strength: common.lora_strength,
+			loras: common.loras,
 			controlnet_model: common.controlnet_model,
 			controlnet_weight: common.controlnet_weight,
 			controlnet_start: common.controlnet_start,

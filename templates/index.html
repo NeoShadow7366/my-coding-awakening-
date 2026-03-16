@@ -138,6 +138,25 @@
     </div>
 
     <div class="sidebar-section">
+      <label for="refiner-model-select" class="field-label">Refiner <span class="optional">(optional)</span></label>
+      <div class="select-wrapper">
+        <select id="refiner-model-select">
+          <option value="">None</option>
+        </select>
+      </div>
+      <p class="hint">Second-pass quality boost (SDXL refiner style).</p>
+    </div>
+
+    <div class="sidebar-section">
+      <label for="vae-model-select" class="field-label">VAE <span class="optional">(optional)</span></label>
+      <div class="select-wrapper">
+        <select id="vae-model-select">
+          <option value="">Default (embedded)</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="sidebar-section">
       <label for="image-sampler-select" class="field-label">Sampler</label>
       <div class="select-wrapper">
         <select id="image-sampler-select">
@@ -147,15 +166,12 @@
     </div>
 
     <div class="sidebar-section">
-      <label for="lora-model-select" class="field-label">LoRA (optional)</label>
-      <div class="select-wrapper">
-        <select id="lora-model-select">
-          <option value="">None</option>
-        </select>
+      <div class="lora-stack-head">
+        <p class="field-label">Extra Networks <span class="optional">(LoRA / LyCORIS)</span></p>
+        <button class="btn btn-ghost btn-xs" id="lora-add-btn" type="button" aria-label="Add LoRA network">＋</button>
       </div>
-      <div class="slider-group">
-        <label for="lora-strength" class="inline-label">LoRA Strength <span id="lora-strength-val">0.80</span></label>
-        <input id="lora-strength" type="range" min="0" max="2" step="0.05" value="0.8" />
+      <div id="lora-stack-container" class="lora-stack-container" aria-label="LoRA network stack">
+        <!-- rows injected by JS -->
       </div>
     </div>
 
@@ -354,7 +370,10 @@
 
         <div id="normal-prompt-wrap" class="form-field">
           <div class="field-label-inline-row">
-            <label for="image-prompt" class="field-label">Prompt</label>
+            <div class="prompt-label-group">
+              <label for="image-prompt" class="field-label">Prompt</label>
+              <button class="btn btn-ghost btn-xs prompt-syntax-info-btn" id="prompt-syntax-info-btn" type="button" aria-label="Prompt syntax help" title="Prompt syntax guide">ℹ</button>
+            </div>
             <div class="prompt-toolbar">
               <button class="btn btn-ghost btn-xs" id="prompt-randomize-btn" type="button">Randomize</button>
               <div class="prompt-recent-wrap">
@@ -364,6 +383,20 @@
             </div>
           </div>
           <textarea id="image-prompt" rows="4" placeholder="A cinematic forest temple, volumetric light, detailed illustration"></textarea>
+          <div id="prompt-syntax-popup" class="prompt-syntax-popup" hidden role="dialog" aria-label="Prompt syntax guide">
+            <div class="prompt-syntax-popup-head">
+              <strong>Prompt Syntax Guide</strong>
+              <button class="btn btn-ghost btn-xs" id="prompt-syntax-close-btn" type="button" aria-label="Close syntax guide">✕</button>
+            </div>
+            <dl class="prompt-syntax-list">
+              <dt><code>(word:1.3)</code></dt><dd>Boost emphasis — weight &gt;1 increases, &lt;1 decreases.</dd>
+              <dt><code>(word)</code></dt><dd>Slight boost (~1.1×). Stack: <code>((word))</code> for more.</dd>
+              <dt><code>[word]</code></dt><dd>Slight de-emphasis (~0.9×).</dd>
+              <dt><code>word AND word</code></dt><dd>Blend concepts (SDXL / attention).</dd>
+              <dt><code>BREAK</code></dt><dd>Split into separate CLIP chunks for long prompts.</dd>
+              <dt>Commas</dt><dd>Separate concepts; order influences weight (earlier = stronger).</dd>
+            </dl>
+          </div>
           <div class="prompt-saved-row">
             <input id="prompt-saved-name" type="text" class="compact-input" placeholder="Preset name" />
             <button class="btn btn-ghost btn-xs" id="prompt-save-btn" type="button">Save</button>
@@ -376,7 +409,10 @@
         </div>
 
         <div class="form-field">
-          <label for="image-negative-prompt" class="field-label">Negative prompt</label>
+          <div class="neg-prompt-label-row">
+            <label for="image-negative-prompt" class="field-label">Negative prompt</label>
+            <button class="btn btn-ghost btn-xs" id="negative-prompt-default-btn" type="button" title="Load default negative prompt from Configurations">Default</button>
+          </div>
           <textarea id="image-negative-prompt" rows="3" placeholder="blurry, low quality, watermark, text"></textarea>
           <div class="enhanced-tag-head">
             <p class="hint enhanced-tag-hint">+Suggestion tags</p>
@@ -384,6 +420,40 @@
           </div>
           <div id="negative-prompt-tags" class="enhanced-tag-cloud" data-target="image-negative-prompt" aria-label="Negative prompt suggestion tags" hidden></div>
         </div>
+
+        <details class="form-field hiresfix-panel" id="hiresfix-panel">
+          <summary class="hiresfix-summary">
+            <span class="field-label">Hi-Res Fix / Upscaler</span>
+            <label class="toggle-label hiresfix-enable-label" onclick="event.stopPropagation()">
+              <input id="hiresfix-enable" type="checkbox" />
+              <span>Enable</span>
+            </label>
+          </summary>
+          <div id="hiresfix-controls" class="hiresfix-controls">
+            <div class="form-field">
+              <label for="hiresfix-upscaler-select" class="field-label">Upscaler model <span class="optional">(optional)</span></label>
+              <div class="select-wrapper">
+                <select id="hiresfix-upscaler-select">
+                  <option value="">Latent (default)</option>
+                </select>
+              </div>
+            </div>
+            <div class="inline-grid two-up">
+              <div class="form-field">
+                <label for="hiresfix-scale" class="field-label">Scale ×</label>
+                <input id="hiresfix-scale" type="number" min="1.1" max="4" step="0.1" value="2" />
+              </div>
+              <div class="form-field">
+                <label for="hiresfix-steps" class="field-label">Hi-Res Steps</label>
+                <input id="hiresfix-steps" type="number" min="5" max="100" step="1" value="20" />
+              </div>
+            </div>
+            <div class="slider-group">
+              <label for="hiresfix-denoise" class="inline-label">Hires Denoise <span id="hiresfix-denoise-val">0.40</span></label>
+              <input id="hiresfix-denoise" type="range" min="0.05" max="1" step="0.01" value="0.4" />
+            </div>
+          </div>
+        </details>
 
         <div class="inline-grid two-up">
           <div class="form-field">
@@ -401,9 +471,10 @@
             <label for="image-batch-size" class="field-label">Batch</label>
             <input id="image-batch-size" type="number" min="1" max="8" value="1" />
           </div>
-          <div class="form-field">
+          <div class="form-field img2img-drop-zone" id="img2img-drop-zone">
             <label for="image-upload" class="field-label">Img2img source <span class="optional">(optional)</span></label>
             <input id="image-upload" type="file" accept="image/*" />
+            <p class="hint img2img-drop-hint" id="img2img-drop-hint">Or drag a gallery image here.</p>
           </div>
         </div>
 
@@ -570,6 +641,12 @@
       <label for="config-huggingface-key" class="field-label">Hugging Face API Key</label>
       <input id="config-huggingface-key" type="password" placeholder="Enter Hugging Face token" autocomplete="off" />
       <p class="hint">Used for Hugging Face model search and downloads.</p>
+    </div>
+
+    <div class="sidebar-section">
+      <label for="config-default-negative-prompt" class="field-label">Default Negative Prompt</label>
+      <textarea id="config-default-negative-prompt" rows="4" placeholder="e.g. blurry, low quality, worst quality, text, watermark" aria-label="Default negative prompt for image generation"></textarea>
+      <p class="hint">Click "Default" on the negative prompt field in Image Inference to load this.</p>
     </div>
 
     <div class="sidebar-section">
