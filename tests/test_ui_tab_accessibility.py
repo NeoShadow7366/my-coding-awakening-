@@ -190,6 +190,8 @@ def test_diagnostics_drawer_keyboard_handler_wiring_present_in_js_bundle():
     assert "if (normalizedCommand === 'ws-status') {" in content
     assert "if (normalizedCommand === 'ws-retry') {" in content
     assert "function forceRetryComfyWebSocket(sourceLabel = 'manual') {" in content
+    assert "Hint: start ComfyUI with --enable-cors-header * (or use Configurations > Start ComfyUI) so WS origin checks accept the app host. Current WS target: ${COMFY_WS_URL}" in content
+    assert "ComfyUI HTTP API base: ${COMFY_HTTP_BASE}" in content
     assert "function renderWsRetryButtonState() {" in content
     assert "function onDiagnosticsActionsKeydown(event) {" in content
     assert "diagWsRetryBtn.addEventListener('keydown', onDiagnosticsActionsKeydown);" in content
@@ -798,3 +800,65 @@ def test_image_model_stack_styles_present_in_css():
     assert ".model-favorite-toggle-row" in content
     assert ".model-recent-list" in content
     assert ".model-stack-compat-hint" in content
+    assert ".lora-row-header" in content
+    assert ".lora-row-enable" in content
+    assert ".lora-row-collapse" in content
+    assert ".lora-disabled" in content
+    assert ".gallery-grid.is-grid-mode .gallery-card" in content
+
+
+def test_sidebar_profiles_at_top_and_sampler_in_model_stack_panel():
+    """Profiles section must appear before model-stack-panel; Sampler must be inside it."""
+    app_module.app.config["TESTING"] = True
+    client = app_module.app.test_client()
+
+    html = client.get("/").get_data(as_text=True)
+
+    # profiles section exists and appears before the model-stack-panel
+    assert 'class="sidebar-section preset-profile-section"' in html
+    profiles_pos = html.index('class="sidebar-section preset-profile-section"')
+    stack_pos = html.index('class="sidebar-section model-stack-panel"')
+    assert profiles_pos < stack_pos, "Profiles section must precede model-stack-panel"
+
+    # sampler select is inside the model-stack-panel block
+    model_stack_block = html[stack_pos:]
+    assert 'id="image-sampler-select"' in model_stack_block
+
+    # vae appears before refiner within the model-stack-panel
+    vae_pos = model_stack_block.index('id="vae-model-select"')
+    refiner_pos = model_stack_block.index('id="refiner-model-select"')
+    assert vae_pos < refiner_pos, "VAE selector must appear before Refiner selector"
+
+
+def test_lora_row_ux_js_wiring():
+    """LoRA rows must have enable-toggle and collapse controls wired in JS."""
+    js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
+    content = js_path.read_text(encoding="utf-8")
+
+    assert "lora-row-enable" in content
+    assert "lora-row-collapse" in content
+    assert "lora-row-body" in content
+    assert "lora-disabled" in content
+    assert "lora-row-header" in content
+
+
+def test_compat_grouping_helpers_present_in_js():
+    """buildCompatGroupedOptions, getBaseCheckpointFamily, and refreshCompatibilityGroupings must exist."""
+    js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
+    content = js_path.read_text(encoding="utf-8")
+
+    assert "function buildCompatGroupedOptions(" in content
+    assert "function getBaseCheckpointFamily()" in content
+    assert "function refreshCompatibilityGroupings()" in content
+    assert "Compatible (" in content  # optgroup label template
+    assert "Possibly incompatible" in content  # optgroup label
+
+
+def test_lora_tag_chip_duplicate_safe_insertion_in_js():
+    """Tag chip click must use comma-split deduplication instead of naive append."""
+    js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
+    content = js_path.read_text(encoding="utf-8")
+
+    assert "split(',').map(" in content
+    assert "parts.includes(tag)" in content
+    assert "parts.join(', ')" in content

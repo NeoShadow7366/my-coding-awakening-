@@ -263,6 +263,21 @@ def test_migrate_model_folders_async_returns_job_status(client, tmp_path):
     assert final["result"]["moved_count"] == 1
 
 
+def test_resolve_comfyui_launch_adds_cors_header_args_for_main_py(tmp_path):
+    comfy_dir = tmp_path / "ComfyUI"
+    comfy_dir.mkdir()
+    (comfy_dir / "main.py").write_text("print('ok')", encoding="utf-8")
+
+    portable_python = tmp_path / "python_embeded"
+    portable_python.mkdir()
+    (portable_python / "python.exe").write_text("", encoding="utf-8")
+
+    command, cwd = app_module._resolve_comfyui_launch(str(comfy_dir))
+
+    assert cwd == comfy_dir
+    assert command[-2:] == ["--enable-cors-header", "*"]
+
+
 def test_migration_status_unknown_job_returns_404(client):
     resp = client.get("/api/config/migrate-model-folders/status/unknown-job")
     assert resp.status_code == 404

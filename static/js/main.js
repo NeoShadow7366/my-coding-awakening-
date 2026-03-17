@@ -2021,7 +2021,7 @@ async function loadImageLoraModels() {
 
 function _buildLoraOptions() {
 	return '<option value="">None</option>' +
-		_loraModelsCache.map((n) => `<option value="${escHtml(n)}">${escHtml(n)}</option>`).join('');
+		buildCompatGroupedOptions(_loraModelsCache, getBaseCheckpointFamily(), inferCheckpointFamily);
 }
 
 function addLoraRow() {
@@ -2031,19 +2031,26 @@ function addLoraRow() {
 	row.className = 'lora-row';
 	row.dataset.loraId = id;
 	row.innerHTML = `
-		<div class="lora-row-head">
-			<div class="select-wrapper">
-				<select class="lora-row-select" aria-label="LoRA model">
-					${_buildLoraOptions()}
-				</select>
-			</div>
-			<label class="inline-label">Str <span class="lora-strength-val">0.80</span>
-				<input class="lora-row-strength" type="range" min="0" max="2" step="0.01" value="0.8" />
-			</label>
-			<button class="lora-row-remove btn btn-ghost btn-xs" type="button" aria-label="Remove LoRA row">\u2212</button>
+		<div class="lora-row-header">
+			<span class="lora-row-label hint">LoRA ${id}</span>
+			<button class="lora-row-enable btn btn-ghost btn-xs" type="button" aria-pressed="true" title="Toggle this LoRA on/off">On</button>
+			<button class="lora-row-collapse btn btn-ghost btn-xs" type="button" aria-expanded="true" aria-label="Collapse LoRA row">&#9660;</button>
+			<button class="lora-row-remove btn btn-ghost btn-xs" type="button" aria-label="Remove LoRA row">&#x2212;</button>
 		</div>
-		<div class="lora-tag-cloud" hidden></div>
-		<p class="lora-tag-hint" hidden>Click a tag to add it to your prompt.</p>
+		<div class="lora-row-body">
+			<div class="lora-row-head">
+				<div class="select-wrapper">
+					<select class="lora-row-select" aria-label="LoRA model">
+						${_buildLoraOptions()}
+					</select>
+				</div>
+				<label class="inline-label">Str <span class="lora-strength-val">0.80</span>
+					<input class="lora-row-strength" type="range" min="0" max="2" step="0.01" value="0.8" />
+				</label>
+			</div>
+			<div class="lora-tag-cloud" hidden></div>
+			<p class="lora-tag-hint" hidden>Click a tag to add it to your prompt.</p>
+		</div>
 	`;
 
 	const sel = row.querySelector('.lora-row-select');
@@ -2052,6 +2059,23 @@ function addLoraRow() {
 	const tagCloud = row.querySelector('.lora-tag-cloud');
 	const tagHint = row.querySelector('.lora-tag-hint');
 	const removeBtn = row.querySelector('.lora-row-remove');
+	const enableBtn = row.querySelector('.lora-row-enable');
+	const collapseBtn = row.querySelector('.lora-row-collapse');
+	const rowBody = row.querySelector('.lora-row-body');
+
+	enableBtn.addEventListener('click', () => {
+		const enabled = row.classList.toggle('lora-disabled') === false;
+		enableBtn.setAttribute('aria-pressed', String(enabled));
+		enableBtn.textContent = enabled ? 'On' : 'Off';
+		updateModelStackBadges();
+	});
+
+	collapseBtn.addEventListener('click', () => {
+		const expanded = rowBody.hidden;
+		rowBody.hidden = !expanded;
+		collapseBtn.setAttribute('aria-expanded', String(expanded));
+		collapseBtn.innerHTML = expanded ? '&#9660;' : '&#9654;';
+	});
 
 	sel.addEventListener('change', async () => {
 		updateModelStackBadges();
@@ -2073,8 +2097,10 @@ function addLoraRow() {
 				tagCloud.querySelectorAll('.lora-tag-chip').forEach((chip) => {
 					chip.addEventListener('click', () => {
 						if (!imagePrompt) return;
-						const val = imagePrompt.value;
-						imagePrompt.value = val ? `${val}, ${chip.textContent}` : chip.textContent;
+						const tag = chip.textContent.trim();
+						const parts = (imagePrompt.value || '').split(',').map((p) => p.trim()).filter(Boolean);
+						if (!parts.includes(tag)) parts.push(tag);
+						imagePrompt.value = parts.join(', ');
 						imagePrompt.focus();
 					});
 				});
@@ -2101,10 +2127,12 @@ if (loraAddBtn) {
 
 function collectLoraStack() {
 	if (!loraStackContainer) return [];
-	return [...loraStackContainer.querySelectorAll('.lora-row')].map((row) => ({
-		name: row.querySelector('.lora-row-select')?.value || '',
-		strength: Number(row.querySelector('.lora-row-strength')?.value || 0.8),
-	})).filter((e) => e.name);
+	return [...loraStackContainer.querySelectorAll('.lora-row')]
+		.filter((row) => !row.classList.contains('lora-disabled'))
+		.map((row) => ({
+			name: row.querySelector('.lora-row-select')?.value || '',
+			strength: Number(row.querySelector('.lora-row-strength')?.value || 0.8),
+		})).filter((e) => e.name);
 }
 
 async function loadControlnetModels() {
@@ -2114,9 +2142,8 @@ async function loadControlnetModels() {
 		const data = await res.json().catch(() => ({}));
 		const models = Array.isArray(data.models) ? data.models : [];
 		const current = controlnetModelSelect.value;
-		controlnetModelSelect.innerHTML = '<option value="">None</option>' + models
-			.map((name) => `<option value="${escHtml(name)}">${escHtml(name)}</option>`)
-			.join('');
+		controlnetModelSelect.innerHTML = '<option value="">None</option>' +
+			buildCompatGroupedOptions(models, getBaseCheckpointFamily(), inferControlnetFamily);
 		if (current && [...controlnetModelSelect.options].some((o) => o.value === current)) {
 			controlnetModelSelect.value = current;
 		}
@@ -2134,9 +2161,8 @@ async function loadRefinerModels() {
 		const data = await res.json().catch(() => ({}));
 		const models = Array.isArray(data.models) ? data.models : [];
 		const current = refinerModelSelect.value;
-		refinerModelSelect.innerHTML = '<option value="">None</option>' + models
-			.map((name) => `<option value="${escHtml(name)}">${escHtml(name)}</option>`)
-			.join('');
+		refinerModelSelect.innerHTML = '<option value="">None</option>' +
+			buildCompatGroupedOptions(models, getBaseCheckpointFamily(), inferCheckpointFamily);
 		if (current && [...refinerModelSelect.options].some((o) => o.value === current)) {
 			refinerModelSelect.value = current;
 		}
@@ -2152,9 +2178,8 @@ async function loadVaeModels() {
 		const data = await res.json().catch(() => ({}));
 		const vaes = Array.isArray(data.vaes) ? data.vaes : [];
 		const current = vaeModelSelect.value;
-		vaeModelSelect.innerHTML = '<option value="">Default</option>' + vaes
-			.map((name) => `<option value="${escHtml(name)}">${escHtml(name)}</option>`)
-			.join('');
+		vaeModelSelect.innerHTML = '<option value="">Default</option>' +
+			buildCompatGroupedOptions(vaes, getBaseCheckpointFamily(), inferCheckpointFamily);
 		if (current && [...vaeModelSelect.options].some((o) => o.value === current)) {
 			vaeModelSelect.value = current;
 		}
@@ -2760,8 +2785,7 @@ if (imageModelSelect) {
 		rememberRecentImageModel(imageModelSelect.value);
 		updateModelFavoriteToggleState();
 		updateModelStackBadges();
-		updateModelStackCompatibilityHint();
-		updateControlnetCompatibilityHint();
+		refreshCompatibilityGroupings();
 	});
 }
 if (imageModelFilter) {
@@ -4197,6 +4221,7 @@ const COMFY_WS_QUICK_CLOSE_THRESHOLD = 3;
 const comfyWsProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
 const comfyWsHost = window.location.hostname || 'localhost';
 const COMFY_WS_URL = `${comfyWsProtocol}://${comfyWsHost}:8188/ws?clientId=${tabInstanceId}`;
+const COMFY_HTTP_BASE = `${window.location.protocol === 'https:' ? 'https' : 'http'}://${comfyWsHost}:8188`;
 
 function _getComfyWsCooldownUntil() {
 	try {
@@ -4406,6 +4431,8 @@ function connectComfyWebSocket() {
 				comfyWsNextRetryAt = 0;
 				setPreviewTransportMode('polling', 'ComfyUI WebSocket appears blocked (likely 403/forbidden). HTTP polling fallback is active.');
 				appendDiagnosticsConsoleLine('ComfyUI websocket appears blocked (likely 403/forbidden); pausing websocket retries while polling fallback stays active.', 'warn');
+				appendDiagnosticsConsoleLine(`Hint: start ComfyUI with --enable-cors-header * (or use Configurations > Start ComfyUI) so WS origin checks accept the app host. Current WS target: ${COMFY_WS_URL}`, 'warn');
+				appendDiagnosticsConsoleLine(`ComfyUI HTTP API base: ${COMFY_HTTP_BASE}`, 'warn');
 				return;
 			}
 			if (comfyWsFailCount >= COMFY_WS_MAX_RETRIES) {
@@ -4575,6 +4602,102 @@ function inferCheckpointFamily(modelName) {
 		return 'sd15';
 	}
 	return '';
+}
+
+function getBaseCheckpointFamily() {
+	return inferCheckpointFamily(imageModelSelect?.value || '');
+}
+
+/**
+ * Build <option> elements, optionally grouped by compatibility with baseFamily.
+ * When baseFamily is known, compatible models appear first, then unknown family,
+ * then incompatible. When baseFamily is unknown, returns a flat list.
+ */
+function buildCompatGroupedOptions(models, baseFamily, inferFn) {
+	if (!models.length) return '';
+	const toOption = (name) => `<option value="${escHtml(name)}">${escHtml(name)}</option>`;
+	if (!baseFamily) {
+		return models.map(toOption).join('');
+	}
+	const compatible = [];
+	const unknown = [];
+	const incompatible = [];
+	for (const name of models) {
+		const fam = inferFn(name);
+		if (!fam) unknown.push(name);
+		else if (fam === baseFamily) compatible.push(name);
+		else incompatible.push(name);
+	}
+	const parts = [];
+	if (compatible.length) {
+		parts.push(`<optgroup label="Compatible (${baseFamily.toUpperCase()})">${compatible.map(toOption).join('')}</optgroup>`);
+	}
+	if (unknown.length) {
+		parts.push(`<optgroup label="Unknown family">${unknown.map(toOption).join('')}</optgroup>`);
+	}
+	if (incompatible.length) {
+		parts.push(`<optgroup label="Possibly incompatible">${incompatible.map(toOption).join('')}</optgroup>`);
+	}
+	return parts.join('');
+}
+
+function refreshCompatibilityGroupings() {
+	const baseFamily = getBaseCheckpointFamily();
+	if (refinerModelSelect) {
+		const cur = refinerModelSelect.value;
+		const models = [...refinerModelSelect.options]
+			.filter((o) => o.value && !o.closest('optgroup[label="Possibly incompatible"]') !== undefined)
+			.map((o) => o.value)
+			.filter(Boolean);
+		// collect all non-empty option values across any current optgroups
+		const allModels = [...refinerModelSelect.querySelectorAll('option')]
+			.map((o) => o.value).filter(Boolean);
+		if (allModels.length) {
+			refinerModelSelect.innerHTML = '<option value="">None</option>' +
+				buildCompatGroupedOptions(allModels, baseFamily, inferCheckpointFamily);
+			if (cur && [...refinerModelSelect.options].some((o) => o.value === cur)) {
+				refinerModelSelect.value = cur;
+			}
+		}
+	}
+	if (vaeModelSelect) {
+		const cur = vaeModelSelect.value;
+		const allModels = [...vaeModelSelect.querySelectorAll('option')]
+			.map((o) => o.value).filter(Boolean);
+		if (allModels.length) {
+			vaeModelSelect.innerHTML = '<option value="">Default</option>' +
+				buildCompatGroupedOptions(allModels, baseFamily, inferCheckpointFamily);
+			if (cur && [...vaeModelSelect.options].some((o) => o.value === cur)) {
+				vaeModelSelect.value = cur;
+			}
+		}
+	}
+	if (controlnetModelSelect) {
+		const cur = controlnetModelSelect.value;
+		const allModels = [...controlnetModelSelect.querySelectorAll('option')]
+			.map((o) => o.value).filter(Boolean);
+		if (allModels.length) {
+			controlnetModelSelect.innerHTML = '<option value="">None</option>' +
+				buildCompatGroupedOptions(allModels, baseFamily, inferControlnetFamily);
+			if (cur && [...controlnetModelSelect.options].some((o) => o.value === cur)) {
+				controlnetModelSelect.value = cur;
+			}
+		}
+	}
+	if (loraStackContainer) {
+		loraStackContainer.querySelectorAll('.lora-row-select').forEach((sel) => {
+			const cur = sel.value;
+			const allModels = [...sel.querySelectorAll('option')]
+				.map((o) => o.value).filter(Boolean);
+			if (allModels.length) {
+				sel.innerHTML = '<option value="">None</option>' +
+					buildCompatGroupedOptions(allModels, baseFamily, inferCheckpointFamily);
+				if (cur && [...sel.options].some((o) => o.value === cur)) sel.value = cur;
+			}
+		});
+	}
+	updateModelStackCompatibilityHint();
+	updateControlnetCompatibilityHint();
 }
 
 function getModelStackCompatibilityMessage(baseModel, refinerModel, vaeModel) {

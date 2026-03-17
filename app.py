@@ -388,20 +388,21 @@ def _resolve_ollama_launch(path_value: str) -> tuple[list[str], Path | None]:
 
 def _resolve_comfyui_launch(path_value: str) -> tuple[list[str], Path | None]:
     candidate = Path(path_value).expanduser()
+    comfy_args = ["--enable-cors-header", "*"]
     if candidate.is_dir():
         # Prefer ComfyUI's bundled launch scripts so it runs in the intended env.
         bat_candidates = ["run_nvidia_gpu.bat", "run_cpu.bat", "run.bat"]
         for bat_name in bat_candidates:
             bat_path = candidate / bat_name
             if bat_path.exists():
-                return ["cmd", "/c", str(bat_path)], candidate
+                return ["cmd", "/c", str(bat_path), *comfy_args], candidate
 
         main_py = candidate / "main.py"
         if main_py.exists():
             portable_python = candidate.parent / "python_embeded" / "python.exe"
             if os.name == "nt" and portable_python.exists():
-                return [str(portable_python), str(main_py)], candidate
-            return [sys.executable, str(main_py)], candidate
+                return [str(portable_python), str(main_py), *comfy_args], candidate
+            return [sys.executable, str(main_py), *comfy_args], candidate
 
         raise ValueError("Configured ComfyUI directory must contain main.py or a run.bat script")
 
@@ -410,10 +411,10 @@ def _resolve_comfyui_launch(path_value: str) -> tuple[list[str], Path | None]:
         if suffix == ".py":
             portable_python = candidate.parent.parent / "python_embeded" / "python.exe"
             if os.name == "nt" and portable_python.exists():
-                return [str(portable_python), str(candidate)], candidate.parent
-            return [sys.executable, str(candidate)], candidate.parent
+                return [str(portable_python), str(candidate), *comfy_args], candidate.parent
+            return [sys.executable, str(candidate), *comfy_args], candidate.parent
         if suffix in {".bat", ".cmd"}:
-            return ["cmd", "/c", str(candidate)], candidate.parent
+            return ["cmd", "/c", str(candidate), *comfy_args], candidate.parent
         return [str(candidate)], candidate.parent
 
     raise ValueError("Configured ComfyUI path does not exist")

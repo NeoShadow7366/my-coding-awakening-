@@ -127,6 +127,25 @@
 <section id="panel-image" class="panel" role="tabpanel" aria-labelledby="nav-image" hidden>
 
   <aside class="sidebar" aria-label="Image generation settings">
+    <div class="sidebar-section preset-profile-section" aria-label="Preset profiles">
+      <p class="field-label">Profiles</p>
+      <div class="preset-profile-wrap" aria-label="Preset profiles">
+        <div class="select-wrapper">
+          <select id="image-profile-select" aria-label="Saved preset profiles">
+            <option value="">No saved profiles</option>
+          </select>
+        </div>
+        <div class="inline-field-row profile-row">
+          <input id="image-profile-name" type="text" class="compact-input" placeholder="Profile name" />
+          <button class="btn btn-ghost btn-xs" id="image-profile-save" type="button">Save</button>
+        </div>
+        <div class="preset-row" role="group" aria-label="Profile actions">
+          <button class="btn btn-ghost btn-xs" id="image-profile-apply" type="button">Apply</button>
+          <button class="btn btn-ghost btn-xs" id="image-profile-delete" type="button">Delete</button>
+        </div>
+      </div>
+    </div>
+
     <div class="sidebar-section model-stack-panel" aria-label="Model Stack settings">
       <div class="model-stack-head">
         <p class="field-label">Model Stack</p>
@@ -159,6 +178,13 @@
       <p id="image-model-hint" class="hint">Loaded from ComfyUI CheckpointLoaderSimple</p>
       <p id="model-stack-compat-hint" class="hint model-stack-compat-hint" aria-live="polite">Tip: keep Base, Refiner, and VAE in the same family (SD1.5 vs SDXL) when possible.</p>
 
+      <label for="vae-model-select" class="field-label">VAE <span class="optional">(optional)</span></label>
+      <div class="select-wrapper">
+        <select id="vae-model-select">
+          <option value="">Default (embedded)</option>
+        </select>
+      </div>
+
       <label for="refiner-model-select" class="field-label">Refiner <span class="optional">(optional)</span></label>
       <div class="select-wrapper">
         <select id="refiner-model-select">
@@ -167,13 +193,6 @@
       </div>
       <p class="hint">Second-pass quality boost (SDXL refiner style).</p>
 
-      <label for="vae-model-select" class="field-label">VAE <span class="optional">(optional)</span></label>
-      <div class="select-wrapper">
-        <select id="vae-model-select">
-          <option value="">Default (embedded)</option>
-        </select>
-      </div>
-
       <div class="lora-stack-head">
         <p class="field-label">Extra Networks <span class="optional">(LoRA / LyCORIS)</span></p>
         <button class="btn btn-ghost btn-xs" id="lora-add-btn" type="button" aria-label="Add LoRA network">＋</button>
@@ -181,9 +200,7 @@
       <div id="lora-stack-container" class="lora-stack-container" aria-label="LoRA network stack">
         <!-- rows injected by JS -->
       </div>
-    </div>
 
-    <div class="sidebar-section">
       <label for="image-sampler-select" class="field-label">Sampler</label>
       <div class="select-wrapper">
         <select id="image-sampler-select">
@@ -235,21 +252,6 @@
         <button class="btn btn-ghost btn-xs" type="button" data-image-preset="fast" aria-pressed="false">Fast</button>
         <button class="btn btn-ghost btn-xs" type="button" data-image-preset="quality" aria-pressed="false">Quality</button>
         <button class="btn btn-ghost btn-xs" type="button" data-image-preset="creative" aria-pressed="false">Creative</button>
-      </div>
-      <div class="preset-profile-wrap" aria-label="Preset profiles">
-        <div class="select-wrapper">
-          <select id="image-profile-select" aria-label="Saved preset profiles">
-            <option value="">No saved profiles</option>
-          </select>
-        </div>
-        <div class="inline-field-row profile-row">
-          <input id="image-profile-name" type="text" class="compact-input" placeholder="Profile name" />
-          <button class="btn btn-ghost btn-xs" id="image-profile-save" type="button">Save</button>
-        </div>
-        <div class="preset-row" role="group" aria-label="Profile actions">
-          <button class="btn btn-ghost btn-xs" id="image-profile-apply" type="button">Apply</button>
-          <button class="btn btn-ghost btn-xs" id="image-profile-delete" type="button">Delete</button>
-        </div>
       </div>
     </div>
 
