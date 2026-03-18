@@ -6028,14 +6028,14 @@ function setModelBrowserResetStatus(message) {
 		mbResetStatusTimer = null;
 	}
 	if (!message) {
-		mbResetStatus.hidden = true;
+		setElementHiddenState(mbResetStatus, true);
 		mbResetStatus.textContent = '';
 		return;
 	}
 	mbResetStatus.textContent = message;
-	mbResetStatus.hidden = false;
+	setElementHiddenState(mbResetStatus, false);
 	mbResetStatusTimer = setTimeout(() => {
-		mbResetStatus.hidden = true;
+		setElementHiddenState(mbResetStatus, true);
 	}, 2400);
 }
 
@@ -7351,7 +7351,7 @@ function focusLocalLibraryReportItem(fileName) {
 function renderLocalLibraryActionReport(title, summary, groups = []) {
 	if (!mbLibraryActionReport) return;
 	if (!summary && (!Array.isArray(groups) || !groups.length)) {
-		mbLibraryActionReport.hidden = true;
+		setElementHiddenState(mbLibraryActionReport, true);
 		return;
 	}
 	const groupMarkup = (Array.isArray(groups) ? groups : [])
@@ -7388,7 +7388,7 @@ function renderLocalLibraryActionReport(title, summary, groups = []) {
 	mbLibraryActionReport.querySelectorAll('.mb-library-action-report-link').forEach((button) => {
 		button.addEventListener('click', () => focusLocalLibraryReportItem(button.dataset.reportFile || ''));
 	});
-	mbLibraryActionReport.hidden = false;
+	setElementHiddenState(mbLibraryActionReport, false);
 }
 
 function renderLocalLibrary(models, root) {
@@ -7843,7 +7843,7 @@ function updateDownloadControlsState() {
 			: 'Idle';
 		mbDownloadsCounter.classList.toggle('is-busy', hasInFlight);
 		mbDownloadsCounter.classList.toggle('is-active', hasActiveTransfer);
-		mbDownloadsCounter.hidden = !mbDownloadsMinimized;
+		setElementHiddenState(mbDownloadsCounter, !mbDownloadsMinimized);
 	}
 	if (mbDownloadsSection) {
 		setElementHiddenState(mbDownloadsSection, rows.length === 0);

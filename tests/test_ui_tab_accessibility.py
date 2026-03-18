@@ -232,6 +232,8 @@ def test_index_model_download_actions_and_modal_semantics():
     assert '<div class="mb-downloads-actions" role="group" aria-label="Download queue actions">' in html
     assert 'id="mb-clear-finished-downloads"' in html
     assert 'id="mb-downloads-section" hidden aria-hidden="true"' in html
+    assert 'id="mb-downloads-counter" class="mb-downloads-counter" hidden aria-hidden="true"' in html
+    assert 'id="mb-reset-status" class="hint mb-reset-status" aria-live="polite" hidden aria-hidden="true"' in html
     assert 'id="mb-downloads-toggle" type="button" aria-controls="mb-downloads-body" aria-expanded="true"' in html
     assert 'id="mb-type-info-panel" class="mb-type-info-panel" hidden aria-hidden="true" tabindex="-1"' in html
     assert 'id="mb-model-modal" class="mb-model-modal" hidden aria-hidden="true" role="dialog" aria-modal="true" aria-label="Model details"' in html
@@ -282,6 +284,11 @@ def test_model_download_actions_keyboard_handler_wiring_present_in_js_bundle():
     assert "setElementHiddenState(mbPagination, false);" in content
     assert "setElementHiddenState(mbDownloadsSection, false);" in content
     assert "setElementHiddenState(mbDownloadsSection, rows.length === 0);" in content
+    assert "setElementHiddenState(mbResetStatus, true);" in content
+    assert "setElementHiddenState(mbResetStatus, false);" in content
+    assert "setElementHiddenState(mbDownloadsCounter, !mbDownloadsMinimized);" in content
+    assert "setElementHiddenState(mbLibraryActionReport, true);" in content
+    assert "setElementHiddenState(mbLibraryActionReport, false);" in content
     assert "function onModelDownloadsActionsKeydown(event)" in content
     assert "mbClearFinishedDownloadsBtn.addEventListener('keydown', onModelDownloadsActionsKeydown);" in content
     assert "mbDownloadsToggleBtn.addEventListener('keydown', onModelDownloadsActionsKeydown);" in content
@@ -671,7 +678,7 @@ def test_index_local_library_has_compare_missing_metadata_button():
     assert "Compare Missing Metadata" in html
     assert 'id="mb-compare-provider-civitai" type="checkbox" checked' in html
     assert 'id="mb-compare-provider-huggingface" type="checkbox" checked' in html
-    assert 'id="mb-library-action-report" class="mb-library-action-report" hidden aria-live="polite"' in html
+    assert 'id="mb-library-action-report" class="mb-library-action-report" hidden aria-hidden="true" aria-live="polite"' in html
     assert 'id="mb-library-action-report-clear"' in html
     assert 'Clear Report' in html
 
