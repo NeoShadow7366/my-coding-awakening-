@@ -8115,7 +8115,38 @@ function renderPromptRecentChips() {
 		btn.addEventListener('click', () => {
 			applyRecentPromptByIndex(Number(btn.dataset.index));
 		});
+		btn.addEventListener('keydown', onPromptRecentControlsKeydown);
 	});
+}
+function onPromptRecentControlsKeydown(event) {
+	const key = event.key;
+	if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(key)) return;
+	if (!(event.currentTarget instanceof HTMLElement)) return;
+
+	const controls = [];
+	if (promptRecentChips) {
+		controls.push(...promptRecentChips.querySelectorAll('.prompt-recent-chip'));
+	}
+	if (promptRecentClearBtn && !promptRecentClearBtn.disabled) {
+		controls.push(promptRecentClearBtn);
+	}
+	if (controls.length < 2) return;
+
+	const currentIndex = controls.indexOf(event.currentTarget);
+	if (currentIndex < 0) return;
+
+	event.preventDefault();
+	let nextIndex = currentIndex;
+	if (key === 'Home') {
+		nextIndex = 0;
+	} else if (key === 'End') {
+		nextIndex = controls.length - 1;
+	} else if (key === 'ArrowRight') {
+		nextIndex = (currentIndex + 1) % controls.length;
+	} else if (key === 'ArrowLeft') {
+		nextIndex = (currentIndex - 1 + controls.length) % controls.length;
+	}
+	controls[nextIndex]?.focus();
 }
 function loadPromptSavedPresets() {
 	try { return JSON.parse(localStorage.getItem(PROMPT_SAVED_KEY) || '{}'); }
@@ -8361,6 +8392,7 @@ if (promptRecentClearBtn) {
 		renderPromptRecentChips();
 		showToast('Cleared recent prompt history.', 'pos');
 	});
+	promptRecentClearBtn.addEventListener('keydown', onPromptRecentControlsKeydown);
 }
 
 renderPromptRecentDropdown();

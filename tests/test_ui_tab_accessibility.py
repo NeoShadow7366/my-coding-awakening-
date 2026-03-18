@@ -1132,6 +1132,10 @@ def test_prompt_recent_chips_markup_and_wiring_present():
     assert "const PROMPT_RECENT_CHIPS_MAX = 8;" in js
     assert "function applyRecentPromptByIndex(index)" in js
     assert "function renderPromptRecentChips()" in js
+    assert "function onPromptRecentControlsKeydown(event)" in js
+    assert "if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(key)) return;" in js
+    assert "btn.addEventListener('keydown', onPromptRecentControlsKeydown);" in js
+    assert "promptRecentClearBtn.addEventListener('keydown', onPromptRecentControlsKeydown);" in js
     assert "promptRecentChips.innerHTML = '<span class=\"hint\">No recent prompts yet.</span>';" in js
     assert "promptRecentChips.querySelectorAll('.prompt-recent-chip').forEach((btn) => {" in js
     assert "localStorage.removeItem(PROMPT_RECENT_KEY);" in js
