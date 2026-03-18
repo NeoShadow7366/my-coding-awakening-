@@ -102,6 +102,13 @@
     </div>
 
     <form class="chat-form" id="chat-form" aria-label="Send a message">
+      <!-- Recent prompts for text input -->
+      <div class="text-prompt-recentwrap" style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap;">
+        <button class="btn btn-ghost btn-xs" id="text-prompt-recent-btn" type="button" aria-haspopup="listbox" aria-controls="text-prompt-recent-dropdown" aria-expanded="false">Recent ▾</button>
+        <ul id="text-prompt-recent-dropdown" class="prompt-recent-dropdown" role="listbox" aria-label="Recent text prompts" hidden aria-hidden="true"></ul>
+      </div>
+      <div id="text-prompt-recent-chips" class="prompt-recent-chips" role="group" aria-label="Recent text prompt chips"></div>
+      
       <textarea
         id="chat-input"
         class="chat-input"

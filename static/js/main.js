@@ -163,6 +163,9 @@ const promptRecentBtn = document.getElementById('prompt-recent-btn');
 const promptRecentDropdown = document.getElementById('prompt-recent-dropdown');
 const promptRecentChips = document.getElementById('prompt-recent-chips');
 const promptRecentClearBtn = document.getElementById('prompt-recent-clear-btn');
+const textPromptRecentBtn = document.getElementById('text-prompt-recent-btn');
+const textPromptRecentDropdown = document.getElementById('text-prompt-recent-dropdown');
+const textPromptRecentChips = document.getElementById('text-prompt-recent-chips');
 const promptSavedName = document.getElementById('prompt-saved-name');
 const promptSaveBtn = document.getElementById('prompt-save-btn');
 const promptSavedSelect = document.getElementById('prompt-saved-select');
@@ -2774,6 +2777,7 @@ chatForm.addEventListener('submit', async (e) => {
 
 	chatInput.value = '';
 	chatInput.style.height = 'auto';
+	saveCurrentTextPromptToHistory(prompt);
 
 	appendMessage('user', prompt);
 	isGenerating = true;
@@ -8448,6 +8452,94 @@ function deleteNamedPromptPreset(name) {
 	renderPromptSavedSelect();
 	showToast(`Deleted prompt preset "${n}".`, 'pos');
 }
+
+// --- Text Prompt Recent History ---
+const TEXT_PROMPT_RECENT_KEY = 'textPromptRecentHistory';
+const TEXT_PROMPT_RECENT_MAX = 20;
+const TEXT_PROMPT_RECENT_CHIPS_MAX = 8;
+
+function loadTextPromptRecentHistory() {
+	try { return JSON.parse(localStorage.getItem(TEXT_PROMPT_RECENT_KEY) || '[]'); }
+	catch { return []; }
+}
+
+function setTextPromptRecentDropdownOpen(isOpen, focusFirst = false) {
+	if (!textPromptRecentDropdown) return;
+	if (isOpen) {
+		renderTextPromptRecentDropdown();
+	}
+	textPromptRecentDropdown.hidden = !isOpen;
+	textPromptRecentDropdown.setAttribute('aria-hidden', isOpen ? 'false' : 'true');
+	if (textPromptRecentBtn) {
+		textPromptRecentBtn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+	}
+	if (!isOpen) return;
+	if (!focusFirst) return;
+	const first = textPromptRecentDropdown.querySelector('.prompt-recent-item');
+	if (first instanceof HTMLElement) {
+		first.focus();
+	}
+}
+
+function applyRecentTextPromptByIndex(index) {
+	const value = loadTextPromptRecentHistory()[index] || '';
+	if (!value) return;
+	chatInput.value = value;
+	chatInput.focus();
+	setTextPromptRecentDropdownOpen(false);
+}
+
+function saveCurrentTextPromptToHistory(text) {
+	const t = String(text || '').trim();
+	if (!t) return;
+	let list = loadTextPromptRecentHistory().filter((p) => p !== t);
+	list.unshift(t);
+	list = list.slice(0, TEXT_PROMPT_RECENT_MAX);
+	localStorage.setItem(TEXT_PROMPT_RECENT_KEY, JSON.stringify(list));
+	renderTextPromptRecentDropdown();
+	renderTextPromptRecentChips();
+}
+
+function renderTextPromptRecentDropdown() {
+	if (!textPromptRecentDropdown) return;
+	const list = loadTextPromptRecentHistory();
+	if (!list.length) {
+		textPromptRecentDropdown.innerHTML = '<li class="prompt-recent-empty">No recent prompts</li>';
+		return;
+	}
+	textPromptRecentDropdown.innerHTML = list.map((p, i) => {
+		const preview = p.length > 80 ? p.slice(0, 80) + '\u2026' : p;
+		return `<li class="prompt-recent-item" data-index="${i}" role="option" tabindex="0">${escHtml(preview)}</li>`;
+	}).join('');
+	textPromptRecentDropdown.querySelectorAll('.prompt-recent-item').forEach((li) => {
+		const apply = () => {
+			applyRecentTextPromptByIndex(Number(li.dataset.index));
+		};
+		li.addEventListener('click', apply);
+		li.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); apply(); } });
+	});
+}
+
+function renderTextPromptRecentChips() {
+	if (!textPromptRecentChips) return;
+	const list = loadTextPromptRecentHistory().slice(0, TEXT_PROMPT_RECENT_CHIPS_MAX);
+	if (!list.length) {
+		textPromptRecentChips.innerHTML = '<span class="hint">No recent prompts yet.</span>';
+		return;
+	}
+	textPromptRecentChips.innerHTML = list.map((p, i) => {
+		const preview = p.length > 66 ? `${p.slice(0, 66)}\u2026` : p;
+		return `<button class="prompt-recent-chip" type="button" data-index="${i}" title="${escHtml(p)}">${escHtml(preview)}</button>`;
+	}).join('');
+	textPromptRecentChips.querySelectorAll('.prompt-recent-chip').forEach((btn) => {
+		btn.addEventListener('click', () => {
+			applyRecentTextPromptByIndex(Number(btn.dataset.index));
+		});
+		btn.addEventListener('keydown', onPromptRecentControlsKeydown);
+	});
+}
+// --- End Text Prompt Recent History ---
+
 // --- End Prompt Recent History & Saved Presets ---
 
 function renderEnhancedPromptSuggestions(suggestions) {
@@ -8759,6 +8851,59 @@ if (promptRecentClearBtn) {
 renderPromptRecentDropdown();
 renderPromptRecentChips();
 renderPromptSavedSelect();
+
+// Text prompt history event listeners
+if (textPromptRecentBtn) {
+	textPromptRecentBtn.addEventListener('click', (e) => {
+		e.stopPropagation();
+		const isOpen = textPromptRecentDropdown ? !textPromptRecentDropdown.hidden : false;
+		setTextPromptRecentDropdownOpen(!isOpen);
+	});
+	textPromptRecentBtn.addEventListener('keydown', (event) => {
+		if (event.key === 'Escape') {
+			event.preventDefault();
+			setTextPromptRecentDropdownOpen(false);
+			return;
+		}
+		if (!['ArrowDown', 'Enter', ' '].includes(event.key)) return;
+		event.preventDefault();
+		setTextPromptRecentDropdownOpen(true, true);
+	});
+}
+
+if (textPromptRecentDropdown) {
+	textPromptRecentDropdown.addEventListener('keydown', (event) => {
+		if (textPromptRecentDropdown.hidden) return;
+		if (event.key === 'Escape') {
+			event.preventDefault();
+			setTextPromptRecentDropdownOpen(false);
+			if (textPromptRecentBtn) textPromptRecentBtn.focus();
+			return;
+		}
+		if (!['ArrowDown', 'ArrowUp'].includes(event.key)) return;
+		const items = [...textPromptRecentDropdown.querySelectorAll('.text-prompt-recent-item')].filter((el) => el instanceof HTMLElement);
+		if (!items.length) return;
+		event.preventDefault();
+		const active = document.activeElement;
+		const currentIndex = items.indexOf(active);
+		const delta = event.key === 'ArrowDown' ? 1 : -1;
+		const nextIndex = currentIndex < 0 ? (delta > 0 ? 0 : items.length - 1) : (currentIndex + delta + items.length) % items.length;
+		items[nextIndex].focus();
+	});
+}
+
+// Close text prompt dropdown when clicking outside
+document.addEventListener('click', (e) => {
+	if (textPromptRecentDropdown && !textPromptRecentDropdown.hidden) {
+		if (!textPromptRecentDropdown.contains(e.target) && e.target !== textPromptRecentBtn) {
+			setTextPromptRecentDropdownOpen(false);
+		}
+	}
+});
+
+// Render text prompt history on page load
+renderTextPromptRecentDropdown();
+renderTextPromptRecentChips();
 
 if (enhancedPromptSuggestBtn) {
 	enhancedPromptSuggestBtn.addEventListener('click', suggestEnhancedPrompts);
