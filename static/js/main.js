@@ -363,6 +363,7 @@ let lightboxCurrentIndex = 0;
 let lightboxCompareEnabled = false;
 let lightboxCompareSplit = 50;
 let lightboxMetaOpen = false;
+let galleryLightboxLastFocus = null;
 const TAG_CATEGORY_LABELS = {
 	'enhanced-subject': 'Subject',
 	'enhanced-setting': 'Setting/Environment',
@@ -4147,6 +4148,7 @@ function applyGalleryPayloadToImageForm(payload) {
 
 function openGalleryLightbox(imgSrc, imgAlt, caption = '', index = 0) {
 	if (!galleryLightbox || !galleryLightboxImage) return;
+	galleryLightboxLastFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
 	lightboxCurrentIndex = index;
 	const entry = currentGalleryImages[index];
 	updateLightboxMedia(entry, imgSrc, imgAlt || 'Generated image', caption);
@@ -4186,6 +4188,10 @@ function closeGalleryLightbox() {
 		galleryLightboxCaption.textContent = '';
 	}
 	document.body.classList.remove('gallery-lightbox-open');
+	if (galleryLightboxLastFocus && document.contains(galleryLightboxLastFocus)) {
+		galleryLightboxLastFocus.focus();
+	}
+	galleryLightboxLastFocus = null;
 }
 
 function loadGalleryFavorites() {
@@ -4541,6 +4547,26 @@ if (galleryLightbox) {
 			closeGalleryLightbox();
 		}
 	});
+
+	galleryLightbox.addEventListener('keydown', (event) => {
+		if (event.key !== 'Tab' || galleryLightbox.hidden) return;
+		const tabStops = getGalleryLightboxTabStops();
+		if (!tabStops.length) return;
+		const first = tabStops[0];
+		const last = tabStops[tabStops.length - 1];
+		const active = document.activeElement;
+		if (event.shiftKey) {
+			if (active === first || !galleryLightbox.contains(active)) {
+				event.preventDefault();
+				last.focus();
+			}
+			return;
+		}
+		if (active === last || !galleryLightbox.contains(active)) {
+			event.preventDefault();
+			first.focus();
+		}
+	});
 }
 
 if (galleryLightboxCloseBtn) {
@@ -4572,6 +4598,22 @@ function getGalleryLightboxFocusableControls() {
 		galleryLightboxReuseBtn,
 		galleryLightboxNext,
 	].filter((control) => control && !control.disabled && isGalleryLightboxControlVisible(control));
+}
+
+function getGalleryLightboxTabStops() {
+	if (!galleryLightbox) return [];
+	const selector = [
+		'button:not([disabled])',
+		'input:not([disabled]):not([type="hidden"])',
+		'select:not([disabled])',
+		'textarea:not([disabled])',
+		'[tabindex]:not([tabindex="-1"])',
+	].join(', ');
+	return [...galleryLightbox.querySelectorAll(selector)].filter((el) => {
+		if (!(el instanceof HTMLElement)) return false;
+		if (!isGalleryLightboxControlVisible(el)) return false;
+		return true;
+	});
 }
 
 function onGalleryLightboxControlsKeydown(event) {

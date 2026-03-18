@@ -955,6 +955,7 @@ def test_gallery_lightbox_compare_markup_and_wiring_present():
     assert "function updateLightboxMedia(entry, fallbackSrc = '', fallbackAlt = 'Generated image', fallbackCaption = '')" in js
     assert "function isGalleryLightboxInteractiveTarget(target)" in js
     assert "function getGalleryLightboxFocusableControls()" in js
+    assert "function getGalleryLightboxTabStops()" in js
     assert "function onGalleryLightboxControlsKeydown(event)" in js
     assert "const isImg2Img = snapshot.mode === 'img2img' && (snapshot.image || snapshot.image_name);" in js
     assert "image: snapshot.image || snapshot.image_name || ''," in js
@@ -965,6 +966,8 @@ def test_gallery_lightbox_compare_markup_and_wiring_present():
     assert "galleryLightboxCompareToggle.addEventListener('keydown', onGalleryLightboxControlsKeydown);" in js
     assert "galleryLightboxSourceUploadInput.addEventListener('change', async () => {" in js
     assert "galleryLightboxCompareSlider.addEventListener('input'" in js
+    assert "galleryLightbox.addEventListener('keydown', (event) => {" in js
+    assert "if (event.key !== 'Tab' || galleryLightbox.hidden) return;" in js
 
     css_path = Path(__file__).resolve().parents[1] / "static" / "css" / "style.css"
     css = css_path.read_text(encoding="utf-8")
@@ -989,6 +992,7 @@ def test_gallery_lightbox_meta_panel_markup_and_wiring_present():
     assert "const galleryLightboxMeta = document.getElementById('gallery-lightbox-meta');" in js
     assert "const galleryLightboxMetaChips = document.getElementById('gallery-lightbox-meta-chips');" in js
     assert "const galleryLightboxReuseBtn = document.getElementById('gallery-lightbox-reuse');" in js
+    assert "let galleryLightboxLastFocus = null;" in js
     assert "let lightboxMetaOpen = false;" in js
     assert "function updateLightboxMeta(entry)" in js
     assert "galleryLightboxMetaToggle.addEventListener('click'" in js
@@ -998,6 +1002,9 @@ def test_gallery_lightbox_meta_panel_markup_and_wiring_present():
     assert "galleryLightboxCloseBtn.addEventListener('keydown', onGalleryLightboxControlsKeydown);" in js
     assert "applyImageSettings(settings);" in js
     assert "showPanel('image');" in js
+    assert "galleryLightboxLastFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;" in js
+    assert "if (galleryLightboxLastFocus && document.contains(galleryLightboxLastFocus)) {" in js
+    assert "galleryLightboxLastFocus = null;" in js
 
     css_path = Path(__file__).resolve().parents[1] / "static" / "css" / "style.css"
     css = css_path.read_text(encoding="utf-8")
