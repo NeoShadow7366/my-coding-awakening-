@@ -1313,6 +1313,24 @@ textarea {
   margin-top: 0.2rem;
 }
 
+.queue-help {
+  margin-top: 0.15rem;
+}
+
+.queue-help summary {
+  cursor: pointer;
+  color: var(--clr-text-muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+  user-select: none;
+}
+
+.queue-help-copy {
+  display: grid;
+  gap: 0.2rem;
+  margin-top: 0.35rem;
+}
+
 .queue-restore-wrap {
   display: inline-flex;
   align-items: center;

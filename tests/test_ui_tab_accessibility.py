@@ -95,6 +95,7 @@ def test_queue_action_keyboard_handler_wiring_present_in_js_bundle():
     assert "body: JSON.stringify(resubmitBody)," in content
     assert "const resubmitUrl = isImg2Img ? '/api/image/img2img-requeue' : '/api/image/generate';" in content
     assert "const QUEUE_STATE_STORAGE_KEY = 'queueStateV1';" in content
+    assert "const QUEUE_HELP_EXPANDED_KEY = 'queueHelpExpandedV1';" in content
     assert "const QUEUE_RESTORE_HINT_HIDDEN_KEY = 'queueRestoreHintHiddenV1';" in content
     assert "function persistTrackedQueueState()" in content
     assert "function restoreTrackedQueueState()" in content
@@ -102,6 +103,7 @@ def test_queue_action_keyboard_handler_wiring_present_in_js_bundle():
     assert "function stopQueueRestoreHintTicker()" in content
     assert "function ensureQueueRestoreHintTicker()" in content
     assert "queueRestoreHintTimer = window.setInterval(() => {" in content
+    assert "const queueHelpDetails = document.getElementById('queue-help-details');" in content
     assert "const queueRestoreWrap = document.getElementById('queue-restore-wrap');" in content
     assert "const queueRestoreHint = document.getElementById('queue-restore-hint');" in content
     assert "const queueRestoreHideBtn = document.getElementById('queue-restore-hide');" in content
@@ -117,6 +119,9 @@ def test_queue_action_keyboard_handler_wiring_present_in_js_bundle():
     assert "queueFilterFailedOnly = false;" in content
     assert "localStorage.removeItem('queueFilterFailedOnly');" in content
     assert "showToast('Queue UI preferences reset.', 'pos');" in content
+    assert "if (queueHelpDetails) {" in content
+    assert "queueHelpDetails.addEventListener('toggle', () => {" in content
+    assert "localStorage.setItem(QUEUE_HELP_EXPANDED_KEY, queueHelpDetails.open ? '1' : '0');" in content
     assert "renderQueueRestoreHint();" in content
     assert "Restored ${count} active queue item" in content
     assert "restoreTrackedQueueState();" in content
@@ -130,6 +135,9 @@ def test_queue_action_keyboard_handler_wiring_present_in_js_bundle():
     assert resp.status_code == 200
     html = resp.get_data(as_text=True)
     assert 'id="queue-shortcuts-hint"' in html
+    assert 'id="queue-help-details"' in html
+    assert 'id="queue-help-toggle"' in html
+    assert 'id="queue-help-copy"' in html
     assert 'id="queue-restore-wrap"' in html
     assert 'id="queue-restore-hint"' in html
     assert 'id="queue-restore-hide"' in html
@@ -140,6 +148,8 @@ def test_queue_action_keyboard_handler_wiring_present_in_js_bundle():
     css = css_path.read_text(encoding="utf-8")
     assert ".queue-chip-front" in css
     assert ".queue-shortcuts-hint" in css
+    assert ".queue-help" in css
+    assert ".queue-help-copy" in css
     assert ".queue-restore-wrap" in css
     assert ".queue-restore-hint" in css
     assert ".queue-restore-show" in css

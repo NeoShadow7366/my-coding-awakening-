@@ -205,6 +205,7 @@ const imageUpload = document.getElementById('image-upload');
 const imageGenerateBtn = document.getElementById('image-generate-btn');
 const queueTelemetry = document.getElementById('queue-telemetry');
 const queueTelemetryResetBtn = document.getElementById('queue-telemetry-reset');
+const queueHelpDetails = document.getElementById('queue-help-details');
 const queueRestoreWrap = document.getElementById('queue-restore-wrap');
 const queueRestoreHint = document.getElementById('queue-restore-hint');
 const queueRestoreHideBtn = document.getElementById('queue-restore-hide');
@@ -333,6 +334,7 @@ const IMAGE_RECENT_MODELS_KEY = 'imageRecentModelsV1';
 const IMAGE_FAVORITE_MODELS_KEY = 'imageFavoriteModelsV1';
 const IMAGE_MODEL_FILTER_MODE_KEY = 'imageModelFilterModeV1';
 const QUEUE_TELEMETRY_KEY = 'queueTelemetryV1';
+const QUEUE_HELP_EXPANDED_KEY = 'queueHelpExpandedV1';
 const QUEUE_STATE_STORAGE_KEY = 'queueStateV1';
 const QUEUE_RESTORE_HINT_HIDDEN_KEY = 'queueRestoreHintHiddenV1';
 const QUEUE_STATE_MAX_ITEMS = 40;
@@ -769,6 +771,13 @@ if (failedOnlyToggle) {
 		queueFilterFailedOnly = failedOnlyToggle.checked;
 		localStorage.setItem('queueFilterFailedOnly', queueFilterFailedOnly ? '1' : '0');
 		renderQueueStatus([], [], new Set());
+	});
+}
+
+if (queueHelpDetails) {
+	queueHelpDetails.open = localStorage.getItem(QUEUE_HELP_EXPANDED_KEY) === '1';
+	queueHelpDetails.addEventListener('toggle', () => {
+		localStorage.setItem(QUEUE_HELP_EXPANDED_KEY, queueHelpDetails.open ? '1' : '0');
 	});
 }
 
