@@ -407,7 +407,7 @@
           <div class="field-label-inline-row">
             <div class="prompt-label-group">
               <label for="image-prompt" class="field-label">Prompt</label>
-              <button class="btn btn-ghost btn-xs prompt-syntax-info-btn" id="prompt-syntax-info-btn" type="button" aria-label="Prompt syntax help" title="Prompt syntax guide">ℹ</button>
+              <button class="btn btn-ghost btn-xs prompt-syntax-info-btn" id="prompt-syntax-info-btn" type="button" aria-label="Prompt syntax help" title="Prompt syntax guide" aria-haspopup="dialog" aria-controls="prompt-syntax-popup" aria-expanded="false">ℹ</button>
             </div>
             <div class="prompt-toolbar">
               <button class="btn btn-ghost btn-xs" id="prompt-randomize-btn" type="button">Randomize</button>
@@ -423,7 +423,7 @@
             <button class="btn btn-ghost btn-xs" id="prompt-recent-clear-btn" type="button" title="Clear recent prompt history">Clear</button>
           </div>
           <div id="prompt-recent-chips" class="prompt-recent-chips" role="group" aria-label="Recent prompt chips"></div>
-          <div id="prompt-syntax-popup" class="prompt-syntax-popup" hidden aria-hidden="true" role="dialog" aria-label="Prompt syntax guide">
+          <div id="prompt-syntax-popup" class="prompt-syntax-popup" hidden aria-hidden="true" role="dialog" aria-modal="true" aria-label="Prompt syntax guide">
             <div class="prompt-syntax-popup-head">
               <strong>Prompt Syntax Guide</strong>
               <button class="btn btn-ghost btn-xs" id="prompt-syntax-close-btn" type="button" aria-label="Close syntax guide">✕</button>

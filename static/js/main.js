@@ -8518,6 +8518,9 @@ function setPromptSyntaxPopupOpen(isOpen) {
 	}
 	promptSyntaxPopup.hidden = !isOpen;
 	promptSyntaxPopup.setAttribute('aria-hidden', isOpen ? 'false' : 'true');
+	if (promptSyntaxInfoBtn) {
+		promptSyntaxInfoBtn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+	}
 	if (isOpen) {
 		if (promptSyntaxCloseBtn) promptSyntaxCloseBtn.focus();
 		return;
