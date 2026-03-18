@@ -4036,6 +4036,46 @@ def api_image_img2img():
         return jsonify({"error": str(exc)}), 502
 
 
+@app.route("/api/image/img2img-requeue", methods=["POST"])
+def api_image_img2img_requeue():
+    """Re-submit an img2img job using an already-uploaded ComfyUI image name (no file upload).
+
+    Used by the prioritize action to move a queued img2img job to the front of the queue
+    without requiring the client to re-upload the source image.
+    """
+    if not _comfy_available():
+        return jsonify({"error": "ComfyUI is not running. Start ComfyUI first."}), 503
+
+    body = request.get_json(silent=True) or {}
+    image_name = (body.get("image_name") or body.get("image") or "").strip()
+    prompt = (body.get("prompt") or "").strip()
+
+    if not image_name:
+        return jsonify({"error": "image_name is required"}), 400
+    if not prompt:
+        return jsonify({"error": "prompt is required"}), 400
+
+    queue_front_raw = body.get("queue_front", False)
+    queue_front = str(queue_front_raw).strip().lower() in {"1", "true", "yes", "on"}
+
+    try:
+        workflow, meta = _build_img2img_workflow(body, image_name)
+        result = _comfy_submit_prompt(workflow, front=queue_front)
+        return jsonify(
+            {
+                "ok": True,
+                "prompt_id": result.get("prompt_id"),
+                "number": result.get("number"),
+                "meta": meta,
+            }
+        )
+    except (TypeError, ValueError) as exc:
+        return jsonify({"error": f"Invalid parameters: {exc}"}), 400
+    except requests.RequestException as exc:
+        logger.error("ComfyUI img2img requeue failed: %s", exc)
+        return jsonify({"error": str(exc)}), 502
+
+
 @app.route("/api/image/queue")
 def api_image_queue():
     """Return queue status and completed images for known prompt IDs."""

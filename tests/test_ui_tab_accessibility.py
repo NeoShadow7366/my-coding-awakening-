@@ -92,7 +92,8 @@ def test_queue_action_keyboard_handler_wiring_present_in_js_bundle():
     assert "if (event.altKey && event.key === 'ArrowUp') {" in content
     assert "const prioritizeBtn = row ? row.querySelector('.queue-action[data-action=\"prioritize\"]') : null;" in content
     assert "prioritizeImageJob(promptId);" in content
-    assert "body: JSON.stringify({ ...snapshot, queue_front: true })," in content
+    assert "body: JSON.stringify(resubmitBody)," in content
+    assert "const resubmitUrl = isImg2Img ? '/api/image/img2img-requeue' : '/api/image/generate';" in content
     assert "if (action === 'prioritize') {" in content
     assert "queueList.addEventListener('keydown', onQueueActionKeydown);" in content
 

@@ -3220,7 +3220,8 @@ function renderQueueStatus(running, pending, donePromptIds = new Set()) {
 			const canCancel = status === 'queued' || status === 'running' || status === 'processing';
 			const canRetry = status === 'failed' || status === 'canceled';
 			const canRerun = status === 'completed' && snap.mode !== 'img2img' && !!String(snap.prompt || '').trim();
-			const canPrioritize = status === 'queued' && snap.mode !== 'img2img' && !!String(snap.prompt || '').trim();
+			const canPrioritize = status === 'queued' && !!String(snap.prompt || '').trim() &&
+				(snap.mode !== 'img2img' || !!(snap.image || snap.image_name));
 			const cancelBusy = queueActionInFlight.has(`cancel:${promptId}`);
 			const retryBusy = queueActionInFlight.has(`retry:${promptId}`);
 			const rerunBusy = queueActionInFlight.has(`rerun:${promptId}`);
@@ -3476,8 +3477,10 @@ async function prioritizeImageJob(promptId) {
 		showToast('Prioritize unavailable: no job snapshot found.', 'neg');
 		return;
 	}
-	if (snapshot.mode === 'img2img') {
-		showToast('Prioritize is currently available for txt2img jobs only.', 'neg');
+	const isImg2Img = snapshot.mode === 'img2img';
+	const img2imgImageName = isImg2Img ? (snapshot.image || snapshot.image_name || '') : '';
+	if (isImg2Img && !img2imgImageName) {
+		showToast('Prioritize unavailable: img2img source image reference not found in snapshot.', 'neg');
 		return;
 	}
 
@@ -3494,10 +3497,14 @@ async function prioritizeImageJob(promptId) {
 			return;
 		}
 
-		const res = await fetch('/api/image/generate', {
+		const resubmitUrl = isImg2Img ? '/api/image/img2img-requeue' : '/api/image/generate';
+		const resubmitBody = isImg2Img
+			? { ...snapshot, image_name: img2imgImageName, queue_front: true }
+			: { ...snapshot, queue_front: true };
+		const res = await fetch(resubmitUrl, {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ ...snapshot, queue_front: true }),
+			body: JSON.stringify(resubmitBody),
 		});
 		const data = await res.json().catch(() => ({}));
 		if (!res.ok || !data.prompt_id) {

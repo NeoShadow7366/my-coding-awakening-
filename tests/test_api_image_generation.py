@@ -255,6 +255,96 @@ def test_img2img_queue_front_passed_to_submit(client, monkeypatch):
     assert seen["front"] is True
 
 
+def test_img2img_requeue_missing_image_name_returns_400(client, monkeypatch):
+    monkeypatch.setattr(app_module, "_comfy_available", lambda: True)
+
+    resp = client.post("/api/image/img2img-requeue", json={"prompt": "forest"})
+
+    assert resp.status_code == 400
+    assert resp.get_json()["error"] == "image_name is required"
+
+
+def test_img2img_requeue_missing_prompt_returns_400(client, monkeypatch):
+    monkeypatch.setattr(app_module, "_comfy_available", lambda: True)
+
+    resp = client.post("/api/image/img2img-requeue", json={"image_name": "uploaded.png"})
+
+    assert resp.status_code == 400
+    assert resp.get_json()["error"] == "prompt is required"
+
+
+def test_img2img_requeue_uses_existing_image_name_no_upload(client, monkeypatch):
+    """Re-queue must call _build_img2img_workflow with image_name but NOT _upload_image_to_comfy."""
+    monkeypatch.setattr(app_module, "_comfy_available", lambda: True)
+
+    upload_called = {"called": False}
+
+    def unexpected_upload(file_storage):
+        upload_called["called"] = True
+        return ""
+
+    seen = {}
+
+    def fake_build_img2img_workflow(body, uploaded_name):
+        seen["image_name"] = uploaded_name
+        seen["prompt"] = body["prompt"]
+        return ({"node": {}}, {"prompt": body["prompt"], "image": uploaded_name, "mode": "img2img"})
+
+    def fake_submit(workflow, front=False):
+        seen["front"] = front
+        return {"prompt_id": "pid-requeue", "number": 99}
+
+    monkeypatch.setattr(app_module, "_upload_image_to_comfy", unexpected_upload)
+    monkeypatch.setattr(app_module, "_build_img2img_workflow", fake_build_img2img_workflow)
+    monkeypatch.setattr(app_module, "_comfy_submit_prompt", fake_submit)
+
+    resp = client.post(
+        "/api/image/img2img-requeue",
+        json={
+            "prompt": "forest",
+            "negative_prompt": "",
+            "model": "test-model.safetensors",
+            "image_name": "comfy-resident.png",
+            "queue_front": True,
+        },
+    )
+
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["ok"] is True
+    assert data["prompt_id"] == "pid-requeue"
+    assert data["meta"]["image"] == "comfy-resident.png"
+    assert seen["image_name"] == "comfy-resident.png"
+    assert seen["prompt"] == "forest"
+    assert seen["front"] is True
+    assert upload_called["called"] is False
+
+
+def test_img2img_requeue_accepts_image_field_fallback(client, monkeypatch):
+    """image_name falls back to 'image' key for legacy snapshot compatibility."""
+    monkeypatch.setattr(app_module, "_comfy_available", lambda: True)
+
+    seen = {}
+
+    def fake_build_img2img_workflow(body, uploaded_name):
+        seen["image_name"] = uploaded_name
+        return ({"node": {}}, {"prompt": body["prompt"], "image": uploaded_name, "mode": "img2img"})
+
+    def fake_submit(workflow, front=False):
+        return {"prompt_id": "pid-legacy", "number": 5}
+
+    monkeypatch.setattr(app_module, "_build_img2img_workflow", fake_build_img2img_workflow)
+    monkeypatch.setattr(app_module, "_comfy_submit_prompt", fake_submit)
+
+    resp = client.post(
+        "/api/image/img2img-requeue",
+        json={"prompt": "clouds", "image": "legacy-name.png"},
+    )
+
+    assert resp.status_code == 200
+    assert seen["image_name"] == "legacy-name.png"
+
+
 def test_build_txt2img_workflow_includes_lora_node(monkeypatch):
     monkeypatch.setattr(app_module, "_image_models", lambda: ["base.safetensors"])
 
