@@ -208,6 +208,7 @@ const queueTelemetryResetBtn = document.getElementById('queue-telemetry-reset');
 const queueRestoreWrap = document.getElementById('queue-restore-wrap');
 const queueRestoreHint = document.getElementById('queue-restore-hint');
 const queueRestoreHideBtn = document.getElementById('queue-restore-hide');
+const queueRestoreShowBtn = document.getElementById('queue-restore-show');
 const queueSummary = document.getElementById('queue-summary');
 const queueList = document.getElementById('queue-list');
 const configOllamaPath = document.getElementById('config-ollama-path');
@@ -638,9 +639,17 @@ function ensureQueueRestoreHintTicker() {
 }
 
 function renderQueueRestoreHint() {
-	if (!queueRestoreHint || !queueRestoreWrap) return;
-	if (!restoredQueueStateInfo || !trackedPromptIds.size || queueRestoreHintHidden) {
+	if (!queueRestoreHint || !queueRestoreWrap || !queueRestoreShowBtn) return;
+	if (!restoredQueueStateInfo || !trackedPromptIds.size) {
 		queueRestoreWrap.hidden = true;
+		queueRestoreShowBtn.hidden = true;
+		queueRestoreHint.textContent = '';
+		stopQueueRestoreHintTicker();
+		return;
+	}
+	if (queueRestoreHintHidden) {
+		queueRestoreWrap.hidden = true;
+		queueRestoreShowBtn.hidden = false;
 		queueRestoreHint.textContent = '';
 		stopQueueRestoreHintTicker();
 		return;
@@ -651,6 +660,7 @@ function renderQueueRestoreHint() {
 	const ageSeconds = Math.max(1, Math.round(ageMs / 1000));
 	queueRestoreHint.textContent = `Restored ${count} active queue item${count === 1 ? '' : 's'} from a previous tab (${ageSeconds}s ago).`;
 	queueRestoreWrap.hidden = false;
+	queueRestoreShowBtn.hidden = true;
 	ensureQueueRestoreHintTicker();
 }
 
@@ -658,6 +668,14 @@ if (queueRestoreHideBtn) {
 	queueRestoreHideBtn.addEventListener('click', () => {
 		queueRestoreHintHidden = true;
 		localStorage.setItem(QUEUE_RESTORE_HINT_HIDDEN_KEY, '1');
+		renderQueueRestoreHint();
+	});
+}
+
+if (queueRestoreShowBtn) {
+	queueRestoreShowBtn.addEventListener('click', () => {
+		queueRestoreHintHidden = false;
+		localStorage.removeItem(QUEUE_RESTORE_HINT_HIDDEN_KEY);
 		renderQueueRestoreHint();
 	});
 }

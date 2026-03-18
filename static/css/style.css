@@ -1325,6 +1325,10 @@ textarea {
   color: color-mix(in srgb, var(--clr-primary) 72%, var(--clr-text-muted));
 }
 
+.queue-restore-show {
+  margin-top: 0.1rem;
+}
+
 .queue-reason {
   display: block;
   font-size: 0.72rem;
