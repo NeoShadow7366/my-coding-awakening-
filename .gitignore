@@ -43,3 +43,4 @@ htmlcov/
 # Runtime app data
 data/history.json
 data/service_config.json
+data/tmp_img2img_source.png
