@@ -2147,10 +2147,10 @@ function addLoraRow() {
 		<div class="lora-row-header">
 			<span class="lora-row-label hint">LoRA ${id}</span>
 			<button class="lora-row-enable btn btn-ghost btn-xs" type="button" aria-pressed="true" title="Toggle this LoRA on/off">On</button>
-			<button class="lora-row-collapse btn btn-ghost btn-xs" type="button" aria-expanded="true" aria-label="Collapse LoRA row">&#9660;</button>
+			<button class="lora-row-collapse btn btn-ghost btn-xs" type="button" aria-expanded="true" aria-controls="lora-row-body-${id}" aria-label="Collapse LoRA row">&#9660;</button>
 			<button class="lora-row-remove btn btn-ghost btn-xs" type="button" aria-label="Remove LoRA row">&#x2212;</button>
 		</div>
-		<div class="lora-row-body">
+		<div class="lora-row-body" id="lora-row-body-${id}">
 			<div class="lora-row-head">
 				<div class="select-wrapper">
 					<select class="lora-row-select" aria-label="LoRA model">
@@ -2186,6 +2186,7 @@ function addLoraRow() {
 	collapseBtn.addEventListener('click', () => {
 		const expanded = rowBody.hidden;
 		rowBody.hidden = !expanded;
+		rowBody.setAttribute('aria-hidden', expanded ? 'false' : 'true');
 		collapseBtn.setAttribute('aria-expanded', String(expanded));
 		collapseBtn.innerHTML = expanded ? '&#9660;' : '&#9654;';
 	});

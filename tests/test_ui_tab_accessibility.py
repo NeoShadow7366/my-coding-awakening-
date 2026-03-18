@@ -857,6 +857,12 @@ def test_lora_row_ux_js_wiring():
     assert "lora-row-body" in content
     assert "lora-disabled" in content
     assert "lora-row-header" in content
+    # ARIA: collapse button must declare its controlled region
+    assert 'aria-controls="lora-row-body-${id}"' in content
+    # ARIA: body must carry a matching id
+    assert 'id="lora-row-body-${id}"' in content
+    # ARIA: hidden state kept in sync with aria-hidden on toggle
+    assert "rowBody.setAttribute('aria-hidden', expanded ? 'false' : 'true');" in content
 
 
 def test_compat_grouping_helpers_present_in_js():
