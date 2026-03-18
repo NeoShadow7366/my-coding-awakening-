@@ -210,6 +210,7 @@ const queueRestoreWrap = document.getElementById('queue-restore-wrap');
 const queueRestoreHint = document.getElementById('queue-restore-hint');
 const queueRestoreHideBtn = document.getElementById('queue-restore-hide');
 const queueRestoreShowBtn = document.getElementById('queue-restore-show');
+const queueLastAction = document.getElementById('queue-last-action');
 const queueSummary = document.getElementById('queue-summary');
 const queueList = document.getElementById('queue-list');
 const configOllamaPath = document.getElementById('config-ollama-path');
@@ -268,6 +269,9 @@ const toastContainer = document.getElementById('toast-container');
 
 if (queueSummary) {
 	queueSummary.setAttribute('aria-live', 'polite');
+}
+if (queueLastAction) {
+	queueLastAction.setAttribute('aria-atomic', 'true');
 }
 const refreshGalleryBtn = document.getElementById('refresh-gallery');
 const galleryGrid = document.getElementById('gallery-grid');
@@ -641,6 +645,11 @@ function ensureQueueRestoreHintTicker() {
 	}, 1000);
 }
 
+function setQueueLastAction(message) {
+	if (!queueLastAction) return;
+	queueLastAction.textContent = `Last action: ${message}`;
+}
+
 function renderQueueRestoreHint() {
 	if (!queueRestoreHint || !queueRestoreWrap || !queueRestoreShowBtn) return;
 	if (!restoredQueueStateInfo || !trackedPromptIds.size) {
@@ -671,6 +680,7 @@ if (queueRestoreHideBtn) {
 	queueRestoreHideBtn.addEventListener('click', () => {
 		queueRestoreHintHidden = true;
 		localStorage.setItem(QUEUE_RESTORE_HINT_HIDDEN_KEY, '1');
+		setQueueLastAction('Restore hint hidden.');
 		renderQueueRestoreHint();
 	});
 }
@@ -679,6 +689,7 @@ if (queueRestoreShowBtn) {
 	queueRestoreShowBtn.addEventListener('click', () => {
 		queueRestoreHintHidden = false;
 		localStorage.removeItem(QUEUE_RESTORE_HINT_HIDDEN_KEY);
+		setQueueLastAction('Restore hint shown.');
 		renderQueueRestoreHint();
 	});
 }
@@ -759,6 +770,7 @@ function restoreTrackedQueueState() {
 		count: restoredCount,
 		savedAt: Number(parsed?.saved_at) || Date.now(),
 	};
+	setQueueLastAction(`Restored ${restoredCount} tracked queue item${restoredCount === 1 ? '' : 's'}.`);
 
 	renderQueueStatus([], [], new Set());
 	ensureQueuePolling();
@@ -770,6 +782,7 @@ if (failedOnlyToggle) {
 	failedOnlyToggle.addEventListener('change', () => {
 		queueFilterFailedOnly = failedOnlyToggle.checked;
 		localStorage.setItem('queueFilterFailedOnly', queueFilterFailedOnly ? '1' : '0');
+		setQueueLastAction(queueFilterFailedOnly ? 'Showing only failed queue items.' : 'Showing all queue items.');
 		renderQueueStatus([], [], new Set());
 	});
 }
@@ -778,6 +791,7 @@ if (queueHelpDetails) {
 	queueHelpDetails.open = localStorage.getItem(QUEUE_HELP_EXPANDED_KEY) === '1';
 	queueHelpDetails.addEventListener('toggle', () => {
 		localStorage.setItem(QUEUE_HELP_EXPANDED_KEY, queueHelpDetails.open ? '1' : '0');
+		setQueueLastAction(queueHelpDetails.open ? 'Queue help opened.' : 'Queue help closed.');
 	});
 }
 
@@ -786,6 +800,7 @@ renderQueueTelemetry();
 if (queueTelemetryResetBtn) {
 	queueTelemetryResetBtn.addEventListener('click', () => {
 		resetQueueTelemetry();
+		setQueueLastAction('Queue counters reset.');
 		showToast('Queue counters reset.', 'pos');
 	});
 }
@@ -3442,10 +3457,12 @@ function _clearQueueByStatus(status) {
 async function clearFailedQueueItems() {
 	const cleared = _clearQueueByStatus('failed');
 	if (!cleared) {
+		setQueueLastAction('Clear failed skipped: no failed items.');
 		showToast('No failed items to clear.');
 		renderQueueStatus([], [], new Set());
 		return;
 	}
+	setQueueLastAction(`Cleared ${cleared} failed item${cleared === 1 ? '' : 's'}.`);
 	showToast(`Cleared ${cleared} failed item${cleared === 1 ? '' : 's'}.`, 'pos');
 	if (trackedPromptIds.size) {
 		await pollQueue();
@@ -3457,10 +3474,12 @@ async function clearFailedQueueItems() {
 async function clearCompletedQueueItems() {
 	const cleared = _clearQueueByStatus('completed');
 	if (!cleared) {
+		setQueueLastAction('Clear done skipped: no completed items.');
 		showToast('No completed items to clear.');
 		renderQueueStatus([], [], new Set());
 		return;
 	}
+	setQueueLastAction(`Cleared ${cleared} completed item${cleared === 1 ? '' : 's'}.`);
 	showToast(`Cleared ${cleared} completed item${cleared === 1 ? '' : 's'}.`, 'pos');
 	if (trackedPromptIds.size) {
 		await pollQueue();
@@ -3696,6 +3715,7 @@ async function prioritizeImageJob(promptId) {
 		incrementQueueTelemetry('submitted');
 		persistTrackedQueueState();
 		ensureQueuePolling();
+		setQueueLastAction('Moved a job to the front of the queue.');
 		showToast('Job moved to the front of the queue.', 'pos');
 		await pollQueue();
 	} catch (err) {
@@ -3814,6 +3834,7 @@ if (queueUiResetBtn) {
 		if (failedOnlyToggle) failedOnlyToggle.checked = false;
 		localStorage.removeItem('queueFilterFailedOnly');
 		localStorage.removeItem(QUEUE_RESTORE_HINT_HIDDEN_KEY);
+		setQueueLastAction('Queue UI preferences reset.');
 		renderQueueStatus([], [], new Set());
 		showToast('Queue UI preferences reset.', 'pos');
 	});

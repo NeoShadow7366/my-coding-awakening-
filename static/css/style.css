@@ -1347,6 +1347,12 @@ textarea {
   margin-top: 0.1rem;
 }
 
+.queue-last-action {
+  margin: 0.18rem 0 0;
+  font-size: 0.74rem;
+  color: color-mix(in srgb, var(--clr-primary) 58%, var(--clr-text-muted));
+}
+
 .queue-reason {
   display: block;
   font-size: 0.72rem;

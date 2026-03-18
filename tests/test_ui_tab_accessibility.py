@@ -108,24 +108,32 @@ def test_queue_action_keyboard_handler_wiring_present_in_js_bundle():
     assert "const queueRestoreHint = document.getElementById('queue-restore-hint');" in content
     assert "const queueRestoreHideBtn = document.getElementById('queue-restore-hide');" in content
     assert "const queueRestoreShowBtn = document.getElementById('queue-restore-show');" in content
+    assert "const queueLastAction = document.getElementById('queue-last-action');" in content
     assert "const queueUiResetBtn = document.getElementById('queue-ui-reset');" in content
+    assert "function setQueueLastAction(message)" in content
     assert "if (queueRestoreHideBtn) {" in content
     assert "queueRestoreHintHidden = true;" in content
     assert "localStorage.setItem(QUEUE_RESTORE_HINT_HIDDEN_KEY, '1');" in content
+    assert "setQueueLastAction('Restore hint hidden.');" in content
     assert "if (queueRestoreShowBtn) {" in content
     assert "queueRestoreHintHidden = false;" in content
     assert "localStorage.removeItem(QUEUE_RESTORE_HINT_HIDDEN_KEY);" in content
+    assert "setQueueLastAction('Restore hint shown.');" in content
     assert "if (queueUiResetBtn) {" in content
     assert "queueFilterFailedOnly = false;" in content
     assert "localStorage.removeItem('queueFilterFailedOnly');" in content
+    assert "setQueueLastAction('Queue UI preferences reset.');" in content
     assert "showToast('Queue UI preferences reset.', 'pos');" in content
     assert "if (queueHelpDetails) {" in content
     assert "queueHelpDetails.addEventListener('toggle', () => {" in content
     assert "localStorage.setItem(QUEUE_HELP_EXPANDED_KEY, queueHelpDetails.open ? '1' : '0');" in content
+    assert "setQueueLastAction(queueHelpDetails.open ? 'Queue help opened.' : 'Queue help closed.');" in content
     assert "renderQueueRestoreHint();" in content
     assert "Restored ${count} active queue item" in content
     assert "restoreTrackedQueueState();" in content
     assert "localStorage.setItem(QUEUE_STATE_STORAGE_KEY" in content
+    assert "setQueueLastAction(`Restored ${restoredCount} tracked queue item${restoredCount === 1 ? '' : 's'}.`);" in content
+    assert "setQueueLastAction('Moved a job to the front of the queue.');" in content
     assert "if (action === 'prioritize') {" in content
     assert "queueList.addEventListener('keydown', onQueueActionKeydown);" in content
 
@@ -142,6 +150,7 @@ def test_queue_action_keyboard_handler_wiring_present_in_js_bundle():
     assert 'id="queue-restore-hint"' in html
     assert 'id="queue-restore-hide"' in html
     assert 'id="queue-restore-show"' in html
+    assert 'id="queue-last-action"' in html
     assert 'id="queue-ui-reset"' in html
 
     css_path = Path(__file__).resolve().parents[1] / "static" / "css" / "style.css"
@@ -153,6 +162,7 @@ def test_queue_action_keyboard_handler_wiring_present_in_js_bundle():
     assert ".queue-restore-wrap" in css
     assert ".queue-restore-hint" in css
     assert ".queue-restore-show" in css
+    assert ".queue-last-action" in css
 
 
 def test_index_gallery_controls_group_semantics():
