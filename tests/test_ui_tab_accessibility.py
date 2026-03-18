@@ -98,6 +98,9 @@ def test_queue_action_keyboard_handler_wiring_present_in_js_bundle():
     assert "function persistTrackedQueueState()" in content
     assert "function restoreTrackedQueueState()" in content
     assert "function renderQueueRestoreHint()" in content
+    assert "function stopQueueRestoreHintTicker()" in content
+    assert "function ensureQueueRestoreHintTicker()" in content
+    assert "queueRestoreHintTimer = window.setInterval(() => {" in content
     assert "const queueRestoreHint = document.getElementById('queue-restore-hint');" in content
     assert "renderQueueRestoreHint();" in content
     assert "Restored ${count} active queue item" in content

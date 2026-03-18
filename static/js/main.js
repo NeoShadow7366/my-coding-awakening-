@@ -318,6 +318,7 @@ const JOB_MISS_THRESHOLD = 4;
 const queueActionInFlight = new Set();
 let queueFilterFailedOnly = localStorage.getItem('queueFilterFailedOnly') === '1';
 let restoredQueueStateInfo = null;
+let queueRestoreHintTimer = null;
 const IMAGE_PROFILE_STORAGE_KEY = 'imagePresetProfilesV1';
 const IMAGE_PROFILE_SELECTED_KEY = 'imagePresetProfilesSelectedV1';
 const MB_MODEL_NOTES_KEY = 'mbModelNotesV1';
@@ -619,11 +620,25 @@ function resetQueueTelemetry() {
 	renderQueueTelemetry();
 }
 
+function stopQueueRestoreHintTicker() {
+	if (!queueRestoreHintTimer) return;
+	window.clearInterval(queueRestoreHintTimer);
+	queueRestoreHintTimer = null;
+}
+
+function ensureQueueRestoreHintTicker() {
+	if (queueRestoreHintTimer) return;
+	queueRestoreHintTimer = window.setInterval(() => {
+		renderQueueRestoreHint();
+	}, 1000);
+}
+
 function renderQueueRestoreHint() {
 	if (!queueRestoreHint) return;
 	if (!restoredQueueStateInfo || !trackedPromptIds.size) {
 		queueRestoreHint.hidden = true;
 		queueRestoreHint.textContent = '';
+		stopQueueRestoreHintTicker();
 		return;
 	}
 
@@ -632,6 +647,7 @@ function renderQueueRestoreHint() {
 	const ageSeconds = Math.max(1, Math.round(ageMs / 1000));
 	queueRestoreHint.textContent = `Restored ${count} active queue item${count === 1 ? '' : 's'} from a previous tab (${ageSeconds}s ago).`;
 	queueRestoreHint.hidden = false;
+	ensureQueueRestoreHintTicker();
 }
 
 function persistTrackedQueueState() {
@@ -9404,6 +9420,7 @@ window.addEventListener('storage', (event) => {
 });
 
 window.addEventListener('beforeunload', () => {
+	stopQueueRestoreHintTicker();
 	stopWsTransportStatusTicker();
 	releaseBackgroundPollingOwnership();
 });
