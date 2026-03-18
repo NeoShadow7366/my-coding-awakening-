@@ -648,7 +648,7 @@ def test_image_generate_clamps_out_of_range_workflow_params(client, monkeypatch)
     # Expose the real builder under an alias for the spy
     app_module._original_build_txt2img_workflow = app_module._build_txt2img_workflow
 
-    def fake_submit(workflow):
+    def fake_submit(workflow, front=False):
         return {"prompt_id": "pid-clamp", "number": 1}
 
     monkeypatch.setattr(app_module, "_build_txt2img_workflow", fake_build)

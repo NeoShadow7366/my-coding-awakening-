@@ -72,8 +72,9 @@ def test_image_generate_success_returns_prompt_metadata(client, monkeypatch):
         assert body["prompt"] == "castle"
         return {"1": {"class_type": "MockNode", "inputs": {}}}, expected_meta
 
-    def fake_submit(workflow):
+    def fake_submit(workflow, front=False):
         assert workflow["1"]["class_type"] == "MockNode"
+        assert front is False
         return {"prompt_id": "pid-xyz", "number": 7}
 
     monkeypatch.setattr(app_module, "_build_txt2img_workflow", fake_build_txt2img_workflow)
@@ -117,8 +118,9 @@ def test_img2img_success_returns_prompt_metadata(client, monkeypatch):
         assert uploaded_name == "uploaded-in.png"
         return ({"node": {}}, {"prompt": "forest", "image": uploaded_name, "mode": "img2img"})
 
-    def fake_submit(workflow):
+    def fake_submit(workflow, front=False):
         assert workflow == {"node": {}}
+        assert front is False
         return {"prompt_id": "pid-img2img", "number": 13}
 
     monkeypatch.setattr(app_module, "_upload_image_to_comfy", fake_upload)
@@ -192,6 +194,65 @@ def test_image_upload_image_success(client, monkeypatch):
     data = resp.get_json()
     assert data["ok"] is True
     assert data["name"] == "uploaded-control.png"
+
+
+def test_image_generate_queue_front_passed_to_submit(client, monkeypatch):
+    monkeypatch.setattr(app_module, "_comfy_available", lambda: True)
+
+    def fake_build_txt2img_workflow(body):
+        assert body["prompt"] == "prioritize me"
+        assert body["queue_front"] is True
+        return {"1": {"class_type": "MockNode", "inputs": {}}}, {"prompt": body["prompt"]}
+
+    seen = {}
+
+    def fake_submit(workflow, front=False):
+        seen["front"] = front
+        return {"prompt_id": "pid-front", "number": 5}
+
+    monkeypatch.setattr(app_module, "_build_txt2img_workflow", fake_build_txt2img_workflow)
+    monkeypatch.setattr(app_module, "_comfy_submit_prompt", fake_submit)
+
+    resp = client.post("/api/image/generate", json={"prompt": "prioritize me", "queue_front": True})
+
+    assert resp.status_code == 200
+    assert seen["front"] is True
+
+
+def test_img2img_queue_front_passed_to_submit(client, monkeypatch):
+    monkeypatch.setattr(app_module, "_comfy_available", lambda: True)
+
+    def fake_upload(file_storage):
+        assert file_storage.filename == "in.png"
+        return "uploaded-front.png"
+
+    def fake_build_img2img_workflow(body, uploaded_name):
+        assert body["prompt"] == "forest"
+        assert uploaded_name == "uploaded-front.png"
+        return ({"node": {}}, {"prompt": "forest", "image": uploaded_name, "mode": "img2img"})
+
+    seen = {}
+
+    def fake_submit(workflow, front=False):
+        seen["front"] = front
+        return {"prompt_id": "pid-img2img-front", "number": 23}
+
+    monkeypatch.setattr(app_module, "_upload_image_to_comfy", fake_upload)
+    monkeypatch.setattr(app_module, "_build_img2img_workflow", fake_build_img2img_workflow)
+    monkeypatch.setattr(app_module, "_comfy_submit_prompt", fake_submit)
+
+    resp = client.post(
+        "/api/image/img2img",
+        data={
+            "prompt": "forest",
+            "queue_front": "true",
+            "image": (BytesIO(b"fake-image-bytes"), "in.png"),
+        },
+        content_type="multipart/form-data",
+    )
+
+    assert resp.status_code == 200
+    assert seen["front"] is True
 
 
 def test_build_txt2img_workflow_includes_lora_node(monkeypatch):

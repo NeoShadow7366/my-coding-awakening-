@@ -133,7 +133,7 @@ def test_image_generate_submit_exception_returns_502(client, monkeypatch):
     def fake_build(body):
         return {"1": {}}, {"prompt": body["prompt"]}
 
-    def exploding_submit(workflow):
+    def exploding_submit(workflow, front=False):
         raise req_lib.ConnectionError("comfy down")
 
     monkeypatch.setattr(app_module, "_build_txt2img_workflow", fake_build)

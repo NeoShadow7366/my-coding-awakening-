@@ -1510,11 +1510,14 @@ def _append_history(item: dict) -> dict:
     return entry
 
 
-def _comfy_submit_prompt(workflow: dict) -> dict:
+def _comfy_submit_prompt(workflow: dict, *, front: bool = False) -> dict:
     """Submit a workflow prompt to ComfyUI and return the raw JSON response."""
+    payload = {"prompt": workflow}
+    if front:
+        payload["front"] = True
     resp = requests.post(
         f"{COMFYUI_BASE_URL}/prompt",
-        json={"prompt": workflow},
+        json=payload,
         timeout=20,
     )
     resp.raise_for_status()
@@ -3955,6 +3958,8 @@ def api_image_generate():
     prompt = (body.get("prompt") or "").strip()
     if not prompt:
         return jsonify({"error": "prompt is required"}), 400
+    queue_front_raw = body.get("queue_front", False)
+    queue_front = str(queue_front_raw).strip().lower() in {"1", "true", "yes", "on"}
 
     try:
         workflow, meta = _build_txt2img_workflow(body)
@@ -3962,7 +3967,7 @@ def api_image_generate():
         return jsonify({"error": f"Invalid parameters: {exc}"}), 400
 
     try:
-        result = _comfy_submit_prompt(workflow)
+        result = _comfy_submit_prompt(workflow, front=queue_front)
         return jsonify(
             {
                 "ok": True,
@@ -4007,13 +4012,15 @@ def api_image_img2img():
         "cfg": request.form.get("cfg", DEFAULT_IMAGE_CFG),
         "denoise": request.form.get("denoise", DEFAULT_IMAGE_DENOISE),
     }
+    queue_front_raw = request.form.get("queue_front", "")
+    queue_front = str(queue_front_raw).strip().lower() in {"1", "true", "yes", "on"}
 
     try:
         uploaded_name = _upload_image_to_comfy(image)
         if not uploaded_name:
             return jsonify({"error": "Failed to upload image to ComfyUI"}), 502
         workflow, meta = _build_img2img_workflow(body, uploaded_name)
-        result = _comfy_submit_prompt(workflow)
+        result = _comfy_submit_prompt(workflow, front=queue_front)
         return jsonify(
             {
                 "ok": True,

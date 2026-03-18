@@ -3209,12 +3209,15 @@ function renderQueueStatus(running, pending, donePromptIds = new Set()) {
 			const canCancel = status === 'queued' || status === 'running' || status === 'processing';
 			const canRetry = status === 'failed' || status === 'canceled';
 			const canRerun = status === 'completed' && snap.mode !== 'img2img' && !!String(snap.prompt || '').trim();
+			const canPrioritize = status === 'queued' && snap.mode !== 'img2img' && !!String(snap.prompt || '').trim();
 			const cancelBusy = queueActionInFlight.has(`cancel:${promptId}`);
 			const retryBusy = queueActionInFlight.has(`retry:${promptId}`);
 			const rerunBusy = queueActionInFlight.has(`rerun:${promptId}`);
+			const prioritizeBusy = queueActionInFlight.has(`prioritize:${promptId}`);
 			const reason = meta.failReason ? `<span class="queue-reason">${escHtml(meta.failReason)}</span>` : '';
 			const promptDisplay = escHtml((snap.prompt || promptId).slice(0, 72));
 			const actions = [
+				canPrioritize ? `<button class="btn btn-ghost btn-xs queue-action" data-action="prioritize" data-prompt-id="${promptLabel}" aria-label="Move job ${promptLabel} to front" title="Move ${promptLabel} to front" ${prioritizeBusy ? 'disabled' : ''}>${prioritizeBusy ? 'Moving...' : 'Prioritize'}</button>` : '',
 				canCancel ? `<button class="btn btn-ghost btn-xs queue-action" data-action="cancel" data-prompt-id="${promptLabel}" aria-label="Cancel job ${promptLabel}" title="Cancel ${promptLabel}" ${cancelBusy ? 'disabled' : ''}>${cancelBusy ? 'Canceling...' : 'Cancel'}</button>` : '',
 				canRetry ? `<button class="btn btn-ghost btn-xs queue-action" data-action="retry" data-prompt-id="${promptLabel}" aria-label="Retry job ${promptLabel}" title="Retry ${promptLabel}" ${retryBusy ? 'disabled' : ''}>${retryBusy ? 'Retrying...' : 'Retry'}</button>` : '',
 				canRerun ? `<button class="btn btn-ghost btn-xs queue-action" data-action="rerun" data-prompt-id="${promptLabel}" aria-label="Re-run job ${promptLabel}" title="Re-run ${promptLabel}" ${rerunBusy ? 'disabled' : ''}>${rerunBusy ? 'Queuing...' : 'Re-run'}</button>` : '',
@@ -3255,6 +3258,7 @@ function _clearQueueByStatus(status) {
 		queueActionInFlight.delete(`cancel:${promptId}`);
 		queueActionInFlight.delete(`retry:${promptId}`);
 		queueActionInFlight.delete(`rerun:${promptId}`);
+		queueActionInFlight.delete(`prioritize:${promptId}`);
 		cleared += 1;
 	}
 	return cleared;
@@ -3452,6 +3456,70 @@ async function rerunImageJob(promptId) {
 	}
 }
 
+async function prioritizeImageJob(promptId) {
+	const snapshot = pendingImageJobs.get(promptId) || (queueJobMeta.get(promptId) || {}).snapshot;
+	if (!snapshot || !String(snapshot.prompt || '').trim()) {
+		showToast('Prioritize unavailable: no job snapshot found.', 'neg');
+		return;
+	}
+	if (snapshot.mode === 'img2img') {
+		showToast('Prioritize is currently available for txt2img jobs only.', 'neg');
+		return;
+	}
+
+	queueActionInFlight.add(`prioritize:${promptId}`);
+	try {
+		const cancelRes = await fetch('/api/image/cancel', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ prompt_id: promptId }),
+		});
+		const cancelData = await cancelRes.json().catch(() => ({}));
+		if (!cancelRes.ok) {
+			showToast(`Prioritize failed: ${cancelData.error || 'Could not cancel original job.'}`, 'neg');
+			return;
+		}
+
+		const res = await fetch('/api/image/generate', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ ...snapshot, queue_front: true }),
+		});
+		const data = await res.json().catch(() => ({}));
+		if (!res.ok || !data.prompt_id) {
+			showToast(`Prioritize failed: ${data.error || 'Could not submit prioritized job.'}`, 'neg');
+			return;
+		}
+
+		trackedPromptIds.delete(promptId);
+		pendingImageJobs.delete(promptId);
+		const oldMeta = queueJobMeta.get(promptId) || {};
+		oldMeta.status = 'canceled';
+		oldMeta.failReason = `Re-queued at front as ${data.prompt_id}.`;
+		oldMeta.updatedAt = Date.now();
+		queueJobMeta.set(promptId, oldMeta);
+
+		const nextPromptId = data.prompt_id;
+		trackedPromptIds.add(nextPromptId);
+		const nextSnapshot = { ...snapshot, ...(data.meta || {}) };
+		pendingImageJobs.set(nextPromptId, nextSnapshot);
+		queueJobMeta.set(nextPromptId, {
+			status: 'queued',
+			missCount: 0,
+			updatedAt: Date.now(),
+			snapshot: nextSnapshot,
+		});
+		incrementQueueTelemetry('submitted');
+		ensureQueuePolling();
+		showToast('Job moved to the front of the queue.', 'pos');
+		await pollQueue();
+	} catch (err) {
+		showToast(`Prioritize failed: ${err.message}`, 'neg');
+	} finally {
+		queueActionInFlight.delete(`prioritize:${promptId}`);
+	}
+}
+
 async function processAutoRetries() {
 	const limit = getAutoRetryLimit();
 	if (limit <= 0) return;
@@ -3505,6 +3573,12 @@ queueList.addEventListener('click', async (e) => {
 		if (queueActionInFlight.has(`cancel:${promptId}`)) return;
 		target.setAttribute('disabled', 'disabled');
 		await cancelImageJob(promptId);
+		return;
+	}
+	if (action === 'prioritize') {
+		if (queueActionInFlight.has(`prioritize:${promptId}`)) return;
+		target.setAttribute('disabled', 'disabled');
+		await prioritizeImageJob(promptId);
 		return;
 	}
 	if (action === 'retry') {

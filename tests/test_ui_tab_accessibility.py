@@ -81,6 +81,10 @@ def test_queue_action_keyboard_handler_wiring_present_in_js_bundle():
     content = js_path.read_text(encoding="utf-8")
 
     assert "function onQueueActionKeydown(event)" in content
+    assert "async function prioritizeImageJob(promptId)" in content
+    assert "data-action=\"prioritize\"" in content
+    assert "body: JSON.stringify({ ...snapshot, queue_front: true })," in content
+    assert "if (action === 'prioritize') {" in content
     assert "queueList.addEventListener('keydown', onQueueActionKeydown);" in content
 
 
