@@ -83,8 +83,8 @@ def test_queue_action_keyboard_handler_wiring_present_in_js_bundle():
     assert "function onQueueActionKeydown(event)" in content
     assert "const runningPositions = new Map();" in content
     assert "const pendingPositions = new Map();" in content
-    assert "<span class=\"chip\">run #${runningPosition}</span>" in content
-    assert "<span class=\"chip\">queue #${pendingPosition}</span>" in content
+    assert "<span class=\"chip\" title=\"Running position in ComfyUI\" aria-label=\"Running position ${runningPosition}\">run #${runningPosition}</span>" in content
+    assert "<span class=\"chip\" title=\"Pending queue position in ComfyUI\" aria-label=\"Pending queue position ${pendingPosition}\">queue #${pendingPosition}</span>" in content
     assert "<span class=\"chip queue-chip-front\">front</span>" in content
     assert "async function prioritizeImageJob(promptId)" in content
     assert "data-action=\"prioritize\"" in content
