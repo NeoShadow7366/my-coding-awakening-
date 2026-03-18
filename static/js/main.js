@@ -8085,12 +8085,42 @@ if (mbShowNsfwToggle) {
 	});
 	mbShowNsfwToggle.addEventListener('keydown', onModelBrowserFilterTogglesKeydown);
 }
+let mbTypeInfoLastFocus = null;
+function setMbTypeInfoPanelOpen(isOpen) {
+	if (!mbTypeInfoBtn || !mbTypeInfoPanel) return;
+	if (isOpen) {
+		mbTypeInfoLastFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+	}
+	mbTypeInfoPanel.hidden = !isOpen;
+	mbTypeInfoPanel.setAttribute('aria-hidden', isOpen ? 'false' : 'true');
+	mbTypeInfoBtn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+	if (isOpen) {
+		mbTypeInfoPanel.focus();
+		return;
+	}
+	if (mbTypeInfoLastFocus && document.contains(mbTypeInfoLastFocus)) {
+		mbTypeInfoLastFocus.focus();
+	}
+	mbTypeInfoLastFocus = null;
+}
 if (mbTypeInfoBtn && mbTypeInfoPanel) {
 	mbTypeInfoBtn.addEventListener('click', () => {
-		const expanded = mbTypeInfoBtn.getAttribute('aria-expanded') === 'true';
-		mbTypeInfoBtn.setAttribute('aria-expanded', expanded ? 'false' : 'true');
-		mbTypeInfoPanel.hidden = expanded;
-		mbTypeInfoPanel.setAttribute('aria-hidden', expanded ? 'true' : 'false');
+		setMbTypeInfoPanelOpen(mbTypeInfoPanel.hidden);
+	});
+	mbTypeInfoBtn.addEventListener('keydown', (event) => {
+		if (event.key === 'ArrowDown') {
+			event.preventDefault();
+			setMbTypeInfoPanelOpen(true);
+		} else if (event.key === 'Escape' && mbTypeInfoBtn.getAttribute('aria-expanded') === 'true') {
+			event.preventDefault();
+			setMbTypeInfoPanelOpen(false);
+		}
+	});
+	mbTypeInfoPanel.addEventListener('keydown', (event) => {
+		if (event.key === 'Escape' && !mbTypeInfoPanel.hidden) {
+			event.preventDefault();
+			setMbTypeInfoPanelOpen(false);
+		}
 	});
 	mbTypeInfoPanel.setAttribute('aria-hidden', mbTypeInfoPanel.hidden ? 'true' : 'false');
 }

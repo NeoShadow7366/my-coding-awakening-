@@ -232,7 +232,7 @@ def test_index_model_download_actions_and_modal_semantics():
     assert '<div class="mb-downloads-actions" role="group" aria-label="Download queue actions">' in html
     assert 'id="mb-clear-finished-downloads"' in html
     assert 'id="mb-downloads-toggle" type="button" aria-controls="mb-downloads-body" aria-expanded="true"' in html
-    assert 'id="mb-type-info-panel" class="mb-type-info-panel" hidden aria-hidden="true"' in html
+    assert 'id="mb-type-info-panel" class="mb-type-info-panel" hidden aria-hidden="true" tabindex="-1"' in html
     assert 'id="mb-model-modal" class="mb-model-modal" hidden aria-hidden="true" role="dialog" aria-modal="true" aria-label="Model details"' in html
     assert 'id="mb-model-modal-download-status" class="hint mb-model-modal-download-status" aria-live="polite" hidden' in html
 
@@ -273,8 +273,16 @@ def test_model_download_actions_keyboard_handler_wiring_present_in_js_bundle():
     assert "mbClearFinishedDownloadsBtn.addEventListener('keydown', onModelDownloadsActionsKeydown);" in content
     assert "mbDownloadsToggleBtn.addEventListener('keydown', onModelDownloadsActionsKeydown);" in content
     assert "mbDownloadsBody.setAttribute('aria-hidden', mbDownloadsMinimized ? 'true' : 'false');" in content
-    assert "mbTypeInfoPanel.setAttribute('aria-hidden', expanded ? 'true' : 'false');" in content
+    assert "mbTypeInfoPanel.setAttribute('aria-hidden', isOpen ? 'false' : 'true');" in content
     assert "mbTypeInfoPanel.setAttribute('aria-hidden', mbTypeInfoPanel.hidden ? 'true' : 'false');" in content
+    assert "let mbTypeInfoLastFocus = null;" in content
+    assert "function setMbTypeInfoPanelOpen(isOpen)" in content
+    assert "mbTypeInfoPanel.focus();" in content
+    assert "mbTypeInfoBtn.addEventListener('keydown', (event) => {" in content
+    assert "if (event.key === 'ArrowDown') {" in content
+    assert "setMbTypeInfoPanelOpen(true);" in content
+    assert "mbTypeInfoPanel.addEventListener('keydown', (event) => {" in content
+    assert "setMbTypeInfoPanelOpen(false);" in content
     assert "let mbModelModalLastFocus = null;" in content
     assert "function getModelModalTabStops()" in content
     assert "mbModelModal.addEventListener('keydown', (event) => {" in content
