@@ -3805,8 +3805,14 @@ function updateGalleryFilterHint(matching, total) {
 
 function updateLightboxNav() {
 	const total = currentGalleryImages.length;
-	if (galleryLightboxPrev) galleryLightboxPrev.hidden = total <= 1;
-	if (galleryLightboxNext) galleryLightboxNext.hidden = total <= 1;
+	if (galleryLightboxPrev) {
+		galleryLightboxPrev.hidden = total <= 1;
+		galleryLightboxPrev.setAttribute('aria-hidden', total <= 1 ? 'true' : 'false');
+	}
+	if (galleryLightboxNext) {
+		galleryLightboxNext.hidden = total <= 1;
+		galleryLightboxNext.setAttribute('aria-hidden', total <= 1 ? 'true' : 'false');
+	}
 	if (galleryLightboxCounter) {
 		galleryLightboxCounter.textContent = total > 1 ? `${lightboxCurrentIndex + 1} / ${total}` : '';
 	}
@@ -3822,6 +3828,7 @@ function updateLightboxMeta(entry) {
 	const hasParams = entry && (entry.model || entry.params);
 	if (galleryLightboxMetaToggle) {
 		galleryLightboxMetaToggle.hidden = !hasParams;
+		galleryLightboxMetaToggle.setAttribute('aria-hidden', hasParams ? 'false' : 'true');
 	}
 	if (!galleryLightboxMetaChips || !hasParams) return;
 	const p = entry.params || {};
@@ -3927,18 +3934,21 @@ function updateLightboxMedia(entry, fallbackSrc = '', fallbackAlt = 'Generated i
 	if (galleryLightboxCompareToggle) {
 		if (sourceUrl) {
 			galleryLightboxCompareToggle.hidden = false;
+			galleryLightboxCompareToggle.setAttribute('aria-hidden', 'false');
 			galleryLightboxCompareToggle.disabled = false;
 			galleryLightboxCompareToggle.dataset.mode = 'compare';
 			galleryLightboxCompareToggle.textContent = 'Compare';
 			galleryLightboxCompareToggle.title = '';
 		} else if (isImg2Img) {
 			galleryLightboxCompareToggle.hidden = false;
+			galleryLightboxCompareToggle.setAttribute('aria-hidden', 'false');
 			galleryLightboxCompareToggle.disabled = false;
 			galleryLightboxCompareToggle.dataset.mode = 'attach';
 			galleryLightboxCompareToggle.textContent = 'Attach source';
 			galleryLightboxCompareToggle.title = 'Upload the missing source image to enable Compare for this entry.';
 		} else {
 			galleryLightboxCompareToggle.hidden = true;
+			galleryLightboxCompareToggle.setAttribute('aria-hidden', 'true');
 			galleryLightboxCompareToggle.disabled = false;
 			galleryLightboxCompareToggle.dataset.mode = '';
 			galleryLightboxCompareToggle.textContent = 'Compare';
@@ -4184,6 +4194,7 @@ function closeGalleryLightbox() {
 	if (galleryLightboxMetaToggle) {
 		galleryLightboxMetaToggle.setAttribute('aria-pressed', 'false');
 		galleryLightboxMetaToggle.hidden = true;
+		galleryLightboxMetaToggle.setAttribute('aria-hidden', 'true');
 	}
 	if (galleryLightboxMetaChips) galleryLightboxMetaChips.innerHTML = '';
 	if (galleryLightboxCaption) {
@@ -4228,6 +4239,7 @@ function updateLightboxStarBtn(entry) {
 	if (!galleryLightboxStarBtn) return;
 	const entryId = entry?.id || '';
 	galleryLightboxStarBtn.hidden = !entryId;
+	galleryLightboxStarBtn.setAttribute('aria-hidden', entryId ? 'false' : 'true');
 	const isFav = isGalleryFavorite(entryId);
 	galleryLightboxStarBtn.setAttribute('aria-pressed', String(isFav));
 	galleryLightboxStarBtn.setAttribute('aria-label', isFav ? 'Remove from favorites' : 'Add to favorites');

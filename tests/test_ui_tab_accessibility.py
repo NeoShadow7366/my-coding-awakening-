@@ -989,8 +989,13 @@ def test_gallery_lightbox_compare_markup_and_wiring_present():
     assert "galleryLightboxCompareToggle.addEventListener('keydown', onGalleryLightboxControlsKeydown);" in js
     assert "galleryLightboxSourceUploadInput.addEventListener('change', async () => {" in js
     assert "galleryLightboxCompareSlider.addEventListener('input'" in js
-    assert "galleryLightbox.addEventListener('keydown', (event) => {" in js
-    assert "if (event.key !== 'Tab' || galleryLightbox.hidden) return;" in js
+    assert "galleryLightboxCompareToggle.hidden = false;" in js
+    assert "galleryLightboxCompareToggle.setAttribute('aria-hidden', 'false');" in js
+    assert "galleryLightboxCompareToggle.hidden = true;" in js
+    assert "galleryLightboxCompareToggle.setAttribute('aria-hidden', 'true');" in js
+    assert "galleryLightboxStarBtn.setAttribute('aria-hidden', entryId ? 'false' : 'true');" in js
+    assert "galleryLightboxPrev.setAttribute('aria-hidden', total <= 1 ? 'true' : 'false');" in js
+    assert "galleryLightboxNext.setAttribute('aria-hidden', total <= 1 ? 'true' : 'false');" in js
 
     css_path = Path(__file__).resolve().parents[1] / "static" / "css" / "style.css"
     css = css_path.read_text(encoding="utf-8")
@@ -1027,7 +1032,10 @@ def test_gallery_lightbox_meta_panel_markup_and_wiring_present():
     assert "showPanel('image');" in js
     assert "galleryLightboxLastFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;" in js
     assert "if (galleryLightboxLastFocus && document.contains(galleryLightboxLastFocus)) {" in js
-    assert "galleryLightboxLastFocus = null;" in js
+    assert "galleryLightboxMetaToggle.hidden = !hasParams;" in js
+    assert "galleryLightboxMetaToggle.setAttribute('aria-hidden', hasParams ? 'false' : 'true');" in js
+    assert "galleryLightboxMetaToggle.hidden = true;" in js
+    assert "galleryLightboxMetaToggle.setAttribute('aria-hidden', 'true');" in js
 
     css_path = Path(__file__).resolve().parents[1] / "static" / "css" / "style.css"
     css = css_path.read_text(encoding="utf-8")
