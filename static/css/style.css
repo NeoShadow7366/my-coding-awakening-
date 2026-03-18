@@ -1313,8 +1313,15 @@ textarea {
   margin-top: 0.2rem;
 }
 
+.queue-restore-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
 .queue-restore-hint {
-  margin-top: 0.1rem;
+  margin-top: 0;
+  margin-bottom: 0;
   color: color-mix(in srgb, var(--clr-primary) 72%, var(--clr-text-muted));
 }
 

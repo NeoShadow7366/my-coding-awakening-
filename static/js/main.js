@@ -205,7 +205,9 @@ const imageUpload = document.getElementById('image-upload');
 const imageGenerateBtn = document.getElementById('image-generate-btn');
 const queueTelemetry = document.getElementById('queue-telemetry');
 const queueTelemetryResetBtn = document.getElementById('queue-telemetry-reset');
+const queueRestoreWrap = document.getElementById('queue-restore-wrap');
 const queueRestoreHint = document.getElementById('queue-restore-hint');
+const queueRestoreHideBtn = document.getElementById('queue-restore-hide');
 const queueSummary = document.getElementById('queue-summary');
 const queueList = document.getElementById('queue-list');
 const configOllamaPath = document.getElementById('config-ollama-path');
@@ -319,6 +321,7 @@ const queueActionInFlight = new Set();
 let queueFilterFailedOnly = localStorage.getItem('queueFilterFailedOnly') === '1';
 let restoredQueueStateInfo = null;
 let queueRestoreHintTimer = null;
+let queueRestoreHintHidden = localStorage.getItem(QUEUE_RESTORE_HINT_HIDDEN_KEY) === '1';
 const IMAGE_PROFILE_STORAGE_KEY = 'imagePresetProfilesV1';
 const IMAGE_PROFILE_SELECTED_KEY = 'imagePresetProfilesSelectedV1';
 const MB_MODEL_NOTES_KEY = 'mbModelNotesV1';
@@ -329,6 +332,7 @@ const IMAGE_FAVORITE_MODELS_KEY = 'imageFavoriteModelsV1';
 const IMAGE_MODEL_FILTER_MODE_KEY = 'imageModelFilterModeV1';
 const QUEUE_TELEMETRY_KEY = 'queueTelemetryV1';
 const QUEUE_STATE_STORAGE_KEY = 'queueStateV1';
+const QUEUE_RESTORE_HINT_HIDDEN_KEY = 'queueRestoreHintHiddenV1';
 const QUEUE_STATE_MAX_ITEMS = 40;
 const BACKGROUND_POLL_OWNER_KEY = 'backgroundPollOwnerV1';
 const BACKGROUND_POLL_LEASE_MS = 10_000;
@@ -634,9 +638,9 @@ function ensureQueueRestoreHintTicker() {
 }
 
 function renderQueueRestoreHint() {
-	if (!queueRestoreHint) return;
-	if (!restoredQueueStateInfo || !trackedPromptIds.size) {
-		queueRestoreHint.hidden = true;
+	if (!queueRestoreHint || !queueRestoreWrap) return;
+	if (!restoredQueueStateInfo || !trackedPromptIds.size || queueRestoreHintHidden) {
+		queueRestoreWrap.hidden = true;
 		queueRestoreHint.textContent = '';
 		stopQueueRestoreHintTicker();
 		return;
@@ -646,8 +650,16 @@ function renderQueueRestoreHint() {
 	const ageMs = Math.max(0, Date.now() - Number(restoredQueueStateInfo.savedAt || Date.now()));
 	const ageSeconds = Math.max(1, Math.round(ageMs / 1000));
 	queueRestoreHint.textContent = `Restored ${count} active queue item${count === 1 ? '' : 's'} from a previous tab (${ageSeconds}s ago).`;
-	queueRestoreHint.hidden = false;
+	queueRestoreWrap.hidden = false;
 	ensureQueueRestoreHintTicker();
+}
+
+if (queueRestoreHideBtn) {
+	queueRestoreHideBtn.addEventListener('click', () => {
+		queueRestoreHintHidden = true;
+		localStorage.setItem(QUEUE_RESTORE_HINT_HIDDEN_KEY, '1');
+		renderQueueRestoreHint();
+	});
 }
 
 function persistTrackedQueueState() {

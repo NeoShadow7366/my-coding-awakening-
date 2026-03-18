@@ -95,13 +95,19 @@ def test_queue_action_keyboard_handler_wiring_present_in_js_bundle():
     assert "body: JSON.stringify(resubmitBody)," in content
     assert "const resubmitUrl = isImg2Img ? '/api/image/img2img-requeue' : '/api/image/generate';" in content
     assert "const QUEUE_STATE_STORAGE_KEY = 'queueStateV1';" in content
+    assert "const QUEUE_RESTORE_HINT_HIDDEN_KEY = 'queueRestoreHintHiddenV1';" in content
     assert "function persistTrackedQueueState()" in content
     assert "function restoreTrackedQueueState()" in content
     assert "function renderQueueRestoreHint()" in content
     assert "function stopQueueRestoreHintTicker()" in content
     assert "function ensureQueueRestoreHintTicker()" in content
     assert "queueRestoreHintTimer = window.setInterval(() => {" in content
+    assert "const queueRestoreWrap = document.getElementById('queue-restore-wrap');" in content
     assert "const queueRestoreHint = document.getElementById('queue-restore-hint');" in content
+    assert "const queueRestoreHideBtn = document.getElementById('queue-restore-hide');" in content
+    assert "if (queueRestoreHideBtn) {" in content
+    assert "queueRestoreHintHidden = true;" in content
+    assert "localStorage.setItem(QUEUE_RESTORE_HINT_HIDDEN_KEY, '1');" in content
     assert "renderQueueRestoreHint();" in content
     assert "Restored ${count} active queue item" in content
     assert "restoreTrackedQueueState();" in content
@@ -115,12 +121,15 @@ def test_queue_action_keyboard_handler_wiring_present_in_js_bundle():
     assert resp.status_code == 200
     html = resp.get_data(as_text=True)
     assert 'id="queue-shortcuts-hint"' in html
+    assert 'id="queue-restore-wrap"' in html
     assert 'id="queue-restore-hint"' in html
+    assert 'id="queue-restore-hide"' in html
 
     css_path = Path(__file__).resolve().parents[1] / "static" / "css" / "style.css"
     css = css_path.read_text(encoding="utf-8")
     assert ".queue-chip-front" in css
     assert ".queue-shortcuts-hint" in css
+    assert ".queue-restore-wrap" in css
     assert ".queue-restore-hint" in css
 
 
