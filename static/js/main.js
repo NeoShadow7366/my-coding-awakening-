@@ -5847,11 +5847,13 @@ function bindSuggestionTagCollapsers() {
 		if (!target) return;
 		btn.addEventListener('click', () => {
 			target.hidden = !target.hidden;
+			target.setAttribute('aria-hidden', target.hidden ? 'true' : 'false');
 			btn.textContent = target.hidden ? 'Show' : 'Hide';
 			btn.setAttribute('aria-expanded', target.hidden ? 'false' : 'true');
 		});
 		btn.setAttribute('aria-controls', targetId);
 		btn.setAttribute('aria-expanded', target.hidden ? 'false' : 'true');
+		target.setAttribute('aria-hidden', target.hidden ? 'true' : 'false');
 	});
 }
 

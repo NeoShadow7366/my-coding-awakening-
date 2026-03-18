@@ -1224,3 +1224,21 @@ def test_prompt_recent_dropdown_semantics_and_keyboard_wiring_present():
     assert "promptRecentDropdown.addEventListener('keydown', (event) => {" in js
     assert "if (!['ArrowDown', 'ArrowUp'].includes(event.key)) return;" in js
     assert "setPromptRecentDropdownOpen(false);" in js
+
+
+def test_suggestion_tag_collapser_semantics_and_aria_hidden_sync_present():
+    app_module.app.config["TESTING"] = True
+    client = app_module.app.test_client()
+
+    html = client.get("/").get_data(as_text=True)
+    assert 'data-suggest-toggle="enhanced-subject-tags" aria-controls="enhanced-subject-tags" aria-expanded="false"' in html
+    assert 'id="enhanced-subject-tags" class="enhanced-tag-cloud" data-target="enhanced-subject" aria-label="Subject suggestion tags" hidden aria-hidden="true"' in html
+    assert 'data-suggest-toggle="negative-prompt-tags" aria-controls="negative-prompt-tags" aria-expanded="false"' in html
+    assert 'id="negative-prompt-tags" class="enhanced-tag-cloud" data-target="image-negative-prompt" aria-label="Negative prompt suggestion tags" hidden aria-hidden="true"' in html
+
+    js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
+    js = js_path.read_text(encoding="utf-8")
+    assert "function bindSuggestionTagCollapsers()" in js
+    assert "target.setAttribute('aria-hidden', target.hidden ? 'true' : 'false');" in js
+    assert "btn.setAttribute('aria-controls', targetId);" in js
+    assert "btn.setAttribute('aria-expanded', target.hidden ? 'false' : 'true');" in js
