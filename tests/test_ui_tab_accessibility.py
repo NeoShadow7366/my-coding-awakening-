@@ -272,6 +272,10 @@ def test_model_download_actions_keyboard_handler_wiring_present_in_js_bundle():
     assert "mbClearFinishedDownloadsBtn.addEventListener('keydown', onModelDownloadsActionsKeydown);" in content
     assert "mbDownloadsToggleBtn.addEventListener('keydown', onModelDownloadsActionsKeydown);" in content
     assert "let mbModelModalLastFocus = null;" in content
+    assert "function getModelModalTabStops()" in content
+    assert "mbModelModal.addEventListener('keydown', (event) => {" in content
+    assert "if (event.key !== 'Tab' || mbModelModal.hidden) return;" in content
+    assert "const tabStops = getModelModalTabStops();" in content
 
 
 def test_model_pagination_keyboard_handler_wiring_present_in_js_bundle():

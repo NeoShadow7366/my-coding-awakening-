@@ -6352,6 +6352,23 @@ function setModelModalOpen(isOpen) {
 	}
 }
 
+function getModelModalTabStops() {
+	if (!mbModelModal) return [];
+	const selector = [
+		'button:not([disabled])',
+		'input:not([disabled]):not([type="hidden"])',
+		'select:not([disabled])',
+		'textarea:not([disabled])',
+		'[tabindex]:not([tabindex="-1"])',
+	].join(', ');
+	return [...mbModelModal.querySelectorAll(selector)].filter((el) => {
+		if (!(el instanceof HTMLElement)) return false;
+		if (el.hidden || el.getAttribute('aria-hidden') === 'true') return false;
+		if (el.closest('[hidden]')) return false;
+		return true;
+	});
+}
+
 function isVideoUrl(url) {
 	const u = String(url || '').toLowerCase().split('?')[0];
 	return u.endsWith('.mp4') || u.endsWith('.webm') || u.endsWith('.mov') || u.endsWith('.avi');
@@ -8177,6 +8194,26 @@ if (mbModelModal) {
 		if (!(target instanceof HTMLElement)) return;
 		if (target.dataset.mbModalClose === 'backdrop') {
 			setModelModalOpen(false);
+		}
+	});
+
+	mbModelModal.addEventListener('keydown', (event) => {
+		if (event.key !== 'Tab' || mbModelModal.hidden) return;
+		const tabStops = getModelModalTabStops();
+		if (!tabStops.length) return;
+		const first = tabStops[0];
+		const last = tabStops[tabStops.length - 1];
+		const active = document.activeElement;
+		if (event.shiftKey) {
+			if (active === first || !mbModelModal.contains(active)) {
+				event.preventDefault();
+				last.focus();
+			}
+			return;
+		}
+		if (active === last || !mbModelModal.contains(active)) {
+			event.preventDefault();
+			first.focus();
 		}
 	});
 }
