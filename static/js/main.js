@@ -3238,7 +3238,7 @@ function renderQueueStatus(running, pending, donePromptIds = new Set()) {
 				snap.model ? `<span class="chip">${escHtml(String(snap.model).split('/').pop().split('\\').pop())}</span>` : '',
 				status === 'running' && runningPosition ? `<span class="chip">run #${runningPosition}</span>` : '',
 				(status === 'queued' || status === 'processing') && pendingPosition ? `<span class="chip">queue #${pendingPosition}</span>` : '',
-				(status === 'queued' || status === 'processing') && isFrontQueued ? '<span class="chip">front</span>' : '',
+				(status === 'queued' || status === 'processing') && isFrontQueued ? '<span class="chip queue-chip-front">front</span>' : '',
 				snap.seed != null ? `<span class="chip">seed ${escHtml(String(snap.seed))}</span>` : '',
 				snap.steps ? `<span class="chip">${escHtml(String(snap.steps))} steps</span>` : '',
 				snap.cfg ? `<span class="chip">cfg ${escHtml(String(snap.cfg))}</span>` : '',

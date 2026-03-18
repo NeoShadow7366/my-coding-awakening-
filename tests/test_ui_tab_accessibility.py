@@ -85,7 +85,7 @@ def test_queue_action_keyboard_handler_wiring_present_in_js_bundle():
     assert "const pendingPositions = new Map();" in content
     assert "<span class=\"chip\">run #${runningPosition}</span>" in content
     assert "<span class=\"chip\">queue #${pendingPosition}</span>" in content
-    assert "<span class=\"chip\">front</span>" in content
+    assert "<span class=\"chip queue-chip-front\">front</span>" in content
     assert "async function prioritizeImageJob(promptId)" in content
     assert "data-action=\"prioritize\"" in content
     assert "aria-keyshortcuts=\"Alt+ArrowUp\"" in content
@@ -95,6 +95,18 @@ def test_queue_action_keyboard_handler_wiring_present_in_js_bundle():
     assert "body: JSON.stringify({ ...snapshot, queue_front: true })," in content
     assert "if (action === 'prioritize') {" in content
     assert "queueList.addEventListener('keydown', onQueueActionKeydown);" in content
+
+    app_module.app.config["TESTING"] = True
+    client = app_module.app.test_client()
+    resp = client.get("/")
+    assert resp.status_code == 200
+    html = resp.get_data(as_text=True)
+    assert 'id="queue-shortcuts-hint"' in html
+
+    css_path = Path(__file__).resolve().parents[1] / "static" / "css" / "style.css"
+    css = css_path.read_text(encoding="utf-8")
+    assert ".queue-chip-front" in css
+    assert ".queue-shortcuts-hint" in css
 
 
 def test_index_gallery_controls_group_semantics():

@@ -1302,6 +1302,17 @@ textarea {
   padding-left: 0;
 }
 
+.queue-chip-front {
+  border-color: color-mix(in srgb, var(--clr-primary) 70%, var(--clr-border));
+  color: var(--clr-primary);
+  font-weight: 600;
+  background: color-mix(in srgb, var(--clr-primary) 14%, transparent);
+}
+
+.queue-shortcuts-hint {
+  margin-top: 0.2rem;
+}
+
 .queue-reason {
   display: block;
   font-size: 0.72rem;
