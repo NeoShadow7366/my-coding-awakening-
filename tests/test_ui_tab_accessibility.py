@@ -106,12 +106,17 @@ def test_queue_action_keyboard_handler_wiring_present_in_js_bundle():
     assert "const queueRestoreHint = document.getElementById('queue-restore-hint');" in content
     assert "const queueRestoreHideBtn = document.getElementById('queue-restore-hide');" in content
     assert "const queueRestoreShowBtn = document.getElementById('queue-restore-show');" in content
+    assert "const queueUiResetBtn = document.getElementById('queue-ui-reset');" in content
     assert "if (queueRestoreHideBtn) {" in content
     assert "queueRestoreHintHidden = true;" in content
     assert "localStorage.setItem(QUEUE_RESTORE_HINT_HIDDEN_KEY, '1');" in content
     assert "if (queueRestoreShowBtn) {" in content
     assert "queueRestoreHintHidden = false;" in content
     assert "localStorage.removeItem(QUEUE_RESTORE_HINT_HIDDEN_KEY);" in content
+    assert "if (queueUiResetBtn) {" in content
+    assert "queueFilterFailedOnly = false;" in content
+    assert "localStorage.removeItem('queueFilterFailedOnly');" in content
+    assert "showToast('Queue UI preferences reset.', 'pos');" in content
     assert "renderQueueRestoreHint();" in content
     assert "Restored ${count} active queue item" in content
     assert "restoreTrackedQueueState();" in content
@@ -129,6 +134,7 @@ def test_queue_action_keyboard_handler_wiring_present_in_js_bundle():
     assert 'id="queue-restore-hint"' in html
     assert 'id="queue-restore-hide"' in html
     assert 'id="queue-restore-show"' in html
+    assert 'id="queue-ui-reset"' in html
 
     css_path = Path(__file__).resolve().parents[1] / "static" / "css" / "style.css"
     css = css_path.read_text(encoding="utf-8")

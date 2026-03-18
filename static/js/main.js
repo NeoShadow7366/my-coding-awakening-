@@ -262,6 +262,7 @@ const autoRetryPolicy = document.getElementById('auto-retry-policy');
 const failedOnlyToggle = document.getElementById('failed-only-toggle');
 const clearFailedQueueBtn = document.getElementById('clear-failed-queue');
 const clearCompletedQueueBtn = document.getElementById('clear-completed-queue');
+const queueUiResetBtn = document.getElementById('queue-ui-reset');
 const toastContainer = document.getElementById('toast-container');
 
 if (queueSummary) {
@@ -3794,6 +3795,18 @@ if (clearCompletedQueueBtn) {
 	clearCompletedQueueBtn.addEventListener('click', async () => {
 		clearCompletedQueueBtn.disabled = true;
 		await clearCompletedQueueItems();
+	});
+}
+
+if (queueUiResetBtn) {
+	queueUiResetBtn.addEventListener('click', () => {
+		queueFilterFailedOnly = false;
+		queueRestoreHintHidden = false;
+		if (failedOnlyToggle) failedOnlyToggle.checked = false;
+		localStorage.removeItem('queueFilterFailedOnly');
+		localStorage.removeItem(QUEUE_RESTORE_HINT_HIDDEN_KEY);
+		renderQueueStatus([], [], new Set());
+		showToast('Queue UI preferences reset.', 'pos');
 	});
 }
 
