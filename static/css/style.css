@@ -734,6 +734,46 @@ textarea {
   min-width: 9rem;
 }
 
+.prompt-history-row {
+  margin-top: var(--sp-xs);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-sm);
+}
+
+.prompt-history-label {
+  margin: 0;
+}
+
+.prompt-recent-chips {
+  margin-top: var(--sp-xs);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-xs);
+}
+
+.prompt-recent-chip {
+  max-width: 100%;
+  border: 1px solid var(--clr-border);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--clr-bg) 86%, var(--clr-surface));
+  color: var(--clr-text);
+  padding: 0.2rem 0.6rem;
+  font-size: 0.78rem;
+  line-height: 1.3;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.prompt-recent-chip:hover,
+.prompt-recent-chip:focus-visible {
+  background: color-mix(in srgb, var(--clr-primary) 16%, var(--clr-surface));
+  outline: none;
+}
+
 .cn-panel {
   border: 1px solid var(--clr-border);
   border-radius: var(--radius);

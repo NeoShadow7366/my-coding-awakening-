@@ -161,6 +161,8 @@ const imagePrompt = document.getElementById('image-prompt');
 const promptRandomizeBtn = document.getElementById('prompt-randomize-btn');
 const promptRecentBtn = document.getElementById('prompt-recent-btn');
 const promptRecentDropdown = document.getElementById('prompt-recent-dropdown');
+const promptRecentChips = document.getElementById('prompt-recent-chips');
+const promptRecentClearBtn = document.getElementById('prompt-recent-clear-btn');
 const promptSavedName = document.getElementById('prompt-saved-name');
 const promptSaveBtn = document.getElementById('prompt-save-btn');
 const promptSavedSelect = document.getElementById('prompt-saved-select');
@@ -8053,10 +8055,19 @@ function buildRandomPromptFromTags() {
 const PROMPT_RECENT_MAX = 20;
 const PROMPT_RECENT_KEY = 'promptRecentHistory';
 const PROMPT_SAVED_KEY = 'promptSavedPresets';
+const PROMPT_RECENT_CHIPS_MAX = 8;
 
 function loadPromptRecentHistory() {
 	try { return JSON.parse(localStorage.getItem(PROMPT_RECENT_KEY) || '[]'); }
 	catch { return []; }
+}
+function applyRecentPromptByIndex(index) {
+	const value = loadPromptRecentHistory()[index] || '';
+	if (!value) return;
+	imagePrompt.value = value;
+	imagePrompt.focus();
+	if (promptRecentDropdown) promptRecentDropdown.hidden = true;
+	if (promptRecentBtn) promptRecentBtn.setAttribute('aria-expanded', 'false');
 }
 function saveCurrentPromptToHistory(text) {
 	const t = String(text || '').trim();
@@ -8066,6 +8077,7 @@ function saveCurrentPromptToHistory(text) {
 	list = list.slice(0, PROMPT_RECENT_MAX);
 	localStorage.setItem(PROMPT_RECENT_KEY, JSON.stringify(list));
 	renderPromptRecentDropdown();
+	renderPromptRecentChips();
 }
 function renderPromptRecentDropdown() {
 	if (!promptRecentDropdown) return;
@@ -8080,13 +8092,29 @@ function renderPromptRecentDropdown() {
 	}).join('');
 	promptRecentDropdown.querySelectorAll('.prompt-recent-item').forEach((li) => {
 		const apply = () => {
-			imagePrompt.value = loadPromptRecentHistory()[Number(li.dataset.index)] || '';
-			promptRecentDropdown.hidden = true;
-			if (promptRecentBtn) promptRecentBtn.setAttribute('aria-expanded', 'false');
-			imagePrompt.focus();
+			applyRecentPromptByIndex(Number(li.dataset.index));
 		};
 		li.addEventListener('click', apply);
 		li.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); apply(); } });
+	});
+}
+function renderPromptRecentChips() {
+	if (!promptRecentChips) return;
+	const list = loadPromptRecentHistory().slice(0, PROMPT_RECENT_CHIPS_MAX);
+	if (!list.length) {
+		promptRecentChips.innerHTML = '<span class="hint">No recent prompts yet.</span>';
+		if (promptRecentClearBtn) promptRecentClearBtn.disabled = true;
+		return;
+	}
+	promptRecentChips.innerHTML = list.map((p, i) => {
+		const preview = p.length > 66 ? `${p.slice(0, 66)}\u2026` : p;
+		return `<button class="prompt-recent-chip" type="button" data-index="${i}" title="${escHtml(p)}">${escHtml(preview)}</button>`;
+	}).join('');
+	if (promptRecentClearBtn) promptRecentClearBtn.disabled = false;
+	promptRecentChips.querySelectorAll('.prompt-recent-chip').forEach((btn) => {
+		btn.addEventListener('click', () => {
+			applyRecentPromptByIndex(Number(btn.dataset.index));
+		});
 	});
 }
 function loadPromptSavedPresets() {
@@ -8326,8 +8354,17 @@ if (promptDeleteSavedBtn) {
 		deleteNamedPromptPreset(promptSavedSelect.value);
 	});
 }
+if (promptRecentClearBtn) {
+	promptRecentClearBtn.addEventListener('click', () => {
+		localStorage.removeItem(PROMPT_RECENT_KEY);
+		renderPromptRecentDropdown();
+		renderPromptRecentChips();
+		showToast('Cleared recent prompt history.', 'pos');
+	});
+}
 
 renderPromptRecentDropdown();
+renderPromptRecentChips();
 renderPromptSavedSelect();
 
 if (enhancedPromptSuggestBtn) {

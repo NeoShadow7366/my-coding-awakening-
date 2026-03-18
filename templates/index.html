@@ -418,6 +418,11 @@
             </div>
           </div>
           <textarea id="image-prompt" rows="4" placeholder="A cinematic forest temple, volumetric light, detailed illustration"></textarea>
+          <div class="prompt-history-row" aria-label="Prompt history quick picks">
+            <p class="hint prompt-history-label">Recent prompts</p>
+            <button class="btn btn-ghost btn-xs" id="prompt-recent-clear-btn" type="button" title="Clear recent prompt history">Clear</button>
+          </div>
+          <div id="prompt-recent-chips" class="prompt-recent-chips" role="group" aria-label="Recent prompt chips"></div>
           <div id="prompt-syntax-popup" class="prompt-syntax-popup" hidden role="dialog" aria-label="Prompt syntax guide">
             <div class="prompt-syntax-popup-head">
               <strong>Prompt Syntax Guide</strong>

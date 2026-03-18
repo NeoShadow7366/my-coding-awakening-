@@ -1114,3 +1114,31 @@ def test_gallery_favorites_markup_and_wiring_present():
     assert ".gallery-star-btn {" in css
     assert ".gallery-star-btn.is-favorited {" in css
     assert "gallery-lightbox-star-btn" in css
+
+
+def test_prompt_recent_chips_markup_and_wiring_present():
+    app_module.app.config["TESTING"] = True
+    client = app_module.app.test_client()
+
+    html = client.get("/").get_data(as_text=True)
+    assert 'id="prompt-recent-chips"' in html
+    assert 'id="prompt-recent-clear-btn"' in html
+    assert 'aria-label="Recent prompt chips"' in html
+
+    js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
+    js = js_path.read_text(encoding="utf-8")
+    assert "const promptRecentChips = document.getElementById('prompt-recent-chips');" in js
+    assert "const promptRecentClearBtn = document.getElementById('prompt-recent-clear-btn');" in js
+    assert "const PROMPT_RECENT_CHIPS_MAX = 8;" in js
+    assert "function applyRecentPromptByIndex(index)" in js
+    assert "function renderPromptRecentChips()" in js
+    assert "promptRecentChips.innerHTML = '<span class=\"hint\">No recent prompts yet.</span>';" in js
+    assert "promptRecentChips.querySelectorAll('.prompt-recent-chip').forEach((btn) => {" in js
+    assert "localStorage.removeItem(PROMPT_RECENT_KEY);" in js
+    assert "renderPromptRecentChips();" in js
+
+    css_path = Path(__file__).resolve().parents[1] / "static" / "css" / "style.css"
+    css = css_path.read_text(encoding="utf-8")
+    assert ".prompt-history-row {" in css
+    assert ".prompt-recent-chips {" in css
+    assert ".prompt-recent-chip {" in css
