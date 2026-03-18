@@ -3135,14 +3135,22 @@ function renderQueueStatus(running, pending, donePromptIds = new Set()) {
 	const focusedQueueAction = getFocusedQueueAction();
 	const runningIds = new Set();
 	const pendingIds = new Set();
+	const runningPositions = new Map();
+	const pendingPositions = new Map();
 
-	running.forEach((item) => {
+	running.forEach((item, index) => {
 		const pid = item[1] || '';
-		if (pid) runningIds.add(pid);
+		if (pid) {
+			runningIds.add(pid);
+			runningPositions.set(pid, index + 1);
+		}
 	});
-	pending.forEach((item) => {
+	pending.forEach((item, index) => {
 		const pid = item[1] || '';
-		if (pid) pendingIds.add(pid);
+		if (pid) {
+			pendingIds.add(pid);
+			pendingPositions.set(pid, index + 1);
+		}
 	});
 
 	for (const promptId of trackedPromptIds) {
@@ -3198,6 +3206,9 @@ function renderQueueStatus(running, pending, donePromptIds = new Set()) {
 			const status = meta.status || 'queued';
 			const promptLabel = escHtml(promptId);
 			const snap = meta.snapshot || {};
+			const runningPosition = runningPositions.get(promptId) || 0;
+			const pendingPosition = pendingPositions.get(promptId) || 0;
+			const isFrontQueued = pendingPosition === 1;
 			const badge =
 				status === 'running' ? '<span class="history-badge positive">RUN</span>' :
 				status === 'queued' ? '<span class="history-badge">WAIT</span>' :
@@ -3225,6 +3236,9 @@ function renderQueueStatus(running, pending, donePromptIds = new Set()) {
 
 			const chips = [
 				snap.model ? `<span class="chip">${escHtml(String(snap.model).split('/').pop().split('\\').pop())}</span>` : '',
+				status === 'running' && runningPosition ? `<span class="chip">run #${runningPosition}</span>` : '',
+				(status === 'queued' || status === 'processing') && pendingPosition ? `<span class="chip">queue #${pendingPosition}</span>` : '',
+				(status === 'queued' || status === 'processing') && isFrontQueued ? '<span class="chip">front</span>' : '',
 				snap.seed != null ? `<span class="chip">seed ${escHtml(String(snap.seed))}</span>` : '',
 				snap.steps ? `<span class="chip">${escHtml(String(snap.steps))} steps</span>` : '',
 				snap.cfg ? `<span class="chip">cfg ${escHtml(String(snap.cfg))}</span>` : '',

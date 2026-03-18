@@ -81,6 +81,11 @@ def test_queue_action_keyboard_handler_wiring_present_in_js_bundle():
     content = js_path.read_text(encoding="utf-8")
 
     assert "function onQueueActionKeydown(event)" in content
+    assert "const runningPositions = new Map();" in content
+    assert "const pendingPositions = new Map();" in content
+    assert "<span class=\"chip\">run #${runningPosition}</span>" in content
+    assert "<span class=\"chip\">queue #${pendingPosition}</span>" in content
+    assert "<span class=\"chip\">front</span>" in content
     assert "async function prioritizeImageJob(promptId)" in content
     assert "data-action=\"prioritize\"" in content
     assert "body: JSON.stringify({ ...snapshot, queue_front: true })," in content
