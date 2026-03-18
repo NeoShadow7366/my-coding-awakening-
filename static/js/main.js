@@ -8256,13 +8256,31 @@ function loadPromptRecentHistory() {
 	try { return JSON.parse(localStorage.getItem(PROMPT_RECENT_KEY) || '[]'); }
 	catch { return []; }
 }
+
+function setPromptRecentDropdownOpen(isOpen, focusFirst = false) {
+	if (!promptRecentDropdown) return;
+	if (isOpen) {
+		renderPromptRecentDropdown();
+	}
+	promptRecentDropdown.hidden = !isOpen;
+	promptRecentDropdown.setAttribute('aria-hidden', isOpen ? 'false' : 'true');
+	if (promptRecentBtn) {
+		promptRecentBtn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+	}
+	if (!isOpen) return;
+	if (!focusFirst) return;
+	const first = promptRecentDropdown.querySelector('.prompt-recent-item');
+	if (first instanceof HTMLElement) {
+		first.focus();
+	}
+}
+
 function applyRecentPromptByIndex(index) {
 	const value = loadPromptRecentHistory()[index] || '';
 	if (!value) return;
 	imagePrompt.value = value;
 	imagePrompt.focus();
-	if (promptRecentDropdown) promptRecentDropdown.hidden = true;
-	if (promptRecentBtn) promptRecentBtn.setAttribute('aria-expanded', 'false');
+	setPromptRecentDropdownOpen(false);
 }
 function saveCurrentPromptToHistory(text) {
 	const t = String(text || '').trim();
@@ -8608,17 +8626,46 @@ if (promptRandomizeBtn) {
 if (promptRecentBtn) {
 	promptRecentBtn.addEventListener('click', (e) => {
 		e.stopPropagation();
-		const isHidden = promptRecentDropdown.hidden;
-		promptRecentDropdown.hidden = !isHidden;
-		promptRecentBtn.setAttribute('aria-expanded', String(isHidden));
-		if (isHidden) renderPromptRecentDropdown();
+		const isOpen = promptRecentDropdown ? !promptRecentDropdown.hidden : false;
+		setPromptRecentDropdownOpen(!isOpen);
+	});
+	promptRecentBtn.addEventListener('keydown', (event) => {
+		if (event.key === 'Escape') {
+			event.preventDefault();
+			setPromptRecentDropdownOpen(false);
+			return;
+		}
+		if (!['ArrowDown', 'Enter', ' '].includes(event.key)) return;
+		event.preventDefault();
+		setPromptRecentDropdownOpen(true, true);
 	});
 }
+
+if (promptRecentDropdown) {
+	promptRecentDropdown.addEventListener('keydown', (event) => {
+		if (promptRecentDropdown.hidden) return;
+		if (event.key === 'Escape') {
+			event.preventDefault();
+			setPromptRecentDropdownOpen(false);
+			if (promptRecentBtn) promptRecentBtn.focus();
+			return;
+		}
+		if (!['ArrowDown', 'ArrowUp'].includes(event.key)) return;
+		const items = [...promptRecentDropdown.querySelectorAll('.prompt-recent-item')].filter((el) => el instanceof HTMLElement);
+		if (!items.length) return;
+		event.preventDefault();
+		const active = document.activeElement;
+		const currentIndex = items.indexOf(active);
+		const delta = event.key === 'ArrowDown' ? 1 : -1;
+		const nextIndex = currentIndex < 0 ? (delta > 0 ? 0 : items.length - 1) : (currentIndex + delta + items.length) % items.length;
+		items[nextIndex].focus();
+	});
+}
+
 document.addEventListener('click', (e) => {
 	if (promptRecentDropdown && !promptRecentDropdown.hidden) {
 		if (!promptRecentDropdown.contains(e.target) && e.target !== promptRecentBtn) {
-			promptRecentDropdown.hidden = true;
-			if (promptRecentBtn) promptRecentBtn.setAttribute('aria-expanded', 'false');
+			setPromptRecentDropdownOpen(false);
 		}
 	}
 });

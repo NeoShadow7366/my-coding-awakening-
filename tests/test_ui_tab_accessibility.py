@@ -1201,3 +1201,26 @@ def test_prompt_syntax_popup_markup_and_wiring_present():
     assert "const tabStops = getPromptSyntaxTabStops();" in js
     assert "promptSyntaxPopup.setAttribute('aria-hidden', isOpen ? 'false' : 'true');" in js
     assert "promptSyntaxInfoBtn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');" in js
+
+
+def test_prompt_recent_dropdown_semantics_and_keyboard_wiring_present():
+    app_module.app.config["TESTING"] = True
+    client = app_module.app.test_client()
+
+    html = client.get("/").get_data(as_text=True)
+    assert 'id="prompt-recent-btn"' in html
+    assert 'aria-haspopup="listbox"' in html
+    assert 'aria-controls="prompt-recent-dropdown"' in html
+    assert 'id="prompt-recent-dropdown" class="prompt-recent-dropdown" role="listbox" aria-label="Recent prompts" hidden aria-hidden="true"' in html
+
+    js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
+    js = js_path.read_text(encoding="utf-8")
+    assert "function setPromptRecentDropdownOpen(isOpen, focusFirst = false)" in js
+    assert "promptRecentDropdown.setAttribute('aria-hidden', isOpen ? 'false' : 'true');" in js
+    assert "promptRecentBtn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');" in js
+    assert "promptRecentBtn.addEventListener('keydown', (event) => {" in js
+    assert "if (!['ArrowDown', 'Enter', ' '].includes(event.key)) return;" in js
+    assert "setPromptRecentDropdownOpen(true, true);" in js
+    assert "promptRecentDropdown.addEventListener('keydown', (event) => {" in js
+    assert "if (!['ArrowDown', 'ArrowUp'].includes(event.key)) return;" in js
+    assert "setPromptRecentDropdownOpen(false);" in js
