@@ -5978,6 +5978,12 @@ if (mbShowNsfwToggle) {
 	mbShowNsfwToggle.setAttribute('aria-pressed', localStorage.getItem('mbShowNsfw') === '1' ? 'true' : 'false');
 }
 
+function setElementHiddenState(element, isHidden) {
+	if (!element) return;
+	element.hidden = Boolean(isHidden);
+	element.setAttribute('aria-hidden', isHidden ? 'true' : 'false');
+}
+
 function setModelBrowserView(view) {
 	const savedView = localStorage.getItem('mbActiveView') === 'library' ? 'library' : 'search';
 	const nextView = view === 'library' || view === 'search' ? view : savedView;
@@ -5995,10 +6001,10 @@ function setModelBrowserView(view) {
 		mbViewLibraryBtn.setAttribute('aria-selected', selected ? 'true' : 'false');
 		mbViewLibraryBtn.setAttribute('tabindex', selected ? '0' : '-1');
 	}
-	if (mbRemoteControls) mbRemoteControls.hidden = nextView !== 'search';
-	if (mbLocalControls) mbLocalControls.hidden = nextView !== 'library';
-	if (mbRemoteView) mbRemoteView.hidden = nextView !== 'search';
-	if (mbLocalView) mbLocalView.hidden = nextView !== 'library';
+	setElementHiddenState(mbRemoteControls, nextView !== 'search');
+	setElementHiddenState(mbLocalControls, nextView !== 'library');
+	setElementHiddenState(mbRemoteView, nextView !== 'search');
+	setElementHiddenState(mbLocalView, nextView !== 'library');
 }
 
 function onModelBrowserViewTabKeydown(event) {
@@ -7542,7 +7548,7 @@ async function runCivitaiSearch(page) {
 	setModelSearchStatus(provider === 'huggingface' ? 'Searching Hugging Face…' : 'Searching CivitAI…', true);
 	if (mbResultsCount) mbResultsCount.textContent = '';
 	mbResultsGrid.innerHTML = '';
-	if (mbResultsSection) mbResultsSection.hidden = false;
+	setElementHiddenState(mbResultsSection, false);
 	try {
 		timeoutHandle = setTimeout(() => {
 			if (requestId !== mbSearchRequestSeq) return;
@@ -7592,19 +7598,19 @@ async function runCivitaiSearch(page) {
 		if (err && err.name === 'AbortError') {
 			if (mbSearchCancelRequested) {
 				setModelSearchStatus('Search cancelled.', true);
-				if (mbPagination) mbPagination.hidden = true;
+				setElementHiddenState(mbPagination, true);
 				mbHasNextPage = false;
 				return;
 			}
 			if (searchTimedOut) {
 				mbHasNextPage = false;
-				if (mbPagination) mbPagination.hidden = true;
+				setElementHiddenState(mbPagination, true);
 				setModelSearchStatus(`Search timed out after ${Math.round(MB_SEARCH_TIMEOUT_MS / 1000)}s. Please try again.`, true);
 			}
 			return;
 		}
 		mbHasNextPage = false;
-		if (mbPagination) mbPagination.hidden = true;
+		setElementHiddenState(mbPagination, true);
 		setModelSearchStatus('Search failed: ' + err.message, true);
 	} finally {
 		if (timeoutHandle) {
@@ -7624,7 +7630,7 @@ function renderSearchResults(items, totalItems, hasProviderTotal = false) {
 	if (!mbResultsGrid) return;
 	mbResultsGrid.innerHTML = '';
 	setModelSearchStatus('', false);
-	if (mbPagination) mbPagination.hidden = false;
+	setElementHiddenState(mbPagination, false);
 	const displayItems = applyModelBrowserClientFilters(items || []);
 	if (mbResultsCount) {
 		const shown = displayItems.length.toLocaleString();
@@ -7727,7 +7733,7 @@ async function startModelDownload(url, fileName, folder, btn, provider = 'civita
 		});
 		const data = await resp.json();
 		if (!resp.ok) throw new Error(data.error || resp.statusText);
-		if (mbDownloadsSection) mbDownloadsSection.hidden = false;
+		setElementHiddenState(mbDownloadsSection, false);
 		if (data.download_id) {
 			addDownloadRow(data.download_id, data.file_name || fileName);
 		}
@@ -7840,7 +7846,7 @@ function updateDownloadControlsState() {
 		mbDownloadsCounter.hidden = !mbDownloadsMinimized;
 	}
 	if (mbDownloadsSection) {
-		mbDownloadsSection.hidden = rows.length === 0;
+		setElementHiddenState(mbDownloadsSection, rows.length === 0);
 	}
 }
 

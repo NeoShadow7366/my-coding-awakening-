@@ -231,6 +231,7 @@ def test_index_model_download_actions_and_modal_semantics():
 
     assert '<div class="mb-downloads-actions" role="group" aria-label="Download queue actions">' in html
     assert 'id="mb-clear-finished-downloads"' in html
+    assert 'id="mb-downloads-section" hidden aria-hidden="true"' in html
     assert 'id="mb-downloads-toggle" type="button" aria-controls="mb-downloads-body" aria-expanded="true"' in html
     assert 'id="mb-type-info-panel" class="mb-type-info-panel" hidden aria-hidden="true" tabindex="-1"' in html
     assert 'id="mb-model-modal" class="mb-model-modal" hidden aria-hidden="true" role="dialog" aria-modal="true" aria-label="Model details"' in html
@@ -246,7 +247,10 @@ def test_index_model_pagination_group_semantics():
     assert resp.status_code == 200
     html = resp.get_data(as_text=True)
 
-    assert '<div class="mb-pagination" id="mb-pagination" role="group" aria-label="Model search pagination" hidden>' in html
+    assert 'id="mb-results-section" hidden aria-hidden="true"' in html
+    assert '<div class="mb-pagination" id="mb-pagination" role="group" aria-label="Model search pagination" hidden aria-hidden="true">' in html
+    assert 'id="mb-local-controls" hidden aria-hidden="true"' in html
+    assert 'id="mb-local-view" hidden aria-hidden="true"' in html
     assert 'id="mb-prev-page"' in html
     assert 'id="mb-next-page"' in html
 
@@ -269,6 +273,15 @@ def test_model_download_actions_keyboard_handler_wiring_present_in_js_bundle():
     js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
     content = js_path.read_text(encoding="utf-8")
 
+    assert "function setElementHiddenState(element, isHidden)" in content
+    assert "element.setAttribute('aria-hidden', isHidden ? 'true' : 'false');" in content
+    assert "setElementHiddenState(mbLocalControls, nextView !== 'library');" in content
+    assert "setElementHiddenState(mbLocalView, nextView !== 'library');" in content
+    assert "setElementHiddenState(mbResultsSection, false);" in content
+    assert "setElementHiddenState(mbPagination, true);" in content
+    assert "setElementHiddenState(mbPagination, false);" in content
+    assert "setElementHiddenState(mbDownloadsSection, false);" in content
+    assert "setElementHiddenState(mbDownloadsSection, rows.length === 0);" in content
     assert "function onModelDownloadsActionsKeydown(event)" in content
     assert "mbClearFinishedDownloadsBtn.addEventListener('keydown', onModelDownloadsActionsKeydown);" in content
     assert "mbDownloadsToggleBtn.addEventListener('keydown', onModelDownloadsActionsKeydown);" in content

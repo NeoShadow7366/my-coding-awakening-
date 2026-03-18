@@ -910,7 +910,7 @@
     </div>
     </div>
 
-    <div id="mb-local-controls" hidden>
+    <div id="mb-local-controls" hidden aria-hidden="true">
     <div class="sidebar-section">
       <label for="mb-local-query" class="field-label">Query</label>
       <input id="mb-local-query" type="text" placeholder="e.g. realistic, anime, xl..." />
@@ -996,7 +996,7 @@
 
     <div id="mb-remote-view">
       <!-- Active downloads -->
-      <section class="models-section mb-downloads-drawer" id="mb-downloads-section" hidden>
+      <section class="models-section mb-downloads-drawer" id="mb-downloads-section" hidden aria-hidden="true">
         <div class="mb-downloads-head">
           <div class="mb-downloads-title-wrap">
             <h2 class="section-heading">Download Queue</h2>
@@ -1013,14 +1013,14 @@
       </section>
 
       <!-- Search results -->
-      <section class="models-section" id="mb-results-section" hidden>
+      <section class="models-section" id="mb-results-section" hidden aria-hidden="true">
         <h2 class="section-heading">
           Search Results
           <span id="mb-results-count" class="section-count"></span>
         </h2>
         <p id="mb-search-status" class="hint"></p>
         <div id="mb-results-grid" class="mb-results-grid"></div>
-        <div class="mb-pagination" id="mb-pagination" role="group" aria-label="Model search pagination" hidden>
+        <div class="mb-pagination" id="mb-pagination" role="group" aria-label="Model search pagination" hidden aria-hidden="true">
           <button class="btn btn-ghost btn-xs" id="mb-prev-page" type="button">&#8249; Prev</button>
           <span id="mb-page-info" class="hint"></span>
           <button class="btn btn-ghost btn-xs" id="mb-next-page" type="button">Next &#8250;</button>
@@ -1028,7 +1028,7 @@
       </section>
     </div>
 
-    <div id="mb-local-view" hidden>
+    <div id="mb-local-view" hidden aria-hidden="true">
       <!-- Local library -->
       <section class="models-section">
         <h2 class="section-heading">Local Library</h2>
