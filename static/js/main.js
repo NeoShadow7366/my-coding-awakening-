@@ -205,6 +205,7 @@ const imageUpload = document.getElementById('image-upload');
 const imageGenerateBtn = document.getElementById('image-generate-btn');
 const queueTelemetry = document.getElementById('queue-telemetry');
 const queueTelemetryResetBtn = document.getElementById('queue-telemetry-reset');
+const queueRestoreHint = document.getElementById('queue-restore-hint');
 const queueSummary = document.getElementById('queue-summary');
 const queueList = document.getElementById('queue-list');
 const configOllamaPath = document.getElementById('config-ollama-path');
@@ -316,6 +317,7 @@ let enhancedPromptSuggestions = [];
 const JOB_MISS_THRESHOLD = 4;
 const queueActionInFlight = new Set();
 let queueFilterFailedOnly = localStorage.getItem('queueFilterFailedOnly') === '1';
+let restoredQueueStateInfo = null;
 const IMAGE_PROFILE_STORAGE_KEY = 'imagePresetProfilesV1';
 const IMAGE_PROFILE_SELECTED_KEY = 'imagePresetProfilesSelectedV1';
 const MB_MODEL_NOTES_KEY = 'mbModelNotesV1';
@@ -617,6 +619,21 @@ function resetQueueTelemetry() {
 	renderQueueTelemetry();
 }
 
+function renderQueueRestoreHint() {
+	if (!queueRestoreHint) return;
+	if (!restoredQueueStateInfo || !trackedPromptIds.size) {
+		queueRestoreHint.hidden = true;
+		queueRestoreHint.textContent = '';
+		return;
+	}
+
+	const count = Number(restoredQueueStateInfo.count) || trackedPromptIds.size;
+	const ageMs = Math.max(0, Date.now() - Number(restoredQueueStateInfo.savedAt || Date.now()));
+	const ageSeconds = Math.max(1, Math.round(ageMs / 1000));
+	queueRestoreHint.textContent = `Restored ${count} active queue item${count === 1 ? '' : 's'} from a previous tab (${ageSeconds}s ago).`;
+	queueRestoreHint.hidden = false;
+}
+
 function persistTrackedQueueState() {
 	const entries = Array.from(trackedPromptIds)
 		.map((promptId) => {
@@ -637,7 +654,9 @@ function persistTrackedQueueState() {
 
 	try {
 		if (!entries.length) {
+			restoredQueueStateInfo = null;
 			localStorage.removeItem(QUEUE_STATE_STORAGE_KEY);
+			renderQueueRestoreHint();
 			return;
 		}
 		localStorage.setItem(QUEUE_STATE_STORAGE_KEY, JSON.stringify({ entries, saved_at: Date.now() }));
@@ -681,9 +700,16 @@ function restoreTrackedQueueState() {
 	}
 
 	if (!restoredCount) {
+		restoredQueueStateInfo = null;
 		try { localStorage.removeItem(QUEUE_STATE_STORAGE_KEY); } catch { /* no-op */ }
+		renderQueueRestoreHint();
 		return;
 	}
+
+	restoredQueueStateInfo = {
+		count: restoredCount,
+		savedAt: Number(parsed?.saved_at) || Date.now(),
+	};
 
 	renderQueueStatus([], [], new Set());
 	ensureQueuePolling();
@@ -3273,6 +3299,7 @@ function renderQueueStatus(running, pending, donePromptIds = new Set()) {
 	}
 	const visibleLabel = queueFilterFailedOnly ? 'Showing: Failed only' : 'Showing: All';
 	queueSummary.textContent = `Running: ${runningCount}  Pending: ${pendingCount}  Tracked: ${trackedPromptIds.size}  Failed: ${failedCount}  Done: ${completedCount}  ${visibleLabel}`;
+	renderQueueRestoreHint();
 
 	const rows = Array.from(queueJobMeta.entries())
 		.filter(([, meta]) => (queueFilterFailedOnly ? meta.status === 'failed' : true))

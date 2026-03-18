@@ -97,6 +97,10 @@ def test_queue_action_keyboard_handler_wiring_present_in_js_bundle():
     assert "const QUEUE_STATE_STORAGE_KEY = 'queueStateV1';" in content
     assert "function persistTrackedQueueState()" in content
     assert "function restoreTrackedQueueState()" in content
+    assert "function renderQueueRestoreHint()" in content
+    assert "const queueRestoreHint = document.getElementById('queue-restore-hint');" in content
+    assert "renderQueueRestoreHint();" in content
+    assert "Restored ${count} active queue item" in content
     assert "restoreTrackedQueueState();" in content
     assert "localStorage.setItem(QUEUE_STATE_STORAGE_KEY" in content
     assert "if (action === 'prioritize') {" in content
@@ -108,11 +112,13 @@ def test_queue_action_keyboard_handler_wiring_present_in_js_bundle():
     assert resp.status_code == 200
     html = resp.get_data(as_text=True)
     assert 'id="queue-shortcuts-hint"' in html
+    assert 'id="queue-restore-hint"' in html
 
     css_path = Path(__file__).resolve().parents[1] / "static" / "css" / "style.css"
     css = css_path.read_text(encoding="utf-8")
     assert ".queue-chip-front" in css
     assert ".queue-shortcuts-hint" in css
+    assert ".queue-restore-hint" in css
 
 
 def test_index_gallery_controls_group_semantics():
