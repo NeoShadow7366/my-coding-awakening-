@@ -1173,3 +1173,27 @@ def test_prompt_recent_chips_markup_and_wiring_present():
     assert ".prompt-history-row {" in css
     assert ".prompt-recent-chips {" in css
     assert ".prompt-recent-chip {" in css
+
+
+def test_prompt_syntax_popup_markup_and_wiring_present():
+    app_module.app.config["TESTING"] = True
+    client = app_module.app.test_client()
+
+    html = client.get("/").get_data(as_text=True)
+    assert 'id="prompt-syntax-info-btn"' in html
+    assert 'id="prompt-syntax-popup"' in html
+    assert 'id="prompt-syntax-close-btn"' in html
+    assert 'id="prompt-syntax-popup" class="prompt-syntax-popup" hidden aria-hidden="true" role="dialog" aria-label="Prompt syntax guide"' in html
+
+    js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
+    js = js_path.read_text(encoding="utf-8")
+    assert "let promptSyntaxLastFocus = null;" in js
+    assert "function getPromptSyntaxTabStops()" in js
+    assert "function setPromptSyntaxPopupOpen(isOpen)" in js
+    assert "setPromptSyntaxPopupOpen(promptSyntaxPopup.hidden);" in js
+    assert "setPromptSyntaxPopupOpen(false);" in js
+    assert "promptSyntaxPopup.addEventListener('keydown', (event) => {" in js
+    assert "if (event.key === 'Escape') {" in js
+    assert "if (event.key !== 'Tab') return;" in js
+    assert "const tabStops = getPromptSyntaxTabStops();" in js
+    assert "promptSyntaxPopup.setAttribute('aria-hidden', isOpen ? 'false' : 'true');" in js

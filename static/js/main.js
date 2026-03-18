@@ -364,6 +364,7 @@ let lightboxCompareEnabled = false;
 let lightboxCompareSplit = 50;
 let lightboxMetaOpen = false;
 let galleryLightboxLastFocus = null;
+let promptSyntaxLastFocus = null;
 const TAG_CATEGORY_LABELS = {
 	'enhanced-subject': 'Subject',
 	'enhanced-setting': 'Setting/Environment',
@@ -8493,14 +8494,76 @@ if (enhancedPromptToggle) {
 }
 
 // Prompt syntax popup
+function getPromptSyntaxTabStops() {
+	if (!promptSyntaxPopup) return [];
+	const selector = [
+		'button:not([disabled])',
+		'input:not([disabled]):not([type="hidden"])',
+		'select:not([disabled])',
+		'textarea:not([disabled])',
+		'[tabindex]:not([tabindex="-1"])',
+	].join(', ');
+	return [...promptSyntaxPopup.querySelectorAll(selector)].filter((el) => {
+		if (!(el instanceof HTMLElement)) return false;
+		if (el.hidden || el.getAttribute('aria-hidden') === 'true') return false;
+		if (el.closest('[hidden]')) return false;
+		return true;
+	});
+}
+
+function setPromptSyntaxPopupOpen(isOpen) {
+	if (!promptSyntaxPopup) return;
+	if (isOpen) {
+		promptSyntaxLastFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+	}
+	promptSyntaxPopup.hidden = !isOpen;
+	promptSyntaxPopup.setAttribute('aria-hidden', isOpen ? 'false' : 'true');
+	if (isOpen) {
+		if (promptSyntaxCloseBtn) promptSyntaxCloseBtn.focus();
+		return;
+	}
+	const active = document.activeElement;
+	if (active instanceof HTMLElement && promptSyntaxPopup.contains(active) && promptSyntaxLastFocus && document.contains(promptSyntaxLastFocus)) {
+		promptSyntaxLastFocus.focus();
+	}
+	promptSyntaxLastFocus = null;
+}
+
 if (promptSyntaxInfoBtn && promptSyntaxPopup) {
 	promptSyntaxInfoBtn.addEventListener('click', () => {
-		promptSyntaxPopup.hidden = !promptSyntaxPopup.hidden;
+		setPromptSyntaxPopupOpen(promptSyntaxPopup.hidden);
 	});
 }
 if (promptSyntaxCloseBtn && promptSyntaxPopup) {
 	promptSyntaxCloseBtn.addEventListener('click', () => {
-		promptSyntaxPopup.hidden = true;
+		setPromptSyntaxPopupOpen(false);
+	});
+}
+if (promptSyntaxPopup) {
+	promptSyntaxPopup.addEventListener('keydown', (event) => {
+		if (promptSyntaxPopup.hidden) return;
+		if (event.key === 'Escape') {
+			event.preventDefault();
+			setPromptSyntaxPopupOpen(false);
+			return;
+		}
+		if (event.key !== 'Tab') return;
+		const tabStops = getPromptSyntaxTabStops();
+		if (!tabStops.length) return;
+		const first = tabStops[0];
+		const last = tabStops[tabStops.length - 1];
+		const active = document.activeElement;
+		if (event.shiftKey) {
+			if (active === first || !promptSyntaxPopup.contains(active)) {
+				event.preventDefault();
+				last.focus();
+			}
+			return;
+		}
+		if (active === last || !promptSyntaxPopup.contains(active)) {
+			event.preventDefault();
+			first.focus();
+		}
 	});
 }
 
