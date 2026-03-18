@@ -982,6 +982,7 @@ def test_gallery_lightbox_compare_markup_and_wiring_present():
 
     html = client.get("/").get_data(as_text=True)
     assert 'id="gallery-lightbox-compare-toggle"' in html
+    assert 'aria-keyshortcuts="C"' in html
     assert 'id="gallery-lightbox-source-upload"' in html
     assert 'id="gallery-lightbox-compare"' in html
     assert 'id="gallery-lightbox-before-image"' in html
@@ -1000,6 +1001,7 @@ def test_gallery_lightbox_compare_markup_and_wiring_present():
     assert "fetch(`/api/image/source-image?prompt_id=${encodeURIComponent(promptId)}`)" in js
     assert "fetch('/api/history/img2img-source', {" in js
     assert "function applyLightboxCompareSplit(splitValue)" in js
+    assert "function toggleGalleryLightboxCompare()" in js
     assert "function updateLightboxMedia(entry, fallbackSrc = '', fallbackAlt = 'Generated image', fallbackCaption = '')" in js
     assert "function isGalleryLightboxInteractiveTarget(target)" in js
     assert "function getGalleryLightboxFocusableControls()" in js
@@ -1008,6 +1010,9 @@ def test_gallery_lightbox_compare_markup_and_wiring_present():
     assert "const isImg2Img = snapshot.mode === 'img2img' && (snapshot.image || snapshot.image_name);" in js
     assert "image: snapshot.image || snapshot.image_name || ''," in js
     assert "if (isGalleryLightboxInteractiveTarget(event.target)) return;" in js
+    assert "if (key !== 'Escape' && key !== 'ArrowLeft' && key !== 'ArrowRight' && key !== 'c' && key !== 'C') return;" in js
+    assert "if (key === 'c' || key === 'C') {" in js
+    assert "toggleGalleryLightboxCompare();" in js
     assert "galleryLightboxPrev.addEventListener('keydown', onGalleryLightboxControlsKeydown);" in js
     assert "galleryLightboxNext.addEventListener('keydown', onGalleryLightboxControlsKeydown);" in js
     assert "galleryLightboxCompareToggle.addEventListener('click'" in js

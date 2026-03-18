@@ -4657,7 +4657,7 @@ function onGalleryLightboxControlsKeydown(event) {
 
 document.addEventListener('keydown', (event) => {
 	const key = event.key;
-	if (key !== 'Escape' && key !== 'ArrowLeft' && key !== 'ArrowRight') return;
+	if (key !== 'Escape' && key !== 'ArrowLeft' && key !== 'ArrowRight' && key !== 'c' && key !== 'C') return;
 
 	if (key === 'Escape') {
 		if (galleryContextMenu && !galleryContextMenu.hidden) {
@@ -4674,6 +4674,15 @@ document.addEventListener('keydown', (event) => {
 	}
 
 	if (!galleryLightbox || galleryLightbox.hidden) return;
+	if (key === 'c' || key === 'C') {
+		const target = event.target;
+		if (target instanceof HTMLElement && target.closest('#gallery-lightbox input, #gallery-lightbox select, #gallery-lightbox textarea')) return;
+		if (!galleryLightboxCompareToggle || galleryLightboxCompareToggle.hidden || galleryLightboxCompareToggle.disabled) return;
+		event.preventDefault();
+		toggleGalleryLightboxCompare();
+		return;
+	}
+
 	if (isGalleryLightboxInteractiveTarget(event.target)) return;
 	event.preventDefault();
 	if (key === 'ArrowLeft') navigateLightbox(-1);
@@ -4863,6 +4872,16 @@ async function attachSourceImageToLightboxEntry(file) {
 	}
 }
 
+function toggleGalleryLightboxCompare() {
+	if (!galleryLightboxCompareToggle) return;
+	const mode = String(galleryLightboxCompareToggle.dataset.mode || '').trim();
+	if (mode !== 'compare') return;
+	lightboxCompareEnabled = !lightboxCompareEnabled;
+	galleryLightboxCompareToggle.setAttribute('aria-pressed', String(lightboxCompareEnabled));
+	const entry = currentGalleryImages[lightboxCurrentIndex];
+	updateLightboxMedia(entry, galleryLightboxImage?.src || '', 'Generated image', entry?.prompt || 'Untitled generation');
+}
+
 if (galleryLightboxCompareToggle) {
 	galleryLightboxCompareToggle.addEventListener('keydown', onGalleryLightboxControlsKeydown);
 	galleryLightboxCompareToggle.addEventListener('click', () => {
@@ -4876,11 +4895,7 @@ if (galleryLightboxCompareToggle) {
 			galleryLightboxSourceUploadInput.click();
 			return;
 		}
-		if (mode !== 'compare') return;
-		lightboxCompareEnabled = !lightboxCompareEnabled;
-		galleryLightboxCompareToggle.setAttribute('aria-pressed', String(lightboxCompareEnabled));
-		const entry = currentGalleryImages[lightboxCurrentIndex];
-		updateLightboxMedia(entry, galleryLightboxImage?.src || '', 'Generated image', entry?.prompt || 'Untitled generation');
+		toggleGalleryLightboxCompare();
 	});
 }
 
