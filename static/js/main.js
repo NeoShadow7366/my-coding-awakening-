@@ -6279,7 +6279,7 @@ function setModelSearchStatus(message = '', isVisible = false) {
 		mbSearchStatusTimer = null;
 	}
 	mbSearchStatus.textContent = message;
-	mbSearchStatus.hidden = !isVisible;
+	setElementHiddenState(mbSearchStatus, !isVisible);
 	if (message === 'Search cancelled.' && isVisible) {
 		mbSearchStatusTimer = setTimeout(() => {
 			if (!mbSearchStatus) return;
@@ -6458,7 +6458,7 @@ async function bulkUpdateInstalledSearchMetadata() {
 	if (mbSearchBulkRefreshInstalledBtn) mbSearchBulkRefreshInstalledBtn.disabled = true;
 	if (mbSearchStatus) {
 		mbSearchStatus.textContent = 'Scanning installed models in current search results...';
-		mbSearchStatus.hidden = false;
+		setElementHiddenState(mbSearchStatus, false);
 	}
 
 	const searchItems = Array.isArray(mbLastSearchItems) ? mbLastSearchItems : [];
@@ -6467,7 +6467,7 @@ async function bulkUpdateInstalledSearchMetadata() {
 		showToast('No installed models were found in current search results.', 'neg');
 		if (mbSearchStatus) {
 			mbSearchStatus.textContent = 'No installed models found in current search results.';
-			mbSearchStatus.hidden = false;
+			setElementHiddenState(mbSearchStatus, false);
 		}
 		if (mbSearchBulkRefreshInstalledBtn) mbSearchBulkRefreshInstalledBtn.disabled = false;
 		return;
@@ -6563,7 +6563,7 @@ async function bulkUpdateInstalledSearchMetadata() {
 
 	if (mbSearchStatus) {
 		mbSearchStatus.textContent = summary;
-		mbSearchStatus.hidden = false;
+		setElementHiddenState(mbSearchStatus, false);
 	}
 
 	await loadModelLibrary();
@@ -6904,7 +6904,7 @@ function mbOnTabActivate() {
 
 async function loadModelLibrary() {
 	if (!mbLibraryGrid) return;
-	if (mbLibraryStatus) { mbLibraryStatus.textContent = 'Scanning local models…'; mbLibraryStatus.hidden = false; }
+	if (mbLibraryStatus) { mbLibraryStatus.textContent = 'Scanning local models…'; setElementHiddenState(mbLibraryStatus, false); }
 	mbLibraryGrid.innerHTML = '';
 	try {
 		const resp = await fetch('/api/models/library');
@@ -6914,7 +6914,7 @@ async function loadModelLibrary() {
 		mbLibraryRoot = String(data.models_root || '');
 		renderLocalLibraryFromState();
 	} catch (err) {
-		if (mbLibraryStatus) { mbLibraryStatus.textContent = 'Could not load local models: ' + err.message; mbLibraryStatus.hidden = false; }
+		if (mbLibraryStatus) { mbLibraryStatus.textContent = 'Could not load local models: ' + err.message; setElementHiddenState(mbLibraryStatus, false); }
 	}
 }
 
@@ -6922,7 +6922,7 @@ async function enrichLocalLibraryPreviews() {
 	if (mbLibraryEnrichPreviewsBtn) mbLibraryEnrichPreviewsBtn.disabled = true;
 	if (mbLibraryStatus) {
 		mbLibraryStatus.textContent = 'Looking up missing previews…';
-		mbLibraryStatus.hidden = false;
+		setElementHiddenState(mbLibraryStatus, false);
 	}
 	try {
 		const resp = await fetch('/api/models/library/enrich-previews', {
@@ -6966,7 +6966,7 @@ async function enrichLocalLibraryPreviews() {
 		]);
 		if (mbLibraryStatus) {
 			mbLibraryStatus.textContent = toastMessage;
-			mbLibraryStatus.hidden = false;
+			setElementHiddenState(mbLibraryStatus, false);
 		}
 		await loadModelLibrary();
 	} catch (err) {
@@ -6974,7 +6974,7 @@ async function enrichLocalLibraryPreviews() {
 		renderLocalLibraryActionReport('Preview Lookup', 'Preview lookup failed: ' + err.message, []);
 		if (mbLibraryStatus) {
 			mbLibraryStatus.textContent = 'Could not enrich local previews: ' + err.message;
-			mbLibraryStatus.hidden = false;
+			setElementHiddenState(mbLibraryStatus, false);
 		}
 	} finally {
 		if (mbLibraryEnrichPreviewsBtn) mbLibraryEnrichPreviewsBtn.disabled = false;
@@ -6985,7 +6985,7 @@ async function compareLocalLibraryMetadata() {
 	if (mbLibraryCompareMetadataBtn) mbLibraryCompareMetadataBtn.disabled = true;
 	if (mbLibraryStatus) {
 		mbLibraryStatus.textContent = 'Comparing missing metadata with providers…';
-		mbLibraryStatus.hidden = false;
+		setElementHiddenState(mbLibraryStatus, false);
 	}
 	let providerSummary = '';
 	try {
@@ -7040,7 +7040,7 @@ async function compareLocalLibraryMetadata() {
 		]);
 		if (mbLibraryStatus) {
 			mbLibraryStatus.textContent = toastMessage;
-			mbLibraryStatus.hidden = false;
+			setElementHiddenState(mbLibraryStatus, false);
 		}
 		await loadModelLibrary();
 	} catch (err) {
@@ -7049,7 +7049,7 @@ async function compareLocalLibraryMetadata() {
 		renderLocalLibraryActionReport('Metadata Compare', errorPrefix + err.message, []);
 		if (mbLibraryStatus) {
 			mbLibraryStatus.textContent = (providerSummary ? `Could not compare metadata (${providerSummary}): ` : 'Could not compare metadata: ') + err.message;
-			mbLibraryStatus.hidden = false;
+			setElementHiddenState(mbLibraryStatus, false);
 		}
 	} finally {
 		if (mbLibraryCompareMetadataBtn) mbLibraryCompareMetadataBtn.disabled = false;
@@ -7062,7 +7062,7 @@ async function recoverLocalLibraryMetadataAndPreviews() {
 	if (mbLibraryEnrichPreviewsBtn) mbLibraryEnrichPreviewsBtn.disabled = true;
 	if (mbLibraryStatus) {
 		mbLibraryStatus.textContent = 'Recovering missing metadata and previews…';
-		mbLibraryStatus.hidden = false;
+		setElementHiddenState(mbLibraryStatus, false);
 	}
 	let providerSummary = '';
 	try {
@@ -7152,7 +7152,7 @@ async function recoverLocalLibraryMetadataAndPreviews() {
 		]);
 		if (mbLibraryStatus) {
 			mbLibraryStatus.textContent = summary;
-			mbLibraryStatus.hidden = false;
+			setElementHiddenState(mbLibraryStatus, false);
 		}
 		await loadModelLibrary();
 	} catch (err) {
@@ -7161,7 +7161,7 @@ async function recoverLocalLibraryMetadataAndPreviews() {
 		renderLocalLibraryActionReport('Metadata + Preview Recovery', errorPrefix + err.message, []);
 		if (mbLibraryStatus) {
 			mbLibraryStatus.textContent = (providerSummary ? `Could not recover metadata and previews (${providerSummary}): ` : 'Could not recover metadata and previews: ') + err.message;
-			mbLibraryStatus.hidden = false;
+			setElementHiddenState(mbLibraryStatus, false);
 		}
 	} finally {
 		if (mbLibraryRecoverMetadataBtn) mbLibraryRecoverMetadataBtn.disabled = false;
@@ -7324,7 +7324,7 @@ function focusLocalLibraryReportItem(fileName) {
 	if (!targetCard) {
 		if (mbLibraryStatus) {
 			mbLibraryStatus.textContent = `Filtered Local Library to report item: ${targetName}`;
-			mbLibraryStatus.hidden = false;
+			setElementHiddenState(mbLibraryStatus, false);
 		}
 		return;
 	}
@@ -7340,7 +7340,7 @@ function focusLocalLibraryReportItem(fileName) {
 	targetCard.focus();
 	if (mbLibraryStatus) {
 		mbLibraryStatus.textContent = `Focused report item in Local Library: ${targetName}`;
-		mbLibraryStatus.hidden = false;
+		setElementHiddenState(mbLibraryStatus, false);
 	}
 	mbReportTargetTimer = window.setTimeout(() => {
 		targetCard.classList.remove('is-report-target');
@@ -7399,7 +7399,7 @@ function renderLocalLibrary(models, root) {
 	if (models.length === 0) {
 		if (mbLibraryStatus) {
 			mbLibraryStatus.textContent = root ? 'No models found in ' + root : 'ComfyUI path not configured — set it on the Configurations tab.';
-			mbLibraryStatus.hidden = false;
+			setElementHiddenState(mbLibraryStatus, false);
 		}
 		return;
 	}
@@ -7407,13 +7407,13 @@ function renderLocalLibrary(models, root) {
 	if (!displayModels.length) {
 		if (mbLibraryStatus) {
 			mbLibraryStatus.textContent = 'No local files match your filters.';
-			mbLibraryStatus.hidden = false;
+			setElementHiddenState(mbLibraryStatus, false);
 		}
 		return;
 	}
 	if (mbLibraryStatus) {
 		mbLibraryStatus.textContent = `Showing ${displayModels.length} of ${models.length} local files`;
-		mbLibraryStatus.hidden = false;
+		setElementHiddenState(mbLibraryStatus, false);
 	}
 	displayModels.forEach(m => {
 		const card = document.createElement('div');
@@ -9029,3 +9029,5 @@ window.addEventListener('beforeunload', () => {
 	stopWsTransportStatusTicker();
 	releaseBackgroundPollingOwnership();
 });
+
+

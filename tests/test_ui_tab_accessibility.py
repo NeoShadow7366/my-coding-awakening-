@@ -249,6 +249,7 @@ def test_index_model_pagination_group_semantics():
     assert resp.status_code == 200
     html = resp.get_data(as_text=True)
 
+    assert 'id="mb-search-status" class="hint" hidden aria-hidden="true"' in html
     assert 'id="mb-results-section" hidden aria-hidden="true"' in html
     assert '<div class="mb-pagination" id="mb-pagination" role="group" aria-label="Model search pagination" hidden aria-hidden="true">' in html
     assert 'id="mb-local-controls" hidden aria-hidden="true"' in html
@@ -357,6 +358,8 @@ def test_model_search_status_lifecycle_is_cleared_after_successful_render():
     content = js_path.read_text(encoding="utf-8")
 
     assert "function setModelSearchStatus(message = '', isVisible = false)" in content
+    assert "setElementHiddenState(mbSearchStatus, !isVisible);" in content
+    assert "setElementHiddenState(mbSearchStatus, false);" in content
     assert "setModelSearchStatus(provider === 'huggingface' ? 'Searching Hugging Face…' : 'Searching CivitAI…', true);" in content
     assert "setModelSearchStatus('Search failed: ' + err.message, true);" in content
     assert "setModelSearchStatus('', false);" in content
@@ -678,6 +681,7 @@ def test_index_local_library_has_compare_missing_metadata_button():
     assert "Compare Missing Metadata" in html
     assert 'id="mb-compare-provider-civitai" type="checkbox" checked' in html
     assert 'id="mb-compare-provider-huggingface" type="checkbox" checked' in html
+    assert 'id="mb-library-status" class="hint" aria-hidden="false"' in html
     assert 'id="mb-library-action-report" class="mb-library-action-report" hidden aria-hidden="true" aria-live="polite"' in html
     assert 'id="mb-library-action-report-clear"' in html
     assert 'Clear Report' in html
@@ -713,6 +717,7 @@ def test_local_library_compare_missing_metadata_button_wired_in_js_bundle():
     assert "Could not compare metadata (${providerSummary}): " in content
     assert "renderLocalLibraryActionReport('Preview Lookup'" in content
     assert "renderLocalLibraryActionReport('Metadata Compare'" in content
+    assert "setElementHiddenState(mbLibraryStatus, false);" in content
     assert "async function compareLocalLibraryMetadata()" in content
     assert "fetch('/api/models/library/compare-metadata'" in content
     assert "providers: selectedProviders" in content
