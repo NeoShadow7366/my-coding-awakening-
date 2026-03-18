@@ -7768,6 +7768,7 @@ function setDownloadsMinimized(minimized) {
 	}
 	if (mbDownloadsBody) {
 		mbDownloadsBody.hidden = mbDownloadsMinimized;
+		mbDownloadsBody.setAttribute('aria-hidden', mbDownloadsMinimized ? 'true' : 'false');
 	}
 	if (mbDownloadsToggleBtn) {
 		mbDownloadsToggleBtn.textContent = mbDownloadsMinimized ? 'Expand' : 'Minimize';
@@ -8089,7 +8090,9 @@ if (mbTypeInfoBtn && mbTypeInfoPanel) {
 		const expanded = mbTypeInfoBtn.getAttribute('aria-expanded') === 'true';
 		mbTypeInfoBtn.setAttribute('aria-expanded', expanded ? 'false' : 'true');
 		mbTypeInfoPanel.hidden = expanded;
+		mbTypeInfoPanel.setAttribute('aria-hidden', expanded ? 'true' : 'false');
 	});
+	mbTypeInfoPanel.setAttribute('aria-hidden', mbTypeInfoPanel.hidden ? 'true' : 'false');
 }
 if (mbLibraryRefreshBtn) {
 	mbLibraryRefreshBtn.addEventListener('click', loadModelLibrary);

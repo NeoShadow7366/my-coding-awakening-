@@ -894,7 +894,7 @@
     </div>
     <div class="sidebar-section">
       <button class="btn btn-ghost btn-full" id="mb-type-info-btn" type="button" aria-expanded="false" aria-controls="mb-type-info-panel">Model Type Guide</button>
-      <div id="mb-type-info-panel" class="mb-type-info-panel" hidden>
+      <div id="mb-type-info-panel" class="mb-type-info-panel" hidden aria-hidden="true">
         <p><strong>Checkpoint:</strong> Full base model for txt2img and img2img.</p>
         <p><strong>LoRA:</strong> Lightweight style/character addon that needs a base checkpoint.</p>
         <p><strong>VAE:</strong> Improves color/detail decoding for many checkpoints.</p>
@@ -1004,7 +1004,7 @@
           </div>
           <div class="mb-downloads-actions" role="group" aria-label="Download queue actions">
             <button class="btn btn-ghost btn-xs" id="mb-clear-finished-downloads" type="button">Clear Finished</button>
-            <button class="btn btn-ghost btn-xs" id="mb-downloads-toggle" type="button" aria-expanded="true">Minimize</button>
+            <button class="btn btn-ghost btn-xs" id="mb-downloads-toggle" type="button" aria-controls="mb-downloads-body" aria-expanded="true">Minimize</button>
           </div>
         </div>
         <div id="mb-downloads-body">
