@@ -953,9 +953,16 @@ def test_gallery_lightbox_compare_markup_and_wiring_present():
     assert "fetch('/api/history/img2img-source', {" in js
     assert "function applyLightboxCompareSplit(splitValue)" in js
     assert "function updateLightboxMedia(entry, fallbackSrc = '', fallbackAlt = 'Generated image', fallbackCaption = '')" in js
+    assert "function isGalleryLightboxInteractiveTarget(target)" in js
+    assert "function getGalleryLightboxFocusableControls()" in js
+    assert "function onGalleryLightboxControlsKeydown(event)" in js
     assert "const isImg2Img = snapshot.mode === 'img2img' && (snapshot.image || snapshot.image_name);" in js
     assert "image: snapshot.image || snapshot.image_name || ''," in js
+    assert "if (isGalleryLightboxInteractiveTarget(event.target)) return;" in js
+    assert "galleryLightboxPrev.addEventListener('keydown', onGalleryLightboxControlsKeydown);" in js
+    assert "galleryLightboxNext.addEventListener('keydown', onGalleryLightboxControlsKeydown);" in js
     assert "galleryLightboxCompareToggle.addEventListener('click'" in js
+    assert "galleryLightboxCompareToggle.addEventListener('keydown', onGalleryLightboxControlsKeydown);" in js
     assert "galleryLightboxSourceUploadInput.addEventListener('change', async () => {" in js
     assert "galleryLightboxCompareSlider.addEventListener('input'" in js
 
@@ -985,7 +992,10 @@ def test_gallery_lightbox_meta_panel_markup_and_wiring_present():
     assert "let lightboxMetaOpen = false;" in js
     assert "function updateLightboxMeta(entry)" in js
     assert "galleryLightboxMetaToggle.addEventListener('click'" in js
+    assert "galleryLightboxMetaToggle.addEventListener('keydown', onGalleryLightboxControlsKeydown);" in js
     assert "galleryLightboxReuseBtn.addEventListener('click'" in js
+    assert "galleryLightboxReuseBtn.addEventListener('keydown', onGalleryLightboxControlsKeydown);" in js
+    assert "galleryLightboxCloseBtn.addEventListener('keydown', onGalleryLightboxControlsKeydown);" in js
     assert "applyImageSettings(settings);" in js
     assert "showPanel('image');" in js
 
@@ -1106,6 +1116,7 @@ def test_gallery_favorites_markup_and_wiring_present():
     assert "isGalleryFavorite" in js
     assert "updateLightboxStarBtn" in js
     assert "galleryLightboxStarBtn" in js
+    assert "galleryLightboxStarBtn.addEventListener('keydown', onGalleryLightboxControlsKeydown);" in js
     assert "gallery-star-btn" in js
     assert "galleryModeFilter === 'favorites'" in js
 

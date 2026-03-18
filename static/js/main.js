@@ -4545,6 +4545,54 @@ if (galleryLightbox) {
 
 if (galleryLightboxCloseBtn) {
 	galleryLightboxCloseBtn.addEventListener('click', closeGalleryLightbox);
+	galleryLightboxCloseBtn.addEventListener('keydown', onGalleryLightboxControlsKeydown);
+}
+
+function isGalleryLightboxInteractiveTarget(target) {
+	if (!(target instanceof HTMLElement)) return false;
+	return Boolean(target.closest(
+		'#gallery-lightbox button, #gallery-lightbox input, #gallery-lightbox select, #gallery-lightbox textarea'
+	));
+}
+
+function isGalleryLightboxControlVisible(control) {
+	if (!(control instanceof HTMLElement)) return false;
+	if (control.hidden || control.hasAttribute('hidden') || control.getAttribute('aria-hidden') === 'true') return false;
+	if (control.closest('[hidden]')) return false;
+	return true;
+}
+
+function getGalleryLightboxFocusableControls() {
+	return [
+		galleryLightboxPrev,
+		galleryLightboxMetaToggle,
+		galleryLightboxCompareToggle,
+		galleryLightboxStarBtn,
+		galleryLightboxCloseBtn,
+		galleryLightboxReuseBtn,
+		galleryLightboxNext,
+	].filter((control) => control && !control.disabled && isGalleryLightboxControlVisible(control));
+}
+
+function onGalleryLightboxControlsKeydown(event) {
+	const key = event.key;
+	if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(key)) return;
+	const controls = getGalleryLightboxFocusableControls();
+	if (controls.length < 2) return;
+	const currentIndex = controls.indexOf(event.currentTarget);
+	if (currentIndex < 0) return;
+	event.preventDefault();
+	let nextIndex = currentIndex;
+	if (key === 'Home') {
+		nextIndex = 0;
+	} else if (key === 'End') {
+		nextIndex = controls.length - 1;
+	} else if (key === 'ArrowRight') {
+		nextIndex = (currentIndex + 1) % controls.length;
+	} else if (key === 'ArrowLeft') {
+		nextIndex = (currentIndex - 1 + controls.length) % controls.length;
+	}
+	controls[nextIndex]?.focus();
 }
 
 document.addEventListener('keydown', (event) => {
@@ -4566,6 +4614,7 @@ document.addEventListener('keydown', (event) => {
 	}
 
 	if (!galleryLightbox || galleryLightbox.hidden) return;
+	if (isGalleryLightboxInteractiveTarget(event.target)) return;
 	event.preventDefault();
 	if (key === 'ArrowLeft') navigateLightbox(-1);
 	if (key === 'ArrowRight') navigateLightbox(1);
@@ -4668,13 +4717,16 @@ if (refreshGalleryBtn) {
 
 if (galleryLightboxPrev) {
 	galleryLightboxPrev.addEventListener('click', () => navigateLightbox(-1));
+	galleryLightboxPrev.addEventListener('keydown', onGalleryLightboxControlsKeydown);
 }
 
 if (galleryLightboxNext) {
 	galleryLightboxNext.addEventListener('click', () => navigateLightbox(1));
+	galleryLightboxNext.addEventListener('keydown', onGalleryLightboxControlsKeydown);
 }
 
 if (galleryLightboxStarBtn) {
+	galleryLightboxStarBtn.addEventListener('keydown', onGalleryLightboxControlsKeydown);
 	galleryLightboxStarBtn.addEventListener('click', () => {
 		const entry = currentGalleryImages[lightboxCurrentIndex];
 		if (!entry?.id) return;
@@ -4752,6 +4804,7 @@ async function attachSourceImageToLightboxEntry(file) {
 }
 
 if (galleryLightboxCompareToggle) {
+	galleryLightboxCompareToggle.addEventListener('keydown', onGalleryLightboxControlsKeydown);
 	galleryLightboxCompareToggle.addEventListener('click', () => {
 		const mode = String(galleryLightboxCompareToggle.dataset.mode || '').trim();
 		if (mode === 'attach') {
@@ -4787,6 +4840,7 @@ if (galleryLightboxCompareSlider) {
 }
 
 if (galleryLightboxMetaToggle) {
+	galleryLightboxMetaToggle.addEventListener('keydown', onGalleryLightboxControlsKeydown);
 	galleryLightboxMetaToggle.addEventListener('click', () => {
 		lightboxMetaOpen = !lightboxMetaOpen;
 		galleryLightboxMetaToggle.setAttribute('aria-pressed', String(lightboxMetaOpen));
@@ -4801,6 +4855,7 @@ if (galleryLightboxMetaToggle) {
 }
 
 if (galleryLightboxReuseBtn) {
+	galleryLightboxReuseBtn.addEventListener('keydown', onGalleryLightboxControlsKeydown);
 	galleryLightboxReuseBtn.addEventListener('click', () => {
 		const entry = currentGalleryImages[lightboxCurrentIndex];
 		if (!entry) return;
