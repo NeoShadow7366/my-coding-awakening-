@@ -325,6 +325,8 @@ const IMAGE_RECENT_MODELS_KEY = 'imageRecentModelsV1';
 const IMAGE_FAVORITE_MODELS_KEY = 'imageFavoriteModelsV1';
 const IMAGE_MODEL_FILTER_MODE_KEY = 'imageModelFilterModeV1';
 const QUEUE_TELEMETRY_KEY = 'queueTelemetryV1';
+const QUEUE_STATE_STORAGE_KEY = 'queueStateV1';
+const QUEUE_STATE_MAX_ITEMS = 40;
 const BACKGROUND_POLL_OWNER_KEY = 'backgroundPollOwnerV1';
 const BACKGROUND_POLL_LEASE_MS = 10_000;
 const BACKGROUND_POLL_HEARTBEAT_MS = 3_000;
@@ -613,6 +615,79 @@ function resetQueueTelemetry() {
 	queueTelemetryState = { submitted: 0, canceled: 0, retried: 0, failed: 0 };
 	persistQueueTelemetryState();
 	renderQueueTelemetry();
+}
+
+function persistTrackedQueueState() {
+	const entries = Array.from(trackedPromptIds)
+		.map((promptId) => {
+			const meta = queueJobMeta.get(promptId) || {};
+			const snapshot = pendingImageJobs.get(promptId) || meta.snapshot || {};
+			if (!snapshot || typeof snapshot !== 'object') return null;
+			return {
+				prompt_id: promptId,
+				status: String(meta.status || 'queued'),
+				miss_count: Number.isFinite(Number(meta.missCount)) ? Number(meta.missCount) : 0,
+				updated_at: Number.isFinite(Number(meta.updatedAt)) ? Number(meta.updatedAt) : Date.now(),
+				snapshot,
+			};
+		})
+		.filter(Boolean)
+		.sort((a, b) => b.updated_at - a.updated_at)
+		.slice(0, QUEUE_STATE_MAX_ITEMS);
+
+	try {
+		if (!entries.length) {
+			localStorage.removeItem(QUEUE_STATE_STORAGE_KEY);
+			return;
+		}
+		localStorage.setItem(QUEUE_STATE_STORAGE_KEY, JSON.stringify({ entries, saved_at: Date.now() }));
+	} catch {
+		// Ignore storage write failures; queue processing still works in-memory.
+	}
+}
+
+function restoreTrackedQueueState() {
+	let parsed;
+	try {
+		parsed = JSON.parse(localStorage.getItem(QUEUE_STATE_STORAGE_KEY) || '{}');
+	} catch {
+		return;
+	}
+
+	const entries = Array.isArray(parsed?.entries) ? parsed.entries : [];
+	if (!entries.length) return;
+
+	let restoredCount = 0;
+	for (const entry of entries) {
+		const promptId = String(entry?.prompt_id || '').trim();
+		if (!promptId) continue;
+		const snapshot = entry?.snapshot && typeof entry.snapshot === 'object' ? entry.snapshot : {};
+		const rawStatus = String(entry?.status || 'queued');
+		const status = ['queued', 'running', 'processing'].includes(rawStatus) ? rawStatus : 'queued';
+		const missCount = Number.isFinite(Number(entry?.miss_count)) ? Math.max(0, Number(entry.miss_count)) : 0;
+		const updatedAt = Number.isFinite(Number(entry?.updated_at)) ? Number(entry.updated_at) : Date.now();
+
+		trackedPromptIds.add(promptId);
+		if (snapshot && Object.keys(snapshot).length) {
+			pendingImageJobs.set(promptId, snapshot);
+		}
+		queueJobMeta.set(promptId, {
+			status,
+			missCount,
+			updatedAt,
+			snapshot,
+		});
+		restoredCount += 1;
+	}
+
+	if (!restoredCount) {
+		try { localStorage.removeItem(QUEUE_STATE_STORAGE_KEY); } catch { /* no-op */ }
+		return;
+	}
+
+	renderQueueStatus([], [], new Set());
+	ensureQueuePolling();
+	pollQueue();
 }
 
 if (failedOnlyToggle) {
@@ -3260,6 +3335,7 @@ function renderQueueStatus(running, pending, donePromptIds = new Set()) {
 		});
 
 	queueList.innerHTML = rows.length ? rows.join('') : '<li class="history-item"><span class="history-text">No queue items match this filter.</span></li>';
+	persistTrackedQueueState();
 	restoreQueueActionFocus(focusedQueueAction);
 }
 
@@ -3276,6 +3352,7 @@ function _clearQueueByStatus(status) {
 		queueActionInFlight.delete(`prioritize:${promptId}`);
 		cleared += 1;
 	}
+	persistTrackedQueueState();
 	return cleared;
 }
 
@@ -3330,6 +3407,7 @@ async function cancelImageJob(promptId) {
 		meta.updatedAt = Date.now();
 		queueJobMeta.set(promptId, meta);
 		incrementQueueTelemetry('canceled');
+		persistTrackedQueueState();
 		showToast('Job canceled.');
 		await pollQueue();
 	} catch (err) {
@@ -3402,6 +3480,7 @@ async function retryImageJob(promptId, isAuto = false) {
 			snapshot: { ...snapshot, ...(data.meta || {}) },
 		});
 		incrementQueueTelemetry('retried');
+		persistTrackedQueueState();
 		ensureQueuePolling();
 		if (!isAuto) showToast('Retry submitted.', 'pos');
 		await pollQueue();
@@ -3456,6 +3535,7 @@ async function rerunImageJob(promptId) {
 			snapshot: { ...snapshot, ...(data.meta || {}) },
 		});
 		incrementQueueTelemetry('submitted');
+		persistTrackedQueueState();
 		ensureQueuePolling();
 		showToast('Re-run submitted.', 'pos');
 		await pollQueue();
@@ -3531,6 +3611,7 @@ async function prioritizeImageJob(promptId) {
 			snapshot: nextSnapshot,
 		});
 		incrementQueueTelemetry('submitted');
+		persistTrackedQueueState();
 		ensureQueuePolling();
 		showToast('Job moved to the front of the queue.', 'pos');
 		await pollQueue();
@@ -5536,6 +5617,7 @@ async function pollQueue() {
 				queueJobMeta.set(promptId, meta);
 				pendingImageJobs.delete(promptId);
 			}
+			persistTrackedQueueState();
 			await loadGallery();
 			await loadLivePreview();
 		}
@@ -9253,6 +9335,7 @@ imageForm.addEventListener('submit', async (e) => {
 			updatedAt: Date.now(),
 			snapshot,
 		});
+		persistTrackedQueueState();
 		ensureQueuePolling();
 
 		queueSummary.textContent = `Submitted: ${promptId}`;
@@ -9266,6 +9349,7 @@ imageForm.addEventListener('submit', async (e) => {
 	}
 });
 
+restoreTrackedQueueState();
 loadGallery();
 loadLivePreview();
 loadServiceConfig();

@@ -94,6 +94,11 @@ def test_queue_action_keyboard_handler_wiring_present_in_js_bundle():
     assert "prioritizeImageJob(promptId);" in content
     assert "body: JSON.stringify(resubmitBody)," in content
     assert "const resubmitUrl = isImg2Img ? '/api/image/img2img-requeue' : '/api/image/generate';" in content
+    assert "const QUEUE_STATE_STORAGE_KEY = 'queueStateV1';" in content
+    assert "function persistTrackedQueueState()" in content
+    assert "function restoreTrackedQueueState()" in content
+    assert "restoreTrackedQueueState();" in content
+    assert "localStorage.setItem(QUEUE_STATE_STORAGE_KEY" in content
     assert "if (action === 'prioritize') {" in content
     assert "queueList.addEventListener('keydown', onQueueActionKeydown);" in content
 
