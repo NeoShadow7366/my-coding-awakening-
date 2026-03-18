@@ -4067,13 +4067,72 @@ function applyGalleryPayloadToImageForm(payload) {
 
 	setSelectValueIfOptionExists(imageModelSelect, payload.model);
 	setSelectValueIfOptionExists(imageSamplerSelect, payload.sampler);
-	setSelectValueIfOptionExists(loraModelSelect, payload.lora);
+	if (loraStackContainer) {
+		const incomingLoras = Array.isArray(payload.loras) ? payload.loras : [];
+		if (incomingLoras.length) {
+			loraStackContainer.innerHTML = '';
+			for (const entry of incomingLoras) {
+				const name = String(entry?.name || '').trim();
+				if (!name) continue;
+				addLoraRow();
+				const row = loraStackContainer.lastElementChild;
+				if (!row) continue;
+				const sel = row.querySelector('.lora-row-select');
+				const str = row.querySelector('.lora-row-strength');
+				const strVal = row.querySelector('.lora-strength-val');
+				if (sel) {
+					if (![...sel.options].some((o) => o.value === name)) {
+						const opt = document.createElement('option');
+						opt.value = name;
+						opt.textContent = name;
+						sel.appendChild(opt);
+					}
+					sel.value = name;
+					sel.dispatchEvent(new Event('change'));
+				}
+				const n = Number(entry?.strength);
+				if (str && Number.isFinite(n)) {
+					str.value = String(n);
+					if (strVal) strVal.textContent = n.toFixed(2);
+				}
+			}
+		} else {
+			const legacyLora = String(payload.lora || '').trim();
+			if (legacyLora) {
+				let row = [...loraStackContainer.querySelectorAll('.lora-row')]
+					.find((r) => !(r.querySelector('.lora-row-select')?.value || '').trim());
+				if (!row) {
+					addLoraRow();
+					row = loraStackContainer.lastElementChild;
+				}
+				if (row) {
+					const sel = row.querySelector('.lora-row-select');
+					const str = row.querySelector('.lora-row-strength');
+					const strVal = row.querySelector('.lora-strength-val');
+					if (sel) {
+						if (![...sel.options].some((o) => o.value === legacyLora)) {
+							const opt = document.createElement('option');
+							opt.value = legacyLora;
+							opt.textContent = legacyLora;
+							sel.appendChild(opt);
+						}
+						sel.value = legacyLora;
+						sel.dispatchEvent(new Event('change'));
+					}
+					const n = Number(payload.lora_strength);
+					if (str && Number.isFinite(n)) {
+						str.value = String(n);
+						if (strVal) strVal.textContent = n.toFixed(2);
+					}
+				}
+			}
+		}
+	}
 	setSelectValueIfOptionExists(controlnetModelSelect, payload.controlnet_model);
 
 	if (payload.seed !== null && payload.seed !== undefined && payload.seed !== '') {
 		imageSeed.value = String(payload.seed);
 	}
-	setNumericInputIfFinite(loraStrength, payload.lora_strength);
 	setNumericInputIfFinite(controlnetWeight, payload.controlnet_weight);
 	setNumericInputIfFinite(controlnetStart, payload.controlnet_start);
 	setNumericInputIfFinite(controlnetEnd, payload.controlnet_end);

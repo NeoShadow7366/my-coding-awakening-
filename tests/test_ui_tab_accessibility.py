@@ -1140,6 +1140,10 @@ def test_prompt_recent_chips_markup_and_wiring_present():
     assert "promptRecentChips.querySelectorAll('.prompt-recent-chip').forEach((btn) => {" in js
     assert "localStorage.removeItem(PROMPT_RECENT_KEY);" in js
     assert "renderPromptRecentChips();" in js
+    assert "setSelectValueIfOptionExists(loraModelSelect, payload.lora);" not in js
+    assert "setNumericInputIfFinite(loraStrength, payload.lora_strength);" not in js
+    assert "const incomingLoras = Array.isArray(payload.loras) ? payload.loras : [];" in js
+    assert "const legacyLora = String(payload.lora || '').trim();" in js
 
     css_path = Path(__file__).resolve().parents[1] / "static" / "css" / "style.css"
     css = css_path.read_text(encoding="utf-8")
