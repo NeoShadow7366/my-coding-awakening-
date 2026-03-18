@@ -3228,7 +3228,7 @@ function renderQueueStatus(running, pending, donePromptIds = new Set()) {
 			const reason = meta.failReason ? `<span class="queue-reason">${escHtml(meta.failReason)}</span>` : '';
 			const promptDisplay = escHtml((snap.prompt || promptId).slice(0, 72));
 			const actions = [
-				canPrioritize ? `<button class="btn btn-ghost btn-xs queue-action" data-action="prioritize" data-prompt-id="${promptLabel}" aria-label="Move job ${promptLabel} to front" title="Move ${promptLabel} to front" ${prioritizeBusy ? 'disabled' : ''}>${prioritizeBusy ? 'Moving...' : 'Prioritize'}</button>` : '',
+				canPrioritize ? `<button class="btn btn-ghost btn-xs queue-action" data-action="prioritize" data-prompt-id="${promptLabel}" aria-label="Move job ${promptLabel} to front" aria-keyshortcuts="Alt+ArrowUp" title="Move ${promptLabel} to front (Alt+ArrowUp)" ${prioritizeBusy ? 'disabled' : ''}>${prioritizeBusy ? 'Moving...' : 'Prioritize'}</button>` : '',
 				canCancel ? `<button class="btn btn-ghost btn-xs queue-action" data-action="cancel" data-prompt-id="${promptLabel}" aria-label="Cancel job ${promptLabel}" title="Cancel ${promptLabel}" ${cancelBusy ? 'disabled' : ''}>${cancelBusy ? 'Canceling...' : 'Cancel'}</button>` : '',
 				canRetry ? `<button class="btn btn-ghost btn-xs queue-action" data-action="retry" data-prompt-id="${promptLabel}" aria-label="Retry job ${promptLabel}" title="Retry ${promptLabel}" ${retryBusy ? 'disabled' : ''}>${retryBusy ? 'Retrying...' : 'Retry'}</button>` : '',
 				canRerun ? `<button class="btn btn-ghost btn-xs queue-action" data-action="rerun" data-prompt-id="${promptLabel}" aria-label="Re-run job ${promptLabel}" title="Re-run ${promptLabel}" ${rerunBusy ? 'disabled' : ''}>${rerunBusy ? 'Queuing...' : 'Re-run'}</button>` : '',
@@ -3551,6 +3551,18 @@ function onQueueActionKeydown(event) {
 	const target = event.target;
 	if (!(target instanceof HTMLElement)) return;
 	if (!target.classList.contains('queue-action')) return;
+	if (event.altKey && event.key === 'ArrowUp') {
+		const promptId = target.getAttribute('data-prompt-id') || '';
+		if (!promptId) return;
+		event.preventDefault();
+		const row = target.closest('.queue-item');
+		const prioritizeBtn = row ? row.querySelector('.queue-action[data-action="prioritize"]') : null;
+		if (!(prioritizeBtn instanceof HTMLButtonElement) || prioritizeBtn.disabled) return;
+		if (queueActionInFlight.has(`prioritize:${promptId}`)) return;
+		prioritizeBtn.disabled = true;
+		prioritizeImageJob(promptId);
+		return;
+	}
 	const key = event.key;
 	if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(key)) return;
 	const row = target.closest('.queue-item');

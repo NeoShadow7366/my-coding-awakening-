@@ -88,6 +88,10 @@ def test_queue_action_keyboard_handler_wiring_present_in_js_bundle():
     assert "<span class=\"chip\">front</span>" in content
     assert "async function prioritizeImageJob(promptId)" in content
     assert "data-action=\"prioritize\"" in content
+    assert "aria-keyshortcuts=\"Alt+ArrowUp\"" in content
+    assert "if (event.altKey && event.key === 'ArrowUp') {" in content
+    assert "const prioritizeBtn = row ? row.querySelector('.queue-action[data-action=\"prioritize\"]') : null;" in content
+    assert "prioritizeImageJob(promptId);" in content
     assert "body: JSON.stringify({ ...snapshot, queue_front: true })," in content
     assert "if (action === 'prioritize') {" in content
     assert "queueList.addEventListener('keydown', onQueueActionKeydown);" in content
