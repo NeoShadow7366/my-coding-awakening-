@@ -276,6 +276,7 @@ def test_model_download_actions_keyboard_handler_wiring_present_in_js_bundle():
     assert "mbModelModal.addEventListener('keydown', (event) => {" in content
     assert "if (event.key !== 'Tab' || mbModelModal.hidden) return;" in content
     assert "const tabStops = getModelModalTabStops();" in content
+    assert "mbModelModalLastFocus = null;" in content
 
 
 def test_model_pagination_keyboard_handler_wiring_present_in_js_bundle():

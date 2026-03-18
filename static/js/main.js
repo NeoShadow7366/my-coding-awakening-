@@ -6349,6 +6349,7 @@ function setModelModalOpen(isOpen) {
 		if (active instanceof HTMLElement && mbModelModal.contains(active) && mbModelModalLastFocus && document.contains(mbModelModalLastFocus)) {
 			mbModelModalLastFocus.focus();
 		}
+		mbModelModalLastFocus = null;
 	}
 }
 
