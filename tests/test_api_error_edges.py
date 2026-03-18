@@ -268,6 +268,7 @@ def test_image_view_proxies_bytes_and_mimetype(client, monkeypatch):
     assert resp.status_code == 200
     assert resp.content_type == "image/png"
     assert resp.data == fake_bytes
+    assert "public" in (resp.headers.get("Cache-Control") or "")
 
 
 # ---------------------------------------------------------------------------
@@ -289,3 +290,139 @@ def test_image_cancel_success_returns_ok_and_prompt_id(client, monkeypatch):
     data = resp.get_json()
     assert data["ok"] is True
     assert data["prompt_id"] == "pid-xyz"
+
+
+# ---------------------------------------------------------------------------
+# /api/image/source-image — prompt lookup for legacy img2img compare
+# ---------------------------------------------------------------------------
+
+def test_image_source_image_requires_prompt_id(client, monkeypatch):
+    monkeypatch.setattr(app_module, "_comfy_available", lambda: True)
+
+    resp = client.get("/api/image/source-image")
+
+    assert resp.status_code == 400
+    assert resp.get_json()["error"] == "prompt_id is required"
+
+
+def test_image_source_image_returns_filename_when_found(client, monkeypatch):
+    monkeypatch.setattr(app_module, "_comfy_available", lambda: True)
+    monkeypatch.setattr(app_module, "_parse_prompt_source_image", lambda prompt_id: "legacy-upload.png")
+
+    resp = client.get("/api/image/source-image?prompt_id=abc-123")
+
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["ok"] is True
+    assert data["image"] == "legacy-upload.png"
+
+
+def test_image_source_image_reads_comfy_history_list_format_via_endpoint(client, monkeypatch):
+    prompt_id = "pid-live-shape"
+    monkeypatch.setattr(app_module, "_comfy_available", lambda: True)
+    monkeypatch.setattr(
+        app_module,
+        "_comfy_history",
+        lambda _: {
+            prompt_id: {
+                "prompt": [
+                    17,
+                    prompt_id,
+                    {
+                        "42": {
+                            "class_type": "LoadImage",
+                            "inputs": {"image": "source-from-history.png"},
+                        }
+                    },
+                ]
+            }
+        },
+    )
+
+    resp = client.get(f"/api/image/source-image?prompt_id={prompt_id}")
+
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["ok"] is True
+    assert data["image"] == "source-from-history.png"
+
+
+def test_history_img2img_source_backfill_updates_matching_prompt(client):
+    create = client.post(
+        "/api/history",
+        json={
+            "type": "image",
+            "prompt": "legacy img2img",
+            "engine": "comfyui",
+            "params": {"mode": "img2img", "prompt_id": "pid-legacy"},
+            "images": [{"filename": "out.png", "subfolder": "", "type": "output"}],
+        },
+    )
+    assert create.status_code == 201
+
+    patch_resp = client.post(
+        "/api/history/img2img-source",
+        json={"prompt_id": "pid-legacy", "image": "source-legacy.png"},
+    )
+    assert patch_resp.status_code == 200
+    assert patch_resp.get_json()["updated"] == 1
+
+    history = client.get("/api/history?type=image").get_json()["history"]
+    assert history[0]["params"]["image"] == "source-legacy.png"
+
+
+def test_history_img2img_source_backfill_updates_matching_entry_id_only(client):
+    create = client.post(
+        "/api/history",
+        json={
+            "type": "image",
+            "prompt": "legacy img2img by id",
+            "engine": "comfyui",
+            "params": {"mode": "img2img", "prompt_id": "pid-by-id"},
+            "images": [{"filename": "out-id.png", "subfolder": "", "type": "output"}],
+        },
+    )
+    assert create.status_code == 201
+    entry_id = create.get_json()["entry"]["id"]
+
+    patch_resp = client.post(
+        "/api/history/img2img-source",
+        json={"entry_id": entry_id, "image": "source-by-id.png"},
+    )
+
+    assert patch_resp.status_code == 200
+    assert patch_resp.get_json()["updated"] == 1
+
+    history = client.get("/api/history?type=image").get_json()["history"]
+    target = next(item for item in history if item["id"] == entry_id)
+    assert target["params"]["image"] == "source-by-id.png"
+
+
+def test_history_img2img_source_backfill_requires_identity_or_prompt(client):
+    resp = client.post("/api/history/img2img-source", json={"image": "source.png"})
+    assert resp.status_code == 400
+    assert resp.get_json()["error"] == "entry_id or prompt_id is required"
+
+
+def test_parse_prompt_source_image_supports_comfy_prompt_list_format(monkeypatch):
+    prompt_id = "pid-list"
+    monkeypatch.setattr(
+        app_module,
+        "_comfy_history",
+        lambda _: {
+            prompt_id: {
+                "prompt": [
+                    1,
+                    prompt_id,
+                    {
+                        "23": {
+                            "class_type": "LoadImage",
+                            "inputs": {"image": "legacy-source.png"},
+                        }
+                    },
+                ]
+            }
+        },
+    )
+
+    assert app_module._parse_prompt_source_image(prompt_id) == "legacy-source.png"

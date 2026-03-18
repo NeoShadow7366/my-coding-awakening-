@@ -1549,6 +1549,33 @@ def _parse_prompt_images(prompt_id: str) -> list[dict]:
     return images
 
 
+def _parse_prompt_source_image(prompt_id: str) -> str:
+    """Extract the primary img2img source image filename from ComfyUI history."""
+    data = _comfy_history(prompt_id)
+    payload = data.get(prompt_id, {})
+    prompt_payload = payload.get("prompt")
+    workflow = {}
+    if isinstance(prompt_payload, dict):
+        workflow = prompt_payload
+    elif isinstance(prompt_payload, list) and len(prompt_payload) >= 3 and isinstance(prompt_payload[2], dict):
+        # ComfyUI history commonly returns prompt as: [number, prompt_id, workflow, extra_data, outputs]
+        workflow = prompt_payload[2]
+
+    if not isinstance(workflow, dict):
+        return ""
+
+    for node in workflow.values():
+        if not isinstance(node, dict):
+            continue
+        if node.get("class_type") != "LoadImage":
+            continue
+        inputs = node.get("inputs") or {}
+        filename = str(inputs.get("image") or "").strip()
+        if filename:
+            return filename
+    return ""
+
+
 def _safe_child_path(base: Path, *parts: str) -> Path:
     """Resolve a child path and reject traversal outside the base directory."""
     base_resolved = base.resolve()
@@ -4081,10 +4108,76 @@ def api_image_view():
     try:
         upstream = requests.get(f"{COMFYUI_BASE_URL}/view", params=params, timeout=20)
         upstream.raise_for_status()
-        return Response(upstream.content, mimetype=upstream.headers.get("content-type", "image/png"))
+        response = Response(upstream.content, mimetype=upstream.headers.get("content-type", "image/png"))
+        # ComfyUI output filenames are immutable snapshots, so allow browser caching.
+        response.headers["Cache-Control"] = "public, max-age=86400, immutable"
+        return response
     except requests.RequestException as exc:
         logger.error("ComfyUI image view failed: %s", exc)
         return jsonify({"error": str(exc)}), 502
+
+
+@app.route("/api/image/source-image")
+def api_image_source_image():
+    """Resolve img2img source image filename from ComfyUI history for a prompt."""
+    if not _comfy_available():
+        return jsonify({"error": "ComfyUI is not available"}), 503
+
+    prompt_id = (request.args.get("prompt_id") or "").strip()
+    if not prompt_id:
+        return jsonify({"error": "prompt_id is required"}), 400
+
+    try:
+        image_name = _parse_prompt_source_image(prompt_id)
+    except requests.RequestException as exc:
+        logger.error("ComfyUI source image lookup failed: %s", exc)
+        return jsonify({"error": str(exc)}), 502
+
+    if not image_name:
+        return jsonify({"ok": False, "image": "", "error": "No source image found"}), 404
+    return jsonify({"ok": True, "image": image_name})
+
+
+@app.route("/api/history/img2img-source", methods=["POST"])
+def api_history_img2img_source():
+    """Backfill missing img2img source image metadata in local history entries."""
+    body = request.get_json(silent=True) or {}
+    image_name = str(body.get("image") or "").strip()
+    if not image_name:
+        return jsonify({"error": "image is required"}), 400
+
+    entry_id = str(body.get("entry_id") or "").strip()
+    prompt_id = str(body.get("prompt_id") or "").strip()
+    if not entry_id and not prompt_id:
+        return jsonify({"error": "entry_id or prompt_id is required"}), 400
+
+    entries = _load_history()
+    updated = 0
+
+    for entry in entries:
+        if str(entry.get("type") or "") != "image":
+            continue
+        params = entry.get("params") if isinstance(entry.get("params"), dict) else {}
+        if str(params.get("mode") or "") != "img2img":
+            continue
+
+        entry_match = bool(entry_id and str(entry.get("id") or "") == entry_id)
+        prompt_match = bool(prompt_id and str(params.get("prompt_id") or "") == prompt_id)
+        if not entry_match and not prompt_match:
+            continue
+
+        if str(params.get("image") or "").strip() == image_name:
+            continue
+
+        params["image"] = image_name
+        entry["params"] = params
+        updated += 1
+        if entry_match:
+            break
+
+    if updated:
+        _save_history(entries[:300])
+    return jsonify({"ok": True, "updated": updated})
 
 
 @app.route("/api/image/live-preview")

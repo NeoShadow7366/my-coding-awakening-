@@ -77,6 +77,7 @@ const mbModelModalVersionStatus = document.getElementById('mb-model-modal-versio
 const mbModelModalDownloadStatus = document.getElementById('mb-model-modal-download-status');
 const mbModelModalFiles = document.getElementById('mb-model-modal-files');
 const mbModelModalDefaults = document.getElementById('mb-model-modal-defaults');
+const mbModelModalNotes = document.getElementById('mb-model-modal-notes');
 const mbSearchBulkRefreshInstalledBtn = document.getElementById('mb-search-bulk-refresh-installed-btn');
 const mbDownloadsSection = document.getElementById('mb-downloads-section');
 const mbDownloadsBody = document.getElementById('mb-downloads-body');
@@ -125,6 +126,10 @@ const loraStackContainer = document.getElementById('lora-stack-container');
 // NOTE: loraModelSelect / loraStrength / loraStrengthVal replaced by multi-LoRA stack
 const controlnetModelSelect = document.getElementById('controlnet-model-select');
 const controlnetImageUpload = document.getElementById('controlnet-image-upload');
+const controlnetImagePreviewWrap = document.getElementById('controlnet-image-preview-wrap');
+const controlnetImagePreview = document.getElementById('controlnet-image-preview');
+const controlnetImageName = document.getElementById('controlnet-image-name');
+const controlnetImageClearBtn = document.getElementById('controlnet-image-clear');
 const controlnetWeight = document.getElementById('controlnet-weight');
 const controlnetWeightVal = document.getElementById('controlnet-weight-val');
 const controlnetStart = document.getElementById('controlnet-start');
@@ -138,6 +143,9 @@ const imageProfileName = document.getElementById('image-profile-name');
 const imageProfileSaveBtn = document.getElementById('image-profile-save');
 const imageProfileApplyBtn = document.getElementById('image-profile-apply');
 const imageProfileDeleteBtn = document.getElementById('image-profile-delete');
+const imageProfileExportBtn = document.getElementById('image-profile-export');
+const imageProfileImportBtn = document.getElementById('image-profile-import-btn');
+const imageProfileImportInput = document.getElementById('image-profile-import-input');
 const imageSteps = document.getElementById('image-steps');
 const imageStepsVal = document.getElementById('image-steps-val');
 const imageCfg = document.getElementById('image-cfg');
@@ -256,8 +264,22 @@ const galleryLightbox = document.getElementById('gallery-lightbox');
 const galleryLightboxImage = document.getElementById('gallery-lightbox-image');
 const galleryLightboxCaption = document.getElementById('gallery-lightbox-caption');
 const galleryLightboxCloseBtn = document.getElementById('gallery-lightbox-close');
+const galleryLightboxMetaToggle = document.getElementById('gallery-lightbox-meta-toggle');
+const galleryLightboxMeta = document.getElementById('gallery-lightbox-meta');
+const galleryLightboxMetaChips = document.getElementById('gallery-lightbox-meta-chips');
+const galleryLightboxReuseBtn = document.getElementById('gallery-lightbox-reuse');
+const galleryLightboxCompareToggle = document.getElementById('gallery-lightbox-compare-toggle');
+const galleryLightboxSourceUploadInput = document.getElementById('gallery-lightbox-source-upload');
+const galleryLightboxCompare = document.getElementById('gallery-lightbox-compare');
+const galleryLightboxBeforeImage = document.getElementById('gallery-lightbox-before-image');
+const galleryLightboxAfterWrap = document.getElementById('gallery-lightbox-after-wrap');
+const galleryLightboxAfterImage = document.getElementById('gallery-lightbox-after-image');
+const galleryLightboxCompareSlider = document.getElementById('gallery-lightbox-compare-slider');
 const galleryContextMenu = document.getElementById('gallery-context-menu');
 const gallerySearch = document.getElementById('gallery-search');
+const gallerySortSelect = document.getElementById('gallery-sort');
+const galleryModeFilterSelect = document.getElementById('gallery-mode-filter');
+const galleryLightboxStarBtn = document.getElementById('gallery-lightbox-star');
 const galleryViewToggle = document.getElementById('gallery-view-toggle');
 const galleryFilterHint = document.getElementById('gallery-filter-hint');
 const galleryLightboxPrev = document.getElementById('gallery-lightbox-prev');
@@ -278,6 +300,7 @@ const previewCard = document.querySelector('.preview-card');
 	 -------------------------------------------------------------------------- */
 let isGenerating = false;
 let queuePollTimer = null;
+const QUEUE_POLL_INTERVAL_MS = 1200;
 let livePreviewTimer = null;
 let statusPollTimer = null;
 let pollLeaseTimer = null;
@@ -290,6 +313,9 @@ const queueActionInFlight = new Set();
 let queueFilterFailedOnly = localStorage.getItem('queueFilterFailedOnly') === '1';
 const IMAGE_PROFILE_STORAGE_KEY = 'imagePresetProfilesV1';
 const IMAGE_PROFILE_SELECTED_KEY = 'imagePresetProfilesSelectedV1';
+const MB_MODEL_NOTES_KEY = 'mbModelNotesV1';
+const GALLERY_FAVORITES_KEY = 'galleryFavoritesV1';
+let mbCurrentModelNoteKey = '';
 const IMAGE_RECENT_MODELS_KEY = 'imageRecentModelsV1';
 const IMAGE_FAVORITE_MODELS_KEY = 'imageFavoriteModelsV1';
 const IMAGE_MODEL_FILTER_MODE_KEY = 'imageModelFilterModeV1';
@@ -313,8 +339,28 @@ if (!['all', 'recent', 'favorites'].includes(imageModelFilterMode)) {
 let currentGalleryImages = [];
 let currentFullHistory = [];
 let galleryViewMode = localStorage.getItem('galleryViewMode') || 'list';
+const GALLERY_HISTORY_LIMIT = 240;
+const GALLERY_EAGER_IMAGE_COUNT = 6;
+const GALLERY_RENDER_CHUNK_SIZE = 24;
+const GALLERY_VIRTUALIZE_THRESHOLD = 120;
+const GALLERY_VIRTUAL_OVERSCAN_ROWS = 3;
+const GALLERY_LIST_EST_CARD_HEIGHT = 280;
+const GALLERY_GRID_EST_CARD_HEIGHT = 230;
+const GALLERY_GRID_MIN_COL_WIDTH = 148;
+let galleryLoadController = null;
+let galleryLoadSeq = 0;
+let galleryRenderSeq = 0;
+let galleryVirtualState = null;
+let galleryVirtualRaf = null;
+const img2imgSourceResolveCache = new Map();
+let controlnetPreviewObjectUrl = '';
 let gallerySearchQuery = '';
+let gallerySortOrder = localStorage.getItem('gallerySortOrder') || 'newest';
+let galleryModeFilter = localStorage.getItem('galleryModeFilter') || 'all';
 let lightboxCurrentIndex = 0;
+let lightboxCompareEnabled = false;
+let lightboxCompareSplit = 50;
+let lightboxMetaOpen = false;
 const TAG_CATEGORY_LABELS = {
 	'enhanced-subject': 'Subject',
 	'enhanced-setting': 'Setting/Environment',
@@ -1228,6 +1274,69 @@ function deleteSelectedImageProfile() {
 	setImageProfileState(profiles);
 	renderImageProfileSelect('');
 	showToast(`Deleted profile: ${name}.`, 'pos');
+}
+
+function exportPresetsAsJson() {
+	const payload = {
+		version: 1,
+		exported: new Date().toISOString(),
+		imageProfiles: getImageProfileState(),
+		promptPresets: (() => {
+			try { return JSON.parse(localStorage.getItem(PROMPT_SAVED_KEY) || '{}'); }
+			catch { return {}; }
+		})(),
+	};
+	const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+	const url = URL.createObjectURL(blob);
+	const a = document.createElement('a');
+	const dateStr = new Date().toISOString().slice(0, 10);
+	a.href = url;
+	a.download = `la-presets-${dateStr}.json`;
+	document.body.appendChild(a);
+	a.click();
+	document.body.removeChild(a);
+	URL.revokeObjectURL(url);
+	const profileCount = Object.keys(payload.imageProfiles).length;
+	const promptCount = Object.keys(payload.promptPresets).length;
+	showToast(`Exported ${profileCount} profile(s) and ${promptCount} prompt preset(s).`, 'pos');
+}
+
+function importPresetsFromJson(file) {
+	if (!file) return;
+	const reader = new FileReader();
+	reader.onload = (e) => {
+		let payload;
+		try { payload = JSON.parse(e.target.result); }
+		catch { showToast('Invalid JSON file — import failed.', 'neg'); return; }
+
+		if (!payload || typeof payload !== 'object') {
+			showToast('Unrecognized format — import failed.', 'neg');
+			return;
+		}
+
+		let profilesImported = 0;
+		if (payload.imageProfiles && typeof payload.imageProfiles === 'object') {
+			const existing = getImageProfileState();
+			Object.assign(existing, payload.imageProfiles);
+			setImageProfileState(existing);
+			renderImageProfileSelect('');
+			profilesImported = Object.keys(payload.imageProfiles).length;
+		}
+
+		let promptsImported = 0;
+		if (payload.promptPresets && typeof payload.promptPresets === 'object') {
+			let existing = {};
+			try { existing = JSON.parse(localStorage.getItem(PROMPT_SAVED_KEY) || '{}'); } catch { existing = {}; }
+			Object.assign(existing, payload.promptPresets);
+			localStorage.setItem(PROMPT_SAVED_KEY, JSON.stringify(existing));
+			renderPromptSavedSelect();
+			promptsImported = Object.keys(payload.promptPresets).length;
+		}
+
+		showToast(`Imported ${profilesImported} profile(s) and ${promptsImported} prompt preset(s).`, 'pos');
+	};
+	reader.onerror = () => { showToast('Failed to read file.', 'neg'); };
+	reader.readAsText(file);
 }
 
 function setDiagnosticValue(el, text, level = '') {
@@ -2773,6 +2882,25 @@ function syncImageControlLabels() {
 	if (controlnetEndVal && controlnetEnd) controlnetEndVal.textContent = Number(controlnetEnd.value).toFixed(2);
 }
 
+function updateControlnetImagePreview() {
+	if (!controlnetImageUpload || !controlnetImagePreviewWrap || !controlnetImagePreview || !controlnetImageName) return;
+	if (controlnetPreviewObjectUrl) {
+		URL.revokeObjectURL(controlnetPreviewObjectUrl);
+		controlnetPreviewObjectUrl = '';
+	}
+	const file = controlnetImageUpload.files && controlnetImageUpload.files[0] ? controlnetImageUpload.files[0] : null;
+	if (!file) {
+		controlnetImagePreviewWrap.hidden = true;
+		controlnetImagePreview.removeAttribute('src');
+		controlnetImageName.textContent = '';
+		return;
+	}
+	controlnetPreviewObjectUrl = URL.createObjectURL(file);
+	controlnetImagePreview.src = controlnetPreviewObjectUrl;
+	controlnetImageName.textContent = file.name;
+	controlnetImagePreviewWrap.hidden = false;
+}
+
 imageSteps.addEventListener('input', syncImageControlLabels);
 imageCfg.addEventListener('input', syncImageControlLabels);
 imageDenoise.addEventListener('input', syncImageControlLabels);
@@ -2818,6 +2946,15 @@ if (vaeModelSelect) {
 	});
 }
 if (controlnetModelSelect) controlnetModelSelect.addEventListener('change', updateControlnetCompatibilityHint);
+if (controlnetImageUpload) {
+	controlnetImageUpload.addEventListener('change', updateControlnetImagePreview);
+}
+if (controlnetImageClearBtn && controlnetImageUpload) {
+	controlnetImageClearBtn.addEventListener('click', () => {
+		controlnetImageUpload.value = '';
+		updateControlnetImagePreview();
+	});
+}
 setImageModelFilterMode(imageModelFilterMode);
 
 imageRandomSeed.addEventListener('click', () => {
@@ -2868,19 +3005,29 @@ if (imageLockSeedBtn) {
 
 function applyImagePreset(preset) {
 	if (preset === 'fast') {
-		imageSteps.value = '20';
-		imageCfg.value = '6.5';
-		imageDenoise.value = '0.70';
+		imageSteps.value = '12';
+		imageCfg.value = '5.5';
+		imageDenoise.value = '0.65';
+		if (imageWidth) imageWidth.value = '768';
+		if (imageHeight) imageHeight.value = '768';
+		if (imageBatchSize) imageBatchSize.value = '1';
+		if (refinerModelSelect) refinerModelSelect.value = '';
+		if (hiresfixEnable) hiresfixEnable.checked = false;
 	} else if (preset === 'quality') {
 		imageSteps.value = '40';
 		imageCfg.value = '7.5';
 		imageDenoise.value = '0.75';
+		if (imageWidth && imageWidth.value === '768') imageWidth.value = '1024';
+		if (imageHeight && imageHeight.value === '768') imageHeight.value = '1024';
 	} else if (preset === 'creative') {
 		imageSteps.value = '32';
 		imageCfg.value = '9.0';
 		imageDenoise.value = '0.85';
+		if (imageWidth && imageWidth.value === '768') imageWidth.value = '1024';
+		if (imageHeight && imageHeight.value === '768') imageHeight.value = '1024';
 	}
 	syncImageControlLabels();
+	updateModelStackCompatibilityHint();
 }
 
 function setActiveImagePresetButton(activePreset) {
@@ -2948,6 +3095,21 @@ if (imageProfileApplyBtn) {
 
 if (imageProfileDeleteBtn) {
 	imageProfileDeleteBtn.addEventListener('click', deleteSelectedImageProfile);
+}
+
+if (imageProfileExportBtn) {
+	imageProfileExportBtn.addEventListener('click', exportPresetsAsJson);
+}
+
+if (imageProfileImportBtn && imageProfileImportInput) {
+	imageProfileImportBtn.addEventListener('click', () => {
+		imageProfileImportInput.value = '';
+		imageProfileImportInput.click();
+	});
+	imageProfileImportInput.addEventListener('change', () => {
+		const file = imageProfileImportInput.files?.[0];
+		if (file) importPresetsFromJson(file);
+	});
 }
 
 if (imageProfileName) {
@@ -3167,7 +3329,7 @@ async function retryImageJob(promptId, isAuto = false) {
 	try {
 		const parentMeta = queueJobMeta.get(promptId) || {};
 		const nextRetryCount = (parentMeta.retryCount || 0) + 1;
-		const isImg2Img = snapshot.mode === 'img2img' && snapshot.image_name;
+		const isImg2Img = snapshot.mode === 'img2img' && (snapshot.image || snapshot.image_name);
 		let res;
 		if (isImg2Img) {
 			const failedMeta = queueJobMeta.get(promptId) || {};
@@ -3645,19 +3807,174 @@ function updateLightboxNav() {
 	}
 }
 
+function getImg2ImgSourceImageUrl(entry) {
+	const imageName = String(entry?.params?.image || entry?.params?.image_name || '').trim();
+	if (!imageName) return '';
+	return `/api/image/view?filename=${encodeURIComponent(imageName)}&subfolder=&type=input`;
+}
+
+function updateLightboxMeta(entry) {
+	const hasParams = entry && (entry.model || entry.params);
+	if (galleryLightboxMetaToggle) {
+		galleryLightboxMetaToggle.hidden = !hasParams;
+	}
+	if (!galleryLightboxMetaChips || !hasParams) return;
+	const p = entry.params || {};
+	const chips = [];
+	const mode = String(p.mode || 'txt2img');
+	chips.push(`<span class="chip chip-mode">${escHtml(mode)}</span>`);
+	if (entry.model) chips.push(`<span class="chip chip-model" title="${escHtml(entry.model)}">${escHtml(entry.model.split('/').pop() || entry.model)}</span>`);
+	if (p.sampler) chips.push(`<span class="chip">sampler: ${escHtml(p.sampler)}</span>`);
+	if (Number.isFinite(Number(p.steps))) chips.push(`<span class="chip">steps: ${escHtml(String(p.steps))}</span>`);
+	if (Number.isFinite(Number(p.cfg))) chips.push(`<span class="chip">cfg: ${escHtml(String(p.cfg))}</span>`);
+	if (Number.isFinite(Number(p.width)) && Number.isFinite(Number(p.height))) {
+		chips.push(`<span class="chip">${escHtml(String(p.width))}×${escHtml(String(p.height))}</span>`);
+	}
+	if (Number.isFinite(Number(p.denoise)) && mode === 'img2img') {
+		chips.push(`<span class="chip">denoise: ${escHtml(String(Number(p.denoise).toFixed(2)))}</span>`);
+	}
+	const seed = p.seed !== undefined && p.seed !== null && p.seed !== '' ? String(p.seed) : '';
+	if (seed) chips.push(`<span class="chip">seed: ${escHtml(seed)}</span>`);
+	if (entry.model && p.vae) chips.push(`<span class="chip">vae: ${escHtml(p.vae.split('/').pop() || p.vae)}</span>`);
+	const loras = Array.isArray(p.loras) ? p.loras : [];
+	for (const lora of loras) {
+		if (!lora.name) continue;
+		const loraLabel = lora.name.split('/').pop() || lora.name;
+		const str = Number.isFinite(Number(lora.strength)) ? ` ×${Number(lora.strength).toFixed(2)}` : '';
+		chips.push(`<span class="chip chip-lora">LoRA: ${escHtml(loraLabel)}${escHtml(str)}</span>`);
+	}
+	galleryLightboxMetaChips.innerHTML = chips.join('');
+}
+
+function resolveLegacyImg2ImgSourceImage(entry) {
+	if (!entry || entry?.params?.mode !== 'img2img') return Promise.resolve('');
+	const existing = String(entry?.params?.image || entry?.params?.image_name || '').trim();
+	if (existing) return Promise.resolve(existing);
+	const promptId = String(entry?.params?.prompt_id || '').trim();
+	if (!promptId) return Promise.resolve('');
+	if (img2imgSourceResolveCache.has(promptId)) {
+		return img2imgSourceResolveCache.get(promptId);
+	}
+	const pending = fetch(`/api/image/source-image?prompt_id=${encodeURIComponent(promptId)}`)
+		.then((res) => (res.ok ? res.json() : null))
+		.then((data) => {
+			const name = String(data?.image || '').trim();
+			if (name) {
+				entry.params = entry.params || {};
+				entry.params.image = name;
+				const entryId = String(entry?.id || '').trim();
+				fetch('/api/history/img2img-source', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({
+						entry_id: entryId,
+						prompt_id: promptId,
+						image: name,
+					}),
+				}).catch(() => {
+					// non-fatal history backfill failure
+				});
+			}
+			return name;
+		})
+		.catch(() => '')
+		.finally(() => {
+			if (!String(entry?.params?.image || '').trim()) {
+				img2imgSourceResolveCache.delete(promptId);
+			}
+		});
+	img2imgSourceResolveCache.set(promptId, pending);
+	return pending;
+}
+
+function applyLightboxCompareSplit(splitValue) {
+	const split = Math.max(0, Math.min(100, Number(splitValue) || 50));
+	lightboxCompareSplit = split;
+	if (galleryLightboxAfterWrap) {
+		galleryLightboxAfterWrap.style.width = `${split}%`;
+	}
+	if (galleryLightboxCompareSlider && Number(galleryLightboxCompareSlider.value) !== split) {
+		galleryLightboxCompareSlider.value = String(split);
+	}
+}
+
+function updateLightboxMedia(entry, fallbackSrc = '', fallbackAlt = 'Generated image', fallbackCaption = '') {
+	if (!galleryLightboxImage) return;
+	const firstImage = entry?.images?.[0];
+	const outputUrl = firstImage ? imageProxyUrl(firstImage) : fallbackSrc;
+	const caption = entry?.prompt || fallbackCaption || 'Untitled generation';
+	const isImg2Img = entry?.params?.mode === 'img2img';
+	const hasImg2ImgSource = isImg2Img && Boolean(entry?.params?.image || entry?.params?.image_name);
+	const sourceUrl = hasImg2ImgSource ? getImg2ImgSourceImageUrl(entry) : '';
+
+	updateLightboxMeta(entry);
+	updateLightboxStarBtn(entry);
+
+	if (!sourceUrl && isImg2Img) {
+		resolveLegacyImg2ImgSourceImage(entry).then((resolvedName) => {
+			if (!resolvedName) return;
+			if (currentGalleryImages[lightboxCurrentIndex] !== entry) return;
+			if (galleryLightbox?.hidden) return;
+			updateLightboxMedia(entry, fallbackSrc, fallbackAlt, fallbackCaption);
+		});
+	}
+
+	if (galleryLightboxCompareToggle) {
+		if (sourceUrl) {
+			galleryLightboxCompareToggle.hidden = false;
+			galleryLightboxCompareToggle.disabled = false;
+			galleryLightboxCompareToggle.dataset.mode = 'compare';
+			galleryLightboxCompareToggle.textContent = 'Compare';
+			galleryLightboxCompareToggle.title = '';
+		} else if (isImg2Img) {
+			galleryLightboxCompareToggle.hidden = false;
+			galleryLightboxCompareToggle.disabled = false;
+			galleryLightboxCompareToggle.dataset.mode = 'attach';
+			galleryLightboxCompareToggle.textContent = 'Attach source';
+			galleryLightboxCompareToggle.title = 'Upload the missing source image to enable Compare for this entry.';
+		} else {
+			galleryLightboxCompareToggle.hidden = true;
+			galleryLightboxCompareToggle.disabled = false;
+			galleryLightboxCompareToggle.dataset.mode = '';
+			galleryLightboxCompareToggle.textContent = 'Compare';
+			galleryLightboxCompareToggle.title = '';
+		}
+		if (!sourceUrl) {
+			lightboxCompareEnabled = false;
+			galleryLightboxCompareToggle.setAttribute('aria-pressed', 'false');
+		}
+	}
+
+	const showCompare = Boolean(sourceUrl && lightboxCompareEnabled && galleryLightboxCompare && galleryLightboxBeforeImage && galleryLightboxAfterImage);
+	if (showCompare) {
+		galleryLightboxImage.hidden = true;
+		galleryLightboxCompare.hidden = false;
+		galleryLightboxBeforeImage.src = sourceUrl;
+		galleryLightboxAfterImage.src = outputUrl;
+		applyLightboxCompareSplit(lightboxCompareSplit);
+	} else {
+		galleryLightboxImage.hidden = false;
+		galleryLightboxImage.src = outputUrl;
+		galleryLightboxImage.alt = fallbackAlt || 'Generated image';
+		if (galleryLightboxCompare) {
+			galleryLightboxCompare.hidden = true;
+		}
+		if (galleryLightboxBeforeImage) galleryLightboxBeforeImage.removeAttribute('src');
+		if (galleryLightboxAfterImage) galleryLightboxAfterImage.removeAttribute('src');
+	}
+
+	if (galleryLightboxCaption) {
+		galleryLightboxCaption.textContent = caption;
+	}
+}
+
 function navigateLightbox(delta) {
 	const total = currentGalleryImages.length;
 	if (total <= 1) return;
 	lightboxCurrentIndex = ((lightboxCurrentIndex + delta) % total + total) % total;
 	const entry = currentGalleryImages[lightboxCurrentIndex];
 	if (!entry) return;
-	const firstImage = entry.images?.[0];
-	if (!firstImage || !galleryLightboxImage) return;
-	galleryLightboxImage.src = imageProxyUrl(firstImage);
-	galleryLightboxImage.alt = 'Generated image';
-	if (galleryLightboxCaption) {
-		galleryLightboxCaption.textContent = entry.prompt || 'Untitled generation';
-	}
+	updateLightboxMedia(entry, '', 'Generated image', entry.prompt || 'Untitled generation');
 	updateLightboxNav();
 }
 
@@ -3770,11 +4087,8 @@ function applyGalleryPayloadToImageForm(payload) {
 function openGalleryLightbox(imgSrc, imgAlt, caption = '', index = 0) {
 	if (!galleryLightbox || !galleryLightboxImage) return;
 	lightboxCurrentIndex = index;
-	galleryLightboxImage.src = imgSrc;
-	galleryLightboxImage.alt = imgAlt || 'Generated image';
-	if (galleryLightboxCaption) {
-		galleryLightboxCaption.textContent = caption;
-	}
+	const entry = currentGalleryImages[index];
+	updateLightboxMedia(entry, imgSrc, imgAlt || 'Generated image', caption);
 	updateLightboxNav();
 	galleryLightbox.hidden = false;
 	galleryLightbox.setAttribute('aria-hidden', 'false');
@@ -3790,16 +4104,151 @@ function closeGalleryLightbox() {
 	galleryLightbox.setAttribute('aria-hidden', 'true');
 	galleryLightboxImage.src = '';
 	galleryLightboxImage.alt = '';
+	galleryLightboxImage.hidden = false;
+	if (galleryLightboxCompare) {
+		galleryLightboxCompare.hidden = true;
+	}
+	if (galleryLightboxBeforeImage) galleryLightboxBeforeImage.removeAttribute('src');
+	if (galleryLightboxAfterImage) galleryLightboxAfterImage.removeAttribute('src');
+	lightboxCompareEnabled = false;
+	if (galleryLightboxCompareToggle) {
+		galleryLightboxCompareToggle.setAttribute('aria-pressed', 'false');
+	}
+	lightboxMetaOpen = false;
+	if (galleryLightboxMeta) galleryLightboxMeta.hidden = true;
+	if (galleryLightboxMetaToggle) {
+		galleryLightboxMetaToggle.setAttribute('aria-pressed', 'false');
+		galleryLightboxMetaToggle.hidden = true;
+	}
+	if (galleryLightboxMetaChips) galleryLightboxMetaChips.innerHTML = '';
 	if (galleryLightboxCaption) {
 		galleryLightboxCaption.textContent = '';
 	}
 	document.body.classList.remove('gallery-lightbox-open');
 }
 
+function loadGalleryFavorites() {
+	try {
+		return new Set(JSON.parse(localStorage.getItem(GALLERY_FAVORITES_KEY) || '[]'));
+	} catch {
+		return new Set();
+	}
+}
+
+function saveGalleryFavorites(favSet) {
+	localStorage.setItem(GALLERY_FAVORITES_KEY, JSON.stringify([...favSet]));
+}
+
+function isGalleryFavorite(entryId) {
+	return Boolean(entryId) && loadGalleryFavorites().has(entryId);
+}
+
+function toggleGalleryFavorite(entryId) {
+	if (!entryId) return false;
+	const favs = loadGalleryFavorites();
+	if (favs.has(entryId)) {
+		favs.delete(entryId);
+	} else {
+		favs.add(entryId);
+	}
+	saveGalleryFavorites(favs);
+	return favs.has(entryId);
+}
+
+function updateLightboxStarBtn(entry) {
+	if (!galleryLightboxStarBtn) return;
+	const entryId = entry?.id || '';
+	galleryLightboxStarBtn.hidden = !entryId;
+	const isFav = isGalleryFavorite(entryId);
+	galleryLightboxStarBtn.setAttribute('aria-pressed', String(isFav));
+	galleryLightboxStarBtn.setAttribute('aria-label', isFav ? 'Remove from favorites' : 'Add to favorites');
+	galleryLightboxStarBtn.textContent = isFav ? '\u2605 Fav' : '\u2606 Fav';
+}
+
+function buildGalleryCardHtml(entry, index) {
+	const firstImage = entry.images?.[0];
+	if (!firstImage) return '';
+	const imgUrl = imageProxyUrl(firstImage);
+	const eagerLoad = index < GALLERY_EAGER_IMAGE_COUNT ? 'eager' : 'lazy';
+	const fetchPriority = index < 2 ? 'high' : 'low';
+	const dragPayload = encodeURIComponent(JSON.stringify(buildGalleryPreviewPayload(entry, imgUrl)));
+	const imageRefPayload = encodeURIComponent(JSON.stringify({
+		filename: firstImage.filename || '',
+		subfolder: firstImage.subfolder || '',
+		type: firstImage.type || 'output',
+	}));
+	const exportBaseName = buildGalleryExportBaseName(entry, firstImage);
+	const prompt = escHtml(entry.prompt || 'Untitled generation');
+	const model = escHtml(entry.model || 'unknown model');
+	const sampler = escHtml(entry.params?.sampler || 'sampler');
+	const steps = escHtml(String(entry.params?.steps || ''));
+	const cfg = escHtml(String(entry.params?.cfg || ''));
+	const entryId = entry.id || '';
+	const isFav = isGalleryFavorite(entryId);
+	return `
+		<article class="gallery-card" draggable="true" data-preview-payload="${dragPayload}" data-image-ref="${imageRefPayload}" data-export-base-name="${escHtml(exportBaseName)}" data-prompt="${prompt}" data-lightbox-index="${index}" data-entry-id="${escHtml(entryId)}">
+			<button class="gallery-star-btn${isFav ? ' is-favorited' : ''}" type="button" aria-pressed="${isFav}" aria-label="${isFav ? 'Remove from favorites' : 'Add to favorites'}" data-entry-id="${escHtml(entryId)}">${isFav ? '\u2605' : '\u2606'}</button>
+			<img src="${imgUrl}" alt="Generated image" loading="${eagerLoad}" fetchpriority="${fetchPriority}" decoding="async" data-lightbox-src="${imgUrl}" data-lightbox-caption="${prompt}" draggable="false" />
+			<div class="gallery-meta">
+				<p class="gallery-prompt" title="${prompt}">${prompt}</p>
+				<p class="gallery-chip-row">
+					<span class="chip">${model}</span>
+					<span class="chip">${sampler}</span>
+					<span class="chip">steps ${steps}</span>
+					<span class="chip">cfg ${cfg}</span>
+				</p>
+			</div>
+		</article>
+	`;
+}
+
+function _getGalleryVirtualMetrics(totalItems) {
+	const isGrid = galleryViewMode === 'grid';
+	const viewportHeight = Math.max(galleryGrid?.clientHeight || 0, 200);
+	const scrollTop = Math.max(galleryGrid?.scrollTop || 0, 0);
+	const rowHeight = isGrid ? GALLERY_GRID_EST_CARD_HEIGHT : GALLERY_LIST_EST_CARD_HEIGHT;
+	const gap = 12;
+	const clientWidth = Math.max(galleryGrid?.clientWidth || 0, GALLERY_GRID_MIN_COL_WIDTH);
+	const columns = isGrid
+		? Math.max(1, Math.floor((clientWidth + gap) / (GALLERY_GRID_MIN_COL_WIDTH + gap)))
+		: 1;
+	const totalRows = Math.ceil(totalItems / columns);
+	const visibleRows = Math.max(1, Math.ceil(viewportHeight / rowHeight));
+	const startRow = Math.max(0, Math.floor(scrollTop / rowHeight) - GALLERY_VIRTUAL_OVERSCAN_ROWS);
+	const endRow = Math.min(totalRows, startRow + visibleRows + (GALLERY_VIRTUAL_OVERSCAN_ROWS * 2));
+	const startIndex = startRow * columns;
+	const endIndex = Math.min(totalItems, endRow * columns);
+	const spacerTop = startRow * rowHeight;
+	const spacerBottom = Math.max(0, (totalRows - endRow) * rowHeight);
+	return { startIndex, endIndex, spacerTop, spacerBottom };
+}
+
+function _renderVirtualGalleryWindow() {
+	if (!galleryVirtualState || !galleryGrid) return;
+	const { entries, seq } = galleryVirtualState;
+	if (seq !== galleryRenderSeq) return;
+	const { startIndex, endIndex, spacerTop, spacerBottom } = _getGalleryVirtualMetrics(entries.length);
+	let html = `<div class="gallery-virtual-spacer" style="height:${spacerTop}px"></div>`;
+	for (let i = startIndex; i < endIndex; i += 1) {
+		html += buildGalleryCardHtml(entries[i], i);
+	}
+	html += `<div class="gallery-virtual-spacer" style="height:${spacerBottom}px"></div>`;
+	galleryGrid.innerHTML = html;
+}
+
+function _scheduleVirtualGalleryWindowRender() {
+	if (!galleryVirtualState || galleryVirtualRaf !== null) return;
+	galleryVirtualRaf = window.requestAnimationFrame(() => {
+		galleryVirtualRaf = null;
+		_renderVirtualGalleryWindow();
+	});
+}
+
 function renderGallery(history) {
 	currentFullHistory = history;
 	const images = history.filter((item) => item.type === 'image');
 	if (!images.length) {
+		galleryVirtualState = null;
 		galleryGrid.innerHTML = '<div class="empty-gallery">No image generations yet.</div>';
 		currentGalleryImages = [];
 		closeGalleryContextMenu();
@@ -3807,18 +4256,27 @@ function renderGallery(history) {
 		return;
 	}
 
-	const orderedImages = images
-		.slice()
-		.sort((a, b) => (Number(b.created_at) || 0) - (Number(a.created_at) || 0));
+	// Sort: newest (default, already API order) or oldest (reverse)
+	const orderedImages = gallerySortOrder === 'oldest' ? [...images].reverse() : images;
+
+	// Mode filter
+	const modeFiltered = galleryModeFilter === 'all'
+		? orderedImages
+		: galleryModeFilter === 'img2img'
+			? orderedImages.filter((e) => e?.params?.mode === 'img2img')
+			: galleryModeFilter === 'favorites'
+				? orderedImages.filter((e) => isGalleryFavorite(e?.id || ''))
+				: orderedImages.filter((e) => e?.params?.mode !== 'img2img');
 
 	const query = gallerySearchQuery.toLowerCase().trim();
 	const filteredImages = query
-		? orderedImages.filter((e) => (e.prompt || '').toLowerCase().includes(query))
-		: orderedImages;
+		? modeFiltered.filter((e) => (e.prompt || '').toLowerCase().includes(query))
+		: modeFiltered;
 
-	updateGalleryFilterHint(filteredImages.length, orderedImages.length);
+	updateGalleryFilterHint(filteredImages.length, modeFiltered.length);
 
 	if (!filteredImages.length) {
+		galleryVirtualState = null;
 		galleryGrid.innerHTML = '<div class="empty-gallery">No images match that filter.</div>';
 		currentGalleryImages = [];
 		return;
@@ -3827,42 +4285,50 @@ function renderGallery(history) {
 	currentGalleryImages = filteredImages;
 	galleryGrid.classList.toggle('is-grid-mode', galleryViewMode === 'grid');
 
-	galleryGrid.innerHTML = filteredImages
-		.map((entry, index) => {
-			const firstImage = entry.images?.[0];
-			if (!firstImage) return '';
-			const imgUrl = imageProxyUrl(firstImage);
-			const dragPayload = encodeURIComponent(JSON.stringify(buildGalleryPreviewPayload(entry, imgUrl)));
-			const imageRefPayload = encodeURIComponent(JSON.stringify({
-				filename: firstImage.filename || '',
-				subfolder: firstImage.subfolder || '',
-				type: firstImage.type || 'output',
-			}));
-			const exportBaseName = buildGalleryExportBaseName(entry, firstImage);
-			const prompt = escHtml(entry.prompt || 'Untitled generation');
-			const model = escHtml(entry.model || 'unknown model');
-			const sampler = escHtml(entry.params?.sampler || 'sampler');
-			const steps = escHtml(String(entry.params?.steps || ''));
-			const cfg = escHtml(String(entry.params?.cfg || ''));
-			return `
-				<article class="gallery-card" draggable="true" data-preview-payload="${dragPayload}" data-image-ref="${imageRefPayload}" data-export-base-name="${escHtml(exportBaseName)}" data-prompt="${prompt}" data-lightbox-index="${index}">
-					<img src="${imgUrl}" alt="Generated image" loading="eager" decoding="async" data-lightbox-src="${imgUrl}" data-lightbox-caption="${prompt}" draggable="false" />
-					<div class="gallery-meta">
-						<p class="gallery-prompt" title="${prompt}">${prompt}</p>
-						<p class="gallery-chip-row">
-							<span class="chip">${model}</span>
-							<span class="chip">${sampler}</span>
-							<span class="chip">steps ${steps}</span>
-							<span class="chip">cfg ${cfg}</span>
-						</p>
-					</div>
-				</article>
-			`;
-		})
-		.join('');
+	const renderSeq = ++galleryRenderSeq;
+	if (filteredImages.length >= GALLERY_VIRTUALIZE_THRESHOLD) {
+		galleryVirtualState = {
+			entries: filteredImages,
+			seq: renderSeq,
+		};
+		_renderVirtualGalleryWindow();
+		return;
+	}
+
+	galleryVirtualState = null;
+	if (filteredImages.length > GALLERY_RENDER_CHUNK_SIZE) {
+		galleryGrid.innerHTML = '<div class="empty-gallery">Rendering gallery...</div>';
+	}
+
+	const renderChunk = (startIndex) => {
+		if (renderSeq !== galleryRenderSeq) return;
+		if (startIndex === 0) {
+			galleryGrid.innerHTML = '';
+		}
+		const endIndex = Math.min(startIndex + GALLERY_RENDER_CHUNK_SIZE, filteredImages.length);
+		let html = '';
+		for (let i = startIndex; i < endIndex; i += 1) {
+			html += buildGalleryCardHtml(filteredImages[i], i);
+		}
+		if (html) {
+			galleryGrid.insertAdjacentHTML('beforeend', html);
+		}
+		if (endIndex < filteredImages.length) {
+			window.requestAnimationFrame(() => renderChunk(endIndex));
+		}
+	};
+
+	renderChunk(0);
 }
 
 if (galleryGrid) {
+	galleryGrid.addEventListener('scroll', () => {
+		_scheduleVirtualGalleryWindowRender();
+	});
+	window.addEventListener('resize', () => {
+		_scheduleVirtualGalleryWindowRender();
+	});
+
 	galleryGrid.addEventListener('dragstart', (event) => {
 		const target = event.target;
 		if (!(target instanceof HTMLElement)) return;
@@ -3886,6 +4352,17 @@ if (galleryGrid) {
 
 	galleryGrid.addEventListener('click', (event) => {
 		const target = event.target;
+		if (target instanceof HTMLElement && target.classList.contains('gallery-star-btn')) {
+			const entryId = target.dataset.entryId || '';
+			if (!entryId) return;
+			const isFav = toggleGalleryFavorite(entryId);
+			target.classList.toggle('is-favorited', isFav);
+			target.setAttribute('aria-pressed', String(isFav));
+			target.setAttribute('aria-label', isFav ? 'Remove from favorites' : 'Add to favorites');
+			target.textContent = isFav ? '\u2605' : '\u2606';
+			if (galleryModeFilter === 'favorites') renderGallery(currentFullHistory);
+			return;
+		}
 		if (!(target instanceof HTMLImageElement)) return;
 		const card = target.closest('.gallery-card');
 		const index = card instanceof HTMLElement ? parseInt(card.dataset.lightboxIndex || '0', 10) : 0;
@@ -4071,6 +4548,24 @@ if (gallerySearch) {
 	});
 }
 
+if (gallerySortSelect) {
+	gallerySortSelect.value = gallerySortOrder;
+	gallerySortSelect.addEventListener('change', () => {
+		gallerySortOrder = gallerySortSelect.value || 'newest';
+		localStorage.setItem('gallerySortOrder', gallerySortOrder);
+		renderGallery(currentFullHistory);
+	});
+}
+
+if (galleryModeFilterSelect) {
+	galleryModeFilterSelect.value = galleryModeFilter;
+	galleryModeFilterSelect.addEventListener('change', () => {
+		galleryModeFilter = galleryModeFilterSelect.value || 'all';
+		localStorage.setItem('galleryModeFilter', galleryModeFilter);
+		renderGallery(currentFullHistory);
+	});
+}
+
 function onGalleryToolbarButtonKeydown(event) {
 	const key = event.key;
 	if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(key)) return;
@@ -4116,6 +4611,170 @@ if (galleryLightboxPrev) {
 
 if (galleryLightboxNext) {
 	galleryLightboxNext.addEventListener('click', () => navigateLightbox(1));
+}
+
+if (galleryLightboxStarBtn) {
+	galleryLightboxStarBtn.addEventListener('click', () => {
+		const entry = currentGalleryImages[lightboxCurrentIndex];
+		if (!entry?.id) return;
+		toggleGalleryFavorite(entry.id);
+		updateLightboxStarBtn(entry);
+		const cardStarBtn = galleryGrid?.querySelector(`.gallery-card[data-entry-id="${CSS.escape(entry.id)}"] .gallery-star-btn`);
+		if (cardStarBtn instanceof HTMLElement) {
+			const isFav = isGalleryFavorite(entry.id);
+			cardStarBtn.classList.toggle('is-favorited', isFav);
+			cardStarBtn.setAttribute('aria-pressed', String(isFav));
+			cardStarBtn.setAttribute('aria-label', isFav ? 'Remove from favorites' : 'Add to favorites');
+			cardStarBtn.textContent = isFav ? '\u2605' : '\u2606';
+		}
+		if (galleryModeFilter === 'favorites') renderGallery(currentFullHistory);
+	});
+}
+
+async function attachSourceImageToLightboxEntry(file) {
+	const entry = currentGalleryImages[lightboxCurrentIndex];
+	if (!entry || entry?.params?.mode !== 'img2img') {
+		showToast('Select an img2img history entry first.', 'neg');
+		return;
+	}
+	if (!file) return;
+	if (galleryLightboxCompareToggle) {
+		galleryLightboxCompareToggle.disabled = true;
+		galleryLightboxCompareToggle.textContent = 'Uploading...';
+	}
+	try {
+		const formData = new FormData();
+		formData.append('image', file);
+		const uploadRes = await fetch('/api/image/upload-image', {
+			method: 'POST',
+			body: formData,
+		});
+		const uploadPayload = await uploadRes.json().catch(() => ({}));
+		const uploadedName = String(uploadPayload?.name || '').trim();
+		if (!uploadRes.ok || !uploadedName) {
+			throw new Error(uploadPayload?.error || 'Failed to upload source image');
+		}
+
+		entry.params = entry.params || {};
+		entry.params.image = uploadedName;
+		const promptId = String(entry?.params?.prompt_id || '').trim();
+		if (promptId) {
+			img2imgSourceResolveCache.set(promptId, Promise.resolve(uploadedName));
+		}
+
+		const entryId = String(entry?.id || '').trim();
+		if (entryId || promptId) {
+			fetch('/api/history/img2img-source', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					entry_id: entryId,
+					prompt_id: promptId,
+					image: uploadedName,
+				}),
+			}).catch(() => {
+				// non-fatal history backfill failure
+			});
+		}
+
+		lightboxCompareEnabled = true;
+		if (galleryLightboxCompareToggle) {
+			galleryLightboxCompareToggle.setAttribute('aria-pressed', 'true');
+		}
+		updateLightboxMedia(entry, galleryLightboxImage?.src || '', 'Generated image', entry?.prompt || 'Untitled generation');
+		showToast('Source image attached. Compare is now available.', 'pos');
+	} catch (error) {
+		showToast(error.message || 'Failed to attach source image.', 'neg');
+		const activeEntry = currentGalleryImages[lightboxCurrentIndex];
+		updateLightboxMedia(activeEntry, galleryLightboxImage?.src || '', 'Generated image', activeEntry?.prompt || 'Untitled generation');
+	}
+}
+
+if (galleryLightboxCompareToggle) {
+	galleryLightboxCompareToggle.addEventListener('click', () => {
+		const mode = String(galleryLightboxCompareToggle.dataset.mode || '').trim();
+		if (mode === 'attach') {
+			if (!galleryLightboxSourceUploadInput) {
+				showToast('Source upload input is unavailable.', 'neg');
+				return;
+			}
+			galleryLightboxSourceUploadInput.value = '';
+			galleryLightboxSourceUploadInput.click();
+			return;
+		}
+		if (mode !== 'compare') return;
+		lightboxCompareEnabled = !lightboxCompareEnabled;
+		galleryLightboxCompareToggle.setAttribute('aria-pressed', String(lightboxCompareEnabled));
+		const entry = currentGalleryImages[lightboxCurrentIndex];
+		updateLightboxMedia(entry, galleryLightboxImage?.src || '', 'Generated image', entry?.prompt || 'Untitled generation');
+	});
+}
+
+if (galleryLightboxSourceUploadInput) {
+	galleryLightboxSourceUploadInput.addEventListener('change', async () => {
+		const file = galleryLightboxSourceUploadInput.files?.[0];
+		if (!file) return;
+		await attachSourceImageToLightboxEntry(file);
+		galleryLightboxSourceUploadInput.value = '';
+	});
+}
+
+if (galleryLightboxCompareSlider) {
+	galleryLightboxCompareSlider.addEventListener('input', () => {
+		applyLightboxCompareSplit(galleryLightboxCompareSlider.value);
+	});
+}
+
+if (galleryLightboxMetaToggle) {
+	galleryLightboxMetaToggle.addEventListener('click', () => {
+		lightboxMetaOpen = !lightboxMetaOpen;
+		galleryLightboxMetaToggle.setAttribute('aria-pressed', String(lightboxMetaOpen));
+		if (galleryLightboxMeta) {
+			galleryLightboxMeta.hidden = !lightboxMetaOpen;
+		}
+		if (lightboxMetaOpen) {
+			const entry = currentGalleryImages[lightboxCurrentIndex];
+			updateLightboxMeta(entry);
+		}
+	});
+}
+
+if (galleryLightboxReuseBtn) {
+	galleryLightboxReuseBtn.addEventListener('click', () => {
+		const entry = currentGalleryImages[lightboxCurrentIndex];
+		if (!entry) return;
+		const settings = {
+			model: entry.model || '',
+			sampler: entry.params?.sampler || '',
+			negative_prompt: entry.negative_prompt || '',
+			seed: entry.params?.seed !== undefined ? entry.params.seed : '',
+			steps: Number(entry.params?.steps || 0),
+			cfg: Number(entry.params?.cfg || 0),
+			denoise: Number(entry.params?.denoise || 0),
+			width: Number(entry.params?.width || 0),
+			height: Number(entry.params?.height || 0),
+			batch_size: Number(entry.params?.batch_size || 1),
+			loras: Array.isArray(entry.params?.loras) ? entry.params.loras : [],
+			vae: entry.params?.vae || '',
+			refiner_model: entry.params?.refiner_model || '',
+			hiresfix_enable: Boolean(entry.params?.hiresfix_enable),
+			hiresfix_upscaler: entry.params?.hiresfix_upscaler || '',
+			hiresfix_scale: Number(entry.params?.hiresfix_scale || 2),
+			hiresfix_steps: Number(entry.params?.hiresfix_steps || 20),
+			hiresfix_denoise: Number(entry.params?.hiresfix_denoise || 0.4),
+			controlnet_model: entry.params?.controlnet_model || '',
+			controlnet_weight: Number(entry.params?.controlnet_weight ?? 1),
+			controlnet_start: Number(entry.params?.controlnet_start ?? 0),
+			controlnet_end: Number(entry.params?.controlnet_end ?? 1),
+		};
+		if (typeof entry.prompt === 'string') {
+			imagePrompt.value = entry.prompt;
+		}
+		applyImageSettings(settings);
+		closeGalleryLightbox();
+		showPanel('image');
+		showToast('Settings loaded from gallery entry.', 'pos');
+	});
 }
 
 function updateLivePreviewFromActiveJob(payload) {
@@ -4493,15 +5152,28 @@ function startLivePreviewAutoRefresh() {
 }
 
 async function loadGallery() {
+	const seq = ++galleryLoadSeq;
+	if (galleryLoadController) {
+		galleryLoadController.abort();
+	}
+	galleryLoadController = new AbortController();
 	try {
-		const res = await fetch('/api/history?type=image');
+		const res = await fetch(`/api/history?type=image&limit=${GALLERY_HISTORY_LIMIT}`, {
+			signal: galleryLoadController.signal,
+		});
 		const data = await res.json();
+		if (seq !== galleryLoadSeq) return;
 		const history = data.history || [];
 		renderGallery(history);
 		updateLivePreview(history[0]);
-	} catch {
+	} catch (err) {
+		if (err?.name === 'AbortError') return;
 		galleryGrid.innerHTML = '<div class="empty-gallery">Could not load gallery.</div>';
 		previewUpdated.textContent = 'Preview unavailable';
+	} finally {
+		if (seq === galleryLoadSeq) {
+			galleryLoadController = null;
+		}
 	}
 }
 
@@ -4552,6 +5224,7 @@ async function pollQueue() {
 						height: snapshot.height || 0,
 						batch_size: snapshot.batch_size || 1,
 						mode: snapshot.mode || 'txt2img',
+						image: snapshot.image || snapshot.image_name || '',
 						prompt_id: promptId,
 					},
 					images,
@@ -4583,7 +5256,7 @@ async function pollQueue() {
 function ensureQueuePolling() {
 	if (!hasBackgroundPollingOwnership) return;
 	if (queuePollTimer) return;
-	queuePollTimer = window.setInterval(pollQueue, 2500);
+	queuePollTimer = window.setInterval(pollQueue, QUEUE_POLL_INTERVAL_MS);
 }
 
 function stopQueuePolling() {
@@ -5467,10 +6140,45 @@ function applyModelBrowserClientFilters(items) {
 	return filtered;
 }
 
+// --- Model notes ---
+function loadAllModelNotes() {
+	try { return JSON.parse(localStorage.getItem(MB_MODEL_NOTES_KEY) || '{}'); }
+	catch { return {}; }
+}
+function getModelNote(key) {
+	return loadAllModelNotes()[key] || '';
+}
+function saveModelNote(key, text) {
+	if (!key) return;
+	const all = loadAllModelNotes();
+	const trimmed = String(text || '').trimEnd();
+	if (trimmed) {
+		all[key] = trimmed;
+	} else {
+		delete all[key];
+	}
+	localStorage.setItem(MB_MODEL_NOTES_KEY, JSON.stringify(all));
+}
+function populateModelNote(key) {
+	mbCurrentModelNoteKey = key || '';
+	if (mbModelModalNotes) {
+		mbModelModalNotes.value = key ? getModelNote(key) : '';
+	}
+}
+function flushModelNote() {
+	if (mbCurrentModelNoteKey && mbModelModalNotes) {
+		saveModelNote(mbCurrentModelNoteKey, mbModelModalNotes.value);
+	}
+	mbCurrentModelNoteKey = '';
+	if (mbModelModalNotes) mbModelModalNotes.value = '';
+}
+
 function setModelModalOpen(isOpen) {
 	if (!mbModelModal) return;
 	if (isOpen) {
 		mbModelModalLastFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+	} else {
+		flushModelNote();
 	}
 	mbModelModal.hidden = !isOpen;
 	mbModelModal.setAttribute('aria-hidden', isOpen ? 'false' : 'true');
@@ -5847,6 +6555,7 @@ function openLocalModelDetailsModal(item) {
 	mbCurrentModelDetails = null;
 	mbCurrentVersionIndex = 0;
 	setModelModalOpen(true);
+	populateModelNote(`local:${item.name || ''}`);
 	if (mbModelModalTitle) mbModelModalTitle.textContent = item.name || 'Local model details';
 	if (mbModelModalMeta) mbModelModalMeta.textContent = `${typeLabel} · Local library · ${folderLabel}${versionLabel ? ` · ${versionLabel}` : ''}`;
 	if (mbModelModalDescription) {
@@ -5919,6 +6628,7 @@ async function openModelDetailsModal(item) {
 	if (!item || !item.id || !mbModelModal) return;
 	const provider = String(item.provider || 'civitai').toLowerCase();
 	setModelModalOpen(true);
+	populateModelNote(`${provider}:${item.id}`);
 	if (mbModelModalTitle) mbModelModalTitle.textContent = item.name || 'Model details';
 	if (mbModelModalMeta) mbModelModalMeta.textContent = 'Loading model details...';
 	if (mbModelModalDescription) mbModelModalDescription.textContent = '';

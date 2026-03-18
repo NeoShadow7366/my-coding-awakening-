@@ -862,3 +862,255 @@ def test_lora_tag_chip_duplicate_safe_insertion_in_js():
     assert "split(',').map(" in content
     assert "parts.includes(tag)" in content
     assert "parts.join(', ')" in content
+
+
+def test_gallery_loading_optimizations_present_in_js_bundle():
+    js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
+    content = js_path.read_text(encoding="utf-8")
+
+    assert "const QUEUE_POLL_INTERVAL_MS = 1200;" in content
+    assert "const GALLERY_HISTORY_LIMIT = 240;" in content
+    assert "const GALLERY_EAGER_IMAGE_COUNT = 6;" in content
+    assert "const GALLERY_RENDER_CHUNK_SIZE = 24;" in content
+    assert "const GALLERY_VIRTUALIZE_THRESHOLD = 120;" in content
+    assert "const GALLERY_VIRTUAL_OVERSCAN_ROWS = 3;" in content
+    assert "let galleryRenderSeq = 0;" in content
+    assert "let galleryVirtualState = null;" in content
+    assert "function buildGalleryCardHtml(entry, index)" in content
+    assert "function _renderVirtualGalleryWindow()" in content
+    assert "function _scheduleVirtualGalleryWindowRender()" in content
+    assert "loading=\"${eagerLoad}\"" in content
+    assert "fetchpriority=\"${fetchPriority}\"" in content
+    assert "fetch(`/api/history?type=image&limit=${GALLERY_HISTORY_LIMIT}`" in content
+    assert "window.requestAnimationFrame(() => renderChunk(endIndex));" in content
+    assert "galleryGrid.addEventListener('scroll'" in content
+    assert "if (err?.name === 'AbortError') return;" in content
+
+
+def test_gallery_virtualization_styles_present_in_css():
+    css_path = Path(__file__).resolve().parents[1] / "static" / "css" / "style.css"
+    content = css_path.read_text(encoding="utf-8")
+
+    assert ".gallery-virtual-spacer" in content
+    assert ".gallery-grid.is-grid-mode .gallery-virtual-spacer" in content
+
+
+def test_controlnet_preview_markup_present_in_index():
+    app_module.app.config["TESTING"] = True
+    client = app_module.app.test_client()
+
+    resp = client.get("/")
+    assert resp.status_code == 200
+    html = resp.get_data(as_text=True)
+
+    assert 'id="controlnet-image-preview-wrap"' in html
+    assert 'id="controlnet-image-preview"' in html
+    assert 'id="controlnet-image-name"' in html
+    assert 'id="controlnet-image-clear"' in html
+
+
+def test_controlnet_preview_wiring_present_in_js_and_css():
+    js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
+    js = js_path.read_text(encoding="utf-8")
+    css_path = Path(__file__).resolve().parents[1] / "static" / "css" / "style.css"
+    css = css_path.read_text(encoding="utf-8")
+
+    assert "const controlnetImagePreviewWrap = document.getElementById('controlnet-image-preview-wrap');" in js
+    assert "const controlnetImagePreview = document.getElementById('controlnet-image-preview');" in js
+    assert "const controlnetImageName = document.getElementById('controlnet-image-name');" in js
+    assert "const controlnetImageClearBtn = document.getElementById('controlnet-image-clear');" in js
+    assert "function updateControlnetImagePreview()" in js
+    assert "controlnetImageUpload.addEventListener('change', updateControlnetImagePreview);" in js
+    assert "controlnetImageClearBtn.addEventListener('click'" in js
+
+    assert ".controlnet-image-preview-wrap" in css
+    assert ".controlnet-image-preview" in css
+    assert ".controlnet-image-preview-row" in css
+
+
+def test_gallery_lightbox_compare_markup_and_wiring_present():
+    app_module.app.config["TESTING"] = True
+    client = app_module.app.test_client()
+
+    html = client.get("/").get_data(as_text=True)
+    assert 'id="gallery-lightbox-compare-toggle"' in html
+    assert 'id="gallery-lightbox-source-upload"' in html
+    assert 'id="gallery-lightbox-compare"' in html
+    assert 'id="gallery-lightbox-before-image"' in html
+    assert 'id="gallery-lightbox-after-image"' in html
+    assert 'id="gallery-lightbox-compare-slider"' in html
+
+    js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
+    js = js_path.read_text(encoding="utf-8")
+    assert "function getImg2ImgSourceImageUrl(entry)" in js
+    assert "function resolveLegacyImg2ImgSourceImage(entry)" in js
+    assert "async function attachSourceImageToLightboxEntry(file)" in js
+    assert "const galleryLightboxSourceUploadInput = document.getElementById('gallery-lightbox-source-upload');" in js
+    assert "const mode = String(galleryLightboxCompareToggle.dataset.mode || '').trim();" in js
+    assert "if (mode === 'attach')" in js
+    assert "fetch('/api/image/upload-image', {" in js
+    assert "fetch(`/api/image/source-image?prompt_id=${encodeURIComponent(promptId)}`)" in js
+    assert "fetch('/api/history/img2img-source', {" in js
+    assert "function applyLightboxCompareSplit(splitValue)" in js
+    assert "function updateLightboxMedia(entry, fallbackSrc = '', fallbackAlt = 'Generated image', fallbackCaption = '')" in js
+    assert "const isImg2Img = snapshot.mode === 'img2img' && (snapshot.image || snapshot.image_name);" in js
+    assert "image: snapshot.image || snapshot.image_name || ''," in js
+    assert "galleryLightboxCompareToggle.addEventListener('click'" in js
+    assert "galleryLightboxSourceUploadInput.addEventListener('change', async () => {" in js
+    assert "galleryLightboxCompareSlider.addEventListener('input'" in js
+
+    css_path = Path(__file__).resolve().parents[1] / "static" / "css" / "style.css"
+    css = css_path.read_text(encoding="utf-8")
+    assert ".gallery-lightbox-compare" in css
+    assert ".gallery-lightbox-compare-after-wrap" in css
+    assert ".gallery-lightbox-compare-slider" in css
+
+
+def test_gallery_lightbox_meta_panel_markup_and_wiring_present():
+    app_module.app.config["TESTING"] = True
+    client = app_module.app.test_client()
+
+    html = client.get("/").get_data(as_text=True)
+    assert 'id="gallery-lightbox-meta-toggle"' in html
+    assert 'id="gallery-lightbox-meta"' in html
+    assert 'id="gallery-lightbox-meta-chips"' in html
+    assert 'id="gallery-lightbox-reuse"' in html
+
+    js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
+    js = js_path.read_text(encoding="utf-8")
+    assert "const galleryLightboxMetaToggle = document.getElementById('gallery-lightbox-meta-toggle');" in js
+    assert "const galleryLightboxMeta = document.getElementById('gallery-lightbox-meta');" in js
+    assert "const galleryLightboxMetaChips = document.getElementById('gallery-lightbox-meta-chips');" in js
+    assert "const galleryLightboxReuseBtn = document.getElementById('gallery-lightbox-reuse');" in js
+    assert "let lightboxMetaOpen = false;" in js
+    assert "function updateLightboxMeta(entry)" in js
+    assert "galleryLightboxMetaToggle.addEventListener('click'" in js
+    assert "galleryLightboxReuseBtn.addEventListener('click'" in js
+    assert "applyImageSettings(settings);" in js
+    assert "showPanel('image');" in js
+
+    css_path = Path(__file__).resolve().parents[1] / "static" / "css" / "style.css"
+    css = css_path.read_text(encoding="utf-8")
+    assert ".gallery-lightbox-meta {" in css
+    assert ".gallery-lightbox-meta-chips {" in css
+    assert ".gallery-lightbox-meta-actions {" in css
+
+
+def test_fast_preset_applies_speed_focused_settings():
+    js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
+    js = js_path.read_text(encoding="utf-8")
+
+    assert "if (preset === 'fast')" in js
+    assert "imageSteps.value = '12';" in js
+    assert "imageCfg.value = '5.5';" in js
+    assert "imageDenoise.value = '0.65';" in js
+    assert "if (imageWidth) imageWidth.value = '768';" in js
+    assert "if (imageHeight) imageHeight.value = '768';" in js
+    assert "if (refinerModelSelect) refinerModelSelect.value = '';" in js
+    assert "if (hiresfixEnable) hiresfixEnable.checked = false;" in js
+
+
+def test_profile_export_import_markup_and_wiring_present():
+    app_module.app.config["TESTING"] = True
+    client = app_module.app.test_client()
+
+    html = client.get("/").get_data(as_text=True)
+    assert 'id="image-profile-export"' in html
+    assert 'id="image-profile-import-btn"' in html
+    assert 'id="image-profile-import-input"' in html
+
+    js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
+    js = js_path.read_text(encoding="utf-8")
+    assert "const imageProfileExportBtn = document.getElementById('image-profile-export');" in js
+    assert "const imageProfileImportBtn = document.getElementById('image-profile-import-btn');" in js
+    assert "const imageProfileImportInput = document.getElementById('image-profile-import-input');" in js
+    assert "function exportPresetsAsJson()" in js
+    assert "function importPresetsFromJson(file)" in js
+    assert "imageProfileExportBtn.addEventListener('click', exportPresetsAsJson);" in js
+    assert "imageProfileImportInput.addEventListener('change'" in js
+    assert "getImageProfileState()" in js
+    assert "renderPromptSavedSelect();" in js
+
+
+def test_model_notes_markup_and_wiring_present():
+    app_module.app.config["TESTING"] = True
+    client = app_module.app.test_client()
+
+    html = client.get("/").get_data(as_text=True)
+    assert 'id="mb-model-modal-notes"' in html
+    assert 'class="mb-model-modal-notes-wrap"' in html
+
+    js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
+    js = js_path.read_text(encoding="utf-8")
+    assert "const mbModelModalNotes = document.getElementById('mb-model-modal-notes');" in js
+    assert "const MB_MODEL_NOTES_KEY = 'mbModelNotesV1';" in js
+    assert "let mbCurrentModelNoteKey = '';" in js
+    assert "function loadAllModelNotes()" in js
+    assert "function getModelNote(key)" in js
+    assert "function saveModelNote(key, text)" in js
+    assert "function populateModelNote(key)" in js
+    assert "function flushModelNote()" in js
+    assert "flushModelNote();" in js
+    assert "populateModelNote(`local:${item.name || ''}`)" in js
+    assert "populateModelNote(`${provider}:${item.id}`)" in js
+
+    css_path = Path(__file__).resolve().parents[1] / "static" / "css" / "style.css"
+    css = css_path.read_text(encoding="utf-8")
+    assert ".mb-model-modal-notes-wrap {" in css
+    assert ".mb-model-modal-notes {" in css
+
+
+def test_gallery_sort_and_mode_filter_markup_and_wiring_present():
+    app_module.app.config["TESTING"] = True
+    client = app_module.app.test_client()
+
+    html = client.get("/").get_data(as_text=True)
+    assert 'id="gallery-sort"' in html
+    assert 'id="gallery-mode-filter"' in html
+    assert '<option value="newest">' in html
+    assert '<option value="oldest">' in html
+    assert '<option value="img2img">' in html
+
+    js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
+    js = js_path.read_text(encoding="utf-8")
+    assert "const gallerySortSelect = document.getElementById('gallery-sort');" in js
+    assert "const galleryModeFilterSelect = document.getElementById('gallery-mode-filter');" in js
+    assert "let gallerySortOrder = " in js
+    assert "let galleryModeFilter = " in js
+    assert "gallerySortOrder === 'oldest'" in js
+    assert "galleryModeFilter === 'img2img'" in js
+    assert "localStorage.setItem('gallerySortOrder'" in js
+    assert "localStorage.setItem('galleryModeFilter'" in js
+
+    css_path = Path(__file__).resolve().parents[1] / "static" / "css" / "style.css"
+    css = css_path.read_text(encoding="utf-8")
+    assert ".gallery-sort-wrap," in css
+    assert ".gallery-mode-filter-wrap {" in css
+
+
+def test_gallery_favorites_markup_and_wiring_present():
+    app_module.app.config["TESTING"] = True
+    client = app_module.app.test_client()
+
+    html = client.get("/").get_data(as_text=True)
+    assert 'id="gallery-mode-filter"' in html
+    assert 'value="favorites"' in html
+    assert 'id="gallery-lightbox-star"' in html
+    assert 'gallery-lightbox-star-btn' in html
+
+    js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
+    js = js_path.read_text(encoding="utf-8")
+    assert "GALLERY_FAVORITES_KEY" in js
+    assert "loadGalleryFavorites" in js
+    assert "toggleGalleryFavorite" in js
+    assert "isGalleryFavorite" in js
+    assert "updateLightboxStarBtn" in js
+    assert "galleryLightboxStarBtn" in js
+    assert "gallery-star-btn" in js
+    assert "galleryModeFilter === 'favorites'" in js
+
+    css_path = Path(__file__).resolve().parents[1] / "static" / "css" / "style.css"
+    css = css_path.read_text(encoding="utf-8")
+    assert ".gallery-star-btn {" in css
+    assert ".gallery-star-btn.is-favorited {" in css
+    assert "gallery-lightbox-star-btn" in css
