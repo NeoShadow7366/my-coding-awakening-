@@ -335,6 +335,7 @@ const QUEUE_TELEMETRY_KEY = 'queueTelemetryV1';
 const QUEUE_LAST_ACTION_PINNED_KEY = 'queueLastActionPinnedV1';
 const QUEUE_LAST_ACTION_MAX_AGE_MS = 120000;
 const DIAG_DRAWER_COLLAPSED_KEY = 'diagDrawerCollapsedV1';
+const DIAG_COMMAND_HISTORY_KEY = 'diagCommandHistoryV1';
 const diagDrawerCollapsedStored = localStorage.getItem(DIAG_DRAWER_COLLAPSED_KEY);
 let queueFilterFailedOnly = localStorage.getItem('queueFilterFailedOnly') === '1';
 let restoredQueueStateInfo = null;
@@ -469,9 +470,22 @@ function getQueueTelemetryState() {
 	}
 }
 
+function getDiagnosticsCommandHistoryState() {
+	try {
+		const parsed = JSON.parse(sessionStorage.getItem(DIAG_COMMAND_HISTORY_KEY) || '[]');
+		if (!Array.isArray(parsed)) return [];
+		return parsed
+			.map((entry) => String(entry || '').trim())
+			.filter(Boolean)
+			.slice(-50);
+	} catch {
+		return [];
+	}
+}
+
 let queueTelemetryState = getQueueTelemetryState();
 let lastDiagnosticsLogKey = '';
-const diagHistory = [];
+const diagHistory = getDiagnosticsCommandHistoryState();
 let diagHistoryIndex = -1;
 let diagHistoryDraft = '';
 let diagDrawerLastFocus = null;
@@ -652,6 +666,10 @@ async function runDiagnosticsConsoleCommand(rawInput) {
 
 function persistQueueTelemetryState() {
 	sessionStorage.setItem(QUEUE_TELEMETRY_KEY, JSON.stringify(queueTelemetryState));
+}
+
+function persistDiagnosticsCommandHistoryState() {
+	sessionStorage.setItem(DIAG_COMMAND_HISTORY_KEY, JSON.stringify(diagHistory.slice(-50)));
 }
 
 function renderQueueTelemetry() {
@@ -2739,6 +2757,7 @@ if (diagDrawerCommandForm && diagDrawerCommandInput) {
 		if (raw.trim()) {
 			diagHistory.push(raw);
 			if (diagHistory.length > 50) diagHistory.shift();
+			persistDiagnosticsCommandHistoryState();
 		}
 		diagHistoryIndex = -1;
 		diagHistoryDraft = '';

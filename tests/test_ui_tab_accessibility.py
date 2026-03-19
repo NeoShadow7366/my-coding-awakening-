@@ -360,6 +360,20 @@ def test_diagnostics_drawer_state_persistence_present_in_js_bundle():
     assert "setDiagnosticsDrawerOpen(!diagDrawerCollapsed);" in content
 
 
+def test_diagnostics_command_history_session_persistence_present_in_js_bundle():
+    js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
+    content = js_path.read_text(encoding="utf-8")
+
+    assert "const DIAG_COMMAND_HISTORY_KEY = 'diagCommandHistoryV1';" in content
+    assert "function getDiagnosticsCommandHistoryState() {" in content
+    assert "const parsed = JSON.parse(sessionStorage.getItem(DIAG_COMMAND_HISTORY_KEY) || '[]');" in content
+    assert "if (!Array.isArray(parsed)) return [];" in content
+    assert "const diagHistory = getDiagnosticsCommandHistoryState();" in content
+    assert "function persistDiagnosticsCommandHistoryState() {" in content
+    assert "sessionStorage.setItem(DIAG_COMMAND_HISTORY_KEY, JSON.stringify(diagHistory.slice(-50)));" in content
+    assert "persistDiagnosticsCommandHistoryState();" in content
+
+
 def test_index_model_download_actions_and_modal_semantics():
     app_module.app.config["TESTING"] = True
     client = app_module.app.test_client()
