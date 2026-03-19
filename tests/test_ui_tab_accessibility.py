@@ -1566,3 +1566,26 @@ def test_queue_poll_done_items_clear_tracking_without_images():
     assert "if (images.length) {" in poll_queue_block
     assert "trackedPromptIds.delete(promptId);" in poll_queue_block
     assert poll_queue_block.index("if (images.length) {") < poll_queue_block.index("trackedPromptIds.delete(promptId);")
+
+
+def test_queue_poll_retries_done_history_persistence_until_post_ok():
+    js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
+    js = js_path.read_text(encoding="utf-8")
+    poll_queue_block = js[js.index("async function pollQueue() {"):js.index("function ensureQueuePolling() {")]
+
+    assert "const saved = await saveHistoryEntry({" in poll_queue_block
+    assert "if (!saved) {" in poll_queue_block
+    assert "meta.status = 'processing';" in poll_queue_block
+    assert "meta.failReason = 'Waiting to persist history entry.';" in poll_queue_block
+    assert "continue;" in poll_queue_block
+    assert poll_queue_block.index("if (!saved) {") < poll_queue_block.index("trackedPromptIds.delete(promptId);")
+
+
+def test_save_history_entry_returns_response_ok_boolean():
+    js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
+    js = js_path.read_text(encoding="utf-8")
+    save_block = js[js.index("async function saveHistoryEntry(entry) {"):js.index("function imageProxyUrl(image) {")]
+
+    assert "const res = await fetch('/api/history', {" in save_block
+    assert "return res.ok;" in save_block
+    assert "return false;" in save_block

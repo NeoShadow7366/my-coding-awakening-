@@ -4206,13 +4206,14 @@ if (queueUiResetBtn) {
 
 async function saveHistoryEntry(entry) {
 	try {
-		await fetch('/api/history', {
+		const res = await fetch('/api/history', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify(entry),
 		});
+		return res.ok;
 	} catch {
-		// non-fatal
+		return false;
 	}
 }
 
@@ -6092,9 +6093,10 @@ async function pollQueue() {
 				const promptId = done.prompt_id;
 				const images = done.images || [];
 				const snapshot = pendingImageJobs.get(promptId) || {};
+				const meta = queueJobMeta.get(promptId) || {};
 
 				if (images.length) {
-					await saveHistoryEntry({
+					const saved = await saveHistoryEntry({
 						type: 'image',
 						prompt: snapshot.prompt || 'Image generation',
 						negative_prompt: snapshot.negative_prompt || '',
@@ -6115,12 +6117,19 @@ async function pollQueue() {
 						},
 						images,
 					});
+					if (!saved) {
+						meta.status = 'processing';
+						meta.updatedAt = Date.now();
+						meta.failReason = 'Waiting to persist history entry.';
+						queueJobMeta.set(promptId, meta);
+						continue;
+					}
 				}
 
 				trackedPromptIds.delete(promptId);
-				const meta = queueJobMeta.get(promptId) || {};
 				meta.status = 'completed';
 				meta.updatedAt = Date.now();
+				meta.failReason = '';
 				meta.snapshot = snapshot;
 				queueJobMeta.set(promptId, meta);
 				pendingImageJobs.delete(promptId);
