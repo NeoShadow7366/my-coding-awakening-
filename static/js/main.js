@@ -139,6 +139,7 @@ const imageAutoApplyRecommendationLabel = document.getElementById('image-auto-ap
 const imageAutoApplyRecommendationToggle = document.getElementById('image-auto-apply-recommendation-toggle');
 const imageLockRecommendationLabel = document.getElementById('image-lock-recommendation-label');
 const imageLockRecommendationToggle = document.getElementById('image-lock-recommendation-toggle');
+const imageUnlockRecommendationOnceBtn = document.getElementById('image-unlock-recommendation-once-btn');
 const imageRecommendationStatus = document.getElementById('image-recommendation-status');
 const imageRecommendationDriftHint = document.getElementById('image-recommendation-drift-hint');
 const imageRecommendationSourceTag = document.getElementById('image-recommendation-source-tag');
@@ -409,6 +410,7 @@ if (!['auto', 'sd', 'flux'].includes(imageModelFamilyMode)) {
 }
 let imageFluxAutoApplyRecommendation = localStorage.getItem(IMAGE_FLUX_AUTO_APPLY_RECOMMENDATION_KEY) === '1';
 let imageFluxLockRecommendation = localStorage.getItem(IMAGE_FLUX_LOCK_RECOMMENDATION_KEY) === '1';
+let imageFluxLockBypassOnce = false;
 let lastAutoRecommendationModelKey = '';
 let activeImagePreset = '';
 let lastResolvedPresetFamily = '';
@@ -3614,11 +3616,25 @@ if (imageLockRecommendationToggle) {
 	imageLockRecommendationToggle.checked = imageFluxLockRecommendation;
 	imageLockRecommendationToggle.addEventListener('change', () => {
 		imageFluxLockRecommendation = imageLockRecommendationToggle.checked;
+		imageFluxLockBypassOnce = false;
 		localStorage.setItem(IMAGE_FLUX_LOCK_RECOMMENDATION_KEY, imageFluxLockRecommendation ? '1' : '0');
 		if (imageFluxLockRecommendation) {
 			applyCurrentFluxRecommendation({ announce: false, suppressNoopStatus: true });
 		}
 		applyImageFamilyModeUi();
+	});
+}
+if (imageUnlockRecommendationOnceBtn) {
+	imageUnlockRecommendationOnceBtn.addEventListener('click', () => {
+		const activeFamily = resolveActiveImageFamily(imageModelSelect?.value || '');
+		if (activeFamily !== 'flux' || !imageFluxLockRecommendation) return;
+		imageFluxLockBypassOnce = true;
+		applyImageFamilyModeUi();
+		if (imageRecommendationStatus) {
+			imageRecommendationStatus.textContent = 'Temporary unlock active for next run. Lock will be restored after submit.';
+			imageRecommendationStatus.hidden = false;
+		}
+		showToast('Temporary unlock active for next run.', '');
 	});
 }
 if (imageModelModeAll) imageModelModeAll.addEventListener('click', () => setImageModelFilterMode('all'));
@@ -6621,12 +6637,18 @@ function applyImageFamilyModeUi() {
 	if (imageLockRecommendationToggle) {
 		imageLockRecommendationToggle.checked = imageFluxLockRecommendation;
 	}
+	if (imageUnlockRecommendationOnceBtn) {
+		const canUseTemporaryUnlock = isFluxActive && imageFluxLockRecommendation;
+		imageUnlockRecommendationOnceBtn.hidden = !canUseTemporaryUnlock;
+		imageUnlockRecommendationOnceBtn.textContent = imageFluxLockBypassOnce ? 'Unlocked for next run' : 'Unlock for next run';
+		imageUnlockRecommendationOnceBtn.setAttribute('aria-pressed', imageFluxLockBypassOnce ? 'true' : 'false');
+	}
 	if (imageSamplerSelect) {
-		imageSamplerSelect.disabled = isFluxActive && imageFluxLockRecommendation;
+		imageSamplerSelect.disabled = isFluxActive && imageFluxLockRecommendation && !imageFluxLockBypassOnce;
 		imageSamplerSelect.title = imageSamplerSelect.disabled ? 'Locked to recommended Flux sampler.' : '';
 	}
 	if (imageSchedulerSelect) {
-		imageSchedulerSelect.disabled = isFluxActive && imageFluxLockRecommendation;
+		imageSchedulerSelect.disabled = isFluxActive && imageFluxLockRecommendation && !imageFluxLockBypassOnce;
 		imageSchedulerSelect.title = imageSchedulerSelect.disabled ? 'Locked to recommended Flux scheduler.' : '';
 	}
 	if (imageRecommendationStatus && !isFluxActive) {
@@ -6649,7 +6671,7 @@ function applyImageFamilyModeUi() {
 	} else {
 		lastAutoRecommendationModelKey = '';
 	}
-	if (isFluxActive && imageFluxLockRecommendation) {
+	if (isFluxActive && imageFluxLockRecommendation && !imageFluxLockBypassOnce) {
 		applyCurrentFluxRecommendation({ announce: false, suppressNoopStatus: true });
 	}
 	updateFluxRecommendationDriftHint();
@@ -10442,6 +10464,14 @@ imageForm.addEventListener('submit', async (e) => {
 		ensureQueuePolling();
 
 		queueSummary.textContent = `Submitted: ${promptId}`;
+		if (imageFluxLockBypassOnce) {
+			imageFluxLockBypassOnce = false;
+			applyImageFamilyModeUi();
+			if (imageRecommendationStatus) {
+				imageRecommendationStatus.textContent = 'Recommendation lock restored after submit.';
+				imageRecommendationStatus.hidden = false;
+			}
+		}
 		imageGenerateBtn.textContent = 'Queued';
 				if (data.meta && data.meta.seed !== undefined) setLastGeneratedSeed(data.meta.seed);
 		await pollQueue();
