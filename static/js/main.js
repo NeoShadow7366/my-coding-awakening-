@@ -6384,9 +6384,18 @@ function applyImageFamilyModeUi() {
 	if (fluxVariantChip) {
 		if (!isFluxActive) {
 			fluxVariantChip.hidden = true;
+			fluxVariantChip.classList.remove('is-dev', 'is-schnell', 'is-auto');
 		} else {
 			const variant = inferFluxVariant(selectedModel);
 			const variantLabel = variant === 'schnell' ? 'Schnell' : (variant === 'dev' ? 'Dev' : 'Auto');
+			fluxVariantChip.classList.remove('is-dev', 'is-schnell', 'is-auto');
+			if (variant === 'schnell') {
+				fluxVariantChip.classList.add('is-schnell');
+			} else if (variant === 'dev') {
+				fluxVariantChip.classList.add('is-dev');
+			} else {
+				fluxVariantChip.classList.add('is-auto');
+			}
 			fluxVariantChip.textContent = `Flux Variant: ${variantLabel}`;
 			fluxVariantChip.hidden = false;
 		}

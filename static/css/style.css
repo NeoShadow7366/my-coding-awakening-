@@ -443,6 +443,24 @@ textarea {
   margin-top: 0.35rem;
 }
 
+.flux-variant-chip.is-dev {
+  color: color-mix(in srgb, var(--clr-text) 84%, #ff934d);
+  border-color: color-mix(in srgb, var(--clr-border) 35%, #ff934d);
+  background: color-mix(in srgb, var(--clr-surface) 68%, #ff934d);
+}
+
+.flux-variant-chip.is-schnell {
+  color: color-mix(in srgb, var(--clr-text) 84%, #4db7ff);
+  border-color: color-mix(in srgb, var(--clr-border) 35%, #4db7ff);
+  background: color-mix(in srgb, var(--clr-surface) 68%, #4db7ff);
+}
+
+.flux-variant-chip.is-auto {
+  color: var(--clr-text-muted);
+  border-color: var(--clr-border);
+  background: color-mix(in srgb, var(--clr-surface) 84%, var(--clr-primary));
+}
+
 .model-recent-wrap {
   display: flex;
   flex-direction: column;

@@ -1562,6 +1562,9 @@ def test_image_scheduler_js_wiring_present_in_bundle():
     assert "FLUX Schnell tip: use euler + simple scheduler with lower step counts for fast output." in js
     assert "FLUX Dev tip: use euler + normal scheduler for stable quality and detail." in js
     assert "fluxVariantChip.textContent = `Flux Variant: ${variantLabel}`;" in js
+    assert "fluxVariantChip.classList.add('is-schnell');" in js
+    assert "fluxVariantChip.classList.add('is-dev');" in js
+    assert "fluxVariantChip.classList.add('is-auto');" in js
 
 
 def test_filter_input_arrow_down_js_wiring():
@@ -1712,3 +1715,13 @@ def test_flux_negative_prompt_js_wiring_present_in_bundle():
     assert "fluxSamplerHint.hidden = false;" in fn_body
     assert "if (fluxVariantChip)" in fn_body
     assert "fluxVariantChip.hidden = false;" in fn_body
+    assert "fluxVariantChip.classList.remove('is-dev', 'is-schnell', 'is-auto');" in fn_body
+
+
+def test_flux_variant_chip_color_classes_present_in_css():
+    css_path = Path(__file__).resolve().parents[1] / "static" / "css" / "style.css"
+    css = css_path.read_text(encoding="utf-8")
+
+    assert ".flux-variant-chip.is-dev" in css
+    assert ".flux-variant-chip.is-schnell" in css
+    assert ".flux-variant-chip.is-auto" in css
