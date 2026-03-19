@@ -329,6 +329,7 @@ const QUEUE_STATE_STORAGE_KEY = 'queueStateV1';
 const QUEUE_RESTORE_HINT_HIDDEN_KEY = 'queueRestoreHintHiddenV1';
 const QUEUE_HELP_EXPANDED_KEY = 'queueHelpExpandedV1';
 const QUEUE_TELEMETRY_KEY = 'queueTelemetryV1';
+const QUEUE_LAST_ACTION_MAX_AGE_MS = 120000;
 let queueFilterFailedOnly = localStorage.getItem('queueFilterFailedOnly') === '1';
 let restoredQueueStateInfo = null;
 let queueRestoreHintTimer = null;
@@ -669,6 +670,12 @@ function renderQueueLastAction() {
 	}
 
 	const ageMs = Math.max(0, Date.now() - Number(queueLastActionInfo.at || Date.now()));
+	if (ageMs > QUEUE_LAST_ACTION_MAX_AGE_MS) {
+		queueLastActionInfo = null;
+		queueLastAction.textContent = 'Last action: none yet.';
+		stopQueueLastActionTicker();
+		return;
+	}
 	const ageSeconds = Math.max(1, Math.round(ageMs / 1000));
 	const ageText = ageSeconds <= 1 ? 'just now' : `${ageSeconds}s ago`;
 	queueLastAction.textContent = `Last action: ${queueLastActionInfo.message} (${ageText})`;

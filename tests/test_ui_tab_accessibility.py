@@ -97,6 +97,7 @@ def test_queue_action_keyboard_handler_wiring_present_in_js_bundle():
     assert "const QUEUE_STATE_STORAGE_KEY = 'queueStateV1';" in content
     assert "const QUEUE_HELP_EXPANDED_KEY = 'queueHelpExpandedV1';" in content
     assert "const QUEUE_RESTORE_HINT_HIDDEN_KEY = 'queueRestoreHintHiddenV1';" in content
+    assert "const QUEUE_LAST_ACTION_MAX_AGE_MS = 120000;" in content
     assert "function persistTrackedQueueState()" in content
     assert "function restoreTrackedQueueState()" in content
     assert "function renderQueueRestoreHint()" in content
@@ -109,6 +110,8 @@ def test_queue_action_keyboard_handler_wiring_present_in_js_bundle():
     assert "function ensureQueueLastActionTicker()" in content
     assert "function renderQueueLastAction()" in content
     assert "queueLastActionTimer = window.setInterval(() => {" in content
+    assert "if (ageMs > QUEUE_LAST_ACTION_MAX_AGE_MS) {" in content
+    assert "queueLastActionInfo = null;" in content
     assert "queueLastAction.textContent = `Last action: ${queueLastActionInfo.message} (${ageText})`;" in content
     assert "const queueHelpDetails = document.getElementById('queue-help-details');" in content
     assert "const queueRestoreWrap = document.getElementById('queue-restore-wrap');" in content
