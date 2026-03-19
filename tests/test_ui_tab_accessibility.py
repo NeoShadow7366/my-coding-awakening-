@@ -1510,6 +1510,8 @@ def test_image_scheduler_select_present_in_html():
     assert 'aria-label="Filter scheduler list"' in html
     assert 'id="image-sampler-filter-status" class="hint" aria-live="polite"' in html
     assert 'id="image-scheduler-filter-status" class="hint" aria-live="polite"' in html
+    assert 'Keyboard: ArrowDown opens sampler list, ArrowUp on first option returns to filter.' in html
+    assert 'Keyboard: ArrowDown opens scheduler list, ArrowUp on first option returns to filter.' in html
 
 
 def test_image_scheduler_js_wiring_present_in_bundle():
