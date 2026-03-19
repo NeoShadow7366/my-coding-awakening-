@@ -668,6 +668,8 @@ function syncQueueLastActionPinButton() {
 	if (!queueLastActionPinBtn) return;
 	queueLastActionPinBtn.textContent = queueLastActionPinned ? 'Unpin' : 'Pin';
 	queueLastActionPinBtn.setAttribute('aria-pressed', queueLastActionPinned ? 'true' : 'false');
+	queueLastActionPinBtn.setAttribute('aria-label', queueLastActionPinned ? 'Unpin queue last action status' : 'Pin queue last action status');
+	queueLastActionPinBtn.title = queueLastActionPinned ? 'Unpin to allow auto-clear after inactivity' : 'Pin this status so it does not auto-clear';
 }
 
 function renderQueueLastAction() {

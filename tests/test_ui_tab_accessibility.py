@@ -111,6 +111,8 @@ def test_queue_action_keyboard_handler_wiring_present_in_js_bundle():
     assert "function stopQueueLastActionTicker()" in content
     assert "function ensureQueueLastActionTicker()" in content
     assert "function syncQueueLastActionPinButton()" in content
+    assert "queueLastActionPinBtn.setAttribute('aria-label', queueLastActionPinned ? 'Unpin queue last action status' : 'Pin queue last action status');" in content
+    assert "queueLastActionPinBtn.title = queueLastActionPinned ? 'Unpin to allow auto-clear after inactivity' : 'Pin this status so it does not auto-clear';" in content
     assert "function renderQueueLastAction()" in content
     assert "queueLastActionTimer = window.setInterval(() => {" in content
     assert "if (!queueLastActionPinned && ageMs > QUEUE_LAST_ACTION_MAX_AGE_MS) {" in content
@@ -171,6 +173,7 @@ def test_queue_action_keyboard_handler_wiring_present_in_js_bundle():
     assert 'id="queue-restore-show"' in html
     assert 'id="queue-last-action"' in html
     assert 'id="queue-last-action-pin"' in html
+    assert 'title="Pin this status so it does not auto-clear"' in html
     assert 'id="queue-ui-reset"' in html
 
     css_path = Path(__file__).resolve().parents[1] / "static" / "css" / "style.css"
