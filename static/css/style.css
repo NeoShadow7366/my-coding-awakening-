@@ -671,6 +671,10 @@ textarea {
   background: color-mix(in srgb, var(--clr-bg) 88%, var(--clr-surface));
 }
 
+.prompt-mode-hint:empty {
+  display: none;
+}
+
 .prompt-toolbar {
   display: inline-flex;
   align-items: center;
@@ -1192,6 +1196,10 @@ textarea {
   display: flex;
   align-items: center;
   gap: var(--sp-sm);
+}
+
+.image-actions .btn-primary {
+  flex: 1;
 }
 
 .history-heading {

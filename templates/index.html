@@ -320,18 +320,14 @@
 
   <div class="image-container">
     <section class="image-form-wrap" aria-label="Image generation form">
-      <h2 class="section-heading">Image Inference</h2>
-      <p class="section-desc">Create images from text prompts, or upload a source image for img2img.</p>
-
       <form id="image-form">
         <div class="field-label-row">
-          <p class="field-label">Image Inference Text</p>
           <label for="enhanced-prompt-toggle" class="toggle-label">
             <input id="enhanced-prompt-toggle" type="checkbox" />
             <span>Enhanced prompt breakdown</span>
           </label>
         </div>
-        <p id="prompt-mode-hint" class="hint prompt-mode-hint" aria-live="polite">Standard prompt mode is active.</p>
+        <p id="prompt-mode-hint" class="hint prompt-mode-hint" aria-live="polite"></p>
 
         <section id="enhanced-prompt-fields" class="enhanced-prompt-fields" hidden aria-label="Enhanced prompt breakdown fields">
           <p class="hint">Fill out the details and generate offline Ollama prompt suggestions.</p>
@@ -512,16 +508,15 @@
           <div class="form-field">
             <label for="image-height" class="field-label">Height</label>
             <input id="image-height" type="number" min="256" max="2048" step="64" value="1024" />
-
-                  <div class="aspect-ratio-row" role="group" aria-label="Aspect ratio presets">
-                    <button class="btn btn-ghost btn-xs" type="button" data-ar="1024:1024" title="Square 1:1 (1024×1024)">1:1</button>
-                    <button class="btn btn-ghost btn-xs" type="button" data-ar="1152:864"  title="Landscape 4:3 (1152×864)">4:3</button>
-                    <button class="btn btn-ghost btn-xs" type="button" data-ar="1216:832"  title="Photo 3:2 (1216×832)">3:2</button>
-                    <button class="btn btn-ghost btn-xs" type="button" data-ar="1344:768"  title="Wide 16:9 (1344×768)">16:9</button>
-                    <button class="btn btn-ghost btn-xs" type="button" data-ar="768:1344"  title="Portrait 9:16 (768×1344)">9:16</button>
-                    <button class="btn btn-ghost btn-xs" type="button" data-ar="832:1216"  title="Portrait 2:3 (832×1216)">2:3</button>
-                  </div>
           </div>
+        </div>
+        <div class="aspect-ratio-row" role="group" aria-label="Aspect ratio presets">
+          <button class="btn btn-ghost btn-xs" type="button" data-ar="1024:1024" title="Square 1:1 (1024×1024)">1:1</button>
+          <button class="btn btn-ghost btn-xs" type="button" data-ar="1152:864"  title="Landscape 4:3 (1152×864)">4:3</button>
+          <button class="btn btn-ghost btn-xs" type="button" data-ar="1216:832"  title="Photo 3:2 (1216×832)">3:2</button>
+          <button class="btn btn-ghost btn-xs" type="button" data-ar="1344:768"  title="Wide 16:9 (1344×768)">16:9</button>
+          <button class="btn btn-ghost btn-xs" type="button" data-ar="768:1344"  title="Portrait 9:16 (768×1344)">9:16</button>
+          <button class="btn btn-ghost btn-xs" type="button" data-ar="832:1216"  title="Portrait 2:3 (832×1216)">2:3</button>
         </div>
 
         <div class="inline-grid two-up">

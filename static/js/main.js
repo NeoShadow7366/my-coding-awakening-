@@ -6158,7 +6158,7 @@ function setEnhancedPromptBreakdownVisible(isVisible) {
 	if (promptModeHint) {
 		promptModeHint.textContent = isVisible
 			? 'Enhanced prompt mode is active. Generate and apply a suggestion before submitting.'
-			: 'Standard prompt mode is active.';
+			: '';
 	}
 	if (isVisible) {
 		// Reset all tag clouds inside the breakdown to hidden so they start collapsed
