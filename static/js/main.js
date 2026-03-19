@@ -211,6 +211,7 @@ const queueRestoreHint = document.getElementById('queue-restore-hint');
 const queueRestoreHideBtn = document.getElementById('queue-restore-hide');
 const queueRestoreShowBtn = document.getElementById('queue-restore-show');
 const queueLastAction = document.getElementById('queue-last-action');
+const queueLastActionPinBtn = document.getElementById('queue-last-action-pin');
 const queueSummary = document.getElementById('queue-summary');
 const queueList = document.getElementById('queue-list');
 const configOllamaPath = document.getElementById('config-ollama-path');
@@ -329,12 +330,14 @@ const QUEUE_STATE_STORAGE_KEY = 'queueStateV1';
 const QUEUE_RESTORE_HINT_HIDDEN_KEY = 'queueRestoreHintHiddenV1';
 const QUEUE_HELP_EXPANDED_KEY = 'queueHelpExpandedV1';
 const QUEUE_TELEMETRY_KEY = 'queueTelemetryV1';
+const QUEUE_LAST_ACTION_PINNED_KEY = 'queueLastActionPinnedV1';
 const QUEUE_LAST_ACTION_MAX_AGE_MS = 120000;
 let queueFilterFailedOnly = localStorage.getItem('queueFilterFailedOnly') === '1';
 let restoredQueueStateInfo = null;
 let queueRestoreHintTimer = null;
 let queueLastActionInfo = null;
 let queueLastActionTimer = null;
+let queueLastActionPinned = localStorage.getItem(QUEUE_LAST_ACTION_PINNED_KEY) === '1';
 let queueRestoreHintHidden = localStorage.getItem(QUEUE_RESTORE_HINT_HIDDEN_KEY) === '1';
 const IMAGE_PROFILE_STORAGE_KEY = 'imagePresetProfilesV1';
 const IMAGE_PROFILE_SELECTED_KEY = 'imagePresetProfilesSelectedV1';
@@ -661,25 +664,34 @@ function ensureQueueLastActionTicker() {
 	}, 1000);
 }
 
+function syncQueueLastActionPinButton() {
+	if (!queueLastActionPinBtn) return;
+	queueLastActionPinBtn.textContent = queueLastActionPinned ? 'Unpin' : 'Pin';
+	queueLastActionPinBtn.setAttribute('aria-pressed', queueLastActionPinned ? 'true' : 'false');
+}
+
 function renderQueueLastAction() {
 	if (!queueLastAction) return;
 	if (!queueLastActionInfo || !queueLastActionInfo.message) {
 		queueLastAction.textContent = 'Last action: none yet.';
 		stopQueueLastActionTicker();
+		syncQueueLastActionPinButton();
 		return;
 	}
 
 	const ageMs = Math.max(0, Date.now() - Number(queueLastActionInfo.at || Date.now()));
-	if (ageMs > QUEUE_LAST_ACTION_MAX_AGE_MS) {
+	if (!queueLastActionPinned && ageMs > QUEUE_LAST_ACTION_MAX_AGE_MS) {
 		queueLastActionInfo = null;
 		queueLastAction.textContent = 'Last action: none yet.';
 		stopQueueLastActionTicker();
+		syncQueueLastActionPinButton();
 		return;
 	}
 	const ageSeconds = Math.max(1, Math.round(ageMs / 1000));
 	const ageText = ageSeconds <= 1 ? 'just now' : `${ageSeconds}s ago`;
 	queueLastAction.textContent = `Last action: ${queueLastActionInfo.message} (${ageText})`;
 	ensureQueueLastActionTicker();
+	syncQueueLastActionPinButton();
 }
 
 function setQueueLastAction(message) {
@@ -731,6 +743,18 @@ if (queueRestoreShowBtn) {
 		localStorage.removeItem(QUEUE_RESTORE_HINT_HIDDEN_KEY);
 		setQueueLastAction('Restore hint shown.');
 		renderQueueRestoreHint();
+	});
+}
+
+if (queueLastActionPinBtn) {
+	queueLastActionPinBtn.addEventListener('click', () => {
+		queueLastActionPinned = !queueLastActionPinned;
+		if (queueLastActionPinned) {
+			localStorage.setItem(QUEUE_LAST_ACTION_PINNED_KEY, '1');
+		} else {
+			localStorage.removeItem(QUEUE_LAST_ACTION_PINNED_KEY);
+		}
+		renderQueueLastAction();
 	});
 }
 

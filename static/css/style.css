@@ -1347,10 +1347,20 @@ textarea {
   margin-top: 0.1rem;
 }
 
+.queue-last-action-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
 .queue-last-action {
   margin: 0.18rem 0 0;
   font-size: 0.74rem;
   color: color-mix(in srgb, var(--clr-primary) 58%, var(--clr-text-muted));
+}
+
+.queue-last-action-pin {
+  margin-top: 0.1rem;
 }
 
 .queue-reason {

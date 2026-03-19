@@ -97,6 +97,7 @@ def test_queue_action_keyboard_handler_wiring_present_in_js_bundle():
     assert "const QUEUE_STATE_STORAGE_KEY = 'queueStateV1';" in content
     assert "const QUEUE_HELP_EXPANDED_KEY = 'queueHelpExpandedV1';" in content
     assert "const QUEUE_RESTORE_HINT_HIDDEN_KEY = 'queueRestoreHintHiddenV1';" in content
+    assert "const QUEUE_LAST_ACTION_PINNED_KEY = 'queueLastActionPinnedV1';" in content
     assert "const QUEUE_LAST_ACTION_MAX_AGE_MS = 120000;" in content
     assert "function persistTrackedQueueState()" in content
     assert "function restoreTrackedQueueState()" in content
@@ -106,11 +107,13 @@ def test_queue_action_keyboard_handler_wiring_present_in_js_bundle():
     assert "queueRestoreHintTimer = window.setInterval(() => {" in content
     assert "let queueLastActionInfo = null;" in content
     assert "let queueLastActionTimer = null;" in content
+    assert "let queueLastActionPinned = localStorage.getItem(QUEUE_LAST_ACTION_PINNED_KEY) === '1';" in content
     assert "function stopQueueLastActionTicker()" in content
     assert "function ensureQueueLastActionTicker()" in content
+    assert "function syncQueueLastActionPinButton()" in content
     assert "function renderQueueLastAction()" in content
     assert "queueLastActionTimer = window.setInterval(() => {" in content
-    assert "if (ageMs > QUEUE_LAST_ACTION_MAX_AGE_MS) {" in content
+    assert "if (!queueLastActionPinned && ageMs > QUEUE_LAST_ACTION_MAX_AGE_MS) {" in content
     assert "queueLastActionInfo = null;" in content
     assert "queueLastAction.textContent = `Last action: ${queueLastActionInfo.message} (${ageText})`;" in content
     assert "const queueHelpDetails = document.getElementById('queue-help-details');" in content
@@ -119,6 +122,7 @@ def test_queue_action_keyboard_handler_wiring_present_in_js_bundle():
     assert "const queueRestoreHideBtn = document.getElementById('queue-restore-hide');" in content
     assert "const queueRestoreShowBtn = document.getElementById('queue-restore-show');" in content
     assert "const queueLastAction = document.getElementById('queue-last-action');" in content
+    assert "const queueLastActionPinBtn = document.getElementById('queue-last-action-pin');" in content
     assert "const queueUiResetBtn = document.getElementById('queue-ui-reset');" in content
     assert "function setQueueLastAction(message)" in content
     assert "if (queueRestoreHideBtn) {" in content
@@ -129,6 +133,10 @@ def test_queue_action_keyboard_handler_wiring_present_in_js_bundle():
     assert "queueRestoreHintHidden = false;" in content
     assert "localStorage.removeItem(QUEUE_RESTORE_HINT_HIDDEN_KEY);" in content
     assert "setQueueLastAction('Restore hint shown.');" in content
+    assert "if (queueLastActionPinBtn) {" in content
+    assert "queueLastActionPinned = !queueLastActionPinned;" in content
+    assert "localStorage.setItem(QUEUE_LAST_ACTION_PINNED_KEY, '1');" in content
+    assert "localStorage.removeItem(QUEUE_LAST_ACTION_PINNED_KEY);" in content
     assert "if (queueUiResetBtn) {" in content
     assert "queueFilterFailedOnly = false;" in content
     assert "localStorage.removeItem('queueFilterFailedOnly');" in content
@@ -162,6 +170,7 @@ def test_queue_action_keyboard_handler_wiring_present_in_js_bundle():
     assert 'id="queue-restore-hide"' in html
     assert 'id="queue-restore-show"' in html
     assert 'id="queue-last-action"' in html
+    assert 'id="queue-last-action-pin"' in html
     assert 'id="queue-ui-reset"' in html
 
     css_path = Path(__file__).resolve().parents[1] / "static" / "css" / "style.css"
@@ -173,7 +182,9 @@ def test_queue_action_keyboard_handler_wiring_present_in_js_bundle():
     assert ".queue-restore-wrap" in css
     assert ".queue-restore-hint" in css
     assert ".queue-restore-show" in css
+    assert ".queue-last-action-row" in css
     assert ".queue-last-action" in css
+    assert ".queue-last-action-pin" in css
 
 
 def test_index_gallery_controls_group_semantics():
