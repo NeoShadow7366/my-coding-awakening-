@@ -1593,6 +1593,19 @@ def test_queue_summary_and_badge_include_history_persisting_state():
     assert "SAVE" in queue_render_block
 
 
+def test_queue_help_explains_persisting_state_in_html():
+    app_module.app.config["TESTING"] = True
+    client = app_module.app.test_client()
+
+    html = client.get("/").get_data(as_text=True)
+
+    assert 'id="queue-help-copy"' in html
+    assert "Persisting counts jobs that are done in ComfyUI but still saving local history." in html
+    assert "SAVE badge" in html
+    assert 'id="queue-summary"' in html
+    assert 'title="Persisting counts done jobs waiting for local history save before leaving tracked queue."' in html
+
+
 def test_save_history_entry_returns_response_ok_boolean():
     js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
     js = js_path.read_text(encoding="utf-8")

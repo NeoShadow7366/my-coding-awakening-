@@ -575,6 +575,7 @@
         <summary id="queue-help-toggle">Queue help</summary>
         <div id="queue-help-copy" class="hint queue-help-copy">
           <p>Use Alt+ArrowUp on a prioritize action to move a queued job to the front.</p>
+          <p>Persisting counts jobs that are done in ComfyUI but still saving local history. These rows show a SAVE badge until persistence succeeds.</p>
           <p>Restored queue hints appear after reload when tracked jobs are recovered from local storage.</p>
           <p>Reset queue UI clears the failed-only filter and restore-hint visibility preference.</p>
         </div>
@@ -588,7 +589,7 @@
         <p id="queue-last-action" class="hint queue-last-action" role="status" aria-live="polite">Last action: none yet.</p>
         <button class="btn btn-ghost btn-xs queue-last-action-pin" id="queue-last-action-pin" type="button" aria-pressed="false" aria-label="Pin queue last action status" title="Pin this status so it does not auto-clear">Pin</button>
       </div>
-      <p id="queue-summary" class="hint">No jobs submitted yet.</p>
+      <p id="queue-summary" class="hint" title="Persisting counts done jobs waiting for local history save before leaving tracked queue.">No jobs submitted yet.</p>
       <ul id="queue-list" class="history-list"></ul>
     </section>
 

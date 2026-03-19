@@ -78,6 +78,73 @@ def test_image_queue_returns_done_for_prompt_ids(client, monkeypatch):
     ]
 
 
+def test_image_queue_transient_parse_error_is_skipped_per_prompt(client, monkeypatch):
+    monkeypatch.setattr(app_module, "_comfy_available", lambda: True)
+
+    def fake_get(url, timeout=0, **kwargs):
+        assert url.endswith("/queue")
+        assert timeout == 10
+        return DummyResponse(payload={"queue_running": [], "queue_pending": []})
+
+    def fake_parse_prompt_images(prompt_id):
+        if prompt_id == "pid-error":
+            raise app_module.requests.RequestException("temporary parse failure")
+        if prompt_id == "pid-done":
+            return [{"filename": "ok.png", "subfolder": "", "type": "output"}]
+        return []
+
+    monkeypatch.setattr(app_module.requests, "get", fake_get)
+    monkeypatch.setattr(app_module, "_parse_prompt_images", fake_parse_prompt_images)
+
+    resp = client.get("/api/image/queue?prompt_ids=pid-error,pid-done")
+
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["running"] == []
+    assert data["pending"] == []
+    assert data["done"] == [
+        {
+            "prompt_id": "pid-done",
+            "images": [{"filename": "ok.png", "subfolder": "", "type": "output"}],
+        }
+    ]
+
+
+def test_image_queue_retry_returns_done_after_transient_parse_failure(client, monkeypatch):
+    monkeypatch.setattr(app_module, "_comfy_available", lambda: True)
+    parse_calls = {"pid-retry": 0}
+
+    def fake_get(url, timeout=0, **kwargs):
+        assert url.endswith("/queue")
+        assert timeout == 10
+        return DummyResponse(payload={"queue_running": [], "queue_pending": []})
+
+    def fake_parse_prompt_images(prompt_id):
+        if prompt_id != "pid-retry":
+            return []
+        parse_calls["pid-retry"] += 1
+        if parse_calls["pid-retry"] == 1:
+            raise app_module.requests.RequestException("history not ready")
+        return [{"filename": "retry.png", "subfolder": "", "type": "output"}]
+
+    monkeypatch.setattr(app_module.requests, "get", fake_get)
+    monkeypatch.setattr(app_module, "_parse_prompt_images", fake_parse_prompt_images)
+
+    first = client.get("/api/image/queue?prompt_ids=pid-retry")
+    second = client.get("/api/image/queue?prompt_ids=pid-retry")
+
+    assert first.status_code == 200
+    assert first.get_json()["done"] == []
+
+    assert second.status_code == 200
+    assert second.get_json()["done"] == [
+        {
+            "prompt_id": "pid-retry",
+            "images": [{"filename": "retry.png", "subfolder": "", "type": "output"}],
+        }
+    ]
+
+
 def test_image_cancel_requires_prompt_id(client, monkeypatch):
     monkeypatch.setattr(app_module, "_comfy_available", lambda: True)
 
