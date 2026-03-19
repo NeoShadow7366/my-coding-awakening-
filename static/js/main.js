@@ -388,7 +388,8 @@ let galleryVirtualState = null;
 let galleryVirtualRaf = null;
 const img2imgSourceResolveCache = new Map();
 let controlnetPreviewObjectUrl = '';
-let gallerySearchQuery = '';
+const GALLERY_SEARCH_QUERY_KEY = 'gallerySearchQueryV1';
+let gallerySearchQuery = localStorage.getItem(GALLERY_SEARCH_QUERY_KEY) || '';
 let gallerySortOrder = localStorage.getItem('gallerySortOrder') || 'newest';
 let galleryModeFilter = localStorage.getItem('galleryModeFilter') || 'all';
 const VALID_GALLERY_SORT_ORDERS = new Set(['newest', 'oldest', 'favorites-first']);
@@ -5172,11 +5173,17 @@ if (galleryContextMenu) {
 }
 
 if (gallerySearch) {
+	if (gallerySearchQuery) gallerySearch.value = gallerySearchQuery;
 	let searchDebounceTimer = null;
 	gallerySearch.addEventListener('input', () => {
 		clearTimeout(searchDebounceTimer);
 		searchDebounceTimer = window.setTimeout(() => {
 			gallerySearchQuery = gallerySearch.value || '';
+			if (gallerySearchQuery) {
+				localStorage.setItem(GALLERY_SEARCH_QUERY_KEY, gallerySearchQuery);
+			} else {
+				localStorage.removeItem(GALLERY_SEARCH_QUERY_KEY);
+			}
 			renderGallery(currentFullHistory);
 		}, 220);
 	});
@@ -5185,6 +5192,7 @@ if (gallerySearch) {
 		e.stopPropagation();
 		gallerySearch.value = '';
 		gallerySearchQuery = '';
+		localStorage.removeItem(GALLERY_SEARCH_QUERY_KEY);
 		renderGallery(currentFullHistory);
 	});
 }

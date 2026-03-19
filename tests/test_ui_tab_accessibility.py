@@ -219,6 +219,17 @@ def test_gallery_toolbar_keyboard_handler_wiring_present_in_js_bundle():
     assert "refreshGalleryBtn.addEventListener('keydown', onGalleryToolbarButtonKeydown);" in content
 
 
+def test_gallery_search_query_persistence_present_in_js_bundle():
+    js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
+    content = js_path.read_text(encoding="utf-8")
+
+    assert "const GALLERY_SEARCH_QUERY_KEY = 'gallerySearchQueryV1';" in content
+    assert "let gallerySearchQuery = localStorage.getItem(GALLERY_SEARCH_QUERY_KEY) || '';" in content
+    assert "if (gallerySearchQuery) gallerySearch.value = gallerySearchQuery;" in content
+    assert "localStorage.setItem(GALLERY_SEARCH_QUERY_KEY, gallerySearchQuery);" in content
+    assert "localStorage.removeItem(GALLERY_SEARCH_QUERY_KEY);" in content
+
+
 def test_index_config_service_action_group_semantics():
     app_module.app.config["TESTING"] = True
     client = app_module.app.test_client()
