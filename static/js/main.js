@@ -332,6 +332,8 @@ const QUEUE_TELEMETRY_KEY = 'queueTelemetryV1';
 let queueFilterFailedOnly = localStorage.getItem('queueFilterFailedOnly') === '1';
 let restoredQueueStateInfo = null;
 let queueRestoreHintTimer = null;
+let queueLastActionInfo = null;
+let queueLastActionTimer = null;
 let queueRestoreHintHidden = localStorage.getItem(QUEUE_RESTORE_HINT_HIDDEN_KEY) === '1';
 const IMAGE_PROFILE_STORAGE_KEY = 'imagePresetProfilesV1';
 const IMAGE_PROFILE_SELECTED_KEY = 'imagePresetProfilesSelectedV1';
@@ -645,9 +647,40 @@ function ensureQueueRestoreHintTicker() {
 	}, 1000);
 }
 
-function setQueueLastAction(message) {
+function stopQueueLastActionTicker() {
+	if (!queueLastActionTimer) return;
+	window.clearInterval(queueLastActionTimer);
+	queueLastActionTimer = null;
+}
+
+function ensureQueueLastActionTicker() {
+	if (queueLastActionTimer) return;
+	queueLastActionTimer = window.setInterval(() => {
+		renderQueueLastAction();
+	}, 1000);
+}
+
+function renderQueueLastAction() {
 	if (!queueLastAction) return;
-	queueLastAction.textContent = `Last action: ${message}`;
+	if (!queueLastActionInfo || !queueLastActionInfo.message) {
+		queueLastAction.textContent = 'Last action: none yet.';
+		stopQueueLastActionTicker();
+		return;
+	}
+
+	const ageMs = Math.max(0, Date.now() - Number(queueLastActionInfo.at || Date.now()));
+	const ageSeconds = Math.max(1, Math.round(ageMs / 1000));
+	const ageText = ageSeconds <= 1 ? 'just now' : `${ageSeconds}s ago`;
+	queueLastAction.textContent = `Last action: ${queueLastActionInfo.message} (${ageText})`;
+	ensureQueueLastActionTicker();
+}
+
+function setQueueLastAction(message) {
+	queueLastActionInfo = {
+		message: String(message || '').trim(),
+		at: Date.now(),
+	};
+	renderQueueLastAction();
 }
 
 function renderQueueRestoreHint() {
@@ -796,6 +829,7 @@ if (queueHelpDetails) {
 }
 
 renderQueueTelemetry();
+renderQueueLastAction();
 
 if (queueTelemetryResetBtn) {
 	queueTelemetryResetBtn.addEventListener('click', () => {
@@ -9494,6 +9528,7 @@ window.addEventListener('storage', (event) => {
 
 window.addEventListener('beforeunload', () => {
 	stopQueueRestoreHintTicker();
+	stopQueueLastActionTicker();
 	stopWsTransportStatusTicker();
 	releaseBackgroundPollingOwnership();
 });

@@ -103,6 +103,13 @@ def test_queue_action_keyboard_handler_wiring_present_in_js_bundle():
     assert "function stopQueueRestoreHintTicker()" in content
     assert "function ensureQueueRestoreHintTicker()" in content
     assert "queueRestoreHintTimer = window.setInterval(() => {" in content
+    assert "let queueLastActionInfo = null;" in content
+    assert "let queueLastActionTimer = null;" in content
+    assert "function stopQueueLastActionTicker()" in content
+    assert "function ensureQueueLastActionTicker()" in content
+    assert "function renderQueueLastAction()" in content
+    assert "queueLastActionTimer = window.setInterval(() => {" in content
+    assert "queueLastAction.textContent = `Last action: ${queueLastActionInfo.message} (${ageText})`;" in content
     assert "const queueHelpDetails = document.getElementById('queue-help-details');" in content
     assert "const queueRestoreWrap = document.getElementById('queue-restore-wrap');" in content
     assert "const queueRestoreHint = document.getElementById('queue-restore-hint');" in content
@@ -129,6 +136,7 @@ def test_queue_action_keyboard_handler_wiring_present_in_js_bundle():
     assert "localStorage.setItem(QUEUE_HELP_EXPANDED_KEY, queueHelpDetails.open ? '1' : '0');" in content
     assert "setQueueLastAction(queueHelpDetails.open ? 'Queue help opened.' : 'Queue help closed.');" in content
     assert "renderQueueRestoreHint();" in content
+    assert "renderQueueLastAction();" in content
     assert "Restored ${count} active queue item" in content
     assert "restoreTrackedQueueState();" in content
     assert "localStorage.setItem(QUEUE_STATE_STORAGE_KEY" in content
