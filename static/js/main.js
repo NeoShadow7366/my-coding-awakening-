@@ -133,6 +133,8 @@ const imageSamplerFilterStatus = document.getElementById('image-sampler-filter-s
 const imageSchedulerSelect = document.getElementById('image-scheduler-select');
 const imageSchedulerFilter = document.getElementById('image-scheduler-filter');
 const imageSchedulerFilterStatus = document.getElementById('image-scheduler-filter-status');
+const imageApplyRecommendationBtn = document.getElementById('image-apply-recommendation-btn');
+const imageRecommendationStatus = document.getElementById('image-recommendation-status');
 const loraAddBtn = document.getElementById('lora-add-btn');
 const loraStackContainer = document.getElementById('lora-stack-container');
 // NOTE: loraModelSelect / loraStrength / loraStrengthVal replaced by multi-LoRA stack
@@ -3557,6 +3559,11 @@ if (imageModelFilter) {
 }
 bindSelectFilterInput(imageSamplerFilter, imageSamplerSelect, IMAGE_SAMPLER_FILTER_QUERY_KEY, imageSamplerFilterStatus, 'samplers');
 bindSelectFilterInput(imageSchedulerFilter, imageSchedulerSelect, IMAGE_SCHEDULER_FILTER_QUERY_KEY, imageSchedulerFilterStatus, 'schedulers');
+if (imageApplyRecommendationBtn) {
+	imageApplyRecommendationBtn.addEventListener('click', () => {
+		applyCurrentFluxRecommendation({ announce: true });
+	});
+}
 if (imageModelModeAll) imageModelModeAll.addEventListener('click', () => setImageModelFilterMode('all'));
 if (imageModelModeRecent) imageModelModeRecent.addEventListener('click', () => setImageModelFilterMode('recent'));
 if (imageModelModeFavorites) imageModelModeFavorites.addEventListener('click', () => setImageModelFilterMode('favorites'));
@@ -6342,6 +6349,52 @@ function getFluxWorkflowRecommendation(modelName = '') {
 	};
 }
 
+function applyCurrentFluxRecommendation(options = {}) {
+	const announce = options.announce !== false;
+	const selectedModel = imageModelSelect?.value || '';
+	const activeFamily = resolveActiveImageFamily(selectedModel);
+	if (activeFamily !== 'flux') {
+		if (imageRecommendationStatus) {
+			imageRecommendationStatus.textContent = 'Switch to FLUX mode to apply recommendations.';
+			imageRecommendationStatus.hidden = false;
+		}
+		if (announce) showToast('Flux recommendations apply only in FLUX mode.', '');
+		return false;
+	}
+
+	const recommendation = getFluxWorkflowRecommendation(selectedModel);
+	if (!recommendation?.sampler || !recommendation?.scheduler) {
+		if (imageRecommendationStatus) {
+			imageRecommendationStatus.textContent = 'No recommendation available for this model.';
+			imageRecommendationStatus.hidden = false;
+		}
+		if (announce) showToast('No Flux recommendation is available for this model.', '');
+		return false;
+	}
+
+	const prevSampler = imageSamplerSelect?.value || '';
+	const prevScheduler = imageSchedulerSelect?.value || '';
+	setSelectValueIfOptionExists(imageSamplerSelect, recommendation.sampler);
+	setSelectValueIfOptionExists(imageSchedulerSelect, recommendation.scheduler);
+	const changed = prevSampler !== (imageSamplerSelect?.value || '') || prevScheduler !== (imageSchedulerSelect?.value || '');
+
+	if (imageRecommendationStatus) {
+		imageRecommendationStatus.textContent = changed
+			? `Applied recommendation: ${recommendation.sampler} + ${recommendation.scheduler}`
+			: `Recommendation already applied: ${recommendation.sampler} + ${recommendation.scheduler}`;
+		imageRecommendationStatus.hidden = false;
+	}
+	if (announce) {
+		showToast(
+			changed
+				? `Applied Flux recommendation (${recommendation.sampler} + ${recommendation.scheduler}).`
+				: `Flux recommendation already active (${recommendation.sampler} + ${recommendation.scheduler}).`,
+			changed ? 'pos' : ''
+		);
+	}
+	return changed;
+}
+
 function resolveActiveImageFamily(modelName = '') {
 	const requestedMode = imageModelFamilySelect?.value || imageModelFamilyMode || 'auto';
 	if (requestedMode === 'flux') return 'flux';
@@ -6405,6 +6458,13 @@ function applyImageFamilyModeUi() {
 			}
 			fluxSamplerHint.hidden = false;
 		}
+	}
+	if (imageApplyRecommendationBtn) {
+		imageApplyRecommendationBtn.hidden = !isFluxActive;
+		imageApplyRecommendationBtn.disabled = !isFluxActive;
+	}
+	if (imageRecommendationStatus && !isFluxActive) {
+		imageRecommendationStatus.hidden = true;
 	}
 	if (fluxVariantChip) {
 		if (!isFluxActive) {
