@@ -1501,6 +1501,13 @@ def test_image_scheduler_select_present_in_html():
 
     html = client.get("/").get_data(as_text=True)
 
+    assert 'id="image-model-family-select"' in html
+    assert 'Auto detect from checkpoint' in html
+    assert 'FLUX workflow' in html
+    assert 'id="image-model-family-hint" class="hint" aria-live="polite"' in html
+    assert 'id="image-vae-field"' in html
+    assert 'id="image-refiner-field"' in html
+    assert 'id="image-cfg-row"' in html
     assert 'id="image-scheduler-select"' in html
     assert '<label for="image-scheduler-select"' in html
     assert 'Scheduler' in html
@@ -1521,6 +1528,13 @@ def test_image_scheduler_js_wiring_present_in_bundle():
     assert "imageSchedulerSelect" in js
     assert "imageSamplerFilter" in js
     assert "imageSchedulerFilter" in js
+    assert "imageModelFamilySelect" in js
+    assert "imageModelFamilyHint" in js
+    assert "const IMAGE_MODEL_FAMILY_MODE_KEY = 'imageModelFamilyModeV1';" in js
+    assert "const IMAGE_FAMILY_CAPABILITIES = {" in js
+    assert "function resolveActiveImageFamily(modelName = '')" in js
+    assert "function applyImageFamilyModeUi()" in js
+    assert "function normalizeImageRequestByFamily(common)" in js
     assert "async function loadImageSchedulers()" in js
     assert "/api/image/schedulers" in js
     assert "function applySelectFilterQuery(selectEl, query)" in js

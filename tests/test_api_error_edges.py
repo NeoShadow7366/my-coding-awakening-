@@ -211,7 +211,13 @@ def test_image_models_returns_list_when_available(client, monkeypatch):
     resp = client.get("/api/image/models")
 
     assert resp.status_code == 200
-    assert resp.get_json()["models"] == ["v1-5.safetensors", "xl.safetensors"]
+    data = resp.get_json()
+    assert data["models"] == ["v1-5.safetensors", "xl.safetensors"]
+    assert "model_details" in data
+    assert isinstance(data["model_details"], list)
+    assert data["model_details"][0]["name"] == "v1-5.safetensors"
+    assert data["model_details"][0]["family"] in {"sd15", "sdxl", "unknown", "flux"}
+    assert "supports_controlnet" in data["model_details"][0]
 
 
 def test_image_models_returns_503_when_unavailable(client, monkeypatch):
@@ -222,7 +228,25 @@ def test_image_models_returns_503_when_unavailable(client, monkeypatch):
     assert resp.status_code == 503
     data = resp.get_json()
     assert data["models"] == []
+    assert data["model_details"] == []
     assert "error" in data
+
+
+def test_image_models_flux_family_capabilities(client, monkeypatch):
+    monkeypatch.setattr(app_module, "_comfy_available", lambda: True)
+    monkeypatch.setattr(app_module, "_image_models", lambda: ["flux1-dev.safetensors"])
+
+    resp = client.get("/api/image/models")
+
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["models"] == ["flux1-dev.safetensors"]
+    assert data["model_details"][0]["family"] == "flux"
+    assert data["model_details"][0]["supports_refiner"] is False
+    assert data["model_details"][0]["supports_vae"] is False
+    assert data["model_details"][0]["supports_controlnet"] is False
+    assert data["model_details"][0]["supports_hiresfix"] is False
+    assert data["model_details"][0]["cfg_max"] == 10
 
 
 def test_image_samplers_returns_list_when_available(client, monkeypatch):

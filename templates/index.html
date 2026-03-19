@@ -176,6 +176,15 @@
           <option value="">- loading checkpoints -</option>
         </select>
       </div>
+      <label for="image-model-family-select" class="field-label">Model Family Mode</label>
+      <div class="select-wrapper">
+        <select id="image-model-family-select" aria-label="Image model family mode">
+          <option value="auto">Auto detect from checkpoint</option>
+          <option value="sd">SD / SDXL workflow</option>
+          <option value="flux">FLUX workflow</option>
+        </select>
+      </div>
+      <p id="image-model-family-hint" class="hint" aria-live="polite">Family mode: auto detect from checkpoint.</p>
       <div class="model-favorite-toggle-row" role="group" aria-label="Favorite checkpoint toggle">
         <button class="btn btn-ghost btn-xs" id="image-model-favorite-toggle" type="button" aria-pressed="false">Favorite Selected</button>
         <button class="btn btn-ghost btn-xs hint-info-btn model-stack-compat-hint" id="model-stack-compat-hint" type="button" aria-live="polite" aria-label="Model stack compatibility tip" title="Tip: keep Base, Refiner, and VAE in the same family (SD1.5 vs SDXL) when possible.">i</button>
@@ -187,21 +196,25 @@
         <div id="image-model-favorite-list" class="model-recent-list" role="group" aria-label="Favorite checkpoint selections"></div>
       </div>
 
-      <label for="vae-model-select" class="field-label">VAE <span class="optional">(optional)</span></label>
-      <div class="select-wrapper">
-        <select id="vae-model-select">
-          <option value="">Default (embedded)</option>
-        </select>
+      <div id="image-vae-field">
+        <label for="vae-model-select" class="field-label">VAE <span class="optional">(optional)</span></label>
+        <div class="select-wrapper">
+          <select id="vae-model-select">
+            <option value="">Default (embedded)</option>
+          </select>
+        </div>
       </div>
 
-      <div class="field-label-with-info">
-        <label for="refiner-model-select" class="field-label">Refiner <span class="optional">(optional)</span></label>
-        <button class="btn btn-ghost btn-xs hint-info-btn" type="button" aria-label="Refiner info" title="Second-pass quality boost (SDXL refiner style).">i</button>
-      </div>
-      <div class="select-wrapper">
-        <select id="refiner-model-select">
-          <option value="">None</option>
-        </select>
+      <div id="image-refiner-field">
+        <div class="field-label-with-info">
+          <label for="refiner-model-select" class="field-label">Refiner <span class="optional">(optional)</span></label>
+          <button class="btn btn-ghost btn-xs hint-info-btn" type="button" aria-label="Refiner info" title="Second-pass quality boost (SDXL refiner style).">i</button>
+        </div>
+        <div class="select-wrapper">
+          <select id="refiner-model-select">
+            <option value="">None</option>
+          </select>
+        </div>
       </div>
 
       <div class="lora-stack-head">
@@ -286,12 +299,12 @@
       </div>
     </div>
 
-    <div class="sidebar-section">
+    <div class="sidebar-section" id="image-basic-slider-section">
       <div class="slider-group">
         <label for="image-steps" class="inline-label">Steps <span id="image-steps-val">30</span></label>
         <input id="image-steps" type="range" min="1" max="150" step="1" value="30" />
       </div>
-      <div class="slider-group">
+      <div class="slider-group" id="image-cfg-row">
         <label for="image-cfg" class="inline-label">CFG <span id="image-cfg-val">7.0</span></label>
         <input id="image-cfg" type="range" min="1" max="30" step="0.1" value="7" />
       </div>

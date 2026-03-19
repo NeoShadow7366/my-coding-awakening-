@@ -109,6 +109,8 @@ const clearChat = document.getElementById('clear-chat');
 
 // Image panel
 const imageModelSelect = document.getElementById('image-model-select');
+const imageModelFamilySelect = document.getElementById('image-model-family-select');
+const imageModelFamilyHint = document.getElementById('image-model-family-hint');
 const imageModelFilter = document.getElementById('image-model-filter');
 const imageModelModeAll = document.getElementById('image-model-mode-all');
 const imageModelModeRecent = document.getElementById('image-model-mode-recent');
@@ -116,6 +118,10 @@ const imageModelModeFavorites = document.getElementById('image-model-mode-favori
 const imageModelFavoriteToggle = document.getElementById('image-model-favorite-toggle');
 const imageModelRecentList = document.getElementById('image-model-recent-list');
 const imageModelFavoriteList = document.getElementById('image-model-favorite-list');
+const imageVaeField = document.getElementById('image-vae-field');
+const imageRefinerField = document.getElementById('image-refiner-field');
+const imageCfgRow = document.getElementById('image-cfg-row');
+const controlnetPanel = document.getElementById('controlnet-panel');
 const modelStackBadges = document.getElementById('model-stack-badges');
 const modelStackCompatHint = document.getElementById('model-stack-compat-hint');
 const refinerModelSelect = document.getElementById('refiner-model-select');
@@ -196,6 +202,7 @@ const enhancedPromptSuggestionsOutput = document.getElementById('enhanced-prompt
 const negativePromptDefaultBtn = document.getElementById('negative-prompt-default-btn');
 const imageNegativePrompt = document.getElementById('image-negative-prompt');
 const hiresfixEnable = document.getElementById('hiresfix-enable');
+const hiresfixPanel = document.getElementById('hiresfix-panel');
 const hiresfixUpscalerSelect = document.getElementById('hiresfix-upscaler-select');
 const hiresfixScale = document.getElementById('hiresfix-scale');
 const hiresfixSteps = document.getElementById('hiresfix-steps');
@@ -360,6 +367,7 @@ let mbCurrentModelNoteKey = '';
 const IMAGE_RECENT_MODELS_KEY = 'imageRecentModelsV1';
 const IMAGE_FAVORITE_MODELS_KEY = 'imageFavoriteModelsV1';
 const IMAGE_MODEL_FILTER_MODE_KEY = 'imageModelFilterModeV1';
+const IMAGE_MODEL_FAMILY_MODE_KEY = 'imageModelFamilyModeV1';
 const IMAGE_SAMPLER_FILTER_QUERY_KEY = 'imageSamplerFilterQueryV1';
 const IMAGE_SCHEDULER_FILTER_QUERY_KEY = 'imageSchedulerFilterQueryV1';
 const QUEUE_STATE_MAX_ITEMS = 40;
@@ -375,10 +383,35 @@ const PREVIEW_ZOOM_MIN = 0.7;
 const PREVIEW_ZOOM_MAX = 3;
 const PREVIEW_ZOOM_STEP = 0.12;
 let imageModelAllOptions = [];
+let imageModelDetailsByName = new Map();
 let imageModelFilterMode = localStorage.getItem(IMAGE_MODEL_FILTER_MODE_KEY) || 'all';
 if (!['all', 'recent', 'favorites'].includes(imageModelFilterMode)) {
 	imageModelFilterMode = 'all';
 }
+let imageModelFamilyMode = localStorage.getItem(IMAGE_MODEL_FAMILY_MODE_KEY) || 'auto';
+if (!['auto', 'sd', 'flux'].includes(imageModelFamilyMode)) {
+	imageModelFamilyMode = 'auto';
+}
+const IMAGE_FAMILY_CAPABILITIES = {
+	sd: {
+		supports_refiner: true,
+		supports_vae: true,
+		supports_controlnet: true,
+		supports_hiresfix: true,
+		cfg_min: 1,
+		cfg_max: 30,
+		cfg_default: 7,
+	},
+	flux: {
+		supports_refiner: false,
+		supports_vae: false,
+		supports_controlnet: false,
+		supports_hiresfix: false,
+		cfg_min: 1,
+		cfg_max: 10,
+		cfg_default: 3.5,
+	},
+};
 let currentGalleryImages = [];
 let currentFullHistory = [];
 let galleryViewMode = localStorage.getItem('galleryViewMode') || 'list';
@@ -1500,6 +1533,7 @@ function setImageProfileState(state) {
 function getCurrentImageSettings() {
 	return {
 		model: imageModelSelect.value,
+		model_family: resolveActiveImageFamily(imageModelSelect?.value || ''),
 		sampler: imageSamplerSelect.value,
 		scheduler: imageSchedulerSelect?.value || 'normal',
 		negative_prompt: imageNegativePrompt?.value || '',
@@ -1530,6 +1564,15 @@ function applyImageSettings(settings) {
 	if (settings.model && [...imageModelSelect.options].some((o) => o.value === settings.model)) {
 		imageModelSelect.value = settings.model;
 	}
+	if (imageModelFamilySelect && typeof settings.model_family === 'string') {
+		const requested = settings.model_family.toLowerCase();
+		if (['auto', 'sd', 'flux'].includes(requested)) {
+			imageModelFamilySelect.value = requested;
+			imageModelFamilyMode = requested;
+			localStorage.setItem(IMAGE_MODEL_FAMILY_MODE_KEY, requested);
+		}
+	}
+	applyImageFamilyModeUi();
 	if (settings.sampler && [...imageSamplerSelect.options].some((o) => o.value === settings.sampler)) {
 		imageSamplerSelect.value = settings.sampler;
 	}
@@ -2248,11 +2291,20 @@ async function loadImageModels() {
 		const data = await res.json();
 		if (!res.ok) {
 			setImageModelMessage(data.error || 'ComfyUI unavailable');
+			imageModelDetailsByName = new Map();
+			applyImageFamilyModeUi();
 			return;
 		}
 		const models = data.models || [];
+		const details = Array.isArray(data.model_details) ? data.model_details : [];
+		imageModelDetailsByName = new Map(
+			details
+				.filter((entry) => entry && typeof entry.name === 'string' && entry.name.trim())
+				.map((entry) => [entry.name, entry])
+		);
 		if (!models.length) {
 			setImageModelMessage('No checkpoints found in ComfyUI');
+			applyImageFamilyModeUi();
 			return;
 		}
 		imageModelAllOptions = models.slice();
@@ -2267,8 +2319,11 @@ async function loadImageModels() {
 		updateModelStackBadges();
 		updateModelStackCompatibilityHint();
 		updateControlnetCompatibilityHint();
+		applyImageFamilyModeUi();
 	} catch {
 		setImageModelMessage('Could not fetch checkpoints');
+		imageModelDetailsByName = new Map();
+		applyImageFamilyModeUi();
 	}
 }
 
@@ -3466,6 +3521,16 @@ if (imageModelSelect) {
 		updateModelFavoriteToggleState();
 		updateModelStackBadges();
 		refreshCompatibilityGroupings();
+		applyImageFamilyModeUi();
+	});
+}
+if (imageModelFamilySelect) {
+	imageModelFamilySelect.value = imageModelFamilyMode;
+	imageModelFamilySelect.addEventListener('change', () => {
+		const mode = imageModelFamilySelect.value;
+		imageModelFamilyMode = ['auto', 'sd', 'flux'].includes(mode) ? mode : 'auto';
+		localStorage.setItem(IMAGE_MODEL_FAMILY_MODE_KEY, imageModelFamilyMode);
+		applyImageFamilyModeUi();
 	});
 }
 if (imageModelFilter) {
@@ -3510,6 +3575,7 @@ if (controlnetImageClearBtn && controlnetImageUpload) {
 	});
 }
 setImageModelFilterMode(imageModelFilterMode);
+applyImageFamilyModeUi();
 
 imageRandomSeed.addEventListener('click', () => {
 	imageSeed.value = randomSeed();
@@ -6183,6 +6249,9 @@ function stopQueuePolling() {
 function inferCheckpointFamily(modelName) {
 	const value = String(modelName || '').toLowerCase();
 	if (!value) return '';
+	if (value.includes('flux')) {
+		return 'flux';
+	}
 	if (value.includes('sdxl') || value.includes('xl') || value.includes('pony') || value.includes('illustrious')) {
 		return 'sdxl';
 	}
@@ -6194,6 +6263,131 @@ function inferCheckpointFamily(modelName) {
 
 function getBaseCheckpointFamily() {
 	return inferCheckpointFamily(imageModelSelect?.value || '');
+}
+
+function getImageModelDetails(modelName) {
+	if (!modelName || !imageModelDetailsByName || !imageModelDetailsByName.size) return null;
+	return imageModelDetailsByName.get(modelName) || null;
+}
+
+function inferImageModelFamily(modelName) {
+	const details = getImageModelDetails(modelName);
+	const detailsFamily = String(details?.family || '').toLowerCase();
+	if (detailsFamily === 'flux') return 'flux';
+	if (detailsFamily === 'sd15' || detailsFamily === 'sdxl') return 'sd';
+
+	const inferred = inferCheckpointFamily(modelName);
+	if (inferred === 'flux') return 'flux';
+	if (inferred === 'sd15' || inferred === 'sdxl') return 'sd';
+	return 'unknown';
+}
+
+function resolveActiveImageFamily(modelName = '') {
+	const requestedMode = imageModelFamilySelect?.value || imageModelFamilyMode || 'auto';
+	if (requestedMode === 'flux') return 'flux';
+	if (requestedMode === 'sd') return 'sd';
+	const inferred = inferImageModelFamily(modelName || imageModelSelect?.value || '');
+	return inferred === 'flux' ? 'flux' : 'sd';
+}
+
+function getImageFamilyCapabilities(activeFamily = resolveActiveImageFamily(imageModelSelect?.value || '')) {
+	const baseCaps = IMAGE_FAMILY_CAPABILITIES[activeFamily] || IMAGE_FAMILY_CAPABILITIES.sd;
+	const details = getImageModelDetails(imageModelSelect?.value || '');
+	if (!details || typeof details !== 'object') return { ...baseCaps };
+
+	const cfgMin = Number(details.cfg_min);
+	const cfgMax = Number(details.cfg_max);
+	const cfgDefault = Number(details.cfg_default);
+	return {
+		...baseCaps,
+		supports_refiner: typeof details.supports_refiner === 'boolean' ? details.supports_refiner : baseCaps.supports_refiner,
+		supports_vae: typeof details.supports_vae === 'boolean' ? details.supports_vae : baseCaps.supports_vae,
+		supports_controlnet: typeof details.supports_controlnet === 'boolean' ? details.supports_controlnet : baseCaps.supports_controlnet,
+		supports_hiresfix: typeof details.supports_hiresfix === 'boolean' ? details.supports_hiresfix : baseCaps.supports_hiresfix,
+		cfg_min: Number.isFinite(cfgMin) ? cfgMin : baseCaps.cfg_min,
+		cfg_max: Number.isFinite(cfgMax) ? cfgMax : baseCaps.cfg_max,
+		cfg_default: Number.isFinite(cfgDefault) ? cfgDefault : baseCaps.cfg_default,
+	};
+}
+
+function applyImageFamilyModeUi() {
+	if (imageModelFamilySelect && imageModelFamilySelect.value !== imageModelFamilyMode) {
+		imageModelFamilySelect.value = imageModelFamilyMode;
+	}
+	const selectedModel = imageModelSelect?.value || '';
+	const activeFamily = resolveActiveImageFamily(selectedModel);
+	const capabilities = getImageFamilyCapabilities(activeFamily);
+
+	if (imageVaeField) imageVaeField.hidden = !capabilities.supports_vae;
+	if (imageRefinerField) imageRefinerField.hidden = !capabilities.supports_refiner;
+	if (controlnetPanel) controlnetPanel.hidden = !capabilities.supports_controlnet;
+	if (hiresfixPanel) hiresfixPanel.hidden = !capabilities.supports_hiresfix;
+	if (imageCfgRow) imageCfgRow.hidden = false;
+
+	if (!capabilities.supports_vae && vaeModelSelect) {
+		vaeModelSelect.value = '';
+	}
+	if (!capabilities.supports_refiner && refinerModelSelect) {
+		refinerModelSelect.value = '';
+	}
+	if (!capabilities.supports_controlnet) {
+		if (controlnetModelSelect) controlnetModelSelect.value = '';
+		if (controlnetImageUpload) controlnetImageUpload.value = '';
+		updateControlnetImagePreview();
+	}
+	if (!capabilities.supports_hiresfix && hiresfixEnable) {
+		hiresfixEnable.checked = false;
+	}
+	if (imageCfg) {
+		imageCfg.min = String(capabilities.cfg_min);
+		imageCfg.max = String(capabilities.cfg_max);
+		const cfgValue = Number(imageCfg.value);
+		if (!Number.isFinite(cfgValue) || cfgValue < capabilities.cfg_min || cfgValue > capabilities.cfg_max) {
+			imageCfg.value = String(capabilities.cfg_default);
+		}
+	}
+
+	if (imageModelFamilyHint) {
+		if (activeFamily === 'flux') {
+			imageModelFamilyHint.textContent = 'Family mode: FLUX. Refiner, VAE, ControlNet, and HiresFix are disabled for this workflow.';
+		} else {
+			imageModelFamilyHint.textContent = 'Family mode: SD / SDXL. Full model-stack controls are available.';
+		}
+	}
+
+	syncImageControlLabels();
+	updateModelStackBadges();
+	updateModelStackCompatibilityHint();
+	updateControlnetCompatibilityHint();
+}
+
+function normalizeImageRequestByFamily(common) {
+	const activeFamily = resolveActiveImageFamily(common.model || '');
+	const capabilities = getImageFamilyCapabilities(activeFamily);
+	const normalized = { ...common, model_family: activeFamily };
+
+	if (!capabilities.supports_refiner) normalized.refiner_model = '';
+	if (!capabilities.supports_vae) normalized.vae = '';
+	if (!capabilities.supports_controlnet) {
+		normalized.controlnet_model = '';
+		normalized.controlnet_image_name = '';
+		normalized.controlnet_weight = 1;
+		normalized.controlnet_start = 0;
+		normalized.controlnet_end = 1;
+	}
+	if (!capabilities.supports_hiresfix) {
+		normalized.hiresfix_enable = false;
+		normalized.hiresfix_upscaler = '';
+	}
+
+	const cfgValue = Number(normalized.cfg);
+	if (Number.isFinite(cfgValue)) {
+		normalized.cfg = Math.max(capabilities.cfg_min, Math.min(capabilities.cfg_max, cfgValue));
+	} else {
+		normalized.cfg = capabilities.cfg_default;
+	}
+
+	return normalized;
 }
 
 /**
@@ -6293,6 +6487,9 @@ function getModelStackCompatibilityMessage(baseModel, refinerModel, vaeModel) {
 		return 'Tip: select a Base checkpoint to validate Refiner/VAE family alignment.';
 	}
 	const baseFamily = inferCheckpointFamily(baseModel);
+	if (baseFamily === 'flux') {
+		return 'FLUX family active. Refiner/VAE stack is typically not used in this workflow.';
+	}
 	const issues = [];
 	if (refinerModel) {
 		const refinerFamily = inferCheckpointFamily(refinerModel);
@@ -6359,12 +6556,12 @@ function validateImageInputs(common) {
 	if (!common.model) {
 		return 'Select a checkpoint model before generating.';
 	}
-	if (/flux/i.test(common.model)) {
-		return 'Selected model appears to be a FLUX checkpoint, which is not supported by the current workflow. Choose a non-FLUX checkpoint (SD/SDXL) for now.';
-	}
-	const compatibilityWarning = getControlnetCompatibilityMessage(common.model, common.controlnet_model);
-	if (compatibilityWarning) {
-		return compatibilityWarning;
+	const capabilities = getImageFamilyCapabilities(common.model_family || resolveActiveImageFamily(common.model));
+	if (capabilities.supports_controlnet) {
+		const compatibilityWarning = getControlnetCompatibilityMessage(common.model, common.controlnet_model);
+		if (compatibilityWarning) {
+			return compatibilityWarning;
+		}
 	}
 	if (common.width < 256 || common.width > 2048 || common.height < 256 || common.height > 2048) {
 		return 'Width and height must be between 256 and 2048.';
@@ -6378,8 +6575,8 @@ function validateImageInputs(common) {
 	if (common.steps < 1 || common.steps > 150) {
 		return 'Steps must be between 1 and 150.';
 	}
-	if (common.cfg < 1 || common.cfg > 30) {
-		return 'CFG must be between 1 and 30.';
+	if (common.cfg < capabilities.cfg_min || common.cfg > capabilities.cfg_max) {
+		return `CFG must be between ${capabilities.cfg_min} and ${capabilities.cfg_max}.`;
 	}
 	if (common.denoise < 0.05 || common.denoise > 1) {
 		return 'Denoise must be between 0.05 and 1.0.';
@@ -9777,6 +9974,7 @@ imageForm.addEventListener('submit', async (e) => {
 			prompt,
 			negative_prompt: imageNegativePrompt.value.trim(),
 			model: imageModelSelect.value,
+			model_family: resolveActiveImageFamily(imageModelSelect?.value || ''),
 			refiner_model: refinerModelSelect?.value || '',
 			vae: vaeModelSelect?.value || '',
 			sampler: imageSamplerSelect.value,
@@ -9809,24 +10007,27 @@ imageForm.addEventListener('submit', async (e) => {
 			return;
 		}
 
+		const normalizedCommon = normalizeImageRequestByFamily(common);
+
 		let res;
 		if (imageUpload.files && imageUpload.files[0]) {
 			const formData = new FormData();
 			formData.append('image', imageUpload.files[0]);
-			formData.append('prompt', common.prompt);
-			formData.append('negative_prompt', common.negative_prompt);
-			formData.append('model', common.model);
-			formData.append('sampler', common.sampler);
-			formData.append('loras', JSON.stringify(common.loras));
-			formData.append('controlnet_model', common.controlnet_model || '');
-			formData.append('controlnet_image_name', common.controlnet_image_name || '');
-			formData.append('controlnet_weight', String(common.controlnet_weight));
-			formData.append('controlnet_start', String(common.controlnet_start));
-			formData.append('controlnet_end', String(common.controlnet_end));
-			formData.append('seed', common.seed || '');
-			formData.append('steps', String(common.steps));
-			formData.append('cfg', String(common.cfg));
-			formData.append('denoise', String(common.denoise));
+			formData.append('prompt', normalizedCommon.prompt);
+			formData.append('negative_prompt', normalizedCommon.negative_prompt);
+			formData.append('model', normalizedCommon.model);
+			formData.append('model_family', normalizedCommon.model_family || '');
+			formData.append('sampler', normalizedCommon.sampler);
+			formData.append('loras', JSON.stringify(normalizedCommon.loras));
+			formData.append('controlnet_model', normalizedCommon.controlnet_model || '');
+			formData.append('controlnet_image_name', normalizedCommon.controlnet_image_name || '');
+			formData.append('controlnet_weight', String(normalizedCommon.controlnet_weight));
+			formData.append('controlnet_start', String(normalizedCommon.controlnet_start));
+			formData.append('controlnet_end', String(normalizedCommon.controlnet_end));
+			formData.append('seed', normalizedCommon.seed || '');
+			formData.append('steps', String(normalizedCommon.steps));
+			formData.append('cfg', String(normalizedCommon.cfg));
+			formData.append('denoise', String(normalizedCommon.denoise));
 			res = await fetch('/api/image/img2img', {
 				method: 'POST',
 				body: formData,
@@ -9835,7 +10036,7 @@ imageForm.addEventListener('submit', async (e) => {
 			res = await fetch('/api/image/generate', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify(common),
+				body: JSON.stringify(normalizedCommon),
 			});
 		}
 
@@ -9849,8 +10050,8 @@ imageForm.addEventListener('submit', async (e) => {
 
 		if (data && data.meta && data.meta.seed !== undefined && data.meta.seed !== null) {
 			setLastGeneratedSeed(data.meta.seed);
-		} else if (common.seed) {
-			setLastGeneratedSeed(common.seed);
+		} else if (normalizedCommon.seed) {
+			setLastGeneratedSeed(normalizedCommon.seed);
 		}
 
 		const promptId = data.prompt_id;
@@ -9858,22 +10059,23 @@ imageForm.addEventListener('submit', async (e) => {
 		trackedPromptIds.add(promptId);
 		incrementQueueTelemetry('submitted');
 		const snapshot = {
-			prompt: common.prompt,
-			negative_prompt: common.negative_prompt,
-			model: common.model,
-			loras: common.loras,
-			controlnet_model: common.controlnet_model,
-			controlnet_weight: common.controlnet_weight,
-			controlnet_start: common.controlnet_start,
-			controlnet_end: common.controlnet_end,
-			sampler: common.sampler,
-			seed: common.seed,
-			steps: common.steps,
-			cfg: common.cfg,
-			denoise: common.denoise,
-			width: common.width,
-			height: common.height,
-			batch_size: common.batch_size,
+			prompt: normalizedCommon.prompt,
+			negative_prompt: normalizedCommon.negative_prompt,
+			model: normalizedCommon.model,
+			model_family: normalizedCommon.model_family,
+			loras: normalizedCommon.loras,
+			controlnet_model: normalizedCommon.controlnet_model,
+			controlnet_weight: normalizedCommon.controlnet_weight,
+			controlnet_start: normalizedCommon.controlnet_start,
+			controlnet_end: normalizedCommon.controlnet_end,
+			sampler: normalizedCommon.sampler,
+			seed: normalizedCommon.seed,
+			steps: normalizedCommon.steps,
+			cfg: normalizedCommon.cfg,
+			denoise: normalizedCommon.denoise,
+			width: normalizedCommon.width,
+			height: normalizedCommon.height,
+			batch_size: normalizedCommon.batch_size,
 			mode: imageUpload.files && imageUpload.files[0] ? 'img2img' : 'txt2img',
 			...(data.meta || {}),
 		};

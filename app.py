@@ -198,6 +198,37 @@ def _image_models() -> list[str]:
     return []
 
 
+def _infer_image_model_family(model_name: str) -> str:
+    """Infer broad model family from checkpoint file naming conventions."""
+    value = str(model_name or "").strip().lower()
+    if not value:
+        return "unknown"
+    if "flux" in value:
+        return "flux"
+    if any(token in value for token in ("sdxl", "pony", "illustrious", "xl")):
+        return "sdxl"
+    if any(token in value for token in ("sd15", "1.5", "v1-5", "1_5")):
+        return "sd15"
+    return "unknown"
+
+
+def _image_model_capabilities(model_name: str) -> dict:
+    """Return UI-facing capability flags for a checkpoint family."""
+    family = _infer_image_model_family(model_name)
+    is_flux = family == "flux"
+    # These flags drive frontend control visibility and payload shaping.
+    return {
+        "family": family,
+        "supports_refiner": not is_flux,
+        "supports_vae": not is_flux,
+        "supports_controlnet": not is_flux,
+        "supports_hiresfix": not is_flux,
+        "cfg_min": 1,
+        "cfg_max": 10 if is_flux else 30,
+        "cfg_default": 3.5 if is_flux else 7.0,
+    }
+
+
 def _image_lora_models() -> list[str]:
     """Return available LoRA names from ComfyUI."""
     data = _comfy_get_object_info("LoraLoader")
@@ -3882,8 +3913,16 @@ def api_generate():
 def api_image_models():
     """List ComfyUI checkpoint names."""
     if not _comfy_available():
-        return jsonify({"models": [], "error": "ComfyUI is not available"}), 503
-    return jsonify({"models": _image_models()})
+        return jsonify({"models": [], "model_details": [], "error": "ComfyUI is not available"}), 503
+    models = _image_models()
+    model_details = [
+        {
+            "name": model_name,
+            **_image_model_capabilities(model_name),
+        }
+        for model_name in models
+    ]
+    return jsonify({"models": models, "model_details": model_details})
 
 
 @app.route("/api/image/samplers")
