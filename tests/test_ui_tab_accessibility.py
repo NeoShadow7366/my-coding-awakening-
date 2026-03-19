@@ -27,6 +27,8 @@ def test_index_includes_tablist_and_tab_defaults():
 
     assert 'id="nav-models"' in html
     assert 'role="tab" aria-controls="panel-models" aria-selected="false" tabindex="-1"' in html
+    assert '/static/css/style.css?v=' in html
+    assert '/static/js/main.js?v=' in html
 
 
 def test_index_panels_have_tabpanel_wiring():

@@ -28,6 +28,7 @@ from flask import Flask, Response, jsonify, render_template, request, send_file,
 app = Flask(__name__)
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
+ASSET_VERSION = str(int(time.time()))
 
 # Ollama runs on this address by default when installed locally.
 OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
@@ -69,6 +70,12 @@ _last_service_errors: dict[str, str] = {
     "ollama": "",
     "comfyui": "",
 }
+
+
+@app.context_processor
+def inject_asset_version() -> dict[str, str]:
+    """Expose a simple asset version string to templates for cache busting."""
+    return {"asset_version": ASSET_VERSION}
 
 
 # ---------------------------------------------------------------------------
