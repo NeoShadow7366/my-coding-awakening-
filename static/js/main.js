@@ -122,8 +122,10 @@ const refinerModelSelect = document.getElementById('refiner-model-select');
 const vaeModelSelect = document.getElementById('vae-model-select');
 const imageSamplerSelect = document.getElementById('image-sampler-select');
 const imageSamplerFilter = document.getElementById('image-sampler-filter');
+const imageSamplerFilterStatus = document.getElementById('image-sampler-filter-status');
 const imageSchedulerSelect = document.getElementById('image-scheduler-select');
 const imageSchedulerFilter = document.getElementById('image-scheduler-filter');
+const imageSchedulerFilterStatus = document.getElementById('image-scheduler-filter-status');
 const loraAddBtn = document.getElementById('lora-add-btn');
 const loraStackContainer = document.getElementById('lora-stack-container');
 // NOTE: loraModelSelect / loraStrength / loraStrengthVal replaced by multi-LoRA stack
@@ -2492,22 +2494,26 @@ async function loadImageSamplers() {
 		const data = await res.json();
 		if (!res.ok) {
 			imageSamplerSelect.innerHTML = '<option value="euler">euler</option>';
-			applySelectFilterQuery(imageSamplerSelect, imageSamplerFilter ? imageSamplerFilter.value : '');
+			const counts = applySelectFilterQuery(imageSamplerSelect, imageSamplerFilter ? imageSamplerFilter.value : '');
+			updateSelectFilterStatus(imageSamplerFilterStatus, imageSamplerFilter ? imageSamplerFilter.value : '', counts, 'samplers');
 			return;
 		}
 		const samplers = data.samplers || [];
 		if (!samplers.length) {
 			imageSamplerSelect.innerHTML = '<option value="euler">euler</option>';
-			applySelectFilterQuery(imageSamplerSelect, imageSamplerFilter ? imageSamplerFilter.value : '');
+			const counts = applySelectFilterQuery(imageSamplerSelect, imageSamplerFilter ? imageSamplerFilter.value : '');
+			updateSelectFilterStatus(imageSamplerFilterStatus, imageSamplerFilter ? imageSamplerFilter.value : '', counts, 'samplers');
 			return;
 		}
 		imageSamplerSelect.innerHTML = samplers
 			.map((name) => `<option value="${escHtml(name)}">${escHtml(name)}</option>`)
 			.join('');
-		applySelectFilterQuery(imageSamplerSelect, imageSamplerFilter ? imageSamplerFilter.value : '');
+		const counts = applySelectFilterQuery(imageSamplerSelect, imageSamplerFilter ? imageSamplerFilter.value : '');
+		updateSelectFilterStatus(imageSamplerFilterStatus, imageSamplerFilter ? imageSamplerFilter.value : '', counts, 'samplers');
 	} catch {
 		imageSamplerSelect.innerHTML = '<option value="euler">euler</option>';
-		applySelectFilterQuery(imageSamplerSelect, imageSamplerFilter ? imageSamplerFilter.value : '');
+		const counts = applySelectFilterQuery(imageSamplerSelect, imageSamplerFilter ? imageSamplerFilter.value : '');
+		updateSelectFilterStatus(imageSamplerFilterStatus, imageSamplerFilter ? imageSamplerFilter.value : '', counts, 'samplers');
 	}
 }
 
@@ -2520,49 +2526,75 @@ async function loadImageSchedulers() {
 		if (!res.ok) {
 			imageSchedulerSelect.innerHTML = DEFAULT_SCHEDULERS
 				.map((n) => `<option value="${escHtml(n)}">${escHtml(n)}</option>`).join('');
-			applySelectFilterQuery(imageSchedulerSelect, imageSchedulerFilter ? imageSchedulerFilter.value : '');
+			const counts = applySelectFilterQuery(imageSchedulerSelect, imageSchedulerFilter ? imageSchedulerFilter.value : '');
+			updateSelectFilterStatus(imageSchedulerFilterStatus, imageSchedulerFilter ? imageSchedulerFilter.value : '', counts, 'schedulers');
 			return;
 		}
 		const schedulers = data.schedulers || [];
 		if (!schedulers.length) {
 			imageSchedulerSelect.innerHTML = DEFAULT_SCHEDULERS
 				.map((n) => `<option value="${escHtml(n)}">${escHtml(n)}</option>`).join('');
-			applySelectFilterQuery(imageSchedulerSelect, imageSchedulerFilter ? imageSchedulerFilter.value : '');
+			const counts = applySelectFilterQuery(imageSchedulerSelect, imageSchedulerFilter ? imageSchedulerFilter.value : '');
+			updateSelectFilterStatus(imageSchedulerFilterStatus, imageSchedulerFilter ? imageSchedulerFilter.value : '', counts, 'schedulers');
 			return;
 		}
 		imageSchedulerSelect.innerHTML = schedulers
 			.map((name) => `<option value="${escHtml(name)}">${escHtml(name)}</option>`)
 			.join('');
-		applySelectFilterQuery(imageSchedulerSelect, imageSchedulerFilter ? imageSchedulerFilter.value : '');
+		const counts = applySelectFilterQuery(imageSchedulerSelect, imageSchedulerFilter ? imageSchedulerFilter.value : '');
+		updateSelectFilterStatus(imageSchedulerFilterStatus, imageSchedulerFilter ? imageSchedulerFilter.value : '', counts, 'schedulers');
 	} catch {
 		imageSchedulerSelect.innerHTML = DEFAULT_SCHEDULERS
 			.map((n) => `<option value="${escHtml(n)}">${escHtml(n)}</option>`).join('');
-		applySelectFilterQuery(imageSchedulerSelect, imageSchedulerFilter ? imageSchedulerFilter.value : '');
+		const counts = applySelectFilterQuery(imageSchedulerSelect, imageSchedulerFilter ? imageSchedulerFilter.value : '');
+		updateSelectFilterStatus(imageSchedulerFilterStatus, imageSchedulerFilter ? imageSchedulerFilter.value : '', counts, 'schedulers');
 	}
 }
 
 function applySelectFilterQuery(selectEl, query) {
-	if (!selectEl) return;
+	if (!selectEl) return { visible: 0, total: 0 };
 	const normalized = String(query || '').trim().toLowerCase();
 	const selected = selectEl.value;
+	let visible = 0;
+	const total = selectEl.options.length;
 	for (const option of selectEl.options) {
 		if (!normalized) {
 			option.hidden = false;
+			visible += 1;
 			continue;
 		}
 		const label = String(option.textContent || option.value || '').toLowerCase();
 		const matches = option.value === selected || label.includes(normalized);
 		option.hidden = !matches;
+		if (matches) visible += 1;
 	}
+	return { visible, total };
 }
 
-function bindSelectFilterInput(inputEl, selectEl, storageKey) {
+function updateSelectFilterStatus(statusEl, query, counts, noun) {
+	if (!statusEl) return;
+	const q = String(query || '').trim();
+	const visible = Number.isFinite(counts?.visible) ? counts.visible : 0;
+	const total = Number.isFinite(counts?.total) ? counts.total : 0;
+	if (!q) {
+		statusEl.textContent = `Showing all ${noun}`;
+		return;
+	}
+	if (visible === 0) {
+		statusEl.textContent = `No ${noun} match "${q}"`;
+		return;
+	}
+	statusEl.textContent = `Showing ${visible} of ${total} ${noun}`;
+}
+
+function bindSelectFilterInput(inputEl, selectEl, storageKey, statusEl, noun) {
 	if (!inputEl || !selectEl) return;
 	const saved = localStorage.getItem(storageKey) || '';
 	if (saved) {
 		inputEl.value = saved;
 	}
-	applySelectFilterQuery(selectEl, inputEl.value);
+	const initCounts = applySelectFilterQuery(selectEl, inputEl.value);
+	updateSelectFilterStatus(statusEl, inputEl.value, initCounts, noun);
 
 	inputEl.addEventListener('input', () => {
 		const query = inputEl.value || '';
@@ -2571,7 +2603,8 @@ function bindSelectFilterInput(inputEl, selectEl, storageKey) {
 		} else {
 			localStorage.removeItem(storageKey);
 		}
-		applySelectFilterQuery(selectEl, query);
+		const counts = applySelectFilterQuery(selectEl, query);
+		updateSelectFilterStatus(statusEl, query, counts, noun);
 	});
 
 	inputEl.addEventListener('keydown', (event) => {
@@ -2579,7 +2612,8 @@ function bindSelectFilterInput(inputEl, selectEl, storageKey) {
 		event.preventDefault();
 		inputEl.value = '';
 		localStorage.removeItem(storageKey);
-		applySelectFilterQuery(selectEl, '');
+		const counts = applySelectFilterQuery(selectEl, '');
+		updateSelectFilterStatus(statusEl, '', counts, noun);
 	});
 }
 
@@ -3427,8 +3461,8 @@ if (imageModelFilter) {
 		updateControlnetCompatibilityHint();
 	});
 }
-bindSelectFilterInput(imageSamplerFilter, imageSamplerSelect, IMAGE_SAMPLER_FILTER_QUERY_KEY);
-bindSelectFilterInput(imageSchedulerFilter, imageSchedulerSelect, IMAGE_SCHEDULER_FILTER_QUERY_KEY);
+bindSelectFilterInput(imageSamplerFilter, imageSamplerSelect, IMAGE_SAMPLER_FILTER_QUERY_KEY, imageSamplerFilterStatus, 'samplers');
+bindSelectFilterInput(imageSchedulerFilter, imageSchedulerSelect, IMAGE_SCHEDULER_FILTER_QUERY_KEY, imageSchedulerFilterStatus, 'schedulers');
 if (imageModelModeAll) imageModelModeAll.addEventListener('click', () => setImageModelFilterMode('all'));
 if (imageModelModeRecent) imageModelModeRecent.addEventListener('click', () => setImageModelFilterMode('recent'));
 if (imageModelModeFavorites) imageModelModeFavorites.addEventListener('click', () => setImageModelFilterMode('favorites'));

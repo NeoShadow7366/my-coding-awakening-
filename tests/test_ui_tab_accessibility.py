@@ -1508,6 +1508,8 @@ def test_image_scheduler_select_present_in_html():
     assert 'id="image-scheduler-filter"' in html
     assert 'aria-label="Filter sampler list"' in html
     assert 'aria-label="Filter scheduler list"' in html
+    assert 'id="image-sampler-filter-status" class="hint" aria-live="polite"' in html
+    assert 'id="image-scheduler-filter-status" class="hint" aria-live="polite"' in html
 
 
 def test_image_scheduler_js_wiring_present_in_bundle():
@@ -1520,7 +1522,9 @@ def test_image_scheduler_js_wiring_present_in_bundle():
     assert "async function loadImageSchedulers()" in js
     assert "/api/image/schedulers" in js
     assert "function applySelectFilterQuery(selectEl, query)" in js
-    assert "function bindSelectFilterInput(inputEl, selectEl, storageKey)" in js
+    assert "function updateSelectFilterStatus(statusEl, query, counts, noun)" in js
+    assert "function bindSelectFilterInput(inputEl, selectEl, storageKey, statusEl, noun)" in js
     assert "IMAGE_SAMPLER_FILTER_QUERY_KEY" in js
     assert "IMAGE_SCHEDULER_FILTER_QUERY_KEY" in js
+    assert "No ${noun} match" in js
     assert "scheduler: imageSchedulerSelect" in js
