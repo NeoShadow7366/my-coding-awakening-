@@ -62,6 +62,8 @@ _service_log_lock = threading.Lock()
 _model_metadata_lock = threading.Lock()
 _migration_jobs_lock = threading.Lock()
 _migration_jobs: dict[str, dict] = {}
+_comfyui_update_jobs_lock = threading.Lock()
+_comfyui_update_jobs: dict[str, dict] = {}
 _service_processes: dict[str, subprocess.Popen | None] = {
     "ollama": None,
     "comfyui": None,
@@ -155,6 +157,60 @@ def _comfy_available() -> bool:
         except requests.exceptions.RequestException:
             continue
     return False
+
+
+def _get_comfyui_version() -> dict:
+    """Get ComfyUI version/commit info from git repo."""
+    config = _load_service_config()
+    path_value = config.get("comfyui_path") or ""
+    if not path_value:
+        return {"error": "ComfyUI path not configured", "current_branch": None, "current_commit": None, "current_version": None}
+    
+    try:
+        comfyui_path = Path(path_value).expanduser().resolve()
+        if not comfyui_path.exists():
+            return {"error": f"ComfyUI path does not exist: {comfyui_path}", "current_branch": None, "current_commit": None, "current_version": None}
+        
+        # Try to get git commit hash (short)
+        current_commit = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"],
+            cwd=comfyui_path,
+            capture_output=True,
+            text=True,
+            timeout=5
+        ).stdout.strip()
+        
+        # Try to get current branch
+        current_branch = subprocess.run(
+            ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+            cwd=comfyui_path,
+            capture_output=True,
+            text=True,
+            timeout=5
+        ).stdout.strip()
+        
+        # Try to get tag or version
+        current_version = subprocess.run(
+            ["git", "describe", "--tags", "--always"],
+            cwd=comfyui_path,
+            capture_output=True,
+            text=True,
+            timeout=5
+        ).stdout.strip()
+        
+        return {
+            "current_commit": current_commit or None,
+            "current_branch": current_branch or None,
+            "current_version": current_version or None,
+            "error": None
+        }
+    except Exception as exc:
+        return {
+            "error": f"Failed to get ComfyUI version: {str(exc)}",
+            "current_branch": None,
+            "current_commit": None,
+            "current_version": None
+        }
 
 
 def _comfy_get_object_info(node_type: str) -> dict:
@@ -1873,6 +1929,88 @@ def _start_migration_job(dry_run: bool = False) -> dict:
 
     threading.Thread(target=_run_migration_job, args=(job_id, dry_run), daemon=True).start()
     return _migration_job_snapshot(job)
+
+
+def _comfyui_update_job_snapshot(job: dict) -> dict:
+    """Return a serializable snapshot of a ComfyUI update job."""
+    return {
+        "id": job.get("id"),
+        "status": job.get("status"),
+        "started_at": job.get("started_at"),
+        "finished_at": job.get("finished_at"),
+        "error": job.get("error", ""),
+        "output": job.get("output", ""),
+        "result": job.get("result"),
+    }
+
+
+def _run_comfyui_update_job(job_id: str) -> None:
+    """Background thread that runs the ComfyUI git pull update."""
+    config = _load_service_config()
+    path_value = config.get("comfyui_path") or ""
+    
+    try:
+        comfyui_path = Path(path_value).expanduser().resolve()
+        if not comfyui_path.exists():
+            raise ValueError(f"ComfyUI path does not exist: {comfyui_path}")
+        
+        # Before-update version
+        before_version = _get_comfyui_version()
+        
+        # Run git pull
+        result = subprocess.run(
+            ["git", "pull"],
+            cwd=comfyui_path,
+            capture_output=True,
+            text=True,
+            timeout=60
+        )
+        
+        output = result.stdout + (f"\nError: {result.stderr}" if result.stderr else "")
+        
+        if result.returncode != 0:
+            raise RuntimeError(f"git pull failed (exit code {result.returncode}): {result.stderr or result.stdout}")
+        
+        # After-update version
+        after_version = _get_comfyui_version()
+        
+        with _comfyui_update_jobs_lock:
+            job = _comfyui_update_jobs.get(job_id)
+            if job:
+                job["status"] = "done"
+                job["output"] = output
+                job["result"] = {
+                    "before_version": before_version,
+                    "after_version": after_version,
+                    "success": True
+                }
+                job["finished_at"] = datetime.now(timezone.utc).isoformat()
+    except Exception as exc:
+        with _comfyui_update_jobs_lock:
+            job = _comfyui_update_jobs.get(job_id)
+            if job:
+                job["status"] = "error"
+                job["error"] = str(exc)
+                job["finished_at"] = datetime.now(timezone.utc).isoformat()
+
+
+def _start_comfyui_update_job() -> dict:
+    """Create and start a background ComfyUI update job."""
+    job_id = f"update-{int(time.time() * 1000)}"
+    job = {
+        "id": job_id,
+        "status": "running",
+        "started_at": datetime.now(timezone.utc).isoformat(),
+        "finished_at": "",
+        "error": "",
+        "output": "",
+        "result": None,
+    }
+    with _comfyui_update_jobs_lock:
+        _comfyui_update_jobs[job_id] = job
+    
+    threading.Thread(target=_run_comfyui_update_job, args=(job_id,), daemon=True).start()
+    return _comfyui_update_job_snapshot(job)
 
 
 def _normalize_image_ref(body: dict) -> dict:
@@ -3784,6 +3922,43 @@ def api_service_control(service: str, action: str):
         _last_service_errors[service_name] = str(exc)
         logger.error("Service control failed for %s/%s: %s", service_name, action_name, exc)
         return jsonify({"error": str(exc)}), 500
+
+
+@app.route("/api/service/comfyui/version", methods=["GET"])
+def api_comfyui_version():
+    """Get ComfyUI version/commit info."""
+    version_info = _get_comfyui_version()
+    return jsonify(version_info)
+
+
+@app.route("/api/service/comfyui/update", methods=["POST"])
+def api_comfyui_update():
+    """Start a background ComfyUI update (git pull)."""
+    try:
+        # Check if ComfyUI is running (optional: could stop first)
+        if _comfy_available():
+            return jsonify({
+                "error": "ComfyUI is currently running. Stop it before updating.",
+                "suggestion": "Use /api/service/comfyui/stop to stop ComfyUI first"
+            }), 409
+        
+        job = _start_comfyui_update_job()
+        return jsonify({"ok": True, "job": job}), 202
+    except Exception as exc:
+        logger.error("ComfyUI update failed: %s", exc)
+        return jsonify({"error": str(exc)}), 500
+
+
+@app.route("/api/service/comfyui/update-status/<job_id>", methods=["GET"])
+def api_comfyui_update_status(job_id: str):
+    """Get status of a running ComfyUI update job."""
+    with _comfyui_update_jobs_lock:
+        job = _comfyui_update_jobs.get(job_id)
+    
+    if not job:
+        return jsonify({"error": f"Job {job_id} not found"}), 404
+    
+    return jsonify(_comfyui_update_job_snapshot(job))
 
 
 @app.route("/api/app/restart", methods=["POST"])

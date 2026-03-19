@@ -788,6 +788,12 @@ textarea {
   gap: var(--sp-sm);
 }
 
+#config-comfyui-update-section {
+  border-top: 1px solid var(--clr-border);
+  padding-top: var(--sp-sm);
+  margin-top: var(--sp-sm);
+}
+
 .config-path-row {
   display: flex;
   gap: var(--sp-sm);

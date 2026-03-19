@@ -260,6 +260,9 @@ const configOllamaStopBtn = document.getElementById('config-ollama-stop');
 const configComfyStartBtn = document.getElementById('config-comfy-start');
 const configComfyRestartBtn = document.getElementById('config-comfy-restart');
 const configComfyStopBtn = document.getElementById('config-comfy-stop');
+const configComfyCheckUpdatesBtn = document.getElementById('config-comfy-check-updates');
+const configComfyUpdateBtn = document.getElementById('config-comfy-update');
+const configComfyVersionInfo = document.getElementById('config-comfy-version-info');
 const configFlaskRestartBtn = document.getElementById('config-flask-restart');
 const configOllamaStatus = document.getElementById('config-ollama-status');
 const configComfyStatus = document.getElementById('config-comfy-status');
@@ -3249,6 +3252,111 @@ if (configComfyStopBtn) {
 	});
 	configComfyStopBtn.addEventListener('keydown', onConfigServiceControlsKeydown);
 }
+
+// ComfyUI update handlers
+if (configComfyCheckUpdatesBtn) {
+	configComfyCheckUpdatesBtn.addEventListener('click', async () => {
+		try {
+			configComfyCheckUpdatesBtn.disabled = true;
+			configComfyVersionInfo.textContent = 'Version info: fetching...';
+			const resp = await fetch('/api/service/comfyui/version');
+			const data = await resp.json();
+			
+			if (data.error) {
+				configComfyVersionInfo.textContent = `Version info: ${data.error}`;
+			} else {
+				const versionText = data.current_version || data.current_commit || 'unknown';
+				const branchText = data.current_branch ? ` (${data.current_branch})` : '';
+				configComfyVersionInfo.textContent = `Version info: ${versionText}${branchText}`;
+				configComfyUpdateBtn.disabled = false;
+			}
+		} catch (err) {
+			configComfyVersionInfo.textContent = `Version info: Failed to fetch - ${err.message}`;
+		} finally {
+			configComfyCheckUpdatesBtn.disabled = false;
+		}
+	});
+}
+
+if (configComfyUpdateBtn) {
+	configComfyUpdateBtn.addEventListener('click', async () => {
+		try {
+			configComfyUpdateBtn.disabled = true;
+			configComfyVersionInfo.textContent = 'Version info: updating...';
+			
+			const resp = await fetch('/api/service/comfyui/update', { method: 'POST' });
+			const data = await resp.json();
+			
+			if (!resp.ok) {
+				configComfyVersionInfo.textContent = `Version info: Update failed - ${data.error}`;
+				configComfyUpdateBtn.disabled = false;
+				return;
+			}
+			
+			const jobId = data.job.id;
+			
+			// Poll update status
+			let finished = false;
+			let attempts = 0;
+			const maxAttempts = 120; // 2 minutes total
+			
+			while (!finished && attempts < maxAttempts) {
+				await new Promise(resolve => setTimeout(resolve, 1000));
+				
+				const statusResp = await fetch(`/api/service/comfyui/update-status/${jobId}`);
+				const statusData = await statusResp.json();
+				
+				if (statusData.status === 'done') {
+					configComfyVersionInfo.textContent = 'Version info: Update complete! Restarting ComfyUI...';
+					
+					// Auto-restart ComfyUI
+					try {
+						await controlService('comfyui', 'restart', configComfyStatus, [configComfyStartBtn, configComfyRestartBtn, configComfyStopBtn]);
+					} catch (err) {
+						configComfyStatus.textContent = `ComfyUI restart error: ${err.message}`;
+					}
+					finished = true;
+				} else if (statusData.status === 'error') {
+					configComfyVersionInfo.textContent = `Version info: Update failed - ${statusData.error}`;
+					finished = true;
+				} else {
+					configComfyVersionInfo.textContent = `Version info: updating... (${attempts}s)`;
+				}
+				attempts++;
+			}
+			
+			if (!finished) {
+				configComfyVersionInfo.textContent = 'Version info: Update timed out';
+			}
+			
+			configComfyUpdateBtn.disabled = true;
+		} catch (err) {
+			configComfyVersionInfo.textContent = `Version info: Update error - ${err.message}`;
+			configComfyUpdateBtn.disabled = false;
+		}
+	});
+}
+
+// Load initial version info when configuration tab loads
+async function loadComfyuiVersionInfo() {
+	try {
+		const resp = await fetch('/api/service/comfyui/version');
+		const data = await resp.json();
+		
+		if (data.error) {
+			configComfyVersionInfo.textContent = `Version info: ${data.error}`;
+		} else {
+			const versionText = data.current_version || data.current_commit || 'unknown';
+			const branchText = data.current_branch ? ` (${data.current_branch})` : '';
+			configComfyVersionInfo.textContent = `Version info: ${versionText}${branchText}`;
+		}
+	} catch (err) {
+		configComfyVersionInfo.textContent = `Version info: Failed to fetch - ${err.message}`;
+	}
+}
+
+// Load version info on page load
+loadComfyuiVersionInfo();
 
 if (configFlaskRestartBtn) {
 	configFlaskRestartBtn.addEventListener('click', restartFlaskApp);
