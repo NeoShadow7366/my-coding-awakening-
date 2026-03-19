@@ -343,6 +343,23 @@ def test_diagnostics_drawer_keyboard_handler_wiring_present_in_js_bundle():
     assert "row.textContent = `[${ts}] ${text}`;" in content
 
 
+def test_diagnostics_drawer_state_persistence_present_in_js_bundle():
+    js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
+    content = js_path.read_text(encoding="utf-8")
+
+    assert "const DIAG_DRAWER_COLLAPSED_KEY = 'diagDrawerCollapsedV1';" in content
+    assert "const diagDrawerCollapsedStored = localStorage.getItem(DIAG_DRAWER_COLLAPSED_KEY);" in content
+    assert "let diagDrawerCollapsed = diagDrawerCollapsedStored === null ? null : diagDrawerCollapsedStored === '1';" in content
+    assert "diagDrawerCollapsed = !isOpen;" in content
+    assert "if (diagDrawerCollapsed) {" in content
+    assert "localStorage.setItem(DIAG_DRAWER_COLLAPSED_KEY, '1');" in content
+    assert "} else {" in content
+    assert "localStorage.setItem(DIAG_DRAWER_COLLAPSED_KEY, '0');" in content
+    assert "// Restore diagnostics drawer open/collapsed state from localStorage" in content
+    assert "if (diagDrawer && diagDrawerCollapsed !== null) {" in content
+    assert "setDiagnosticsDrawerOpen(!diagDrawerCollapsed);" in content
+
+
 def test_index_model_download_actions_and_modal_semantics():
     app_module.app.config["TESTING"] = True
     client = app_module.app.test_client()

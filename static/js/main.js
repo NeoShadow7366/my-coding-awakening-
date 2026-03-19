@@ -334,6 +334,8 @@ const QUEUE_HELP_EXPANDED_KEY = 'queueHelpExpandedV1';
 const QUEUE_TELEMETRY_KEY = 'queueTelemetryV1';
 const QUEUE_LAST_ACTION_PINNED_KEY = 'queueLastActionPinnedV1';
 const QUEUE_LAST_ACTION_MAX_AGE_MS = 120000;
+const DIAG_DRAWER_COLLAPSED_KEY = 'diagDrawerCollapsedV1';
+const diagDrawerCollapsedStored = localStorage.getItem(DIAG_DRAWER_COLLAPSED_KEY);
 let queueFilterFailedOnly = localStorage.getItem('queueFilterFailedOnly') === '1';
 let restoredQueueStateInfo = null;
 let queueRestoreHintTimer = null;
@@ -341,6 +343,7 @@ let queueLastActionInfo = null;
 let queueLastActionTimer = null;
 let queueLastActionPinned = localStorage.getItem(QUEUE_LAST_ACTION_PINNED_KEY) === '1';
 let queueRestoreHintHidden = localStorage.getItem(QUEUE_RESTORE_HINT_HIDDEN_KEY) === '1';
+let diagDrawerCollapsed = diagDrawerCollapsedStored === null ? null : diagDrawerCollapsedStored === '1';
 const IMAGE_PROFILE_STORAGE_KEY = 'imagePresetProfilesV1';
 const IMAGE_PROFILE_SELECTED_KEY = 'imagePresetProfilesSelectedV1';
 const MB_MODEL_NOTES_KEY = 'mbModelNotesV1';
@@ -498,6 +501,12 @@ function setDiagnosticsDrawerOpen(isOpen) {
 	}
 	diagDrawer.hidden = !isOpen;
 	diagDrawer.setAttribute('aria-hidden', isOpen ? 'false' : 'true');
+	diagDrawerCollapsed = !isOpen;
+	if (diagDrawerCollapsed) {
+		localStorage.setItem(DIAG_DRAWER_COLLAPSED_KEY, '1');
+	} else {
+		localStorage.setItem(DIAG_DRAWER_COLLAPSED_KEY, '0');
+	}
 	if (diagDrawerToggle) {
 		diagDrawerToggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
 	}
@@ -2799,6 +2808,11 @@ if (diagDrawerCommandForm && diagDrawerCommandInput) {
 
 if (diagDrawerOutput) {
 	appendDiagnosticsConsoleLine('Diagnostics console ready. Type help for commands.');
+}
+
+// Restore diagnostics drawer open/collapsed state from localStorage
+if (diagDrawer && diagDrawerCollapsed !== null) {
+	setDiagnosticsDrawerOpen(!diagDrawerCollapsed);
 }
 
 if (configSaveBtn) {
