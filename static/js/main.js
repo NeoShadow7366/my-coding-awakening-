@@ -121,7 +121,9 @@ const modelStackCompatHint = document.getElementById('model-stack-compat-hint');
 const refinerModelSelect = document.getElementById('refiner-model-select');
 const vaeModelSelect = document.getElementById('vae-model-select');
 const imageSamplerSelect = document.getElementById('image-sampler-select');
+const imageSamplerFilter = document.getElementById('image-sampler-filter');
 const imageSchedulerSelect = document.getElementById('image-scheduler-select');
+const imageSchedulerFilter = document.getElementById('image-scheduler-filter');
 const loraAddBtn = document.getElementById('lora-add-btn');
 const loraStackContainer = document.getElementById('lora-stack-container');
 // NOTE: loraModelSelect / loraStrength / loraStrengthVal replaced by multi-LoRA stack
@@ -355,6 +357,8 @@ let mbCurrentModelNoteKey = '';
 const IMAGE_RECENT_MODELS_KEY = 'imageRecentModelsV1';
 const IMAGE_FAVORITE_MODELS_KEY = 'imageFavoriteModelsV1';
 const IMAGE_MODEL_FILTER_MODE_KEY = 'imageModelFilterModeV1';
+const IMAGE_SAMPLER_FILTER_QUERY_KEY = 'imageSamplerFilterQueryV1';
+const IMAGE_SCHEDULER_FILTER_QUERY_KEY = 'imageSchedulerFilterQueryV1';
 const QUEUE_STATE_MAX_ITEMS = 40;
 const BACKGROUND_POLL_OWNER_KEY = 'backgroundPollOwnerV1';
 const BACKGROUND_POLL_LEASE_MS = 10_000;
@@ -2482,23 +2486,28 @@ function updateModelStackBadges() {
 }
 
 async function loadImageSamplers() {
+	if (!imageSamplerSelect) return;
 	try {
 		const res = await fetch('/api/image/samplers');
 		const data = await res.json();
 		if (!res.ok) {
 			imageSamplerSelect.innerHTML = '<option value="euler">euler</option>';
+			applySelectFilterQuery(imageSamplerSelect, imageSamplerFilter ? imageSamplerFilter.value : '');
 			return;
 		}
 		const samplers = data.samplers || [];
 		if (!samplers.length) {
 			imageSamplerSelect.innerHTML = '<option value="euler">euler</option>';
+			applySelectFilterQuery(imageSamplerSelect, imageSamplerFilter ? imageSamplerFilter.value : '');
 			return;
 		}
 		imageSamplerSelect.innerHTML = samplers
 			.map((name) => `<option value="${escHtml(name)}">${escHtml(name)}</option>`)
 			.join('');
+		applySelectFilterQuery(imageSamplerSelect, imageSamplerFilter ? imageSamplerFilter.value : '');
 	} catch {
 		imageSamplerSelect.innerHTML = '<option value="euler">euler</option>';
+		applySelectFilterQuery(imageSamplerSelect, imageSamplerFilter ? imageSamplerFilter.value : '');
 	}
 }
 
@@ -2511,21 +2520,67 @@ async function loadImageSchedulers() {
 		if (!res.ok) {
 			imageSchedulerSelect.innerHTML = DEFAULT_SCHEDULERS
 				.map((n) => `<option value="${escHtml(n)}">${escHtml(n)}</option>`).join('');
+			applySelectFilterQuery(imageSchedulerSelect, imageSchedulerFilter ? imageSchedulerFilter.value : '');
 			return;
 		}
 		const schedulers = data.schedulers || [];
 		if (!schedulers.length) {
 			imageSchedulerSelect.innerHTML = DEFAULT_SCHEDULERS
 				.map((n) => `<option value="${escHtml(n)}">${escHtml(n)}</option>`).join('');
+			applySelectFilterQuery(imageSchedulerSelect, imageSchedulerFilter ? imageSchedulerFilter.value : '');
 			return;
 		}
 		imageSchedulerSelect.innerHTML = schedulers
 			.map((name) => `<option value="${escHtml(name)}">${escHtml(name)}</option>`)
 			.join('');
+		applySelectFilterQuery(imageSchedulerSelect, imageSchedulerFilter ? imageSchedulerFilter.value : '');
 	} catch {
 		imageSchedulerSelect.innerHTML = DEFAULT_SCHEDULERS
 			.map((n) => `<option value="${escHtml(n)}">${escHtml(n)}</option>`).join('');
+		applySelectFilterQuery(imageSchedulerSelect, imageSchedulerFilter ? imageSchedulerFilter.value : '');
 	}
+}
+
+function applySelectFilterQuery(selectEl, query) {
+	if (!selectEl) return;
+	const normalized = String(query || '').trim().toLowerCase();
+	const selected = selectEl.value;
+	for (const option of selectEl.options) {
+		if (!normalized) {
+			option.hidden = false;
+			continue;
+		}
+		const label = String(option.textContent || option.value || '').toLowerCase();
+		const matches = option.value === selected || label.includes(normalized);
+		option.hidden = !matches;
+	}
+}
+
+function bindSelectFilterInput(inputEl, selectEl, storageKey) {
+	if (!inputEl || !selectEl) return;
+	const saved = localStorage.getItem(storageKey) || '';
+	if (saved) {
+		inputEl.value = saved;
+	}
+	applySelectFilterQuery(selectEl, inputEl.value);
+
+	inputEl.addEventListener('input', () => {
+		const query = inputEl.value || '';
+		if (query) {
+			localStorage.setItem(storageKey, query);
+		} else {
+			localStorage.removeItem(storageKey);
+		}
+		applySelectFilterQuery(selectEl, query);
+	});
+
+	inputEl.addEventListener('keydown', (event) => {
+		if (event.key !== 'Escape' || !inputEl.value) return;
+		event.preventDefault();
+		inputEl.value = '';
+		localStorage.removeItem(storageKey);
+		applySelectFilterQuery(selectEl, '');
+	});
 }
 
 /* --------------------------------------------------------------------------
@@ -3372,6 +3427,8 @@ if (imageModelFilter) {
 		updateControlnetCompatibilityHint();
 	});
 }
+bindSelectFilterInput(imageSamplerFilter, imageSamplerSelect, IMAGE_SAMPLER_FILTER_QUERY_KEY);
+bindSelectFilterInput(imageSchedulerFilter, imageSchedulerSelect, IMAGE_SCHEDULER_FILTER_QUERY_KEY);
 if (imageModelModeAll) imageModelModeAll.addEventListener('click', () => setImageModelFilterMode('all'));
 if (imageModelModeRecent) imageModelModeRecent.addEventListener('click', () => setImageModelFilterMode('recent'));
 if (imageModelModeFavorites) imageModelModeFavorites.addEventListener('click', () => setImageModelFilterMode('favorites'));
