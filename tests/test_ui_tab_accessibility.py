@@ -1555,6 +1555,21 @@ def test_filter_select_arrow_up_returns_focus_to_filter_js_wiring():
     assert "inputEl.focus();" in js
 
 
+def test_filter_arrow_up_focus_flash_class_wiring():
+    js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
+    js = js_path.read_text(encoding="utf-8")
+    css_path = Path(__file__).resolve().parents[1] / "static" / "css" / "style.css"
+    css = css_path.read_text(encoding="utf-8")
+
+    bind_idx = js.index("function bindSelectFilterInput(")
+    flash_idx = js.index("filter-input-focus-flash")
+    assert flash_idx > bind_idx
+    assert "inputEl.classList.add('filter-input-focus-flash');" in js
+    assert "setTimeout(() => inputEl.classList.remove('filter-input-focus-flash')" in js
+    assert "filter-input-focus-flash" in css
+    assert "filter-focus-flash" in css
+
+
 def test_image_prompt_ctrl_enter_shortcut():
     app_module.app.config["TESTING"] = True
     client = app_module.app.test_client()

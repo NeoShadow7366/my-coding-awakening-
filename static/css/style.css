@@ -329,6 +329,15 @@ body {
   font-size: 0.78rem;
 }
 
+@keyframes filter-focus-flash {
+  0%   { outline: 2px solid var(--clr-primary); outline-offset: 1px; }
+  80%  { outline: 2px solid var(--clr-primary); outline-offset: 1px; }
+  100% { outline: 2px solid transparent; outline-offset: 1px; }
+}
+.filter-input-focus-flash {
+  animation: filter-focus-flash 400ms ease-out forwards;
+}
+
 .select-wrapper { position: relative; }
 .select-wrapper::after {
   content: "v";

@@ -2628,6 +2628,8 @@ function bindSelectFilterInput(inputEl, selectEl, storageKey, statusEl, noun) {
 		if (selectEl.value !== firstVisible.value) return;
 		event.preventDefault();
 		inputEl.focus();
+		inputEl.classList.add('filter-input-focus-flash');
+		setTimeout(() => inputEl.classList.remove('filter-input-focus-flash'), 420);
 	});
 }
 
