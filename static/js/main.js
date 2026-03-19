@@ -6158,7 +6158,10 @@ function updateModelStackCompatibilityHint() {
 		refinerModelSelect ? refinerModelSelect.value : '',
 		vaeModelSelect ? vaeModelSelect.value : '',
 	);
-	modelStackCompatHint.textContent = message;
+	const isWarning = /mixing families can reduce quality or fail workflow stages/i.test(message);
+	modelStackCompatHint.setAttribute('title', message);
+	modelStackCompatHint.setAttribute('aria-label', `Model stack compatibility: ${message}`);
+	modelStackCompatHint.classList.toggle('is-warning', isWarning);
 }
 
 function inferControlnetFamily(controlnetName) {

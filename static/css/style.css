@@ -440,6 +440,34 @@ textarea {
   margin: 0;
 }
 
+.hint-info-row {
+  display: flex;
+  align-items: center;
+}
+
+.hint-info-btn {
+  min-width: 1.45rem;
+  min-height: 1.45rem;
+  width: 1.45rem;
+  height: 1.45rem;
+  border-radius: 999px;
+  padding: 0;
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.field-label-with-info {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-xs);
+}
+
+.field-label-with-info .field-label {
+  margin: 0;
+}
+
 .model-recent-list {
   display: flex;
   flex-wrap: wrap;
@@ -465,8 +493,12 @@ textarea {
 }
 
 .model-stack-compat-hint {
-  border-left: 2px solid color-mix(in srgb, var(--clr-primary) 50%, var(--clr-border));
-  padding-left: 0.5rem;
+  border-color: color-mix(in srgb, var(--clr-primary) 55%, var(--clr-border));
+}
+
+.model-stack-compat-hint.is-warning {
+  border-color: color-mix(in srgb, var(--clr-accent-neg) 60%, var(--clr-border));
+  color: color-mix(in srgb, var(--clr-accent-neg) 76%, var(--clr-text));
 }
 
 .seed-action-row {

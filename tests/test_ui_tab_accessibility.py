@@ -995,6 +995,11 @@ def test_index_image_model_stack_controls_present():
     assert 'id="image-model-favorite-list"' in html
     assert 'id="model-stack-badges"' in html
     assert 'id="model-stack-compat-hint"' in html
+    assert 'title="Tip: keep Base, Refiner, and VAE in the same family (SD1.5 vs SDXL) when possible."' in html
+    assert 'title="Second-pass quality boost (SDXL refiner style)."' in html
+    assert 'Loaded from ComfyUI CheckpointLoaderSimple' not in html
+    assert '<p class="hint model-recent-label">Recent</p>' not in html
+    assert '<p class="hint model-recent-label">Favorites</p>' not in html
 
 
 def test_image_model_stack_filter_and_recent_wiring_present_in_js_bundle():
