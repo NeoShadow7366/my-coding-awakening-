@@ -2608,12 +2608,16 @@ function bindSelectFilterInput(inputEl, selectEl, storageKey, statusEl, noun) {
 	});
 
 	inputEl.addEventListener('keydown', (event) => {
-		if (event.key !== 'Escape' || !inputEl.value) return;
-		event.preventDefault();
-		inputEl.value = '';
-		localStorage.removeItem(storageKey);
-		const counts = applySelectFilterQuery(selectEl, '');
-		updateSelectFilterStatus(statusEl, '', counts, noun);
+		if (event.key === 'Escape' && inputEl.value) {
+			event.preventDefault();
+			inputEl.value = '';
+			localStorage.removeItem(storageKey);
+			const counts = applySelectFilterQuery(selectEl, '');
+			updateSelectFilterStatus(statusEl, '', counts, noun);
+		} else if (event.key === 'ArrowDown') {
+			event.preventDefault();
+			selectEl.focus();
+		}
 	});
 }
 
@@ -9696,7 +9700,16 @@ async function uploadControlnetImageIfNeeded() {
 
 imageForm.addEventListener('submit', async (e) => {
 	e.preventDefault();
+if (imagePrompt) {
+	imagePrompt.addEventListener('keydown', (event) => {
+		if ((event.ctrlKey || event.metaKey) && event.key === 'Enter' && !imageGenerateBtn?.disabled) {
+			event.preventDefault();
+			imageForm.requestSubmit();
+		}
+	});
+}
 
+imageForm.addEventListener('submit', async (e) => {
 	const prompt = resolvePromptForSubmission();
 	if (prompt) saveCurrentPromptToHistory(prompt);
 	if (!prompt) {

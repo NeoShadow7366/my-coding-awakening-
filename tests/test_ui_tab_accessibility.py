@@ -1528,3 +1528,28 @@ def test_image_scheduler_js_wiring_present_in_bundle():
     assert "IMAGE_SCHEDULER_FILTER_QUERY_KEY" in js
     assert "No ${noun} match" in js
     assert "scheduler: imageSchedulerSelect" in js
+
+
+def test_filter_input_arrow_down_js_wiring():
+    js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
+    js = js_path.read_text(encoding="utf-8")
+
+    assert "ArrowDown" in js
+    assert "selectEl.focus()" in js
+    bind_idx = js.index("function bindSelectFilterInput(")
+    arrow_idx = js.index("ArrowDown")
+    assert arrow_idx > bind_idx
+
+
+def test_image_prompt_ctrl_enter_shortcut():
+    app_module.app.config["TESTING"] = True
+    client = app_module.app.test_client()
+    html = client.get("/").get_data(as_text=True)
+
+    js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
+    js = js_path.read_text(encoding="utf-8")
+
+    assert 'title="Generate Image (Ctrl+Enter)"' in html
+    assert 'id="image-generate-btn"' in html
+    assert "event.ctrlKey || event.metaKey" in js
+    assert "imageForm.requestSubmit()" in js
