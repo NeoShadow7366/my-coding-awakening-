@@ -134,6 +134,7 @@ const imageSchedulerSelect = document.getElementById('image-scheduler-select');
 const imageSchedulerFilter = document.getElementById('image-scheduler-filter');
 const imageSchedulerFilterStatus = document.getElementById('image-scheduler-filter-status');
 const imageApplyRecommendationBtn = document.getElementById('image-apply-recommendation-btn');
+const imageRecommendationInfoBtn = document.getElementById('image-recommendation-info-btn');
 const imageAutoApplyRecommendationLabel = document.getElementById('image-auto-apply-recommendation-label');
 const imageAutoApplyRecommendationToggle = document.getElementById('image-auto-apply-recommendation-toggle');
 const imageRecommendationStatus = document.getElementById('image-recommendation-status');
@@ -3580,6 +3581,19 @@ if (imageApplyRecommendationBtn) {
 		applyCurrentFluxRecommendation({ announce: true });
 	});
 }
+if (imageRecommendationInfoBtn) {
+	imageRecommendationInfoBtn.addEventListener('click', () => {
+		const recommendation = getFluxWorkflowRecommendation(imageModelSelect?.value || '');
+		if (!recommendation?.sampler || !recommendation?.scheduler) return;
+		const sourceLabel = recommendation.sourceLabel || (recommendation.source === 'metadata' ? 'model metadata' : 'fallback heuristic');
+		const detailText = `Recommended pair ${recommendation.sampler} + ${recommendation.scheduler} from ${sourceLabel}.`;
+		if (imageRecommendationStatus) {
+			imageRecommendationStatus.textContent = detailText;
+			imageRecommendationStatus.hidden = false;
+		}
+		showToast(detailText, '');
+	});
+}
 if (imageAutoApplyRecommendationToggle) {
 	imageAutoApplyRecommendationToggle.checked = imageFluxAutoApplyRecommendation;
 	imageAutoApplyRecommendationToggle.addEventListener('change', () => {
@@ -6367,13 +6381,44 @@ function getFluxWorkflowRecommendation(modelName = '') {
 	const sampler = String(details?.recommended_sampler || '').toLowerCase();
 	const scheduler = String(details?.recommended_scheduler || '').toLowerCase();
 	if (sampler && scheduler) {
-		return { sampler, scheduler };
+		return {
+			sampler,
+			scheduler,
+			source: 'metadata',
+			sourceLabel: 'model metadata',
+		};
 	}
 	const variant = inferFluxVariant(modelName || imageModelSelect?.value || '');
 	return {
 		sampler: 'euler',
 		scheduler: variant === 'schnell' ? 'simple' : 'normal',
+		source: 'heuristic',
+		sourceLabel: variant === 'schnell' ? 'Schnell fallback heuristic' : 'Dev fallback heuristic',
 	};
+}
+
+function updateFluxRecommendationInfoButton() {
+	if (!imageRecommendationInfoBtn) return;
+	const selectedModel = imageModelSelect?.value || '';
+	const activeFamily = resolveActiveImageFamily(selectedModel);
+	if (activeFamily !== 'flux') {
+		imageRecommendationInfoBtn.hidden = true;
+		imageRecommendationInfoBtn.title = 'Recommendation source details';
+		imageRecommendationInfoBtn.setAttribute('aria-label', 'Recommendation source details');
+		return;
+	}
+	const recommendation = getFluxWorkflowRecommendation(selectedModel);
+	if (!recommendation?.sampler || !recommendation?.scheduler) {
+		imageRecommendationInfoBtn.hidden = true;
+		imageRecommendationInfoBtn.title = 'Recommendation source details';
+		imageRecommendationInfoBtn.setAttribute('aria-label', 'Recommendation source details');
+		return;
+	}
+	const sourceLabel = recommendation.sourceLabel || (recommendation.source === 'metadata' ? 'model metadata' : 'fallback heuristic');
+	const detailText = `Recommended pair ${recommendation.sampler} + ${recommendation.scheduler} from ${sourceLabel}.`;
+	imageRecommendationInfoBtn.title = detailText;
+	imageRecommendationInfoBtn.setAttribute('aria-label', detailText);
+	imageRecommendationInfoBtn.hidden = false;
 }
 
 function applyCurrentFluxRecommendation(options = {}) {
@@ -6524,6 +6569,7 @@ function applyImageFamilyModeUi() {
 		imageApplyRecommendationBtn.hidden = !isFluxActive;
 		imageApplyRecommendationBtn.disabled = !isFluxActive;
 	}
+	updateFluxRecommendationInfoButton();
 	if (imageAutoApplyRecommendationLabel) {
 		imageAutoApplyRecommendationLabel.hidden = !isFluxActive;
 	}

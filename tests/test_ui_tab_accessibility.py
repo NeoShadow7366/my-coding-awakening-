@@ -1533,6 +1533,7 @@ def test_image_scheduler_select_present_in_html():
     assert 'id="image-negative-prompt-section"' in html
     assert 'id="flux-variant-chip"' in html
     assert 'id="image-apply-recommendation-btn"' in html
+    assert 'id="image-recommendation-info-btn"' in html
     assert 'id="image-auto-apply-recommendation-toggle"' in html
     assert 'id="image-auto-apply-recommendation-label"' in html
     assert 'id="image-recommendation-status"' in html
@@ -1547,6 +1548,7 @@ def test_image_scheduler_js_wiring_present_in_bundle():
     assert "imageSamplerFilter" in js
     assert "imageSchedulerFilter" in js
     assert "const imageApplyRecommendationBtn = document.getElementById('image-apply-recommendation-btn');" in js
+    assert "const imageRecommendationInfoBtn = document.getElementById('image-recommendation-info-btn');" in js
     assert "const imageAutoApplyRecommendationLabel = document.getElementById('image-auto-apply-recommendation-label');" in js
     assert "const imageAutoApplyRecommendationToggle = document.getElementById('image-auto-apply-recommendation-toggle');" in js
     assert "const imageRecommendationStatus = document.getElementById('image-recommendation-status');" in js
@@ -1559,6 +1561,9 @@ def test_image_scheduler_js_wiring_present_in_bundle():
     assert "function resolveActiveImageFamily(modelName = '')" in js
     assert "function inferFluxVariant(modelName = '')" in js
     assert "function getFluxWorkflowRecommendation(modelName = '')" in js
+    assert "source: 'metadata'" in js
+    assert "source: 'heuristic'" in js
+    assert "function updateFluxRecommendationInfoButton()" in js
     assert "function applyCurrentFluxRecommendation(options = {})" in js
     assert "function updateFluxRecommendationDriftHint()" in js
     assert "const IMAGE_FLUX_AUTO_APPLY_RECOMMENDATION_KEY = 'imageFluxAutoApplyRecommendationV1';" in js
@@ -1594,6 +1599,7 @@ def test_image_scheduler_js_wiring_present_in_bundle():
     assert "if (isFluxActive && imageFluxAutoApplyRecommendation) {" in js
     assert "applyCurrentFluxRecommendation({ announce: false, suppressNoopStatus: true });" in js
     assert "applyCurrentFluxRecommendation({ announce: true });" in js
+    assert "if (imageRecommendationInfoBtn) {" in js
     assert "updateFluxRecommendationDriftHint();" in js
     assert "if (imageAutoApplyRecommendationToggle) {" in js
     assert "localStorage.setItem(IMAGE_FLUX_AUTO_APPLY_RECOMMENDATION_KEY, imageFluxAutoApplyRecommendation ? '1' : '0');" in js

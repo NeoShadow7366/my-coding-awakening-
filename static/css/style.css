@@ -506,6 +506,10 @@ textarea {
   flex-wrap: wrap;
 }
 
+.recommendation-info-btn {
+  min-width: 2.3rem;
+}
+
 #image-auto-apply-recommendation-label {
   font-size: var(--fs-xs);
 }
