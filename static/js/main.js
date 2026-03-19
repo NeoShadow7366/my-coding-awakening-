@@ -6309,6 +6309,10 @@ function inferImageModelFamily(modelName) {
 }
 
 function inferFluxVariant(modelName = '') {
+	const details = getImageModelDetails(modelName || imageModelSelect?.value || '');
+	const detailsVariant = String(details?.flux_variant || '').toLowerCase();
+	if (detailsVariant === 'schnell' || detailsVariant === 'dev') return detailsVariant;
+
 	const value = String(modelName || imageModelSelect?.value || '').toLowerCase();
 	if (!value.includes('flux')) return '';
 	if (value.includes('schnell') || value.includes('flux.1-s') || value.includes('flux1-s') || value.includes('flux_1_s')) {

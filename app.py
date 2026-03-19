@@ -212,13 +212,27 @@ def _infer_image_model_family(model_name: str) -> str:
     return "unknown"
 
 
+def _infer_flux_variant(model_name: str) -> str:
+    """Infer Flux checkpoint variant from naming conventions."""
+    value = str(model_name or "").strip().lower()
+    if "flux" not in value:
+        return ""
+    if "schnell" in value or "flux.1-s" in value or "flux1-s" in value or "flux_1_s" in value:
+        return "schnell"
+    if "dev" in value or "flux.1-d" in value or "flux1-d" in value or "flux_1_d" in value:
+        return "dev"
+    return "dev"
+
+
 def _image_model_capabilities(model_name: str) -> dict:
     """Return UI-facing capability flags for a checkpoint family."""
     family = _infer_image_model_family(model_name)
+    flux_variant = _infer_flux_variant(model_name) if family == "flux" else ""
     is_flux = family == "flux"
     # These flags drive frontend control visibility and payload shaping.
     return {
         "family": family,
+        "flux_variant": flux_variant,
         "supports_refiner": not is_flux,
         "supports_vae": not is_flux,
         "supports_controlnet": not is_flux,

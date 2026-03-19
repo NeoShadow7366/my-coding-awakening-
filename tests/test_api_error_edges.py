@@ -247,6 +247,20 @@ def test_image_models_flux_family_capabilities(client, monkeypatch):
     assert data["model_details"][0]["supports_controlnet"] is False
     assert data["model_details"][0]["supports_hiresfix"] is False
     assert data["model_details"][0]["cfg_max"] == 10
+    assert data["model_details"][0]["flux_variant"] == "dev"
+
+
+def test_image_models_flux_schnell_variant_capabilities(client, monkeypatch):
+    monkeypatch.setattr(app_module, "_comfy_available", lambda: True)
+    monkeypatch.setattr(app_module, "_image_models", lambda: ["flux.1-schnell.safetensors"])
+
+    resp = client.get("/api/image/models")
+
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["models"] == ["flux.1-schnell.safetensors"]
+    assert data["model_details"][0]["family"] == "flux"
+    assert data["model_details"][0]["flux_variant"] == "schnell"
 
 
 def test_image_samplers_returns_list_when_available(client, monkeypatch):

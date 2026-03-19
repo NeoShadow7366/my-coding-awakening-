@@ -1546,6 +1546,8 @@ def test_image_scheduler_js_wiring_present_in_bundle():
     assert "const IMAGE_FAMILY_CAPABILITIES = {" in js
     assert "function resolveActiveImageFamily(modelName = '')" in js
     assert "function inferFluxVariant(modelName = '')" in js
+    assert "const detailsVariant = String(details?.flux_variant || '').toLowerCase();" in js
+    assert "if (detailsVariant === 'schnell' || detailsVariant === 'dev') return detailsVariant;" in js
     assert "function applyImageFamilyModeUi()" in js
     assert "function normalizeImageRequestByFamily(common)" in js
     assert "async function loadImageSchedulers()" in js
