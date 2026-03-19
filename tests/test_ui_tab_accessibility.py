@@ -1541,6 +1541,18 @@ def test_filter_input_arrow_down_js_wiring():
     assert arrow_idx > bind_idx
 
 
+def test_filter_select_arrow_up_returns_focus_to_filter_js_wiring():
+    js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
+    js = js_path.read_text(encoding="utf-8")
+
+    bind_idx = js.index("function bindSelectFilterInput(")
+    arrow_up_idx = js.index("event.key !== 'ArrowUp'")
+    assert arrow_up_idx > bind_idx
+    assert "const firstVisible = [...selectEl.options].find((opt) => !opt.hidden && !opt.disabled);" in js
+    assert "if (selectEl.value !== firstVisible.value) return;" in js
+    assert "inputEl.focus();" in js
+
+
 def test_image_prompt_ctrl_enter_shortcut():
     app_module.app.config["TESTING"] = True
     client = app_module.app.test_client()

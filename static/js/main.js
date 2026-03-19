@@ -2620,6 +2620,15 @@ function bindSelectFilterInput(inputEl, selectEl, storageKey, statusEl, noun) {
 			selectEl.focus();
 		}
 	});
+
+	selectEl.addEventListener('keydown', (event) => {
+		if (event.key !== 'ArrowUp') return;
+		const firstVisible = [...selectEl.options].find((opt) => !opt.hidden && !opt.disabled);
+		if (!firstVisible) return;
+		if (selectEl.value !== firstVisible.value) return;
+		event.preventDefault();
+		inputEl.focus();
+	});
 }
 
 /* --------------------------------------------------------------------------
