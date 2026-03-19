@@ -139,6 +139,7 @@ const imageAutoApplyRecommendationLabel = document.getElementById('image-auto-ap
 const imageAutoApplyRecommendationToggle = document.getElementById('image-auto-apply-recommendation-toggle');
 const imageRecommendationStatus = document.getElementById('image-recommendation-status');
 const imageRecommendationDriftHint = document.getElementById('image-recommendation-drift-hint');
+const imageRecommendationSourceTag = document.getElementById('image-recommendation-source-tag');
 const loraAddBtn = document.getElementById('lora-add-btn');
 const loraStackContainer = document.getElementById('lora-stack-container');
 // NOTE: loraModelSelect / loraStrength / loraStrengthVal replaced by multi-LoRA stack
@@ -6421,6 +6422,26 @@ function updateFluxRecommendationInfoButton() {
 	imageRecommendationInfoBtn.hidden = false;
 }
 
+function updateFluxRecommendationSourceTag() {
+	if (!imageRecommendationSourceTag) return;
+	const selectedModel = imageModelSelect?.value || '';
+	const activeFamily = resolveActiveImageFamily(selectedModel);
+	if (activeFamily !== 'flux') {
+		imageRecommendationSourceTag.hidden = true;
+		imageRecommendationSourceTag.textContent = '';
+		return;
+	}
+	const recommendation = getFluxWorkflowRecommendation(selectedModel);
+	if (!recommendation?.sampler || !recommendation?.scheduler) {
+		imageRecommendationSourceTag.hidden = true;
+		imageRecommendationSourceTag.textContent = '';
+		return;
+	}
+	const sourceLabel = recommendation.sourceLabel || (recommendation.source === 'metadata' ? 'model metadata' : 'fallback heuristic');
+	imageRecommendationSourceTag.textContent = `Source: ${sourceLabel}`;
+	imageRecommendationSourceTag.hidden = false;
+}
+
 function applyCurrentFluxRecommendation(options = {}) {
 	const announce = options.announce !== false;
 	const suppressNoopStatus = options.suppressNoopStatus === true;
@@ -6478,12 +6499,14 @@ function updateFluxRecommendationDriftHint() {
 	if (activeFamily !== 'flux') {
 		imageRecommendationDriftHint.hidden = true;
 		imageRecommendationDriftHint.classList.remove('is-warning');
+		updateFluxRecommendationSourceTag();
 		return;
 	}
 	const recommendation = getFluxWorkflowRecommendation(selectedModel);
 	if (!recommendation?.sampler || !recommendation?.scheduler) {
 		imageRecommendationDriftHint.hidden = true;
 		imageRecommendationDriftHint.classList.remove('is-warning');
+		updateFluxRecommendationSourceTag();
 		return;
 	}
 	const currentSampler = String(imageSamplerSelect?.value || '').toLowerCase();
@@ -6499,6 +6522,7 @@ function updateFluxRecommendationDriftHint() {
 		imageRecommendationDriftHint.classList.add('is-warning');
 	}
 	imageRecommendationDriftHint.hidden = false;
+	updateFluxRecommendationSourceTag();
 }
 
 function resolveActiveImageFamily(modelName = '') {
@@ -6582,6 +6606,10 @@ function applyImageFamilyModeUi() {
 	if (imageRecommendationDriftHint && !isFluxActive) {
 		imageRecommendationDriftHint.hidden = true;
 		imageRecommendationDriftHint.classList.remove('is-warning');
+	}
+	if (imageRecommendationSourceTag && !isFluxActive) {
+		imageRecommendationSourceTag.hidden = true;
+		imageRecommendationSourceTag.textContent = '';
 	}
 	if (isFluxActive && imageFluxAutoApplyRecommendation) {
 		const autoKey = `${selectedModel || ''}|${imageModelFamilyMode}`;

@@ -1538,6 +1538,7 @@ def test_image_scheduler_select_present_in_html():
     assert 'id="image-auto-apply-recommendation-label"' in html
     assert 'id="image-recommendation-status"' in html
     assert 'id="image-recommendation-drift-hint"' in html
+    assert 'id="image-recommendation-source-tag"' in html
 
 
 def test_image_scheduler_js_wiring_present_in_bundle():
@@ -1553,6 +1554,7 @@ def test_image_scheduler_js_wiring_present_in_bundle():
     assert "const imageAutoApplyRecommendationToggle = document.getElementById('image-auto-apply-recommendation-toggle');" in js
     assert "const imageRecommendationStatus = document.getElementById('image-recommendation-status');" in js
     assert "const imageRecommendationDriftHint = document.getElementById('image-recommendation-drift-hint');" in js
+    assert "const imageRecommendationSourceTag = document.getElementById('image-recommendation-source-tag');" in js
     assert "imageModelFamilySelect" in js
     assert "imageModelFamilyHint" in js
     assert "const fluxVariantChip = document.getElementById('flux-variant-chip');" in js
@@ -1564,6 +1566,7 @@ def test_image_scheduler_js_wiring_present_in_bundle():
     assert "source: 'metadata'" in js
     assert "source: 'heuristic'" in js
     assert "function updateFluxRecommendationInfoButton()" in js
+    assert "function updateFluxRecommendationSourceTag()" in js
     assert "function applyCurrentFluxRecommendation(options = {})" in js
     assert "function updateFluxRecommendationDriftHint()" in js
     assert "const IMAGE_FLUX_AUTO_APPLY_RECOMMENDATION_KEY = 'imageFluxAutoApplyRecommendationV1';" in js
@@ -1601,8 +1604,13 @@ def test_image_scheduler_js_wiring_present_in_bundle():
     assert "applyCurrentFluxRecommendation({ announce: true });" in js
     assert "if (imageRecommendationInfoBtn) {" in js
     assert "updateFluxRecommendationDriftHint();" in js
+    assert "updateFluxRecommendationSourceTag();" in js
     assert "if (imageAutoApplyRecommendationToggle) {" in js
     assert "localStorage.setItem(IMAGE_FLUX_AUTO_APPLY_RECOMMENDATION_KEY, imageFluxAutoApplyRecommendation ? '1' : '0');" in js
+
+    css_path = Path(__file__).resolve().parents[1] / "static" / "css" / "style.css"
+    css = css_path.read_text(encoding="utf-8")
+    assert ".recommendation-source-tag {" in css
 
 
 def test_filter_input_arrow_down_js_wiring():

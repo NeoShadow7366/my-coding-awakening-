@@ -518,6 +518,16 @@ textarea {
   color: color-mix(in srgb, var(--clr-accent-neg) 76%, var(--clr-text));
 }
 
+.recommendation-source-tag {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 0.1rem;
+  padding: 0.02rem 0.42rem;
+  border-radius: 999px;
+  border: 1px solid var(--clr-border);
+  background: color-mix(in srgb, var(--clr-surface) 86%, var(--clr-primary));
+}
+
 .model-recent-list {
   display: flex;
   flex-wrap: wrap;
