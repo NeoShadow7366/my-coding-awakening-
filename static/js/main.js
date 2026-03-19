@@ -243,6 +243,7 @@ const tagAddBtn = document.getElementById('tag-add-btn');
 const tagEditorList = document.getElementById('tag-editor-list');
 const tagManagerStatus = document.getElementById('tag-manager-status');
 const tagResetDefaultsBtn = document.getElementById('tag-reset-defaults-btn');
+const diagCopyBtn = document.getElementById('diag-copy-btn');
 const diagnosticsRunBtn = document.getElementById('diagnostics-run-btn');
 const diagWsRetryBtn = document.getElementById('diag-ws-retry-btn');
 const diagnosticsSummary = document.getElementById('diagnostics-summary');
@@ -524,6 +525,28 @@ function getDiagnosticsStatusSnapshotText() {
 	const frontend = diagFrontendBuild?.textContent || 'unknown';
 	const summary = diagnosticsSummary?.textContent || 'Diagnostics unavailable';
 	return `${summary} | text=${text} image=${image} checkpoints=${checkpoints} samplers=${samplers} frontend=${frontend}`;
+}
+
+async function copyTextToClipboard(text) {
+	const value = String(text || '');
+	if (navigator.clipboard?.writeText) {
+		await navigator.clipboard.writeText(value);
+		return;
+	}
+	const textarea = document.createElement('textarea');
+	textarea.value = value;
+	textarea.setAttribute('readonly', 'readonly');
+	textarea.style.position = 'fixed';
+	textarea.style.opacity = '0';
+	textarea.style.pointerEvents = 'none';
+	document.body.appendChild(textarea);
+	textarea.select();
+	textarea.setSelectionRange(0, textarea.value.length);
+	const copied = document.execCommand('copy');
+	document.body.removeChild(textarea);
+	if (!copied) {
+		throw new Error('Copy command failed.');
+	}
 }
 
 async function appendServiceDiagnosticLogs(service = 'comfyui') {
@@ -973,7 +996,7 @@ function onTopNavTabKeydown(event) {
 }
 
 function onDiagnosticsActionsKeydown(event) {
-	const controls = [diagWsRetryBtn, diagnosticsRunBtn].filter(Boolean);
+	const controls = [diagCopyBtn, diagWsRetryBtn, diagnosticsRunBtn].filter(Boolean);
 	if (!controls.length) return;
 	const currentIndex = controls.indexOf(event.currentTarget);
 	if (currentIndex < 0) return;
@@ -2642,6 +2665,20 @@ async function checkStatus() {
 			hint: 'Could not reach backend status endpoint.',
 		});
 	}
+}
+
+if (diagCopyBtn) {
+	diagCopyBtn.addEventListener('keydown', onDiagnosticsActionsKeydown);
+	diagCopyBtn.addEventListener('click', async () => {
+		try {
+			await copyTextToClipboard(getDiagnosticsStatusSnapshotText());
+			appendDiagnosticsConsoleLine('Copied diagnostics snapshot.', 'info');
+			showToast('Diagnostics snapshot copied.', 'pos');
+		} catch (err) {
+			appendDiagnosticsConsoleLine(`Could not copy diagnostics snapshot: ${err.message}`, 'warn');
+			showToast('Could not copy diagnostics snapshot.', 'neg');
+		}
+	});
 }
 
 if (diagnosticsRunBtn) {

@@ -276,6 +276,7 @@ def test_index_diagnostics_drawer_semantics():
     assert 'id="diag-drawer-toggle"' in html
     assert 'aria-expanded="false"' in html
     assert 'id="diag-drawer" class="diag-drawer" hidden aria-hidden="true" aria-label="Diagnostics console"' in html
+    assert 'id="diag-copy-btn"' in html
     assert 'id="diag-ws-retry-btn"' in html
     assert 'id="diag-frontend-build"' in html
     assert 'Frontend build' in html
@@ -287,8 +288,12 @@ def test_diagnostics_drawer_keyboard_handler_wiring_present_in_js_bundle():
     content = js_path.read_text(encoding="utf-8")
 
     assert "function setDiagnosticsDrawerOpen(isOpen)" in content
+    assert "const diagCopyBtn = document.getElementById('diag-copy-btn');" in content
     assert "const diagWsRetryBtn = document.getElementById('diag-ws-retry-btn');" in content
     assert "const diagFrontendBuild = document.getElementById('diag-frontend-build');" in content
+    assert "async function copyTextToClipboard(text)" in content
+    assert "await navigator.clipboard.writeText(value);" in content
+    assert "const copied = document.execCommand('copy');" in content
     assert "const commandAliases = {" in content
     assert "const DIAGNOSTICS_COMMAND_SUGGESTIONS = [" in content
     assert "ws: 'ws-status'," in content
@@ -307,6 +312,11 @@ def test_diagnostics_drawer_keyboard_handler_wiring_present_in_js_bundle():
     assert "ComfyUI HTTP API base: ${COMFY_HTTP_BASE}" in content
     assert "function renderWsRetryButtonState() {" in content
     assert "function onDiagnosticsActionsKeydown(event) {" in content
+    assert "const controls = [diagCopyBtn, diagWsRetryBtn, diagnosticsRunBtn].filter(Boolean);" in content
+    assert "diagCopyBtn.addEventListener('keydown', onDiagnosticsActionsKeydown);" in content
+    assert "diagCopyBtn.addEventListener('click', async () => {" in content
+    assert "appendDiagnosticsConsoleLine('Copied diagnostics snapshot.', 'info');" in content
+    assert "showToast('Diagnostics snapshot copied.', 'pos');" in content
     assert "diagWsRetryBtn.addEventListener('keydown', onDiagnosticsActionsKeydown);" in content
     assert "diagnosticsRunBtn.addEventListener('keydown', onDiagnosticsActionsKeydown);" in content
     assert "diagWsRetryBtn.addEventListener('click', () => {" in content
