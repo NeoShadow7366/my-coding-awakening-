@@ -140,6 +140,7 @@ const imageAutoApplyRecommendationToggle = document.getElementById('image-auto-a
 const imageLockRecommendationLabel = document.getElementById('image-lock-recommendation-label');
 const imageLockRecommendationToggle = document.getElementById('image-lock-recommendation-toggle');
 const imageUnlockRecommendationOnceBtn = document.getElementById('image-unlock-recommendation-once-btn');
+const imageUnlockExpiryHint = document.getElementById('image-unlock-expiry-hint');
 const imageRecommendationStatus = document.getElementById('image-recommendation-status');
 const imageRecommendationDriftHint = document.getElementById('image-recommendation-drift-hint');
 const imageRecommendationSourceTag = document.getElementById('image-recommendation-source-tag');
@@ -6642,6 +6643,11 @@ function applyImageFamilyModeUi() {
 		imageUnlockRecommendationOnceBtn.hidden = !canUseTemporaryUnlock;
 		imageUnlockRecommendationOnceBtn.textContent = imageFluxLockBypassOnce ? 'Unlocked for next run' : 'Unlock for next run';
 		imageUnlockRecommendationOnceBtn.setAttribute('aria-pressed', imageFluxLockBypassOnce ? 'true' : 'false');
+	}
+	if (imageUnlockExpiryHint) {
+		const canUseTemporaryUnlock = isFluxActive && imageFluxLockRecommendation;
+		imageUnlockExpiryHint.hidden = !canUseTemporaryUnlock;
+		imageUnlockExpiryHint.classList.toggle('is-active', imageFluxLockBypassOnce && canUseTemporaryUnlock);
 	}
 	if (imageSamplerSelect) {
 		imageSamplerSelect.disabled = isFluxActive && imageFluxLockRecommendation && !imageFluxLockBypassOnce;

@@ -528,6 +528,21 @@ textarea {
   background: color-mix(in srgb, var(--clr-surface) 86%, var(--clr-primary));
 }
 
+.recommendation-expiry-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.02rem 0.42rem;
+  border-radius: 999px;
+  border: 1px dashed color-mix(in srgb, var(--clr-border) 70%, var(--clr-text));
+  background: color-mix(in srgb, var(--clr-surface) 88%, var(--clr-primary));
+}
+
+.recommendation-expiry-tag.is-active {
+  color: color-mix(in srgb, var(--clr-text) 84%, #ff934d);
+  border-color: color-mix(in srgb, var(--clr-border) 35%, #ff934d);
+  background: color-mix(in srgb, var(--clr-surface) 70%, #ff934d);
+}
+
 .model-recent-list {
   display: flex;
   flex-wrap: wrap;

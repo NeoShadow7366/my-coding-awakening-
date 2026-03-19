@@ -1539,6 +1539,7 @@ def test_image_scheduler_select_present_in_html():
     assert 'id="image-lock-recommendation-toggle"' in html
     assert 'id="image-lock-recommendation-label"' in html
     assert 'id="image-unlock-recommendation-once-btn"' in html
+    assert 'id="image-unlock-expiry-hint"' in html
     assert 'id="image-recommendation-status"' in html
     assert 'id="image-recommendation-drift-hint"' in html
     assert 'id="image-recommendation-source-tag"' in html
@@ -1558,6 +1559,7 @@ def test_image_scheduler_js_wiring_present_in_bundle():
     assert "const imageLockRecommendationLabel = document.getElementById('image-lock-recommendation-label');" in js
     assert "const imageLockRecommendationToggle = document.getElementById('image-lock-recommendation-toggle');" in js
     assert "const imageUnlockRecommendationOnceBtn = document.getElementById('image-unlock-recommendation-once-btn');" in js
+    assert "const imageUnlockExpiryHint = document.getElementById('image-unlock-expiry-hint');" in js
     assert "const imageRecommendationStatus = document.getElementById('image-recommendation-status');" in js
     assert "const imageRecommendationDriftHint = document.getElementById('image-recommendation-drift-hint');" in js
     assert "const imageRecommendationSourceTag = document.getElementById('image-recommendation-source-tag');" in js
@@ -1622,6 +1624,8 @@ def test_image_scheduler_js_wiring_present_in_bundle():
     assert "if (imageLockRecommendationToggle) {" in js
     assert "localStorage.setItem(IMAGE_FLUX_LOCK_RECOMMENDATION_KEY, imageFluxLockRecommendation ? '1' : '0');" in js
     assert "if (imageUnlockRecommendationOnceBtn) {" in js
+    assert "if (imageUnlockExpiryHint) {" in js
+    assert "imageUnlockExpiryHint.classList.toggle('is-active', imageFluxLockBypassOnce && canUseTemporaryUnlock);" in js
     assert "imageFluxLockBypassOnce = true;" in js
     assert "Temporary unlock active for next run." in js
     assert "Recommendation lock restored after submit." in js
@@ -1629,6 +1633,8 @@ def test_image_scheduler_js_wiring_present_in_bundle():
     css_path = Path(__file__).resolve().parents[1] / "static" / "css" / "style.css"
     css = css_path.read_text(encoding="utf-8")
     assert ".recommendation-source-tag {" in css
+    assert ".recommendation-expiry-tag {" in css
+    assert ".recommendation-expiry-tag.is-active {" in css
 
 
 def test_filter_input_arrow_down_js_wiring():
