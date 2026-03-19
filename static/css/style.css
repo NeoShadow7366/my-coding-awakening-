@@ -489,6 +489,8 @@ textarea {
 
 .model-favorite-toggle-row {
   display: flex;
+  align-items: center;
+  gap: var(--sp-xs);
   justify-content: flex-start;
 }
 
