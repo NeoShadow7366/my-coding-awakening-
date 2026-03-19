@@ -1553,3 +1553,16 @@ def test_image_prompt_ctrl_enter_shortcut():
     assert 'id="image-generate-btn"' in html
     assert "event.ctrlKey || event.metaKey" in js
     assert "imageForm.requestSubmit()" in js
+    assert js.count("imageForm.addEventListener('submit', async (e) => {") == 1
+
+
+def test_queue_poll_done_items_clear_tracking_without_images():
+    js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
+    js = js_path.read_text(encoding="utf-8")
+    poll_queue_block = js[js.index("async function pollQueue() {"):js.index("function ensureQueuePolling() {")]
+
+    assert "const doneItems = data.done || [];" in poll_queue_block
+    assert "const images = done.images || [];" in poll_queue_block
+    assert "if (images.length) {" in poll_queue_block
+    assert "trackedPromptIds.delete(promptId);" in poll_queue_block
+    assert poll_queue_block.index("if (images.length) {") < poll_queue_block.index("trackedPromptIds.delete(promptId);")

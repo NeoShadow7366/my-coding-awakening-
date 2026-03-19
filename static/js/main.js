@@ -6091,30 +6091,31 @@ async function pollQueue() {
 			for (const done of doneItems) {
 				const promptId = done.prompt_id;
 				const images = done.images || [];
-				if (!images.length) continue;
 				const snapshot = pendingImageJobs.get(promptId) || {};
 
-				await saveHistoryEntry({
-					type: 'image',
-					prompt: snapshot.prompt || 'Image generation',
-					negative_prompt: snapshot.negative_prompt || '',
-					engine: 'comfyui',
-					model: snapshot.model || '',
-					params: {
-						sampler: snapshot.sampler || '',
-						seed: snapshot.seed || null,
-						steps: snapshot.steps || 0,
-						cfg: snapshot.cfg || 0,
-						denoise: snapshot.denoise || 0,
-						width: snapshot.width || 0,
-						height: snapshot.height || 0,
-						batch_size: snapshot.batch_size || 1,
-						mode: snapshot.mode || 'txt2img',
-						image: snapshot.image || snapshot.image_name || '',
-						prompt_id: promptId,
-					},
-					images,
-				});
+				if (images.length) {
+					await saveHistoryEntry({
+						type: 'image',
+						prompt: snapshot.prompt || 'Image generation',
+						negative_prompt: snapshot.negative_prompt || '',
+						engine: 'comfyui',
+						model: snapshot.model || '',
+						params: {
+							sampler: snapshot.sampler || '',
+							seed: snapshot.seed || null,
+							steps: snapshot.steps || 0,
+							cfg: snapshot.cfg || 0,
+							denoise: snapshot.denoise || 0,
+							width: snapshot.width || 0,
+							height: snapshot.height || 0,
+							batch_size: snapshot.batch_size || 1,
+							mode: snapshot.mode || 'txt2img',
+							image: snapshot.image || snapshot.image_name || '',
+							prompt_id: promptId,
+						},
+						images,
+					});
+				}
 
 				trackedPromptIds.delete(promptId);
 				const meta = queueJobMeta.get(promptId) || {};
@@ -9698,8 +9699,6 @@ async function uploadControlnetImageIfNeeded() {
 	return String(payload.name || '');
 }
 
-imageForm.addEventListener('submit', async (e) => {
-	e.preventDefault();
 if (imagePrompt) {
 	imagePrompt.addEventListener('keydown', (event) => {
 		if ((event.ctrlKey || event.metaKey) && event.key === 'Enter' && !imageGenerateBtn?.disabled) {
@@ -9710,6 +9709,7 @@ if (imagePrompt) {
 }
 
 imageForm.addEventListener('submit', async (e) => {
+	e.preventDefault();
 	const prompt = resolvePromptForSubmission();
 	if (prompt) saveCurrentPromptToHistory(prompt);
 	if (!prompt) {
