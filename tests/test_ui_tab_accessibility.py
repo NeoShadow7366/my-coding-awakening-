@@ -1576,9 +1576,21 @@ def test_queue_poll_retries_done_history_persistence_until_post_ok():
     assert "const saved = await saveHistoryEntry({" in poll_queue_block
     assert "if (!saved) {" in poll_queue_block
     assert "meta.status = 'processing';" in poll_queue_block
-    assert "meta.failReason = 'Waiting to persist history entry.';" in poll_queue_block
+    assert "meta.failReason = HISTORY_PERSIST_PENDING_REASON;" in poll_queue_block
     assert "continue;" in poll_queue_block
     assert poll_queue_block.index("if (!saved) {") < poll_queue_block.index("trackedPromptIds.delete(promptId);")
+
+
+def test_queue_summary_and_badge_include_history_persisting_state():
+    js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
+    js = js_path.read_text(encoding="utf-8")
+    queue_render_block = js[js.index("function renderQueueStatus("):js.index("function _clearQueueByStatus(")]
+
+    assert "const HISTORY_PERSIST_PENDING_REASON = 'Waiting to persist history entry.';" in js
+    assert "const persistingCount =" in queue_render_block
+    assert "Persisting: ${persistingCount}" in queue_render_block
+    assert "status === 'processing' && meta.failReason === HISTORY_PERSIST_PENDING_REASON" in queue_render_block
+    assert "SAVE" in queue_render_block
 
 
 def test_save_history_entry_returns_response_ok_boolean():

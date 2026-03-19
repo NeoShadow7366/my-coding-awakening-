@@ -332,6 +332,7 @@ const pendingImageJobs = new Map();
 const queueJobMeta = new Map();
 let enhancedPromptSuggestions = [];
 const JOB_MISS_THRESHOLD = 4;
+const HISTORY_PERSIST_PENDING_REASON = 'Waiting to persist history entry.';
 const queueActionInFlight = new Set();
 const QUEUE_STATE_STORAGE_KEY = 'queueStateV1';
 const QUEUE_RESTORE_HINT_HIDDEN_KEY = 'queueRestoreHintHiddenV1';
@@ -3724,6 +3725,11 @@ function renderQueueStatus(running, pending, donePromptIds = new Set()) {
 	const completedCount = Array.from(queueJobMeta.values()).filter((m) => m.status === 'completed').length;
 	const runningCount = Array.from(queueJobMeta.entries()).filter(([promptId, meta]) => trackedPromptIds.has(promptId) && meta.status === 'running').length;
 	const pendingCount = Array.from(queueJobMeta.entries()).filter(([promptId, meta]) => trackedPromptIds.has(promptId) && (meta.status === 'queued' || meta.status === 'processing')).length;
+	const persistingCount = Array.from(queueJobMeta.entries()).filter(([promptId, meta]) => (
+		trackedPromptIds.has(promptId) &&
+		meta.status === 'processing' &&
+		meta.failReason === HISTORY_PERSIST_PENDING_REASON
+	)).length;
 	if (clearFailedQueueBtn) {
 		clearFailedQueueBtn.disabled = failedCount === 0;
 		clearFailedQueueBtn.textContent = failedCount > 0 ? `Clear failed (${failedCount})` : 'Clear failed';
@@ -3733,7 +3739,7 @@ function renderQueueStatus(running, pending, donePromptIds = new Set()) {
 		clearCompletedQueueBtn.textContent = completedCount > 0 ? `Clear done (${completedCount})` : 'Clear done';
 	}
 	const visibleLabel = queueFilterFailedOnly ? 'Showing: Failed only' : 'Showing: All';
-	queueSummary.textContent = `Running: ${runningCount}  Pending: ${pendingCount}  Tracked: ${trackedPromptIds.size}  Failed: ${failedCount}  Done: ${completedCount}  ${visibleLabel}`;
+	queueSummary.textContent = `Running: ${runningCount}  Pending: ${pendingCount}  Persisting: ${persistingCount}  Tracked: ${trackedPromptIds.size}  Failed: ${failedCount}  Done: ${completedCount}  ${visibleLabel}`;
 	renderQueueRestoreHint();
 
 	const rows = Array.from(queueJobMeta.entries())
@@ -3749,6 +3755,7 @@ function renderQueueStatus(running, pending, donePromptIds = new Set()) {
 			const badge =
 				status === 'running' ? '<span class="history-badge positive">RUN</span>' :
 				status === 'queued' ? '<span class="history-badge">WAIT</span>' :
+				(status === 'processing' && meta.failReason === HISTORY_PERSIST_PENDING_REASON) ? '<span class="history-badge">SAVE</span>' :
 				status === 'completed' ? '<span class="history-badge positive">DONE</span>' :
 				status === 'canceled' ? '<span class="history-badge negative">CANCEL</span>' :
 				status === 'failed' ? '<span class="history-badge negative">FAIL</span>' :
@@ -6120,7 +6127,7 @@ async function pollQueue() {
 					if (!saved) {
 						meta.status = 'processing';
 						meta.updatedAt = Date.now();
-						meta.failReason = 'Waiting to persist history entry.';
+						meta.failReason = HISTORY_PERSIST_PENDING_REASON;
 						queueJobMeta.set(promptId, meta);
 						continue;
 					}
