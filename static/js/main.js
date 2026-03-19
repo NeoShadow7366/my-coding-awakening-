@@ -3638,6 +3638,7 @@ if (imageLockSeedBtn) {
 
 function applyImagePreset(preset) {
 	const family = resolveActiveImageFamily(imageModelSelect?.value || '');
+	const fluxRecommendation = family === 'flux' ? getFluxWorkflowRecommendation(imageModelSelect?.value || '') : null;
 	const fluxVariant = family === 'flux' ? inferFluxVariant(imageModelSelect?.value || '') : '';
 	const familyPresetMap = {
 		sd: {
@@ -3647,14 +3648,14 @@ function applyImagePreset(preset) {
 		},
 		flux: {
 			dev: {
-				fast: { steps: 16, cfg: 3.0, denoise: 0.65, width: 1024, height: 1024, batch: 1, scheduler: 'normal' },
-				quality: { steps: 28, cfg: 3.5, denoise: 0.72, width: 1024, height: 1024, batch: 1, scheduler: 'normal' },
-				creative: { steps: 36, cfg: 4.5, denoise: 0.82, width: 1152, height: 896, batch: 1, scheduler: 'normal' },
+				fast: { steps: 16, cfg: 3.0, denoise: 0.65, width: 1024, height: 1024, batch: 1, scheduler: fluxRecommendation?.scheduler || 'normal' },
+				quality: { steps: 28, cfg: 3.5, denoise: 0.72, width: 1024, height: 1024, batch: 1, scheduler: fluxRecommendation?.scheduler || 'normal' },
+				creative: { steps: 36, cfg: 4.5, denoise: 0.82, width: 1152, height: 896, batch: 1, scheduler: fluxRecommendation?.scheduler || 'normal' },
 			},
 			schnell: {
-				fast: { steps: 8, cfg: 1.8, denoise: 0.62, width: 1024, height: 1024, batch: 1, scheduler: 'simple' },
-				quality: { steps: 12, cfg: 2.2, denoise: 0.70, width: 1024, height: 1024, batch: 1, scheduler: 'simple' },
-				creative: { steps: 16, cfg: 2.6, denoise: 0.80, width: 1152, height: 896, batch: 1, scheduler: 'simple' },
+				fast: { steps: 8, cfg: 1.8, denoise: 0.62, width: 1024, height: 1024, batch: 1, scheduler: fluxRecommendation?.scheduler || 'simple' },
+				quality: { steps: 12, cfg: 2.2, denoise: 0.70, width: 1024, height: 1024, batch: 1, scheduler: fluxRecommendation?.scheduler || 'simple' },
+				creative: { steps: 16, cfg: 2.6, denoise: 0.80, width: 1152, height: 896, batch: 1, scheduler: fluxRecommendation?.scheduler || 'simple' },
 			},
 		},
 	};
@@ -3669,6 +3670,9 @@ function applyImagePreset(preset) {
 	if (imageWidth) imageWidth.value = String(presetData.width);
 	if (imageHeight) imageHeight.value = String(presetData.height);
 	if (imageBatchSize) imageBatchSize.value = String(presetData.batch);
+	if (family === 'flux' && fluxRecommendation?.sampler) {
+		setSelectValueIfOptionExists(imageSamplerSelect, fluxRecommendation.sampler);
+	}
 	if (refinerModelSelect) refinerModelSelect.value = '';
 	if (hiresfixEnable) hiresfixEnable.checked = false;
 	setSelectValueIfOptionExists(imageSchedulerSelect, presetData.scheduler || 'normal');
@@ -6324,6 +6328,20 @@ function inferFluxVariant(modelName = '') {
 	return 'dev';
 }
 
+function getFluxWorkflowRecommendation(modelName = '') {
+	const details = getImageModelDetails(modelName || imageModelSelect?.value || '');
+	const sampler = String(details?.recommended_sampler || '').toLowerCase();
+	const scheduler = String(details?.recommended_scheduler || '').toLowerCase();
+	if (sampler && scheduler) {
+		return { sampler, scheduler };
+	}
+	const variant = inferFluxVariant(modelName || imageModelSelect?.value || '');
+	return {
+		sampler: 'euler',
+		scheduler: variant === 'schnell' ? 'simple' : 'normal',
+	};
+}
+
 function resolveActiveImageFamily(modelName = '') {
 	const requestedMode = imageModelFamilySelect?.value || imageModelFamilyMode || 'auto';
 	if (requestedMode === 'flux') return 'flux';
@@ -6377,10 +6395,13 @@ function applyImageFamilyModeUi() {
 			fluxSamplerHint.hidden = true;
 		} else {
 			const variant = inferFluxVariant(selectedModel);
+			const recommendation = getFluxWorkflowRecommendation(selectedModel);
+			const sampler = recommendation.sampler || 'euler';
+			const scheduler = recommendation.scheduler || (variant === 'schnell' ? 'simple' : 'normal');
 			if (variant === 'schnell') {
-				fluxSamplerHint.textContent = 'FLUX Schnell tip: use euler + simple scheduler with lower step counts for fast output.';
+				fluxSamplerHint.textContent = `FLUX Schnell tip: use ${sampler} + ${scheduler} scheduler with lower step counts for fast output.`;
 			} else {
-				fluxSamplerHint.textContent = 'FLUX Dev tip: use euler + normal scheduler for stable quality and detail.';
+				fluxSamplerHint.textContent = `FLUX Dev tip: use ${sampler} + ${scheduler} scheduler for stable quality and detail.`;
 			}
 			fluxSamplerHint.hidden = false;
 		}

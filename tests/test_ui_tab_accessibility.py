@@ -1282,8 +1282,10 @@ def test_fast_preset_applies_speed_focused_settings():
     assert "const familyPresetMap = {" in js
     assert "sd:" in js
     assert "flux:" in js
+    assert "const fluxRecommendation = family === 'flux' ? getFluxWorkflowRecommendation(imageModelSelect?.value || '') : null;" in js
     assert "fast: { steps: 12, cfg: 5.5, denoise: 0.65, width: 768, height: 768, batch: 1, scheduler: 'normal' }" in js
-    assert "fast: { steps: 16, cfg: 3.0, denoise: 0.65, width: 1024, height: 1024, batch: 1, scheduler: 'normal' }" in js
+    assert "fast: { steps: 16, cfg: 3.0, denoise: 0.65, width: 1024, height: 1024, batch: 1, scheduler: fluxRecommendation?.scheduler || 'normal' }" in js
+    assert "setSelectValueIfOptionExists(imageSamplerSelect, fluxRecommendation.sampler);" in js
     assert "if (activeImagePreset && activeFamily !== lastResolvedPresetFamily) {" in js
     assert "applyImagePreset(activeImagePreset);" in js
     assert "if (refinerModelSelect) refinerModelSelect.value = '';" in js
@@ -1546,6 +1548,10 @@ def test_image_scheduler_js_wiring_present_in_bundle():
     assert "const IMAGE_FAMILY_CAPABILITIES = {" in js
     assert "function resolveActiveImageFamily(modelName = '')" in js
     assert "function inferFluxVariant(modelName = '')" in js
+    assert "function getFluxWorkflowRecommendation(modelName = '')" in js
+    assert "const sampler = String(details?.recommended_sampler || '').toLowerCase();" in js
+    assert "const scheduler = String(details?.recommended_scheduler || '').toLowerCase();" in js
+    assert "if (sampler && scheduler) {" in js
     assert "const detailsVariant = String(details?.flux_variant || '').toLowerCase();" in js
     assert "if (detailsVariant === 'schnell' || detailsVariant === 'dev') return detailsVariant;" in js
     assert "function applyImageFamilyModeUi()" in js
@@ -1561,8 +1567,9 @@ def test_image_scheduler_js_wiring_present_in_bundle():
     assert "scheduler: imageSchedulerSelect" in js
     assert "flux: {" in js
     assert "schnell:" in js
-    assert "FLUX Schnell tip: use euler + simple scheduler with lower step counts for fast output." in js
-    assert "FLUX Dev tip: use euler + normal scheduler for stable quality and detail." in js
+    assert "setSelectValueIfOptionExists(imageSamplerSelect, fluxRecommendation.sampler);" in js
+    assert "FLUX Schnell tip: use ${sampler} + ${scheduler} scheduler with lower step counts for fast output." in js
+    assert "FLUX Dev tip: use ${sampler} + ${scheduler} scheduler for stable quality and detail." in js
     assert "fluxVariantChip.textContent = `Flux Variant: ${variantLabel}`;" in js
     assert "fluxVariantChip.classList.add('is-schnell');" in js
     assert "fluxVariantChip.classList.add('is-dev');" in js

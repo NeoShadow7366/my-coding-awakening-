@@ -229,10 +229,19 @@ def _image_model_capabilities(model_name: str) -> dict:
     family = _infer_image_model_family(model_name)
     flux_variant = _infer_flux_variant(model_name) if family == "flux" else ""
     is_flux = family == "flux"
+    recommended_sampler = "euler" if is_flux else ""
+    if not is_flux:
+        recommended_scheduler = ""
+    elif flux_variant == "schnell":
+        recommended_scheduler = "simple"
+    else:
+        recommended_scheduler = "normal"
     # These flags drive frontend control visibility and payload shaping.
     return {
         "family": family,
         "flux_variant": flux_variant,
+        "recommended_sampler": recommended_sampler,
+        "recommended_scheduler": recommended_scheduler,
         "supports_refiner": not is_flux,
         "supports_vae": not is_flux,
         "supports_controlnet": not is_flux,

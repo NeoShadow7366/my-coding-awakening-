@@ -248,6 +248,8 @@ def test_image_models_flux_family_capabilities(client, monkeypatch):
     assert data["model_details"][0]["supports_hiresfix"] is False
     assert data["model_details"][0]["cfg_max"] == 10
     assert data["model_details"][0]["flux_variant"] == "dev"
+    assert data["model_details"][0]["recommended_sampler"] == "euler"
+    assert data["model_details"][0]["recommended_scheduler"] == "normal"
 
 
 def test_image_models_flux_schnell_variant_capabilities(client, monkeypatch):
@@ -261,6 +263,8 @@ def test_image_models_flux_schnell_variant_capabilities(client, monkeypatch):
     assert data["models"] == ["flux.1-schnell.safetensors"]
     assert data["model_details"][0]["family"] == "flux"
     assert data["model_details"][0]["flux_variant"] == "schnell"
+    assert data["model_details"][0]["recommended_sampler"] == "euler"
+    assert data["model_details"][0]["recommended_scheduler"] == "simple"
 
 
 def test_image_samplers_returns_list_when_available(client, monkeypatch):
