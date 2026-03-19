@@ -439,6 +439,10 @@ textarea {
   white-space: nowrap;
 }
 
+.flux-variant-chip {
+  margin-top: 0.35rem;
+}
+
 .model-recent-wrap {
   display: flex;
   flex-direction: column;

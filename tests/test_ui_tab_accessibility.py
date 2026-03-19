@@ -1529,6 +1529,7 @@ def test_image_scheduler_select_present_in_html():
     assert 'id="flux-sampler-hint"' in html
     assert 'id="flux-no-neg-hint"' in html
     assert 'id="image-negative-prompt-section"' in html
+    assert 'id="flux-variant-chip"' in html
 
 
 def test_image_scheduler_js_wiring_present_in_bundle():
@@ -1540,6 +1541,7 @@ def test_image_scheduler_js_wiring_present_in_bundle():
     assert "imageSchedulerFilter" in js
     assert "imageModelFamilySelect" in js
     assert "imageModelFamilyHint" in js
+    assert "const fluxVariantChip = document.getElementById('flux-variant-chip');" in js
     assert "const IMAGE_MODEL_FAMILY_MODE_KEY = 'imageModelFamilyModeV1';" in js
     assert "const IMAGE_FAMILY_CAPABILITIES = {" in js
     assert "function resolveActiveImageFamily(modelName = '')" in js
@@ -1559,6 +1561,7 @@ def test_image_scheduler_js_wiring_present_in_bundle():
     assert "schnell:" in js
     assert "FLUX Schnell tip: use euler + simple scheduler with lower step counts for fast output." in js
     assert "FLUX Dev tip: use euler + normal scheduler for stable quality and detail." in js
+    assert "fluxVariantChip.textContent = `Flux Variant: ${variantLabel}`;" in js
 
 
 def test_filter_input_arrow_down_js_wiring():
@@ -1707,3 +1710,5 @@ def test_flux_negative_prompt_js_wiring_present_in_bundle():
     assert "const variant = inferFluxVariant(selectedModel);" in fn_body
     assert "if (variant === 'schnell')" in fn_body
     assert "fluxSamplerHint.hidden = false;" in fn_body
+    assert "if (fluxVariantChip)" in fn_body
+    assert "fluxVariantChip.hidden = false;" in fn_body

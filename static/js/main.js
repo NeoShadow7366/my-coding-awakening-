@@ -118,6 +118,7 @@ const imageModelModeFavorites = document.getElementById('image-model-mode-favori
 const imageModelFavoriteToggle = document.getElementById('image-model-favorite-toggle');
 const imageModelRecentList = document.getElementById('image-model-recent-list');
 const imageModelFavoriteList = document.getElementById('image-model-favorite-list');
+const fluxVariantChip = document.getElementById('flux-variant-chip');
 const imageVaeField = document.getElementById('image-vae-field');
 const imageRefinerField = document.getElementById('image-refiner-field');
 const imageCfgRow = document.getElementById('image-cfg-row');
@@ -6378,6 +6379,16 @@ function applyImageFamilyModeUi() {
 				fluxSamplerHint.textContent = 'FLUX Dev tip: use euler + normal scheduler for stable quality and detail.';
 			}
 			fluxSamplerHint.hidden = false;
+		}
+	}
+	if (fluxVariantChip) {
+		if (!isFluxActive) {
+			fluxVariantChip.hidden = true;
+		} else {
+			const variant = inferFluxVariant(selectedModel);
+			const variantLabel = variant === 'schnell' ? 'Schnell' : (variant === 'dev' ? 'Dev' : 'Auto');
+			fluxVariantChip.textContent = `Flux Variant: ${variantLabel}`;
+			fluxVariantChip.hidden = false;
 		}
 	}
 
