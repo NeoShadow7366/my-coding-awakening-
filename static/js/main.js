@@ -2487,10 +2487,17 @@ function applyImageModelSelection(modelName) {
 	}
 }
 
+function canSelectCheckpointInCurrentFamilyMode(modelName) {
+	const requestedMode = imageModelFamilySelect?.value || imageModelFamilyMode || 'auto';
+	if (requestedMode === 'auto' || requestedMode === 'flux') return true;
+	const family = inferImageModelFamily(modelName);
+	if (requestedMode === 'sd' && family === 'flux') return false;
+	return true;
+}
+
 function renderFilteredImageModels(rawFilter = '', preferredValue = '') {
 	if (!imageModelSelect) return;
 	const filter = String(rawFilter || '').trim().toLowerCase();
-	const isUnsupportedFluxModel = (name) => /flux/i.test(name || '');
 	const modePool = getImageModelPoolForMode();
 	const filtered = filter
 		? modePool.filter((name) => String(name).toLowerCase().includes(filter))
@@ -2512,8 +2519,8 @@ function renderFilteredImageModels(rawFilter = '', preferredValue = '') {
 	}
 	imageModelSelect.innerHTML = filtered
 		.map((name) => {
-			const unsupported = isUnsupportedFluxModel(name);
-			const optionLabel = unsupported ? `${name} (unsupported in current workflow)` : name;
+			const unsupported = !canSelectCheckpointInCurrentFamilyMode(name);
+			const optionLabel = unsupported ? `${name} (set family mode to Auto/Flux to enable)` : name;
 			return `<option value="${escHtml(name)}" ${unsupported ? 'disabled data-unsupported="true"' : ''}>${escHtml(optionLabel)}</option>`;
 		})
 		.join('');
@@ -6318,6 +6325,9 @@ function getImageFamilyCapabilities(activeFamily = resolveActiveImageFamily(imag
 function applyImageFamilyModeUi() {
 	if (imageModelFamilySelect && imageModelFamilySelect.value !== imageModelFamilyMode) {
 		imageModelFamilySelect.value = imageModelFamilyMode;
+	}
+	if (imageModelSelect) {
+		renderFilteredImageModels(imageModelFilter ? imageModelFilter.value : '', imageModelSelect.value || '');
 	}
 	const selectedModel = imageModelSelect?.value || '';
 	const activeFamily = resolveActiveImageFamily(selectedModel);

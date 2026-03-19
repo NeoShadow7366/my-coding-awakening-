@@ -1016,6 +1016,11 @@ def test_image_model_stack_filter_and_recent_wiring_present_in_js_bundle():
     assert "const modelStackBadges = document.getElementById('model-stack-badges');" in content
     assert "const modelStackCompatHint = document.getElementById('model-stack-compat-hint');" in content
     assert "function renderFilteredImageModels(rawFilter = '', preferredValue = '')" in content
+    assert "function canSelectCheckpointInCurrentFamilyMode(modelName)" in content
+    assert "if (requestedMode === 'auto' || requestedMode === 'flux') return true;" in content
+    assert "if (requestedMode === 'sd' && family === 'flux') return false;" in content
+    assert "set family mode to Auto/Flux to enable" in content
+    assert "const isUnsupportedFluxModel = (name) => /flux/i.test(name || '');" not in content
     assert "function rememberRecentImageModel(modelName)" in content
     assert "function getFavoriteImageModels()" in content
     assert "function toggleFavoriteImageModel(modelName)" in content
