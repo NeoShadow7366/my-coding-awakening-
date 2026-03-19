@@ -201,6 +201,9 @@ const enhancedPromptStatus = document.getElementById('enhanced-prompt-status');
 const enhancedPromptSuggestionsOutput = document.getElementById('enhanced-prompt-suggestions');
 const negativePromptDefaultBtn = document.getElementById('negative-prompt-default-btn');
 const imageNegativePrompt = document.getElementById('image-negative-prompt');
+const imageNegativePromptSection = document.getElementById('image-negative-prompt-section');
+const fluxNoNegHint = document.getElementById('flux-no-neg-hint');
+const fluxSamplerHint = document.getElementById('flux-sampler-hint');
 const hiresfixEnable = document.getElementById('hiresfix-enable');
 const hiresfixPanel = document.getElementById('hiresfix-panel');
 const hiresfixUpscalerSelect = document.getElementById('hiresfix-upscaler-select');
@@ -6338,6 +6341,11 @@ function applyImageFamilyModeUi() {
 	if (controlnetPanel) controlnetPanel.hidden = !capabilities.supports_controlnet;
 	if (hiresfixPanel) hiresfixPanel.hidden = !capabilities.supports_hiresfix;
 	if (imageCfgRow) imageCfgRow.hidden = false;
+
+	const isFluxActive = activeFamily === 'flux';
+	if (imageNegativePromptSection) imageNegativePromptSection.hidden = isFluxActive;
+	if (fluxNoNegHint) fluxNoNegHint.hidden = !isFluxActive;
+	if (fluxSamplerHint) fluxSamplerHint.hidden = !isFluxActive;
 
 	if (!capabilities.supports_vae && vaeModelSelect) {
 		vaeModelSelect.value = '';

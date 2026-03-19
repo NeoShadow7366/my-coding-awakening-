@@ -504,3 +504,84 @@ def test_image_prompt_suggestions_upstream_error_returns_502(client, monkeypatch
 
     assert resp.status_code == 502
     assert "read timed out" in resp.get_json()["error"]
+
+
+def test_build_txt2img_workflow_flux_model_family_uses_flux_guidance_node(monkeypatch):
+    """Flux txt2img workflow must include a FluxGuidance node and set KSampler cfg to 1.0."""
+    monkeypatch.setattr(app_module, "_image_models", lambda: ["flux1-dev.safetensors"])
+
+    input_cfg = 3.5
+    workflow, meta = app_module._build_txt2img_workflow(
+        {
+            "prompt": "a neon city at night",
+            "negative_prompt": "",
+            "model": "flux1-dev.safetensors",
+            "model_family": "flux",
+            "sampler": "euler",
+            "scheduler": "normal",
+            "cfg": input_cfg,
+            "steps": 20,
+        }
+    )
+
+    fg_nodes = [v for v in workflow.values() if v.get("class_type") == "FluxGuidance"]
+    assert len(fg_nodes) == 1, "Expected exactly one FluxGuidance node for Flux model"
+    assert fg_nodes[0]["inputs"]["guidance"] == input_cfg
+
+    ks_nodes = [v for v in workflow.values() if v.get("class_type") == "KSampler"]
+    assert len(ks_nodes) == 1
+    assert ks_nodes[0]["inputs"]["cfg"] == 1.0
+
+
+def test_build_txt2img_workflow_sd_model_family_no_flux_guidance_node(monkeypatch):
+    """SD txt2img workflow must NOT include FluxGuidance; KSampler cfg equals input cfg."""
+    monkeypatch.setattr(app_module, "_image_models", lambda: ["v1-5-pruned.safetensors"])
+
+    input_cfg = 7.5
+    workflow, meta = app_module._build_txt2img_workflow(
+        {
+            "prompt": "mountain landscape",
+            "negative_prompt": "blurry",
+            "model": "v1-5-pruned.safetensors",
+            "model_family": "sd",
+            "sampler": "euler",
+            "cfg": input_cfg,
+            "steps": 20,
+        }
+    )
+
+    fg_nodes = [v for v in workflow.values() if v.get("class_type") == "FluxGuidance"]
+    assert len(fg_nodes) == 0, "No FluxGuidance node expected for SD model"
+
+    ks_nodes = [v for v in workflow.values() if v.get("class_type") == "KSampler"]
+    assert len(ks_nodes) == 1
+    assert ks_nodes[0]["inputs"]["cfg"] == input_cfg
+
+
+def test_build_img2img_workflow_flux_model_family_uses_flux_guidance_node(monkeypatch):
+    """Flux img2img workflow must include a FluxGuidance node and set KSampler cfg to 1.0."""
+    monkeypatch.setattr(app_module, "_image_models", lambda: ["flux1-dev.safetensors"])
+
+    input_cfg = 3.0
+    workflow, meta = app_module._build_img2img_workflow(
+        {
+            "prompt": "futuristic robot",
+            "negative_prompt": "",
+            "model": "flux1-dev.safetensors",
+            "model_family": "flux",
+            "sampler": "euler",
+            "scheduler": "simple",
+            "cfg": input_cfg,
+            "steps": 20,
+            "denoise": 0.7,
+        },
+        "source.png",
+    )
+
+    fg_nodes = [v for v in workflow.values() if v.get("class_type") == "FluxGuidance"]
+    assert len(fg_nodes) == 1, "Expected exactly one FluxGuidance node for Flux img2img"
+    assert fg_nodes[0]["inputs"]["guidance"] == input_cfg
+
+    ks_nodes = [v for v in workflow.values() if v.get("class_type") == "KSampler"]
+    assert len(ks_nodes) == 1
+    assert ks_nodes[0]["inputs"]["cfg"] == 1.0

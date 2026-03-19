@@ -244,6 +244,7 @@
       <input id="image-scheduler-filter" type="text" class="compact-input" placeholder="Filter schedulers..." aria-label="Filter scheduler list" />
       <p id="image-scheduler-filter-status" class="hint" aria-live="polite">Showing all schedulers</p>
       <p class="hint">Keyboard: ArrowDown opens scheduler list, ArrowUp on first option returns to filter.</p>
+      <p class="hint flux-sampler-hint" id="flux-sampler-hint" hidden>FLUX tip: <code>euler</code> sampler with <code>simple</code> or <code>normal</code> scheduler is recommended for best results.</p>
     </div>
 
     <details class="sidebar-section cn-panel" id="controlnet-panel">
@@ -478,7 +479,7 @@
           </div>
         </div>
 
-        <div class="form-field">
+        <div class="form-field" id="image-negative-prompt-section">
           <div class="neg-prompt-label-row">
             <label for="image-negative-prompt" class="field-label">Negative prompt</label>
             <button class="btn btn-ghost btn-xs" id="negative-prompt-default-btn" type="button" title="Load default negative prompt from Configurations">Default</button>
@@ -490,6 +491,7 @@
           </div>
           <div id="negative-prompt-tags" class="enhanced-tag-cloud" data-target="image-negative-prompt" aria-label="Negative prompt suggestion tags" hidden aria-hidden="true"></div>
         </div>
+        <p class="hint flux-no-neg-hint" id="flux-no-neg-hint" hidden>Flux models do not use negative prompts — this field is hidden in FLUX mode.</p>
 
         <details class="form-field hiresfix-panel" id="hiresfix-panel">
           <summary class="hiresfix-summary">

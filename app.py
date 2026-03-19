@@ -2085,6 +2085,19 @@ def _build_txt2img_workflow(body: dict) -> tuple[dict, dict]:
         positive_ref = [cn_apply, 0]
         negative_ref = [cn_apply, 1]
 
+    # Flux guidance node: wraps positive conditioning; KSampler cfg is set to 1.0
+    family = body.get("model_family") or _infer_image_model_family(model)
+    if family == "flux":
+        fg_node = _nid()
+        workflow[fg_node] = {
+            "class_type": "FluxGuidance",
+            "inputs": {"conditioning": positive_ref, "guidance": cfg},
+        }
+        positive_ref = [fg_node, 0]
+        ks_cfg = 1.0
+    else:
+        ks_cfg = cfg
+
     # Primary KSampler
     ks_node = _nid()
     workflow[ks_node] = {
@@ -2092,7 +2105,7 @@ def _build_txt2img_workflow(body: dict) -> tuple[dict, dict]:
         "inputs": {
             "seed": seed,
             "steps": steps,
-            "cfg": cfg,
+            "cfg": ks_cfg,
             "sampler_name": sampler,
             "scheduler": scheduler,
             "denoise": 1.0,
@@ -2347,13 +2360,26 @@ def _build_img2img_workflow(body: dict, uploaded_name: str) -> tuple[dict, dict]
         positive_ref = [cn_apply, 0]
         negative_ref = [cn_apply, 1]
 
+    # Flux guidance node
+    img2img_family = body.get("model_family") or _infer_image_model_family(model)
+    if img2img_family == "flux":
+        fg_node = _nid()
+        workflow[fg_node] = {
+            "class_type": "FluxGuidance",
+            "inputs": {"conditioning": positive_ref, "guidance": cfg},
+        }
+        positive_ref = [fg_node, 0]
+        ks_cfg = 1.0
+    else:
+        ks_cfg = cfg
+
     ks_node = _nid()
     workflow[ks_node] = {
         "class_type": "KSampler",
         "inputs": {
             "seed": seed,
             "steps": steps,
-            "cfg": cfg,
+            "cfg": ks_cfg,
             "sampler_name": sampler,
             "scheduler": scheduler,
             "denoise": denoise,

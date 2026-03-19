@@ -1664,3 +1664,36 @@ def test_save_history_entry_returns_response_ok_boolean():
     assert "const res = await fetch('/api/history', {" in save_block
     assert "return res.ok;" in save_block
     assert "return false;" in save_block
+
+
+def test_flux_negative_prompt_section_present_in_html():
+    """Negative prompt section must have an id so JS can hide it in Flux mode."""
+    app_module.app.config["TESTING"] = True
+    client = app_module.app.test_client()
+
+    html = client.get("/").get_data(as_text=True)
+
+    assert 'id="image-negative-prompt-section"' in html
+    assert 'id="flux-no-neg-hint"' in html
+    assert 'Flux models do not use negative prompts' in html
+    assert 'id="flux-sampler-hint"' in html
+    assert 'FLUX tip:' in html
+
+
+def test_flux_negative_prompt_js_wiring_present_in_bundle():
+    """JS bundle must declare Flux UI variables and toggle them inside applyImageFamilyModeUi."""
+    js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
+    js = js_path.read_text(encoding="utf-8")
+
+    assert "const imageNegativePromptSection = document.getElementById('image-negative-prompt-section');" in js
+    assert "const fluxNoNegHint = document.getElementById('flux-no-neg-hint');" in js
+    assert "const fluxSamplerHint = document.getElementById('flux-sampler-hint');" in js
+
+    # Verify toggle logic is inside applyImageFamilyModeUi
+    fn_start = js.index("function applyImageFamilyModeUi()")
+    fn_end = js.index("\nfunction ", fn_start + 1)
+    fn_body = js[fn_start:fn_end]
+    assert "isFluxActive" in fn_body
+    assert "imageNegativePromptSection.hidden = isFluxActive" in fn_body
+    assert "fluxNoNegHint.hidden = !isFluxActive" in fn_body
+    assert "fluxSamplerHint.hidden = !isFluxActive" in fn_body
