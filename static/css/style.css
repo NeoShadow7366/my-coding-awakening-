@@ -2602,6 +2602,20 @@ body.gallery-lightbox-open {
   color: color-mix(in srgb, var(--clr-primary) 70%, var(--clr-text));
 }
 
+.mb-hf-filter-hint {
+  background: color-mix(in srgb, var(--clr-info) 12%, var(--clr-bg));
+  border: 1px solid color-mix(in srgb, var(--clr-info) 30%, var(--clr-border));
+  border-radius: var(--radius);
+  padding: var(--sp-sm);
+}
+
+.mb-hf-filter-hint .hint-text {
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  color: color-mix(in srgb, var(--clr-info) 70%, var(--clr-text));
+}
+
 .mb-type-info-panel {
   border: 1px solid var(--clr-border);
   border-radius: var(--radius);

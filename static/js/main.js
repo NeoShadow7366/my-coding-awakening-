@@ -7300,6 +7300,7 @@ if (mbHideEarlyAccessToggle) {
 if (mbShowNsfwToggle) {
 	mbShowNsfwToggle.setAttribute('aria-pressed', localStorage.getItem('mbShowNsfw') === '1' ? 'true' : 'false');
 }
+applyModelBrowserProviderFilters();
 
 function setElementHiddenState(element, isHidden) {
 	if (!element) return;
@@ -7518,6 +7519,22 @@ function getMbPageSize() {
 	const value = mbPageSize ? Number(mbPageSize.value || '20') : 20;
 	if (!Number.isFinite(value)) return 20;
 	return Math.max(20, Math.min(80, Math.trunc(value)));
+}
+
+function applyModelBrowserProviderFilters() {
+	const isHuggingFace = mbProvider && mbProvider.value === 'huggingface';
+	const baseModelSection = document.getElementById('mb-base-model-section');
+	const nsfwSection = document.getElementById('mb-show-nsfw-section');
+	const hfHint = document.getElementById('mb-hf-filter-hint');
+	if (baseModelSection) {
+		setElementHiddenState(baseModelSection, isHuggingFace);
+	}
+	if (nsfwSection) {
+		setElementHiddenState(nsfwSection, isHuggingFace);
+	}
+	if (hfHint) {
+		setElementHiddenState(hfHint, !isHuggingFace);
+	}
 }
 
 function modelPublishedTs(item) {
@@ -9359,6 +9376,7 @@ if (mbProvider) {
 	mbProvider.addEventListener('keydown', onModelSearchControlKeydown);
 	mbProvider.addEventListener('change', () => {
 		localStorage.setItem('mbProvider', mbProvider.value || 'civitai');
+		applyModelBrowserProviderFilters();
 		rerunModelBrowserSearchIfVisible();
 	});
 }

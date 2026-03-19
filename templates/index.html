@@ -906,7 +906,7 @@
         </select>
       </div>
     </div>
-    <div class="sidebar-section">
+    <div id="mb-base-model-section" class="sidebar-section">
       <label for="mb-base-model" class="field-label">Base model</label>
       <div class="select-wrapper">
         <select id="mb-base-model">
@@ -957,10 +957,15 @@
         <span aria-hidden="true">⏱</span>
         <span class="mb-filter-toggle-label">Hide Early Access</span>
       </button>
-      <button class="btn btn-ghost btn-xs mb-filter-toggle" id="mb-show-nsfw" type="button" title="Show NSFW content" aria-label="Show NSFW content" aria-pressed="false">
-        <span aria-hidden="true">⚠</span>
-        <span class="mb-filter-toggle-label">Show NSFW</span>
-      </button>
+      <div id="mb-show-nsfw-section">
+        <button class="btn btn-ghost btn-xs mb-filter-toggle" id="mb-show-nsfw" type="button" title="Show NSFW content" aria-label="Show NSFW content" aria-pressed="false">
+          <span aria-hidden="true">⚠</span>
+          <span class="mb-filter-toggle-label">Show NSFW</span>
+        </button>
+      </div>
+    </div>
+    <div id="mb-hf-filter-hint" class="sidebar-section mb-hf-filter-hint" hidden aria-hidden="true">
+      <p class="hint-text">ℹ️ Hugging Face doesn't support base model or NSFW filtering. Try searching by specific model names or use CivitAI for more filters.</p>
     </div>
     <div class="sidebar-section">
       <button class="btn btn-ghost btn-full" id="mb-type-info-btn" type="button" aria-expanded="false" aria-controls="mb-type-info-panel">Model Type Guide</button>
