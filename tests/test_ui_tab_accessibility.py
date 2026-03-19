@@ -277,6 +277,8 @@ def test_index_diagnostics_drawer_semantics():
     assert 'aria-expanded="false"' in html
     assert 'id="diag-drawer" class="diag-drawer" hidden aria-hidden="true" aria-label="Diagnostics console"' in html
     assert 'id="diag-ws-retry-btn"' in html
+    assert 'id="diag-frontend-build"' in html
+    assert 'Frontend build' in html
     assert 'id="ws-transport-status"' in html
 
 
@@ -286,6 +288,7 @@ def test_diagnostics_drawer_keyboard_handler_wiring_present_in_js_bundle():
 
     assert "function setDiagnosticsDrawerOpen(isOpen)" in content
     assert "const diagWsRetryBtn = document.getElementById('diag-ws-retry-btn');" in content
+    assert "const diagFrontendBuild = document.getElementById('diag-frontend-build');" in content
     assert "const commandAliases = {" in content
     assert "const DIAGNOSTICS_COMMAND_SUGGESTIONS = [" in content
     assert "ws: 'ws-status'," in content
@@ -293,6 +296,8 @@ def test_diagnostics_drawer_keyboard_handler_wiring_present_in_js_bundle():
     assert "cls: 'clear'," in content
     assert "const normalizedCommand = commandAliases[command] || command;" in content
     assert "appendDiagnosticsConsoleLine('Aliases: h/?=help, q=queue, p=poll, ws=ws-status, retry=ws-retry, cls=clear');" in content
+    assert "const frontend = diagFrontendBuild?.textContent || 'unknown';" in content
+    assert "frontend=${frontend}" in content
     assert "Unknown command: ${command}. Try: ${suggestions.join(', ')}" in content
     assert "Unknown command: ${command}. Type help for commands." in content
     assert "if (normalizedCommand === 'ws-status') {" in content

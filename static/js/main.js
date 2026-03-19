@@ -251,6 +251,7 @@ const diagTextStatus = document.getElementById('diag-text-status');
 const diagImageStatus = document.getElementById('diag-image-status');
 const diagCheckpoints = document.getElementById('diag-checkpoints');
 const diagSamplers = document.getElementById('diag-samplers');
+const diagFrontendBuild = document.getElementById('diag-frontend-build');
 const diagLastRun = document.getElementById('diag-last-run');
 const pollOwnerStatus = document.getElementById('poll-owner-status');
 const wsTransportStatus = document.getElementById('ws-transport-status');
@@ -520,8 +521,9 @@ function getDiagnosticsStatusSnapshotText() {
 	const image = diagImageStatus?.textContent || 'unknown';
 	const checkpoints = diagCheckpoints?.textContent || '-';
 	const samplers = diagSamplers?.textContent || '-';
+	const frontend = diagFrontendBuild?.textContent || 'unknown';
 	const summary = diagnosticsSummary?.textContent || 'Diagnostics unavailable';
-	return `${summary} | text=${text} image=${image} checkpoints=${checkpoints} samplers=${samplers}`;
+	return `${summary} | text=${text} image=${image} checkpoints=${checkpoints} samplers=${samplers} frontend=${frontend}`;
 }
 
 async function appendServiceDiagnosticLogs(service = 'comfyui') {
