@@ -230,6 +230,27 @@ def test_gallery_search_query_persistence_present_in_js_bundle():
     assert "localStorage.removeItem(GALLERY_SEARCH_QUERY_KEY);" in content
 
 
+def test_image_sidebar_section_collapse_persistence_present_in_assets():
+    js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
+    content = js_path.read_text(encoding="utf-8")
+
+    assert "const SIDEBAR_SECTION_COLLAPSE_KEY = 'imageSidebarSectionCollapseV1';" in content
+    assert "let imageSidebarSectionCollapseState = getSidebarSectionCollapseState();" in content
+    assert "function getSidebarSectionCollapseState()" in content
+    assert "function persistSidebarSectionCollapseState()" in content
+    assert "function setupImageSidebarSectionCollapse()" in content
+    assert "toggleBtn.className = 'btn btn-ghost btn-xs sidebar-section-toggle';" in content
+    assert "section.classList.toggle('is-collapsed', isCollapsed);" in content
+    assert "localStorage.setItem(SIDEBAR_SECTION_COLLAPSE_KEY, JSON.stringify(imageSidebarSectionCollapseState));" in content
+    assert "setupImageSidebarSectionCollapse();" in content
+
+    css_path = Path(__file__).resolve().parents[1] / "static" / "css" / "style.css"
+    css = css_path.read_text(encoding="utf-8")
+    assert ".sidebar-section-head" in css
+    assert ".sidebar-section-toggle" in css
+    assert ".sidebar-section.is-collapsed > :not(.sidebar-section-head)" in css
+
+
 def test_index_config_service_action_group_semantics():
     app_module.app.config["TESTING"] = True
     client = app_module.app.test_client()

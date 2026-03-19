@@ -254,6 +254,30 @@ body {
   font-weight: 700;
 }
 
+.sidebar-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-xs);
+}
+
+.sidebar-section-head .field-label {
+  margin: 0;
+}
+
+.sidebar-section-toggle {
+  margin-left: auto;
+  min-width: 2.9rem;
+}
+
+.sidebar-section.is-collapsed {
+  gap: 0;
+}
+
+.sidebar-section.is-collapsed > :not(.sidebar-section-head) {
+  display: none;
+}
+
 .sidebar .inline-label,
 .sidebar .hint {
   font-size: 0.81rem;

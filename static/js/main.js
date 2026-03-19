@@ -336,6 +336,7 @@ const QUEUE_LAST_ACTION_PINNED_KEY = 'queueLastActionPinnedV1';
 const QUEUE_LAST_ACTION_MAX_AGE_MS = 120000;
 const DIAG_DRAWER_COLLAPSED_KEY = 'diagDrawerCollapsedV1';
 const DIAG_COMMAND_HISTORY_KEY = 'diagCommandHistoryV1';
+const SIDEBAR_SECTION_COLLAPSE_KEY = 'imageSidebarSectionCollapseV1';
 const diagDrawerCollapsedStored = localStorage.getItem(DIAG_DRAWER_COLLAPSED_KEY);
 let queueFilterFailedOnly = localStorage.getItem('queueFilterFailedOnly') === '1';
 let restoredQueueStateInfo = null;
@@ -460,6 +461,7 @@ const DEFAULT_SUGGESTION_TAGS = {
 	],
 };
 let suggestionTagStore = {};
+let imageSidebarSectionCollapseState = getSidebarSectionCollapseState();
 
 function getQueueTelemetryState() {
 	try {
@@ -486,6 +488,93 @@ function getDiagnosticsCommandHistoryState() {
 	} catch {
 		return [];
 	}
+}
+
+function getSidebarSectionCollapseState() {
+	try {
+		const parsed = JSON.parse(localStorage.getItem(SIDEBAR_SECTION_COLLAPSE_KEY) || '{}');
+		if (!parsed || Array.isArray(parsed) || typeof parsed !== 'object') return {};
+		return parsed;
+	} catch {
+		return {};
+	}
+}
+
+function persistSidebarSectionCollapseState() {
+	try {
+		localStorage.setItem(SIDEBAR_SECTION_COLLAPSE_KEY, JSON.stringify(imageSidebarSectionCollapseState));
+	} catch {
+		// best-effort persistence only
+	}
+}
+
+function toSidebarSectionKey(label, index) {
+	const slug = String(label || '')
+		.toLowerCase()
+		.replace(/[^a-z0-9]+/g, '-')
+		.replace(/^-+|-+$/g, '');
+	return slug ? `image:${slug}` : `image:section-${index}`;
+}
+
+function getSidebarSectionLabel(section, index) {
+	const direct = section.querySelector(':scope > .field-label, :scope > label.field-label');
+	if (direct?.textContent) return direct.textContent.trim();
+	const nested = section.querySelector(':scope > .model-stack-head .field-label, :scope > .diagnostics-head .field-label, :scope > .cn-panel > summary.field-label');
+	if (nested?.textContent) return nested.textContent.trim();
+	return `Section ${index + 1}`;
+}
+
+function syncSidebarSectionCollapsedState(section, toggleBtn, isCollapsed) {
+	const label = section.dataset.sidebarSectionLabel || 'section';
+	section.classList.toggle('is-collapsed', isCollapsed);
+	section.setAttribute('data-collapsed', isCollapsed ? '1' : '0');
+	toggleBtn.textContent = isCollapsed ? 'Show' : 'Hide';
+	toggleBtn.setAttribute('aria-expanded', isCollapsed ? 'false' : 'true');
+	toggleBtn.setAttribute('aria-label', `${isCollapsed ? 'Expand' : 'Collapse'} ${label}`);
+	toggleBtn.title = `${isCollapsed ? 'Expand' : 'Collapse'} ${label}`;
+}
+
+function setupImageSidebarSectionCollapse() {
+	const imageSidebar = document.querySelector('#panel-image .sidebar');
+	if (!imageSidebar) return;
+	const sections = [...imageSidebar.querySelectorAll(':scope > .sidebar-section')];
+	sections.forEach((section, index) => {
+		if (section.classList.contains('sidebar-section-collapse-ready')) return;
+		let header = section.querySelector(':scope > .model-stack-head, :scope > .diagnostics-head');
+		const directTitle = section.querySelector(':scope > .field-label, :scope > label.field-label');
+		if (!header) {
+			header = document.createElement('div');
+			header.className = 'sidebar-section-head';
+			if (directTitle) {
+				header.appendChild(directTitle);
+			}
+			section.insertBefore(header, section.firstElementChild);
+		} else {
+			header.classList.add('sidebar-section-head');
+		}
+
+		const label = getSidebarSectionLabel(section, index);
+		section.dataset.sidebarSectionLabel = label;
+		const key = section.dataset.sidebarSectionKey || toSidebarSectionKey(label, index);
+		section.dataset.sidebarSectionKey = key;
+
+		const toggleBtn = document.createElement('button');
+		toggleBtn.type = 'button';
+		toggleBtn.className = 'btn btn-ghost btn-xs sidebar-section-toggle';
+		header.appendChild(toggleBtn);
+
+		const collapsedStored = imageSidebarSectionCollapseState[key] === 1 || imageSidebarSectionCollapseState[key] === true;
+		syncSidebarSectionCollapsedState(section, toggleBtn, collapsedStored);
+
+		toggleBtn.addEventListener('click', () => {
+			const nextCollapsed = !section.classList.contains('is-collapsed');
+			syncSidebarSectionCollapsedState(section, toggleBtn, nextCollapsed);
+			imageSidebarSectionCollapseState[key] = nextCollapsed ? 1 : 0;
+			persistSidebarSectionCollapseState();
+		});
+
+		section.classList.add('sidebar-section-collapse-ready');
+	});
 }
 
 let queueTelemetryState = getQueueTelemetryState();
@@ -9145,6 +9234,8 @@ if (enhancedPromptToggle) {
 	const saved = localStorage.getItem('enhancedPromptBreakdownEnabled') === '1';
 	setEnhancedPromptBreakdownVisible(saved);
 }
+
+setupImageSidebarSectionCollapse();
 
 // Prompt syntax popup
 function getPromptSyntaxTabStops() {
