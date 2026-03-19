@@ -178,6 +178,16 @@ def _image_samplers() -> list[str]:
     return ["euler", "euler_ancestral", "dpmpp_2m"]
 
 
+def _image_schedulers() -> list[str]:
+    """Return scheduler names from ComfyUI's KSampler metadata."""
+    data = _comfy_get_object_info("KSampler")
+    required = data.get("KSampler", {}).get("input", {}).get("required", {})
+    names = required.get("scheduler", [[]])
+    if names and isinstance(names[0], list) and names[0]:
+        return names[0]
+    return ["normal", "karras", "exponential", "sgm_uniform", "simple", "ddim_uniform"]
+
+
 def _image_models() -> list[str]:
     """Return available checkpoint names from ComfyUI."""
     data = _comfy_get_object_info("CheckpointLoaderSimple")
@@ -3882,6 +3892,14 @@ def api_image_samplers():
     if not _comfy_available():
         return jsonify({"samplers": [], "error": "ComfyUI is not available"}), 503
     return jsonify({"samplers": _image_samplers()})
+
+
+@app.route("/api/image/schedulers")
+def api_image_schedulers():
+    """List ComfyUI scheduler names."""
+    if not _comfy_available():
+        return jsonify({"schedulers": [], "error": "ComfyUI is not available"}), 503
+    return jsonify({"schedulers": _image_schedulers()})
 
 
 @app.route("/api/image/lora-models")

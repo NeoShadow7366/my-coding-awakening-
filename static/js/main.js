@@ -121,6 +121,7 @@ const modelStackCompatHint = document.getElementById('model-stack-compat-hint');
 const refinerModelSelect = document.getElementById('refiner-model-select');
 const vaeModelSelect = document.getElementById('vae-model-select');
 const imageSamplerSelect = document.getElementById('image-sampler-select');
+const imageSchedulerSelect = document.getElementById('image-scheduler-select');
 const loraAddBtn = document.getElementById('lora-add-btn');
 const loraStackContainer = document.getElementById('lora-stack-container');
 // NOTE: loraModelSelect / loraStrength / loraStrengthVal replaced by multi-LoRA stack
@@ -1493,6 +1494,7 @@ function getCurrentImageSettings() {
 	return {
 		model: imageModelSelect.value,
 		sampler: imageSamplerSelect.value,
+		scheduler: imageSchedulerSelect?.value || 'normal',
 		negative_prompt: imageNegativePrompt?.value || '',
 		loras: collectLoraStack(),
 		vae: vaeModelSelect?.value || '',
@@ -1523,6 +1525,9 @@ function applyImageSettings(settings) {
 	}
 	if (settings.sampler && [...imageSamplerSelect.options].some((o) => o.value === settings.sampler)) {
 		imageSamplerSelect.value = settings.sampler;
+	}
+	if (settings.scheduler && imageSchedulerSelect && [...imageSchedulerSelect.options].some((o) => o.value === settings.scheduler)) {
+		imageSchedulerSelect.value = settings.scheduler;
 	}
 	if (typeof settings.negative_prompt === 'string' && imageNegativePrompt) {
 		imageNegativePrompt.value = settings.negative_prompt;
@@ -2181,6 +2186,7 @@ async function controlService(service, action, statusNode, buttonGroup = []) {
 		} else {
 			await loadImageModels();
 			await loadImageSamplers();
+			await loadImageSchedulers();
 			await loadImageLoraModels();
 			await loadControlnetModels();
 		}
@@ -2496,6 +2502,32 @@ async function loadImageSamplers() {
 	}
 }
 
+async function loadImageSchedulers() {
+	if (!imageSchedulerSelect) return;
+	const DEFAULT_SCHEDULERS = ['normal', 'karras', 'exponential', 'sgm_uniform', 'simple', 'ddim_uniform'];
+	try {
+		const res = await fetch('/api/image/schedulers');
+		const data = await res.json();
+		if (!res.ok) {
+			imageSchedulerSelect.innerHTML = DEFAULT_SCHEDULERS
+				.map((n) => `<option value="${escHtml(n)}">${escHtml(n)}</option>`).join('');
+			return;
+		}
+		const schedulers = data.schedulers || [];
+		if (!schedulers.length) {
+			imageSchedulerSelect.innerHTML = DEFAULT_SCHEDULERS
+				.map((n) => `<option value="${escHtml(n)}">${escHtml(n)}</option>`).join('');
+			return;
+		}
+		imageSchedulerSelect.innerHTML = schedulers
+			.map((name) => `<option value="${escHtml(name)}">${escHtml(name)}</option>`)
+			.join('');
+	} catch {
+		imageSchedulerSelect.innerHTML = DEFAULT_SCHEDULERS
+			.map((n) => `<option value="${escHtml(n)}">${escHtml(n)}</option>`).join('');
+	}
+}
+
 /* --------------------------------------------------------------------------
 	 Multi-LoRA stack
 	 -------------------------------------------------------------------------- */
@@ -2737,6 +2769,7 @@ async function checkStatus() {
 			}
 			await loadImageModels();
 			await loadImageSamplers();
+			await loadImageSchedulers();
 			await loadImageLoraModels();
 			await loadRefinerModels();
 			await loadVaeModels();
@@ -3427,18 +3460,21 @@ function applyImagePreset(preset) {
 		if (imageBatchSize) imageBatchSize.value = '1';
 		if (refinerModelSelect) refinerModelSelect.value = '';
 		if (hiresfixEnable) hiresfixEnable.checked = false;
+		setSelectValueIfOptionExists(imageSchedulerSelect, 'normal');
 	} else if (preset === 'quality') {
 		imageSteps.value = '40';
 		imageCfg.value = '7.5';
 		imageDenoise.value = '0.75';
 		if (imageWidth && imageWidth.value === '768') imageWidth.value = '1024';
 		if (imageHeight && imageHeight.value === '768') imageHeight.value = '1024';
+		setSelectValueIfOptionExists(imageSchedulerSelect, 'karras');
 	} else if (preset === 'creative') {
 		imageSteps.value = '32';
 		imageCfg.value = '9.0';
 		imageDenoise.value = '0.85';
 		if (imageWidth && imageWidth.value === '768') imageWidth.value = '1024';
 		if (imageHeight && imageHeight.value === '768') imageHeight.value = '1024';
+		setSelectValueIfOptionExists(imageSchedulerSelect, 'exponential');
 	}
 	syncImageControlLabels();
 	updateModelStackCompatibilityHint();
@@ -4378,6 +4414,7 @@ function updateLightboxMeta(entry) {
 	chips.push(`<span class="chip chip-mode">${escHtml(mode)}</span>`);
 	if (entry.model) chips.push(`<span class="chip chip-model" title="${escHtml(entry.model)}">${escHtml(entry.model.split('/').pop() || entry.model)}</span>`);
 	if (p.sampler) chips.push(`<span class="chip">sampler: ${escHtml(p.sampler)}</span>`);
+	if (p.scheduler && p.scheduler !== 'normal') chips.push(`<span class="chip">scheduler: ${escHtml(p.scheduler)}</span>`);
 	if (Number.isFinite(Number(p.steps))) chips.push(`<span class="chip">steps: ${escHtml(String(p.steps))}</span>`);
 	if (Number.isFinite(Number(p.cfg))) chips.push(`<span class="chip">cfg: ${escHtml(String(p.cfg))}</span>`);
 	if (Number.isFinite(Number(p.width)) && Number.isFinite(Number(p.height))) {
@@ -4621,6 +4658,7 @@ function applyGalleryPayloadToImageForm(payload) {
 
 	setSelectValueIfOptionExists(imageModelSelect, payload.model);
 	setSelectValueIfOptionExists(imageSamplerSelect, payload.sampler);
+	setSelectValueIfOptionExists(imageSchedulerSelect, payload.scheduler);
 	if (loraStackContainer) {
 		const incomingLoras = Array.isArray(payload.loras) ? payload.loras : [];
 		if (incomingLoras.length) {
@@ -9611,6 +9649,7 @@ imageForm.addEventListener('submit', async (e) => {
 			refiner_model: refinerModelSelect?.value || '',
 			vae: vaeModelSelect?.value || '',
 			sampler: imageSamplerSelect.value,
+			scheduler: imageSchedulerSelect?.value || 'normal',
 			loras: collectLoraStack(),
 			controlnet_model: controlnetModel,
 			controlnet_image_name: controlnetImageName,

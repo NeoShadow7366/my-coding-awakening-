@@ -246,6 +246,38 @@ def test_image_samplers_returns_503_when_unavailable(client, monkeypatch):
     assert "error" in data
 
 
+def test_image_schedulers_returns_list_when_available(client, monkeypatch):
+    monkeypatch.setattr(app_module, "_comfy_available", lambda: True)
+    monkeypatch.setattr(app_module, "_image_schedulers", lambda: ["normal", "karras", "exponential"])
+
+    resp = client.get("/api/image/schedulers")
+
+    assert resp.status_code == 200
+    assert resp.get_json()["schedulers"] == ["normal", "karras", "exponential"]
+
+
+def test_image_schedulers_returns_503_when_unavailable(client, monkeypatch):
+    monkeypatch.setattr(app_module, "_comfy_available", lambda: False)
+
+    resp = client.get("/api/image/schedulers")
+
+    assert resp.status_code == 503
+    data = resp.get_json()
+    assert data["schedulers"] == []
+    assert "error" in data
+
+
+def test_image_schedulers_fallback_when_comfy_returns_empty(client, monkeypatch):
+    """_image_schedulers() returns a sensible fallback list when ComfyUI metadata is empty."""
+    monkeypatch.setattr(app_module, "_comfy_get_object_info", lambda node: {})
+
+    result = app_module._image_schedulers()
+
+    assert isinstance(result, list)
+    assert len(result) > 0
+    assert "normal" in result
+
+
 # ---------------------------------------------------------------------------
 # /api/image/view — happy path (proxied image bytes)
 # ---------------------------------------------------------------------------

@@ -1493,3 +1493,24 @@ def test_suggestion_tag_collapser_semantics_and_aria_hidden_sync_present():
     assert "target.setAttribute('aria-hidden', target.hidden ? 'true' : 'false');" in js
     assert "btn.setAttribute('aria-controls', targetId);" in js
     assert "btn.setAttribute('aria-expanded', target.hidden ? 'false' : 'true');" in js
+
+
+def test_image_scheduler_select_present_in_html():
+    app_module.app.config["TESTING"] = True
+    client = app_module.app.test_client()
+
+    html = client.get("/").get_data(as_text=True)
+
+    assert 'id="image-scheduler-select"' in html
+    assert '<label for="image-scheduler-select"' in html
+    assert 'Scheduler' in html
+
+
+def test_image_scheduler_js_wiring_present_in_bundle():
+    js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
+    js = js_path.read_text(encoding="utf-8")
+
+    assert "imageSchedulerSelect" in js
+    assert "async function loadImageSchedulers()" in js
+    assert "/api/image/schedulers" in js
+    assert "scheduler: imageSchedulerSelect" in js
