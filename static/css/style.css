@@ -243,13 +243,20 @@ body {
 }
 
 .sidebar .field-label {
-  font-size: 0.78rem;
-  letter-spacing: 0.05em;
+  font-size: 0.79rem;
+  letter-spacing: 0.01em;
+  text-transform: none;
+}
+
+.sidebar-section > .field-label:first-child,
+.sidebar-section > label.field-label:first-child {
+  color: var(--clr-text);
+  font-weight: 700;
 }
 
 .sidebar .inline-label,
 .sidebar .hint {
-  font-size: 0.8rem;
+  font-size: 0.81rem;
   line-height: 1.4;
 }
 
@@ -259,6 +266,15 @@ body {
 
 .sidebar .inline-field-row {
   gap: 0.45rem;
+}
+
+.sidebar select,
+.sidebar textarea,
+.sidebar input[type="number"],
+.sidebar input[type="file"],
+.sidebar input[type="text"] {
+  padding: 0.42rem 0.6rem;
+  font-size: 0.84rem;
 }
 
 .field-label {
