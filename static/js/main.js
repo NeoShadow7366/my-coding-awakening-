@@ -137,6 +137,8 @@ const imageApplyRecommendationBtn = document.getElementById('image-apply-recomme
 const imageRecommendationInfoBtn = document.getElementById('image-recommendation-info-btn');
 const imageAutoApplyRecommendationLabel = document.getElementById('image-auto-apply-recommendation-label');
 const imageAutoApplyRecommendationToggle = document.getElementById('image-auto-apply-recommendation-toggle');
+const imageLockRecommendationLabel = document.getElementById('image-lock-recommendation-label');
+const imageLockRecommendationToggle = document.getElementById('image-lock-recommendation-toggle');
 const imageRecommendationStatus = document.getElementById('image-recommendation-status');
 const imageRecommendationDriftHint = document.getElementById('image-recommendation-drift-hint');
 const imageRecommendationSourceTag = document.getElementById('image-recommendation-source-tag');
@@ -382,6 +384,7 @@ const IMAGE_MODEL_FAMILY_MODE_KEY = 'imageModelFamilyModeV1';
 const IMAGE_SAMPLER_FILTER_QUERY_KEY = 'imageSamplerFilterQueryV1';
 const IMAGE_SCHEDULER_FILTER_QUERY_KEY = 'imageSchedulerFilterQueryV1';
 const IMAGE_FLUX_AUTO_APPLY_RECOMMENDATION_KEY = 'imageFluxAutoApplyRecommendationV1';
+const IMAGE_FLUX_LOCK_RECOMMENDATION_KEY = 'imageFluxLockRecommendationV1';
 const QUEUE_STATE_MAX_ITEMS = 40;
 const BACKGROUND_POLL_OWNER_KEY = 'backgroundPollOwnerV1';
 const BACKGROUND_POLL_LEASE_MS = 10_000;
@@ -405,6 +408,7 @@ if (!['auto', 'sd', 'flux'].includes(imageModelFamilyMode)) {
 	imageModelFamilyMode = 'auto';
 }
 let imageFluxAutoApplyRecommendation = localStorage.getItem(IMAGE_FLUX_AUTO_APPLY_RECOMMENDATION_KEY) === '1';
+let imageFluxLockRecommendation = localStorage.getItem(IMAGE_FLUX_LOCK_RECOMMENDATION_KEY) === '1';
 let lastAutoRecommendationModelKey = '';
 let activeImagePreset = '';
 let lastResolvedPresetFamily = '';
@@ -3606,6 +3610,17 @@ if (imageAutoApplyRecommendationToggle) {
 		}
 	});
 }
+if (imageLockRecommendationToggle) {
+	imageLockRecommendationToggle.checked = imageFluxLockRecommendation;
+	imageLockRecommendationToggle.addEventListener('change', () => {
+		imageFluxLockRecommendation = imageLockRecommendationToggle.checked;
+		localStorage.setItem(IMAGE_FLUX_LOCK_RECOMMENDATION_KEY, imageFluxLockRecommendation ? '1' : '0');
+		if (imageFluxLockRecommendation) {
+			applyCurrentFluxRecommendation({ announce: false, suppressNoopStatus: true });
+		}
+		applyImageFamilyModeUi();
+	});
+}
 if (imageModelModeAll) imageModelModeAll.addEventListener('click', () => setImageModelFilterMode('all'));
 if (imageModelModeRecent) imageModelModeRecent.addEventListener('click', () => setImageModelFilterMode('recent'));
 if (imageModelModeFavorites) imageModelModeFavorites.addEventListener('click', () => setImageModelFilterMode('favorites'));
@@ -6600,6 +6615,20 @@ function applyImageFamilyModeUi() {
 	if (imageAutoApplyRecommendationToggle) {
 		imageAutoApplyRecommendationToggle.checked = imageFluxAutoApplyRecommendation;
 	}
+	if (imageLockRecommendationLabel) {
+		imageLockRecommendationLabel.hidden = !isFluxActive;
+	}
+	if (imageLockRecommendationToggle) {
+		imageLockRecommendationToggle.checked = imageFluxLockRecommendation;
+	}
+	if (imageSamplerSelect) {
+		imageSamplerSelect.disabled = isFluxActive && imageFluxLockRecommendation;
+		imageSamplerSelect.title = imageSamplerSelect.disabled ? 'Locked to recommended Flux sampler.' : '';
+	}
+	if (imageSchedulerSelect) {
+		imageSchedulerSelect.disabled = isFluxActive && imageFluxLockRecommendation;
+		imageSchedulerSelect.title = imageSchedulerSelect.disabled ? 'Locked to recommended Flux scheduler.' : '';
+	}
 	if (imageRecommendationStatus && !isFluxActive) {
 		imageRecommendationStatus.hidden = true;
 	}
@@ -6619,6 +6648,9 @@ function applyImageFamilyModeUi() {
 		}
 	} else {
 		lastAutoRecommendationModelKey = '';
+	}
+	if (isFluxActive && imageFluxLockRecommendation) {
+		applyCurrentFluxRecommendation({ announce: false, suppressNoopStatus: true });
 	}
 	updateFluxRecommendationDriftHint();
 	if (fluxVariantChip) {

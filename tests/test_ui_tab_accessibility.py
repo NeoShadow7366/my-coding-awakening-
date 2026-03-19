@@ -1536,6 +1536,8 @@ def test_image_scheduler_select_present_in_html():
     assert 'id="image-recommendation-info-btn"' in html
     assert 'id="image-auto-apply-recommendation-toggle"' in html
     assert 'id="image-auto-apply-recommendation-label"' in html
+    assert 'id="image-lock-recommendation-toggle"' in html
+    assert 'id="image-lock-recommendation-label"' in html
     assert 'id="image-recommendation-status"' in html
     assert 'id="image-recommendation-drift-hint"' in html
     assert 'id="image-recommendation-source-tag"' in html
@@ -1552,6 +1554,8 @@ def test_image_scheduler_js_wiring_present_in_bundle():
     assert "const imageRecommendationInfoBtn = document.getElementById('image-recommendation-info-btn');" in js
     assert "const imageAutoApplyRecommendationLabel = document.getElementById('image-auto-apply-recommendation-label');" in js
     assert "const imageAutoApplyRecommendationToggle = document.getElementById('image-auto-apply-recommendation-toggle');" in js
+    assert "const imageLockRecommendationLabel = document.getElementById('image-lock-recommendation-label');" in js
+    assert "const imageLockRecommendationToggle = document.getElementById('image-lock-recommendation-toggle');" in js
     assert "const imageRecommendationStatus = document.getElementById('image-recommendation-status');" in js
     assert "const imageRecommendationDriftHint = document.getElementById('image-recommendation-drift-hint');" in js
     assert "const imageRecommendationSourceTag = document.getElementById('image-recommendation-source-tag');" in js
@@ -1570,7 +1574,9 @@ def test_image_scheduler_js_wiring_present_in_bundle():
     assert "function applyCurrentFluxRecommendation(options = {})" in js
     assert "function updateFluxRecommendationDriftHint()" in js
     assert "const IMAGE_FLUX_AUTO_APPLY_RECOMMENDATION_KEY = 'imageFluxAutoApplyRecommendationV1';" in js
+    assert "const IMAGE_FLUX_LOCK_RECOMMENDATION_KEY = 'imageFluxLockRecommendationV1';" in js
     assert "let imageFluxAutoApplyRecommendation = localStorage.getItem(IMAGE_FLUX_AUTO_APPLY_RECOMMENDATION_KEY) === '1';" in js
+    assert "let imageFluxLockRecommendation = localStorage.getItem(IMAGE_FLUX_LOCK_RECOMMENDATION_KEY) === '1';" in js
     assert "const sampler = String(details?.recommended_sampler || '').toLowerCase();" in js
     assert "const scheduler = String(details?.recommended_scheduler || '').toLowerCase();" in js
     assert "if (sampler && scheduler) {" in js
@@ -1599,7 +1605,10 @@ def test_image_scheduler_js_wiring_present_in_bundle():
     assert "imageApplyRecommendationBtn.hidden = !isFluxActive;" in js
     assert "if (imageAutoApplyRecommendationLabel) {" in js
     assert "imageAutoApplyRecommendationLabel.hidden = !isFluxActive;" in js
+    assert "if (imageLockRecommendationLabel) {" in js
+    assert "imageLockRecommendationLabel.hidden = !isFluxActive;" in js
     assert "if (isFluxActive && imageFluxAutoApplyRecommendation) {" in js
+    assert "if (isFluxActive && imageFluxLockRecommendation) {" in js
     assert "applyCurrentFluxRecommendation({ announce: false, suppressNoopStatus: true });" in js
     assert "applyCurrentFluxRecommendation({ announce: true });" in js
     assert "if (imageRecommendationInfoBtn) {" in js
@@ -1607,6 +1616,8 @@ def test_image_scheduler_js_wiring_present_in_bundle():
     assert "updateFluxRecommendationSourceTag();" in js
     assert "if (imageAutoApplyRecommendationToggle) {" in js
     assert "localStorage.setItem(IMAGE_FLUX_AUTO_APPLY_RECOMMENDATION_KEY, imageFluxAutoApplyRecommendation ? '1' : '0');" in js
+    assert "if (imageLockRecommendationToggle) {" in js
+    assert "localStorage.setItem(IMAGE_FLUX_LOCK_RECOMMENDATION_KEY, imageFluxLockRecommendation ? '1' : '0');" in js
 
     css_path = Path(__file__).resolve().parents[1] / "static" / "css" / "style.css"
     css = css_path.read_text(encoding="utf-8")
