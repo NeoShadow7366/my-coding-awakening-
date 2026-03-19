@@ -134,6 +134,8 @@ const imageSchedulerSelect = document.getElementById('image-scheduler-select');
 const imageSchedulerFilter = document.getElementById('image-scheduler-filter');
 const imageSchedulerFilterStatus = document.getElementById('image-scheduler-filter-status');
 const imageApplyRecommendationBtn = document.getElementById('image-apply-recommendation-btn');
+const imageAutoApplyRecommendationLabel = document.getElementById('image-auto-apply-recommendation-label');
+const imageAutoApplyRecommendationToggle = document.getElementById('image-auto-apply-recommendation-toggle');
 const imageRecommendationStatus = document.getElementById('image-recommendation-status');
 const loraAddBtn = document.getElementById('lora-add-btn');
 const loraStackContainer = document.getElementById('lora-stack-container');
@@ -376,6 +378,7 @@ const IMAGE_MODEL_FILTER_MODE_KEY = 'imageModelFilterModeV1';
 const IMAGE_MODEL_FAMILY_MODE_KEY = 'imageModelFamilyModeV1';
 const IMAGE_SAMPLER_FILTER_QUERY_KEY = 'imageSamplerFilterQueryV1';
 const IMAGE_SCHEDULER_FILTER_QUERY_KEY = 'imageSchedulerFilterQueryV1';
+const IMAGE_FLUX_AUTO_APPLY_RECOMMENDATION_KEY = 'imageFluxAutoApplyRecommendationV1';
 const QUEUE_STATE_MAX_ITEMS = 40;
 const BACKGROUND_POLL_OWNER_KEY = 'backgroundPollOwnerV1';
 const BACKGROUND_POLL_LEASE_MS = 10_000;
@@ -398,6 +401,8 @@ let imageModelFamilyMode = localStorage.getItem(IMAGE_MODEL_FAMILY_MODE_KEY) || 
 if (!['auto', 'sd', 'flux'].includes(imageModelFamilyMode)) {
 	imageModelFamilyMode = 'auto';
 }
+let imageFluxAutoApplyRecommendation = localStorage.getItem(IMAGE_FLUX_AUTO_APPLY_RECOMMENDATION_KEY) === '1';
+let lastAutoRecommendationModelKey = '';
 let activeImagePreset = '';
 let lastResolvedPresetFamily = '';
 const IMAGE_FAMILY_CAPABILITIES = {
@@ -3564,6 +3569,17 @@ if (imageApplyRecommendationBtn) {
 		applyCurrentFluxRecommendation({ announce: true });
 	});
 }
+if (imageAutoApplyRecommendationToggle) {
+	imageAutoApplyRecommendationToggle.checked = imageFluxAutoApplyRecommendation;
+	imageAutoApplyRecommendationToggle.addEventListener('change', () => {
+		imageFluxAutoApplyRecommendation = imageAutoApplyRecommendationToggle.checked;
+		localStorage.setItem(IMAGE_FLUX_AUTO_APPLY_RECOMMENDATION_KEY, imageFluxAutoApplyRecommendation ? '1' : '0');
+		lastAutoRecommendationModelKey = '';
+		if (imageFluxAutoApplyRecommendation) {
+			applyCurrentFluxRecommendation({ announce: false, suppressNoopStatus: true });
+		}
+	});
+}
 if (imageModelModeAll) imageModelModeAll.addEventListener('click', () => setImageModelFilterMode('all'));
 if (imageModelModeRecent) imageModelModeRecent.addEventListener('click', () => setImageModelFilterMode('recent'));
 if (imageModelModeFavorites) imageModelModeFavorites.addEventListener('click', () => setImageModelFilterMode('favorites'));
@@ -6351,6 +6367,7 @@ function getFluxWorkflowRecommendation(modelName = '') {
 
 function applyCurrentFluxRecommendation(options = {}) {
 	const announce = options.announce !== false;
+	const suppressNoopStatus = options.suppressNoopStatus === true;
 	const selectedModel = imageModelSelect?.value || '';
 	const activeFamily = resolveActiveImageFamily(selectedModel);
 	if (activeFamily !== 'flux') {
@@ -6379,10 +6396,12 @@ function applyCurrentFluxRecommendation(options = {}) {
 	const changed = prevSampler !== (imageSamplerSelect?.value || '') || prevScheduler !== (imageSchedulerSelect?.value || '');
 
 	if (imageRecommendationStatus) {
-		imageRecommendationStatus.textContent = changed
-			? `Applied recommendation: ${recommendation.sampler} + ${recommendation.scheduler}`
-			: `Recommendation already applied: ${recommendation.sampler} + ${recommendation.scheduler}`;
-		imageRecommendationStatus.hidden = false;
+		if (changed || !suppressNoopStatus) {
+			imageRecommendationStatus.textContent = changed
+				? `Applied recommendation: ${recommendation.sampler} + ${recommendation.scheduler}`
+				: `Recommendation already applied: ${recommendation.sampler} + ${recommendation.scheduler}`;
+			imageRecommendationStatus.hidden = false;
+		}
 	}
 	if (announce) {
 		showToast(
@@ -6463,8 +6482,23 @@ function applyImageFamilyModeUi() {
 		imageApplyRecommendationBtn.hidden = !isFluxActive;
 		imageApplyRecommendationBtn.disabled = !isFluxActive;
 	}
+	if (imageAutoApplyRecommendationLabel) {
+		imageAutoApplyRecommendationLabel.hidden = !isFluxActive;
+	}
+	if (imageAutoApplyRecommendationToggle) {
+		imageAutoApplyRecommendationToggle.checked = imageFluxAutoApplyRecommendation;
+	}
 	if (imageRecommendationStatus && !isFluxActive) {
 		imageRecommendationStatus.hidden = true;
+	}
+	if (isFluxActive && imageFluxAutoApplyRecommendation) {
+		const autoKey = `${selectedModel || ''}|${imageModelFamilyMode}`;
+		if (autoKey && autoKey !== lastAutoRecommendationModelKey) {
+			applyCurrentFluxRecommendation({ announce: false, suppressNoopStatus: true });
+			lastAutoRecommendationModelKey = autoKey;
+		}
+	} else {
+		lastAutoRecommendationModelKey = '';
 	}
 	if (fluxVariantChip) {
 		if (!isFluxActive) {

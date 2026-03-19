@@ -506,6 +506,10 @@ textarea {
   flex-wrap: wrap;
 }
 
+#image-auto-apply-recommendation-label {
+  font-size: var(--fs-xs);
+}
+
 .model-recent-list {
   display: flex;
   flex-wrap: wrap;
