@@ -3637,6 +3637,7 @@ if (imageLockSeedBtn) {
 
 function applyImagePreset(preset) {
 	const family = resolveActiveImageFamily(imageModelSelect?.value || '');
+	const fluxVariant = family === 'flux' ? inferFluxVariant(imageModelSelect?.value || '') : '';
 	const familyPresetMap = {
 		sd: {
 			fast: { steps: 12, cfg: 5.5, denoise: 0.65, width: 768, height: 768, batch: 1, scheduler: 'normal' },
@@ -3644,12 +3645,21 @@ function applyImagePreset(preset) {
 			creative: { steps: 32, cfg: 9.0, denoise: 0.85, width: 1024, height: 1024, batch: 1, scheduler: 'exponential' },
 		},
 		flux: {
-			fast: { steps: 16, cfg: 3.0, denoise: 0.65, width: 1024, height: 1024, batch: 1, scheduler: 'normal' },
-			quality: { steps: 28, cfg: 3.5, denoise: 0.72, width: 1024, height: 1024, batch: 1, scheduler: 'normal' },
-			creative: { steps: 36, cfg: 4.5, denoise: 0.82, width: 1152, height: 896, batch: 1, scheduler: 'normal' },
+			dev: {
+				fast: { steps: 16, cfg: 3.0, denoise: 0.65, width: 1024, height: 1024, batch: 1, scheduler: 'normal' },
+				quality: { steps: 28, cfg: 3.5, denoise: 0.72, width: 1024, height: 1024, batch: 1, scheduler: 'normal' },
+				creative: { steps: 36, cfg: 4.5, denoise: 0.82, width: 1152, height: 896, batch: 1, scheduler: 'normal' },
+			},
+			schnell: {
+				fast: { steps: 8, cfg: 1.8, denoise: 0.62, width: 1024, height: 1024, batch: 1, scheduler: 'simple' },
+				quality: { steps: 12, cfg: 2.2, denoise: 0.70, width: 1024, height: 1024, batch: 1, scheduler: 'simple' },
+				creative: { steps: 16, cfg: 2.6, denoise: 0.80, width: 1152, height: 896, batch: 1, scheduler: 'simple' },
+			},
 		},
 	};
-	const presetData = familyPresetMap[family]?.[preset] || familyPresetMap.sd[preset];
+	const presetData = family === 'flux'
+		? (familyPresetMap.flux[fluxVariant] || familyPresetMap.flux.dev)?.[preset]
+		: familyPresetMap.sd[preset];
 	if (!presetData) return;
 
 	imageSteps.value = String(presetData.steps);
@@ -6297,6 +6307,18 @@ function inferImageModelFamily(modelName) {
 	return 'unknown';
 }
 
+function inferFluxVariant(modelName = '') {
+	const value = String(modelName || imageModelSelect?.value || '').toLowerCase();
+	if (!value.includes('flux')) return '';
+	if (value.includes('schnell') || value.includes('flux.1-s') || value.includes('flux1-s') || value.includes('flux_1_s')) {
+		return 'schnell';
+	}
+	if (value.includes('dev') || value.includes('flux.1-d') || value.includes('flux1-d') || value.includes('flux_1_d')) {
+		return 'dev';
+	}
+	return 'dev';
+}
+
 function resolveActiveImageFamily(modelName = '') {
 	const requestedMode = imageModelFamilySelect?.value || imageModelFamilyMode || 'auto';
 	if (requestedMode === 'flux') return 'flux';
@@ -6345,7 +6367,19 @@ function applyImageFamilyModeUi() {
 	const isFluxActive = activeFamily === 'flux';
 	if (imageNegativePromptSection) imageNegativePromptSection.hidden = isFluxActive;
 	if (fluxNoNegHint) fluxNoNegHint.hidden = !isFluxActive;
-	if (fluxSamplerHint) fluxSamplerHint.hidden = !isFluxActive;
+	if (fluxSamplerHint) {
+		if (!isFluxActive) {
+			fluxSamplerHint.hidden = true;
+		} else {
+			const variant = inferFluxVariant(selectedModel);
+			if (variant === 'schnell') {
+				fluxSamplerHint.textContent = 'FLUX Schnell tip: use euler + simple scheduler with lower step counts for fast output.';
+			} else {
+				fluxSamplerHint.textContent = 'FLUX Dev tip: use euler + normal scheduler for stable quality and detail.';
+			}
+			fluxSamplerHint.hidden = false;
+		}
+	}
 
 	if (!capabilities.supports_vae && vaeModelSelect) {
 		vaeModelSelect.value = '';

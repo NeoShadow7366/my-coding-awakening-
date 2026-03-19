@@ -1526,6 +1526,9 @@ def test_image_scheduler_select_present_in_html():
     assert 'id="image-scheduler-filter-status" class="hint" aria-live="polite"' in html
     assert 'Keyboard: ArrowDown opens sampler list, ArrowUp on first option returns to filter.' in html
     assert 'Keyboard: ArrowDown opens scheduler list, ArrowUp on first option returns to filter.' in html
+    assert 'id="flux-sampler-hint"' in html
+    assert 'id="flux-no-neg-hint"' in html
+    assert 'id="image-negative-prompt-section"' in html
 
 
 def test_image_scheduler_js_wiring_present_in_bundle():
@@ -1540,6 +1543,7 @@ def test_image_scheduler_js_wiring_present_in_bundle():
     assert "const IMAGE_MODEL_FAMILY_MODE_KEY = 'imageModelFamilyModeV1';" in js
     assert "const IMAGE_FAMILY_CAPABILITIES = {" in js
     assert "function resolveActiveImageFamily(modelName = '')" in js
+    assert "function inferFluxVariant(modelName = '')" in js
     assert "function applyImageFamilyModeUi()" in js
     assert "function normalizeImageRequestByFamily(common)" in js
     assert "async function loadImageSchedulers()" in js
@@ -1551,6 +1555,10 @@ def test_image_scheduler_js_wiring_present_in_bundle():
     assert "IMAGE_SCHEDULER_FILTER_QUERY_KEY" in js
     assert "No ${noun} match" in js
     assert "scheduler: imageSchedulerSelect" in js
+    assert "flux: {" in js
+    assert "schnell:" in js
+    assert "FLUX Schnell tip: use euler + simple scheduler with lower step counts for fast output." in js
+    assert "FLUX Dev tip: use euler + normal scheduler for stable quality and detail." in js
 
 
 def test_filter_input_arrow_down_js_wiring():
@@ -1696,4 +1704,6 @@ def test_flux_negative_prompt_js_wiring_present_in_bundle():
     assert "isFluxActive" in fn_body
     assert "imageNegativePromptSection.hidden = isFluxActive" in fn_body
     assert "fluxNoNegHint.hidden = !isFluxActive" in fn_body
-    assert "fluxSamplerHint.hidden = !isFluxActive" in fn_body
+    assert "const variant = inferFluxVariant(selectedModel);" in fn_body
+    assert "if (variant === 'schnell')" in fn_body
+    assert "fluxSamplerHint.hidden = false;" in fn_body
