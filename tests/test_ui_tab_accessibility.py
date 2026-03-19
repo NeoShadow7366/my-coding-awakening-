@@ -1536,6 +1536,7 @@ def test_image_scheduler_select_present_in_html():
     assert 'id="image-auto-apply-recommendation-toggle"' in html
     assert 'id="image-auto-apply-recommendation-label"' in html
     assert 'id="image-recommendation-status"' in html
+    assert 'id="image-recommendation-drift-hint"' in html
 
 
 def test_image_scheduler_js_wiring_present_in_bundle():
@@ -1549,6 +1550,7 @@ def test_image_scheduler_js_wiring_present_in_bundle():
     assert "const imageAutoApplyRecommendationLabel = document.getElementById('image-auto-apply-recommendation-label');" in js
     assert "const imageAutoApplyRecommendationToggle = document.getElementById('image-auto-apply-recommendation-toggle');" in js
     assert "const imageRecommendationStatus = document.getElementById('image-recommendation-status');" in js
+    assert "const imageRecommendationDriftHint = document.getElementById('image-recommendation-drift-hint');" in js
     assert "imageModelFamilySelect" in js
     assert "imageModelFamilyHint" in js
     assert "const fluxVariantChip = document.getElementById('flux-variant-chip');" in js
@@ -1558,6 +1560,7 @@ def test_image_scheduler_js_wiring_present_in_bundle():
     assert "function inferFluxVariant(modelName = '')" in js
     assert "function getFluxWorkflowRecommendation(modelName = '')" in js
     assert "function applyCurrentFluxRecommendation(options = {})" in js
+    assert "function updateFluxRecommendationDriftHint()" in js
     assert "const IMAGE_FLUX_AUTO_APPLY_RECOMMENDATION_KEY = 'imageFluxAutoApplyRecommendationV1';" in js
     assert "let imageFluxAutoApplyRecommendation = localStorage.getItem(IMAGE_FLUX_AUTO_APPLY_RECOMMENDATION_KEY) === '1';" in js
     assert "const sampler = String(details?.recommended_sampler || '').toLowerCase();" in js
@@ -1591,6 +1594,7 @@ def test_image_scheduler_js_wiring_present_in_bundle():
     assert "if (isFluxActive && imageFluxAutoApplyRecommendation) {" in js
     assert "applyCurrentFluxRecommendation({ announce: false, suppressNoopStatus: true });" in js
     assert "applyCurrentFluxRecommendation({ announce: true });" in js
+    assert "updateFluxRecommendationDriftHint();" in js
     assert "if (imageAutoApplyRecommendationToggle) {" in js
     assert "localStorage.setItem(IMAGE_FLUX_AUTO_APPLY_RECOMMENDATION_KEY, imageFluxAutoApplyRecommendation ? '1' : '0');" in js
 
@@ -1746,8 +1750,11 @@ def test_flux_negative_prompt_js_wiring_present_in_bundle():
     assert "if (imageAutoApplyRecommendationLabel)" in fn_body
     assert "imageAutoApplyRecommendationLabel.hidden = !isFluxActive;" in fn_body
     assert "if (imageRecommendationStatus && !isFluxActive)" in fn_body
+    assert "if (imageRecommendationDriftHint && !isFluxActive)" in fn_body
+    assert "imageRecommendationDriftHint.classList.remove('is-warning');" in fn_body
     assert "if (isFluxActive && imageFluxAutoApplyRecommendation)" in fn_body
     assert "lastAutoRecommendationModelKey = autoKey;" in fn_body
+    assert "updateFluxRecommendationDriftHint();" in fn_body
     assert "if (fluxVariantChip)" in fn_body
     assert "fluxVariantChip.hidden = false;" in fn_body
     assert "fluxVariantChip.classList.remove('is-dev', 'is-schnell', 'is-auto');" in fn_body
@@ -1761,3 +1768,4 @@ def test_flux_variant_chip_color_classes_present_in_css():
     assert ".flux-variant-chip.is-schnell" in css
     assert ".flux-variant-chip.is-auto" in css
     assert "#image-auto-apply-recommendation-label" in css
+    assert ".recommendation-drift-hint.is-warning" in css

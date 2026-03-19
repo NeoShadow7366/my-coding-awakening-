@@ -510,6 +510,10 @@ textarea {
   font-size: var(--fs-xs);
 }
 
+.recommendation-drift-hint.is-warning {
+  color: color-mix(in srgb, var(--clr-accent-neg) 76%, var(--clr-text));
+}
+
 .model-recent-list {
   display: flex;
   flex-wrap: wrap;

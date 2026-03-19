@@ -137,6 +137,7 @@ const imageApplyRecommendationBtn = document.getElementById('image-apply-recomme
 const imageAutoApplyRecommendationLabel = document.getElementById('image-auto-apply-recommendation-label');
 const imageAutoApplyRecommendationToggle = document.getElementById('image-auto-apply-recommendation-toggle');
 const imageRecommendationStatus = document.getElementById('image-recommendation-status');
+const imageRecommendationDriftHint = document.getElementById('image-recommendation-drift-hint');
 const loraAddBtn = document.getElementById('lora-add-btn');
 const loraStackContainer = document.getElementById('lora-stack-container');
 // NOTE: loraModelSelect / loraStrength / loraStrengthVal replaced by multi-LoRA stack
@@ -3564,6 +3565,16 @@ if (imageModelFilter) {
 }
 bindSelectFilterInput(imageSamplerFilter, imageSamplerSelect, IMAGE_SAMPLER_FILTER_QUERY_KEY, imageSamplerFilterStatus, 'samplers');
 bindSelectFilterInput(imageSchedulerFilter, imageSchedulerSelect, IMAGE_SCHEDULER_FILTER_QUERY_KEY, imageSchedulerFilterStatus, 'schedulers');
+if (imageSamplerSelect) {
+	imageSamplerSelect.addEventListener('change', () => {
+		updateFluxRecommendationDriftHint();
+	});
+}
+if (imageSchedulerSelect) {
+	imageSchedulerSelect.addEventListener('change', () => {
+		updateFluxRecommendationDriftHint();
+	});
+}
 if (imageApplyRecommendationBtn) {
 	imageApplyRecommendationBtn.addEventListener('click', () => {
 		applyCurrentFluxRecommendation({ announce: true });
@@ -6411,7 +6422,38 @@ function applyCurrentFluxRecommendation(options = {}) {
 			changed ? 'pos' : ''
 		);
 	}
+	updateFluxRecommendationDriftHint();
 	return changed;
+}
+
+function updateFluxRecommendationDriftHint() {
+	if (!imageRecommendationDriftHint) return;
+	const selectedModel = imageModelSelect?.value || '';
+	const activeFamily = resolveActiveImageFamily(selectedModel);
+	if (activeFamily !== 'flux') {
+		imageRecommendationDriftHint.hidden = true;
+		imageRecommendationDriftHint.classList.remove('is-warning');
+		return;
+	}
+	const recommendation = getFluxWorkflowRecommendation(selectedModel);
+	if (!recommendation?.sampler || !recommendation?.scheduler) {
+		imageRecommendationDriftHint.hidden = true;
+		imageRecommendationDriftHint.classList.remove('is-warning');
+		return;
+	}
+	const currentSampler = String(imageSamplerSelect?.value || '').toLowerCase();
+	const currentScheduler = String(imageSchedulerSelect?.value || '').toLowerCase();
+	const recSampler = recommendation.sampler;
+	const recScheduler = recommendation.scheduler;
+	const matches = currentSampler === recSampler && currentScheduler === recScheduler;
+	if (matches) {
+		imageRecommendationDriftHint.textContent = `Using recommended pair: ${recSampler} + ${recScheduler}.`;
+		imageRecommendationDriftHint.classList.remove('is-warning');
+	} else {
+		imageRecommendationDriftHint.textContent = `Custom pair active: ${currentSampler || '(none)'} + ${currentScheduler || '(none)'}. Recommended: ${recSampler} + ${recScheduler}.`;
+		imageRecommendationDriftHint.classList.add('is-warning');
+	}
+	imageRecommendationDriftHint.hidden = false;
 }
 
 function resolveActiveImageFamily(modelName = '') {
@@ -6491,6 +6533,10 @@ function applyImageFamilyModeUi() {
 	if (imageRecommendationStatus && !isFluxActive) {
 		imageRecommendationStatus.hidden = true;
 	}
+	if (imageRecommendationDriftHint && !isFluxActive) {
+		imageRecommendationDriftHint.hidden = true;
+		imageRecommendationDriftHint.classList.remove('is-warning');
+	}
 	if (isFluxActive && imageFluxAutoApplyRecommendation) {
 		const autoKey = `${selectedModel || ''}|${imageModelFamilyMode}`;
 		if (autoKey && autoKey !== lastAutoRecommendationModelKey) {
@@ -6500,6 +6546,7 @@ function applyImageFamilyModeUi() {
 	} else {
 		lastAutoRecommendationModelKey = '';
 	}
+	updateFluxRecommendationDriftHint();
 	if (fluxVariantChip) {
 		if (!isFluxActive) {
 			fluxVariantChip.hidden = true;
