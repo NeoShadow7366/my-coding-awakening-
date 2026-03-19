@@ -391,6 +391,10 @@ let controlnetPreviewObjectUrl = '';
 let gallerySearchQuery = '';
 let gallerySortOrder = localStorage.getItem('gallerySortOrder') || 'newest';
 let galleryModeFilter = localStorage.getItem('galleryModeFilter') || 'all';
+const VALID_GALLERY_SORT_ORDERS = new Set(['newest', 'oldest', 'favorites-first']);
+if (!VALID_GALLERY_SORT_ORDERS.has(gallerySortOrder)) {
+	gallerySortOrder = 'newest';
+}
 let lightboxCurrentIndex = 0;
 let lightboxCompareEnabled = false;
 let lightboxCompareSplit = 50;
@@ -4784,8 +4788,23 @@ function renderGallery(history) {
 		return;
 	}
 
-	// Sort: newest (default, already API order) or oldest (reverse)
-	const orderedImages = gallerySortOrder === 'oldest' ? [...images].reverse() : images;
+	// Sort: newest (default, already API order), oldest, or favorites first.
+	let orderedImages;
+	if (gallerySortOrder === 'oldest') {
+		orderedImages = [...images].reverse();
+	} else if (gallerySortOrder === 'favorites-first') {
+		orderedImages = images
+			.map((entry, index) => ({ entry, index }))
+			.sort((a, b) => {
+				const aFav = isGalleryFavorite(a.entry?.id || '');
+				const bFav = isGalleryFavorite(b.entry?.id || '');
+				if (aFav !== bFav) return aFav ? -1 : 1;
+				return a.index - b.index;
+			})
+			.map((item) => item.entry);
+	} else {
+		orderedImages = images;
+	}
 
 	// Mode filter
 	const modeFiltered = galleryModeFilter === 'all'
@@ -5174,6 +5193,9 @@ if (gallerySortSelect) {
 	gallerySortSelect.value = gallerySortOrder;
 	gallerySortSelect.addEventListener('change', () => {
 		gallerySortOrder = gallerySortSelect.value || 'newest';
+		if (!VALID_GALLERY_SORT_ORDERS.has(gallerySortOrder)) {
+			gallerySortOrder = 'newest';
+		}
 		localStorage.setItem('gallerySortOrder', gallerySortOrder);
 		renderGallery(currentFullHistory);
 	});

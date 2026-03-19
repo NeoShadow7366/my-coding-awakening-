@@ -202,6 +202,7 @@ def test_index_gallery_controls_group_semantics():
     html = resp.get_data(as_text=True)
 
     assert '<div class="gallery-controls" role="group" aria-label="Gallery controls">' in html
+    assert '<option value="favorites-first">Favorites first</option>' in html
     assert 'id="gallery-view-toggle"' in html
     assert 'id="refresh-gallery"' in html
 
@@ -211,6 +212,9 @@ def test_gallery_toolbar_keyboard_handler_wiring_present_in_js_bundle():
     content = js_path.read_text(encoding="utf-8")
 
     assert "function onGalleryToolbarButtonKeydown(event)" in content
+    assert "const VALID_GALLERY_SORT_ORDERS = new Set(['newest', 'oldest', 'favorites-first']);" in content
+    assert "gallerySortOrder === 'favorites-first'" in content
+    assert "if (!VALID_GALLERY_SORT_ORDERS.has(gallerySortOrder)) {" in content
     assert "galleryViewToggle.addEventListener('keydown', onGalleryToolbarButtonKeydown);" in content
     assert "refreshGalleryBtn.addEventListener('keydown', onGalleryToolbarButtonKeydown);" in content
 
