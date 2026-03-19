@@ -392,6 +392,8 @@ let imageModelFamilyMode = localStorage.getItem(IMAGE_MODEL_FAMILY_MODE_KEY) || 
 if (!['auto', 'sd', 'flux'].includes(imageModelFamilyMode)) {
 	imageModelFamilyMode = 'auto';
 }
+let activeImagePreset = '';
+let lastResolvedPresetFamily = '';
 const IMAGE_FAMILY_CAPABILITIES = {
 	sd: {
 		supports_refiner: true,
@@ -3624,36 +3626,39 @@ if (imageLockSeedBtn) {
 }
 
 function applyImagePreset(preset) {
-	if (preset === 'fast') {
-		imageSteps.value = '12';
-		imageCfg.value = '5.5';
-		imageDenoise.value = '0.65';
-		if (imageWidth) imageWidth.value = '768';
-		if (imageHeight) imageHeight.value = '768';
-		if (imageBatchSize) imageBatchSize.value = '1';
-		if (refinerModelSelect) refinerModelSelect.value = '';
-		if (hiresfixEnable) hiresfixEnable.checked = false;
-		setSelectValueIfOptionExists(imageSchedulerSelect, 'normal');
-	} else if (preset === 'quality') {
-		imageSteps.value = '40';
-		imageCfg.value = '7.5';
-		imageDenoise.value = '0.75';
-		if (imageWidth && imageWidth.value === '768') imageWidth.value = '1024';
-		if (imageHeight && imageHeight.value === '768') imageHeight.value = '1024';
-		setSelectValueIfOptionExists(imageSchedulerSelect, 'karras');
-	} else if (preset === 'creative') {
-		imageSteps.value = '32';
-		imageCfg.value = '9.0';
-		imageDenoise.value = '0.85';
-		if (imageWidth && imageWidth.value === '768') imageWidth.value = '1024';
-		if (imageHeight && imageHeight.value === '768') imageHeight.value = '1024';
-		setSelectValueIfOptionExists(imageSchedulerSelect, 'exponential');
-	}
+	const family = resolveActiveImageFamily(imageModelSelect?.value || '');
+	const familyPresetMap = {
+		sd: {
+			fast: { steps: 12, cfg: 5.5, denoise: 0.65, width: 768, height: 768, batch: 1, scheduler: 'normal' },
+			quality: { steps: 40, cfg: 7.5, denoise: 0.75, width: 1024, height: 1024, batch: 1, scheduler: 'karras' },
+			creative: { steps: 32, cfg: 9.0, denoise: 0.85, width: 1024, height: 1024, batch: 1, scheduler: 'exponential' },
+		},
+		flux: {
+			fast: { steps: 16, cfg: 3.0, denoise: 0.65, width: 1024, height: 1024, batch: 1, scheduler: 'normal' },
+			quality: { steps: 28, cfg: 3.5, denoise: 0.72, width: 1024, height: 1024, batch: 1, scheduler: 'normal' },
+			creative: { steps: 36, cfg: 4.5, denoise: 0.82, width: 1152, height: 896, batch: 1, scheduler: 'normal' },
+		},
+	};
+	const presetData = familyPresetMap[family]?.[preset] || familyPresetMap.sd[preset];
+	if (!presetData) return;
+
+	imageSteps.value = String(presetData.steps);
+	imageCfg.value = String(presetData.cfg);
+	imageDenoise.value = String(presetData.denoise);
+	if (imageWidth) imageWidth.value = String(presetData.width);
+	if (imageHeight) imageHeight.value = String(presetData.height);
+	if (imageBatchSize) imageBatchSize.value = String(presetData.batch);
+	if (refinerModelSelect) refinerModelSelect.value = '';
+	if (hiresfixEnable) hiresfixEnable.checked = false;
+	setSelectValueIfOptionExists(imageSchedulerSelect, presetData.scheduler || 'normal');
+	activeImagePreset = preset;
+	lastResolvedPresetFamily = family;
 	syncImageControlLabels();
 	updateModelStackCompatibilityHint();
 }
 
 function setActiveImagePresetButton(activePreset) {
+	activeImagePreset = activePreset || '';
 	if (!imagePresetButtons || !imagePresetButtons.length) return;
 	imagePresetButtons.forEach((btn, index) => {
 		const isActive = (btn.dataset.imagePreset || '') === activePreset;
@@ -6353,6 +6358,9 @@ function applyImageFamilyModeUi() {
 		} else {
 			imageModelFamilyHint.textContent = 'Family mode: SD / SDXL. Full model-stack controls are available.';
 		}
+	}
+	if (activeImagePreset && activeFamily !== lastResolvedPresetFamily) {
+		applyImagePreset(activeImagePreset);
 	}
 
 	syncImageControlLabels();

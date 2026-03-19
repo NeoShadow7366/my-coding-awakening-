@@ -1273,12 +1273,14 @@ def test_fast_preset_applies_speed_focused_settings():
     js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
     js = js_path.read_text(encoding="utf-8")
 
-    assert "if (preset === 'fast')" in js
-    assert "imageSteps.value = '12';" in js
-    assert "imageCfg.value = '5.5';" in js
-    assert "imageDenoise.value = '0.65';" in js
-    assert "if (imageWidth) imageWidth.value = '768';" in js
-    assert "if (imageHeight) imageHeight.value = '768';" in js
+    assert "const family = resolveActiveImageFamily(imageModelSelect?.value || '');" in js
+    assert "const familyPresetMap = {" in js
+    assert "sd:" in js
+    assert "flux:" in js
+    assert "fast: { steps: 12, cfg: 5.5, denoise: 0.65, width: 768, height: 768, batch: 1, scheduler: 'normal' }" in js
+    assert "fast: { steps: 16, cfg: 3.0, denoise: 0.65, width: 1024, height: 1024, batch: 1, scheduler: 'normal' }" in js
+    assert "if (activeImagePreset && activeFamily !== lastResolvedPresetFamily) {" in js
+    assert "applyImagePreset(activeImagePreset);" in js
     assert "if (refinerModelSelect) refinerModelSelect.value = '';" in js
     assert "if (hiresfixEnable) hiresfixEnable.checked = false;" in js
 
