@@ -29,7 +29,7 @@
   --fs-lg: 1.125rem;
   --lh-base: 1.55;
 
-  --sidebar-w: 300px;
+  --sidebar-w: 320px;
   --header-h: 52px;
   --radius: 0.5rem;
   --radius-lg: 0.75rem;
@@ -212,16 +212,53 @@ body {
   background: var(--clr-surface);
   border-right: 1px solid var(--clr-border);
   overflow-y: auto;
-  padding: var(--sp-lg);
+  padding: var(--sp-md);
   display: flex;
   flex-direction: column;
-  gap: var(--sp-lg);
+  gap: var(--sp-md);
 }
 
 .sidebar-section {
   display: flex;
   flex-direction: column;
   gap: var(--sp-sm);
+  padding: 0.7rem 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--clr-border) 84%, transparent);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--clr-bg) 90%, var(--clr-surface));
+  transition: border-color var(--transition), background var(--transition), box-shadow var(--transition);
+}
+
+.sidebar-section:hover {
+  border-color: color-mix(in srgb, var(--clr-border) 52%, var(--clr-text-muted));
+}
+
+.sidebar-section:focus-within {
+  border-color: color-mix(in srgb, var(--clr-primary) 58%, var(--clr-border));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--clr-primary) 34%, transparent);
+}
+
+.sidebar-section > .field-label:first-child {
+  margin-bottom: 0.15rem;
+}
+
+.sidebar .field-label {
+  font-size: 0.78rem;
+  letter-spacing: 0.05em;
+}
+
+.sidebar .inline-label,
+.sidebar .hint {
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+.sidebar .btn-xs {
+  min-height: 1.75rem;
+}
+
+.sidebar .inline-field-row {
+  gap: 0.45rem;
 }
 
 .field-label {
@@ -318,10 +355,10 @@ textarea {
 }
 
 .model-stack-panel {
-  border: 1px solid var(--clr-border);
-  border-radius: var(--radius);
-  padding: var(--sp-sm);
-  background: color-mix(in srgb, var(--clr-bg) 90%, var(--clr-surface));
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  background: transparent;
 }
 
 .model-stack-head {
@@ -379,7 +416,7 @@ textarea {
 .model-mode-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.25rem;
+  gap: 0.35rem;
 }
 
 .model-favorite-toggle-row {
@@ -779,10 +816,10 @@ textarea {
 }
 
 .cn-panel {
-  border: 1px solid var(--clr-border);
-  border-radius: var(--radius);
-  padding: var(--sp-sm);
-  background: color-mix(in srgb, var(--clr-bg) 90%, var(--clr-surface));
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  background: transparent;
 }
 
 .cn-panel summary {
@@ -1389,10 +1426,10 @@ textarea {
 }
 
 .diagnostics-panel {
-  border: 1px solid var(--clr-border);
-  border-radius: var(--radius);
-  padding: var(--sp-sm);
-  background: var(--clr-bg);
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  background: transparent;
 }
 
 .diagnostics-head {
