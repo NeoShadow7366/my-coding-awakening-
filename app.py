@@ -6,6 +6,7 @@ The app uses:
 """
 
 import io
+import hashlib
 import json
 import logging
 import os
@@ -31,6 +32,24 @@ app = Flask(__name__)
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
 ASSET_VERSION = str(int(time.time()))
+APP_STARTED_AT_UTC = datetime.now(timezone.utc)
+
+
+def _compute_template_version() -> str:
+    """Return a short hash for main templates to detect stale frontend/backend mismatch."""
+    try:
+        template_dir = Path(app.root_path) / "templates"
+        digest = hashlib.sha1()
+        for name in ("base.html", "index.html"):
+            path = template_dir / name
+            if path.exists():
+                digest.update(path.read_bytes())
+        return digest.hexdigest()[:12]
+    except Exception:
+        return "unknown"
+
+
+TEMPLATE_VERSION = _compute_template_version()
 
 # Ollama runs on this address by default when installed locally.
 OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
@@ -51,6 +70,7 @@ MIN_CFG = 1.0
 DATA_DIR = Path(app.root_path) / "data"
 HISTORY_FILE = DATA_DIR / "history.json"
 SERVICE_CONFIG_FILE = DATA_DIR / "service_config.json"
+DISABLE_OP_LOG_FILE = DATA_DIR / "disable_op_log.json"
 SERVICE_LOG_DIR = DATA_DIR / "service_logs"
 
 SERVICE_PORTS = {
@@ -66,6 +86,10 @@ _migration_jobs_lock = threading.Lock()
 _migration_jobs: dict[str, dict] = {}
 _comfyui_update_jobs_lock = threading.Lock()
 _comfyui_update_jobs: dict[str, dict] = {}
+_disable_op_log_lock = threading.Lock()
+_disable_op_log: list[dict] = []
+_disable_op_log_loaded = False
+_DISABLE_OP_LOG_MAX = 25
 _service_processes: dict[str, subprocess.Popen | None] = {
     "ollama": None,
     "comfyui": None,
@@ -226,6 +250,504 @@ def _comfy_get_object_info(node_type: str) -> dict:
         return {}
 
 
+def _comfy_get_all_object_info() -> dict:
+    """Fetch ComfyUI object metadata for all registered nodes."""
+    try:
+        resp = requests.get(f"{COMFYUI_BASE_URL}/object_info", timeout=12)
+        resp.raise_for_status()
+        return resp.json() or {}
+    except Exception as exc:
+        logger.warning("Could not fetch ComfyUI full object info: %s", exc)
+        return {}
+
+
+def _comfy_custom_nodes(include_builtin: bool = False) -> list[dict]:
+    """Return normalized ComfyUI node rows for the custom-node browser."""
+    object_info = _comfy_get_all_object_info()
+    if not isinstance(object_info, dict):
+        return []
+
+    rows: list[dict] = []
+    for node_type, node_meta in object_info.items():
+        if not isinstance(node_meta, dict):
+            continue
+        category = str(node_meta.get("category") or "").strip()
+        display_name = str(node_meta.get("display_name") or node_type).strip()
+        module_name = str(node_meta.get("python_module") or "").strip()
+        category_l = category.lower()
+        module_l = module_name.lower()
+
+        is_builtin = False
+        if module_l:
+            is_builtin = (
+                module_l.startswith("nodes")
+                or module_l.startswith("comfy.")
+                or module_l.startswith("comfy_extras")
+            )
+
+        is_custom = ("custom_nodes" in category_l) or ("custom_nodes" in module_l) or (module_l != "" and not is_builtin)
+        if not include_builtin and not is_custom:
+            continue
+
+        rows.append(
+            {
+                "type": str(node_type),
+                "display_name": display_name,
+                "category": category,
+                "python_module": module_name,
+                "is_custom": is_custom,
+            }
+        )
+
+    rows.sort(key=lambda item: (not bool(item.get("is_custom")), item.get("category", ""), item.get("display_name", ""), item.get("type", "")))
+    return rows
+
+
+def _comfy_custom_node_packages() -> list[dict]:
+    """Return installed ComfyUI custom-node package folders from disk."""
+    config = _load_service_config()
+    comfy_path_raw = str(config.get("comfyui_path") or "").strip()
+    if not comfy_path_raw:
+        return []
+
+    try:
+        comfy_path = Path(comfy_path_raw).expanduser().resolve()
+    except Exception:
+        return []
+
+    custom_nodes_dir = comfy_path / "custom_nodes"
+    if not custom_nodes_dir.exists() or not custom_nodes_dir.is_dir():
+        return []
+
+    rows: list[dict] = []
+    for child in sorted(custom_nodes_dir.iterdir(), key=lambda p: p.name.lower()):
+        if not child.is_dir():
+            continue
+        if child.name.startswith("."):
+            continue
+        # Treat underscore-prefixed packages as disabled/parked by convention.
+        enabled = not child.name.startswith("_")
+        rows.append(
+            {
+                "name": child.name,
+                "path": str(child),
+                "enabled": enabled,
+            }
+        )
+    return rows
+
+
+def _resolve_comfy_custom_nodes_dir() -> Path | None:
+    """Return configured ComfyUI custom_nodes directory if valid."""
+    config = _load_service_config()
+    comfy_path_raw = str(config.get("comfyui_path") or "").strip()
+    if not comfy_path_raw:
+        return None
+    try:
+        comfy_path = Path(comfy_path_raw).expanduser().resolve()
+    except Exception:
+        return None
+    custom_nodes_dir = comfy_path / "custom_nodes"
+    if not custom_nodes_dir.exists() or not custom_nodes_dir.is_dir():
+        return None
+    return custom_nodes_dir
+
+
+def _resolve_custom_node_package_path(package_name: str) -> Path | None:
+    """Resolve and validate a custom-node package folder by name."""
+    name = str(package_name or "").strip()
+    if not name or "/" in name or "\\" in name or name in {".", ".."}:
+        return None
+    root = _resolve_comfy_custom_nodes_dir()
+    if not root:
+        return None
+    candidate = (root / name).resolve()
+    try:
+        candidate.relative_to(root)
+    except ValueError:
+        return None
+    if not candidate.exists() or not candidate.is_dir():
+        return None
+    return candidate
+
+
+def _collect_custom_node_package_git_info(package_path: Path) -> dict:
+    """Collect lightweight git metadata for a custom-node package folder."""
+    def _run_git(args: list[str]) -> str:
+        try:
+            proc = subprocess.run(
+                ["git", *args],
+                cwd=package_path,
+                capture_output=True,
+                text=True,
+                timeout=5,
+                check=False,
+            )
+            if proc.returncode != 0:
+                return ""
+            return (proc.stdout or "").strip()
+        except Exception:
+            return ""
+
+    inside = _run_git(["rev-parse", "--is-inside-work-tree"]).lower() == "true"
+    if not inside:
+        return {
+            "is_git": False,
+            "branch": "",
+            "commit": "",
+            "remote": "",
+            "upstream": "",
+            "ahead": 0,
+            "behind": 0,
+            "dirty": False,
+        }
+
+    branch = _run_git(["symbolic-ref", "--short", "HEAD"]) or "detached"
+    commit = _run_git(["rev-parse", "--short", "HEAD"])
+    remote = _run_git(["config", "--get", "remote.origin.url"])
+    upstream = _run_git(["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}"])
+    dirty = bool(_run_git(["status", "--porcelain"]))
+
+    ahead = 0
+    behind = 0
+    if upstream:
+        counts = _run_git(["rev-list", "--left-right", "--count", "HEAD...@{upstream}"])
+        parts = counts.split()
+        if len(parts) >= 2:
+            try:
+                ahead = int(parts[0])
+                behind = int(parts[1])
+            except ValueError:
+                ahead = 0
+                behind = 0
+
+    return {
+        "is_git": True,
+        "branch": branch,
+        "commit": commit,
+        "remote": remote,
+        "upstream": upstream,
+        "ahead": ahead,
+        "behind": behind,
+        "dirty": dirty,
+    }
+
+
+def _toggle_custom_node_package_enabled(package_path: Path, enable: bool) -> Path:
+    """Toggle package folder enabled state using underscore-prefix convention."""
+    current_name = package_path.name
+    is_enabled = not current_name.startswith("_")
+    if is_enabled == bool(enable):
+        return package_path
+
+    if enable:
+        target_name = current_name[1:] if current_name.startswith("_") else current_name
+    else:
+        target_name = current_name if current_name.startswith("_") else f"_{current_name}"
+
+    target_name = target_name.strip()
+    if not target_name:
+        raise ValueError("invalid target package name")
+
+    target_path = package_path.parent / target_name
+    if target_path.exists():
+        raise FileExistsError(f"Target package folder already exists: {target_name}")
+
+    return package_path.rename(target_path)
+
+
+def _run_custom_node_package_git_pull(package_path: Path) -> dict:
+    """Run a fast-forward-only git pull for one custom-node package."""
+    inside = subprocess.run(
+        ["git", "rev-parse", "--is-inside-work-tree"],
+        cwd=package_path,
+        capture_output=True,
+        text=True,
+        timeout=8,
+        check=False,
+    )
+    if inside.returncode != 0 or (inside.stdout or "").strip().lower() != "true":
+        raise ValueError("package is not a git repository")
+
+    proc = subprocess.run(
+        ["git", "pull", "--ff-only"],
+        cwd=package_path,
+        capture_output=True,
+        text=True,
+        timeout=45,
+        check=False,
+    )
+    if proc.returncode != 0:
+        err = (proc.stderr or proc.stdout or "git pull failed").strip()
+        raise RuntimeError(err)
+
+    return {
+        "message": (proc.stdout or "Already up to date.").strip(),
+        "git": _collect_custom_node_package_git_info(package_path),
+    }
+
+
+def _is_core_custom_node_package(package_name: str) -> bool:
+    """Return True for package folders that should not be mass-disabled."""
+    name = str(package_name or "").strip().lstrip("_").lower()
+    core_names = {
+        "comfyui-manager",
+        "comfyui_manager",
+        "comfy-manager",
+        "manager",
+    }
+    return name in core_names
+
+
+def _ensure_disable_op_log_store() -> None:
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    if not DISABLE_OP_LOG_FILE.exists():
+        DISABLE_OP_LOG_FILE.write_text("[]", encoding="utf-8")
+
+
+def _load_disable_op_log_from_disk() -> list[dict]:
+    _ensure_disable_op_log_store()
+    try:
+        raw = json.loads(DISABLE_OP_LOG_FILE.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        logger.warning("Disable operation log file was invalid JSON, resetting.")
+        DISABLE_OP_LOG_FILE.write_text("[]", encoding="utf-8")
+        return []
+    if not isinstance(raw, list):
+        DISABLE_OP_LOG_FILE.write_text("[]", encoding="utf-8")
+        return []
+    entries = [item for item in raw if isinstance(item, dict)]
+    if len(entries) > _DISABLE_OP_LOG_MAX:
+        entries = entries[-_DISABLE_OP_LOG_MAX:]
+    return entries
+
+
+def _persist_disable_op_log_locked() -> None:
+    _ensure_disable_op_log_store()
+    DISABLE_OP_LOG_FILE.write_text(json.dumps(_disable_op_log, ensure_ascii=True, indent=2), encoding="utf-8")
+
+
+def _ensure_disable_op_log_loaded_locked() -> None:
+    global _disable_op_log_loaded
+    if _disable_op_log_loaded:
+        return
+    # Allow tests to seed in-memory entries before first load.
+    if _disable_op_log:
+        _disable_op_log_loaded = True
+        return
+    _disable_op_log[:] = _load_disable_op_log_from_disk()
+    _disable_op_log_loaded = True
+
+
+def _disable_op_log_store_health() -> dict:
+    """Return a lightweight health summary for persisted disable operation log storage."""
+    existed_before = DISABLE_OP_LOG_FILE.exists()
+    try:
+        _ensure_disable_op_log_store()
+        raw = json.loads(DISABLE_OP_LOG_FILE.read_text(encoding="utf-8"))
+        if not isinstance(raw, list):
+            return {
+                "status": "invalid-shape",
+                "ok": False,
+                "count": 0,
+            }
+        entries = [item for item in raw if isinstance(item, dict)]
+        return {
+            "status": "ok" if existed_before else "created",
+            "ok": True,
+            "count": len(entries),
+        }
+    except json.JSONDecodeError:
+        return {
+            "status": "invalid-json",
+            "ok": False,
+            "count": 0,
+        }
+    except Exception as exc:
+        return {
+            "status": "error",
+            "ok": False,
+            "count": 0,
+            "error": str(exc),
+        }
+
+
+def _repair_disable_op_log_store_locked() -> dict:
+    """Repair disable operation log storage and rehydrate in-memory state.
+
+    Caller must hold `_disable_op_log_lock`.
+    """
+    global _disable_op_log_loaded
+    _ensure_disable_op_log_store()
+
+    status = "ok"
+    source = "disk"
+    error = ""
+
+    try:
+        raw = json.loads(DISABLE_OP_LOG_FILE.read_text(encoding="utf-8"))
+        if not isinstance(raw, list):
+            raise ValueError("invalid-shape")
+        normalized = [item for item in raw if isinstance(item, dict)]
+        if len(normalized) > _DISABLE_OP_LOG_MAX:
+            normalized = normalized[-_DISABLE_OP_LOG_MAX:]
+    except json.JSONDecodeError:
+        status = "repaired-invalid-json"
+        error = "invalid-json"
+        normalized = []
+    except ValueError:
+        status = "repaired-invalid-shape"
+        error = "invalid-shape"
+        normalized = []
+    except Exception as exc:
+        status = "repaired-read-error"
+        error = str(exc)
+        normalized = []
+
+    # If disk content is not usable but in-memory entries exist, preserve them.
+    if status != "ok":
+        if _disable_op_log:
+            source = "memory"
+            normalized = [item for item in _disable_op_log if isinstance(item, dict)]
+            if len(normalized) > _DISABLE_OP_LOG_MAX:
+                normalized = normalized[-_DISABLE_OP_LOG_MAX:]
+            status = "repaired-from-memory"
+        else:
+            source = "empty"
+
+    _disable_op_log[:] = normalized
+    _disable_op_log_loaded = True
+    _persist_disable_op_log_locked()
+
+    payload = {
+        "ok": True,
+        "status": status,
+        "source": source,
+        "count": len(normalized),
+    }
+    if error:
+        payload["error"] = error
+    return payload
+
+
+def _append_disable_op_log_entry(entry: dict) -> None:
+    """Append one disable operation log entry with bounded history."""
+    if not isinstance(entry, dict):
+        return
+    with _disable_op_log_lock:
+        _ensure_disable_op_log_loaded_locked()
+        _disable_op_log.append(entry)
+        if len(_disable_op_log) > _DISABLE_OP_LOG_MAX:
+            del _disable_op_log[:-_DISABLE_OP_LOG_MAX]
+        _persist_disable_op_log_locked()
+
+
+def _disable_op_log_snapshot() -> list[dict]:
+    """Return a JSON-safe deep copy of disable operation log entries."""
+    with _disable_op_log_lock:
+        _ensure_disable_op_log_loaded_locked()
+        if not _disable_op_log:
+            return []
+        return json.loads(json.dumps(_disable_op_log, ensure_ascii=True))
+
+
+def _find_last_disable_entry_with_pending_revert() -> dict | None:
+    """Return the most recent disable log entry that still has unreverted moves.
+
+    Caller must hold `_disable_op_log_lock`.
+    """
+    for entry in reversed(_disable_op_log):
+        moves = entry.get("moves") or []
+        if any(not bool(move.get("reverted")) for move in moves if isinstance(move, dict)):
+            return entry
+    return None
+
+
+def _find_disable_entry_by_id(entry_id: str) -> dict | None:
+    """Return disable log entry by id, if present.
+
+    Caller must hold `_disable_op_log_lock`.
+    """
+    wanted = str(entry_id or "").strip()
+    if not wanted:
+        return None
+    for entry in _disable_op_log:
+        if str(entry.get("id") or "").strip() == wanted:
+            return entry
+    return None
+
+
+def _revert_disable_log_entry_inplace(entry: dict) -> dict:
+    """Revert pending moves for one disable log entry (entry mutated in-place)."""
+    success = 0
+    skipped = 0
+    failed = 0
+    results: list[dict] = []
+    now_iso = datetime.now(timezone.utc).isoformat()
+
+    for move in entry.get("moves") or []:
+        if not isinstance(move, dict):
+            continue
+        if bool(move.get("reverted")):
+            continue
+
+        from_name = str(move.get("from") or "").strip()
+        to_name = str(move.get("to") or "").strip()
+        if not from_name or not to_name:
+            failed += 1
+            results.append({"from": from_name, "to": to_name, "ok": False, "error": "invalid move metadata"})
+            continue
+
+        disabled_path = _resolve_custom_node_package_path(to_name)
+        if disabled_path:
+            try:
+                renamed = _toggle_custom_node_package_enabled(disabled_path, True)
+                move["reverted"] = True
+                move["reverted_at"] = now_iso
+                move["reverted_to"] = renamed.name
+                success += 1
+                results.append({"from": from_name, "to": to_name, "ok": True, "reverted_to": renamed.name})
+            except Exception as exc:
+                failed += 1
+                results.append({"from": from_name, "to": to_name, "ok": False, "error": str(exc)})
+            continue
+
+        already_enabled_path = _resolve_custom_node_package_path(from_name)
+        if already_enabled_path:
+            move["reverted"] = True
+            move["reverted_at"] = now_iso
+            move["reverted_to"] = from_name
+            skipped += 1
+            results.append({"from": from_name, "to": to_name, "ok": True, "skipped": True, "reason": "already enabled"})
+            continue
+
+        failed += 1
+        results.append({"from": from_name, "to": to_name, "ok": False, "error": "package folder not found for revert"})
+
+    pending_revert_count = sum(
+        1
+        for move in (entry.get("moves") or [])
+        if isinstance(move, dict) and not bool(move.get("reverted"))
+    )
+    entry["last_revert_at"] = now_iso
+    entry["last_revert_summary"] = {
+        "success": success,
+        "skipped": skipped,
+        "failed": failed,
+        "pending_revert_count": pending_revert_count,
+    }
+    _persist_disable_op_log_locked()
+    return {
+        "ok": failed == 0,
+        "batch_id": str(entry.get("id") or ""),
+        "success": success,
+        "skipped": skipped,
+        "failed": failed,
+        "pending_revert_count": pending_revert_count,
+        "results": results,
+    }
+
+
 def _image_samplers() -> list[str]:
     """Return sampler names from ComfyUI's KSampler metadata."""
     data = _comfy_get_object_info("KSampler")
@@ -328,6 +850,51 @@ def _image_controlnet_models() -> list[str]:
     if names and isinstance(names[0], list):
         return names[0]
     return []
+
+
+# Curated list used when ComfyUI's AIO_Preprocessor node is unavailable
+_CONTROLNET_PREPROCESSOR_FALLBACK = [
+    "none",
+    "CannyEdgePreprocessor",
+    "DepthAnythingV2Preprocessor",
+    "MiDaS-DepthMapPreprocessor",
+    "DWPreprocessor",
+    "OpenPose_Preprocessor",
+    "NormalBaePreprocessor",
+    "LineArtPreprocessor",
+    "LineArt_Anime_Preprocessor",
+    "HEDPreprocessor",
+    "SoftEdge_PIDI_Preprocessor",
+    "MLSDPreprocessor",
+    "ScribblePreprocessor",
+    "Scribble_XDoG_Preprocessor",
+    "ColorPreprocessor",
+    "TilePreprocessor",
+    "InpaintPreprocessor",
+    "SemSegPreprocessor",
+    "ShufflePreprocessor",
+]
+
+
+def _image_controlnet_preprocessors() -> list[str]:
+    """Return available ControlNet preprocessor names.
+
+    Queries the ComfyUI AIO_Preprocessor node (from comfyui-controlnet-aux).
+    Falls back to a curated static list when the node is not installed.
+    'none' (raw image, no preprocessing) is always the first option.
+    """
+    try:
+        data = _comfy_get_object_info("AIO_Preprocessor")
+        required = data.get("AIO_Preprocessor", {}).get("input", {}).get("required", {})
+        names = required.get("preprocessor", [[]])
+        if names and isinstance(names[0], list) and names[0]:
+            values: list[str] = names[0]
+            # Ensure 'none' is always first
+            filtered = ["none"] + [v for v in values if v.lower() != "none"]
+            return filtered
+    except Exception:
+        pass
+    return list(_CONTROLNET_PREPROCESSOR_FALLBACK)
 
 
 def _image_vae_models() -> list[str]:
@@ -658,14 +1225,14 @@ def _service_available(service: str) -> bool:
 
 def _restart_flask_via_helper(port: int = 5000) -> int:
     """Launch a detached helper that restarts this Flask app on the target port."""
-    script_path = Path(app.root_path) / "scripts" / "start_app.ps1"
+    script_path = Path(app.root_path) / "scripts" / "restart_and_wait.ps1"
     if not script_path.exists():
         raise FileNotFoundError(f"Missing restart helper script: {script_path}")
 
     if os.name == "nt":
         script_for_ps = str(script_path).replace("'", "''")
         ps_command = (
-            f"Start-Sleep -Milliseconds 800; & '{script_for_ps}' -Port {int(port)}"
+            f"Start-Sleep -Milliseconds 800; & '{script_for_ps}' -Port {int(port)} -TimeoutSec 45"
         )
         creationflags = subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS
         proc = subprocess.Popen(
@@ -1727,11 +2294,22 @@ def _resolve_comfy_root_dir() -> Path | None:
         return None
 
     candidate = Path(raw_path).expanduser()
-    if candidate.is_dir():
-        return candidate
     if candidate.is_file():
-        return candidate.parent
-    return None
+        candidate = candidate.parent
+    if not candidate.is_dir():
+        return None
+
+    # ComfyUI portable bundles often place the app under <root>/ComfyUI while
+    # users configure the top-level portable folder.
+    nested_comfy = candidate / "ComfyUI"
+    if nested_comfy.is_dir() and (
+        (nested_comfy / "main.py").exists()
+        or (nested_comfy / "output").is_dir()
+        or (nested_comfy / "input").is_dir()
+    ):
+        return nested_comfy
+
+    return candidate
 
 
 def _resolve_shared_models_root_dir() -> Path | None:
@@ -2051,6 +2629,25 @@ def _resolve_comfy_image_path(image_ref: dict) -> Path:
     return _safe_child_path(comfy_root, type_dir, *subfolder_parts, filename)
 
 
+def _fetch_comfy_image_bytes(image_ref: dict) -> bytes | None:
+    """Fetch image bytes from ComfyUI /view as a fallback for file actions."""
+    filename = str(image_ref.get("filename") or "").strip()
+    if not filename:
+        return None
+
+    params = {
+        "filename": filename,
+        "subfolder": str(image_ref.get("subfolder") or "").strip(),
+        "type": str(image_ref.get("type") or "output").strip(),
+    }
+    try:
+        upstream = requests.get(f"{COMFYUI_BASE_URL}/view", params=params, timeout=20)
+        upstream.raise_for_status()
+        return upstream.content
+    except requests.RequestException:
+        return None
+
+
 def _image_ref_matches(item: dict, image_ref: dict) -> bool:
     """Return True when history image reference equals the target image ref."""
     return (
@@ -2136,6 +2733,7 @@ def _build_txt2img_workflow(body: dict) -> tuple[dict, dict]:
 
     controlnet_model = (body.get("controlnet_model") or "").strip()
     controlnet_image_name = (body.get("controlnet_image_name") or "").strip()
+    controlnet_preprocessor = (body.get("controlnet_preprocessor") or "none").strip() or "none"
     controlnet_weight = _clamp_float(float(body.get("controlnet_weight", 1.0)), 0.0, 2.0)
     controlnet_start = _clamp_float(float(body.get("controlnet_start", 0.0)), 0.0, 1.0)
     controlnet_end = _clamp_float(float(body.get("controlnet_end", 1.0)), 0.0, 1.0)
@@ -2168,6 +2766,7 @@ def _build_txt2img_workflow(body: dict) -> tuple[dict, dict]:
         "hiresfix_denoise": hiresfix_denoise,
         "controlnet_model": controlnet_model,
         "controlnet_image_name": controlnet_image_name,
+        "controlnet_preprocessor": controlnet_preprocessor,
         "controlnet_weight": controlnet_weight,
         "controlnet_start": controlnet_start,
         "controlnet_end": controlnet_end,
@@ -2233,13 +2832,22 @@ def _build_txt2img_workflow(body: dict) -> tuple[dict, dict]:
         cn_apply = _nid()
         workflow[cn_loader] = {"class_type": "ControlNetLoader", "inputs": {"control_net_name": controlnet_model}}
         workflow[cn_img] = {"class_type": "LoadImage", "inputs": {"image": controlnet_image_name}}
+        # Optionally preprocess the control image
+        cn_image_ref = [cn_img, 0]
+        if controlnet_preprocessor and controlnet_preprocessor.lower() != "none":
+            cn_prep = _nid()
+            workflow[cn_prep] = {
+                "class_type": "AIO_Preprocessor",
+                "inputs": {"preprocessor": controlnet_preprocessor, "image": cn_image_ref},
+            }
+            cn_image_ref = [cn_prep, 0]
         workflow[cn_apply] = {
             "class_type": "ControlNetApplyAdvanced",
             "inputs": {
                 "positive": positive_ref,
                 "negative": negative_ref,
                 "control_net": [cn_loader, 0],
-                "image": [cn_img, 0],
+                "image": cn_image_ref,
                 "strength": controlnet_weight,
                 "start_percent": controlnet_start,
                 "end_percent": controlnet_end,
@@ -2247,8 +2855,6 @@ def _build_txt2img_workflow(body: dict) -> tuple[dict, dict]:
         }
         positive_ref = [cn_apply, 0]
         negative_ref = [cn_apply, 1]
-
-    # Flux guidance node: wraps positive conditioning; KSampler cfg is set to 1.0
     family = body.get("model_family") or _infer_image_model_family(model)
     if family == "flux":
         fg_node = _nid()
@@ -2426,6 +3032,7 @@ def _build_img2img_workflow(body: dict, uploaded_name: str) -> tuple[dict, dict]
 
     controlnet_model = (body.get("controlnet_model") or "").strip()
     controlnet_image_name = (body.get("controlnet_image_name") or "").strip()
+    controlnet_preprocessor = (body.get("controlnet_preprocessor") or "none").strip() or "none"
     controlnet_weight = _clamp_float(float(body.get("controlnet_weight", 1.0)), 0.0, 2.0)
     controlnet_start = _clamp_float(float(body.get("controlnet_start", 0.0)), 0.0, 1.0)
     controlnet_end = _clamp_float(float(body.get("controlnet_end", 1.0)), 0.0, 1.0)
@@ -2451,6 +3058,7 @@ def _build_img2img_workflow(body: dict, uploaded_name: str) -> tuple[dict, dict]
         "vae": custom_vae,
         "controlnet_model": controlnet_model,
         "controlnet_image_name": controlnet_image_name,
+        "controlnet_preprocessor": controlnet_preprocessor,
         "controlnet_weight": controlnet_weight,
         "controlnet_start": controlnet_start,
         "controlnet_end": controlnet_end,
@@ -2508,13 +3116,22 @@ def _build_img2img_workflow(body: dict, uploaded_name: str) -> tuple[dict, dict]
         cn_apply = _nid()
         workflow[cn_loader] = {"class_type": "ControlNetLoader", "inputs": {"control_net_name": controlnet_model}}
         workflow[cn_img] = {"class_type": "LoadImage", "inputs": {"image": controlnet_image_name}}
+        # Optionally preprocess the control image
+        cn_image_ref = [cn_img, 0]
+        if controlnet_preprocessor and controlnet_preprocessor.lower() != "none":
+            cn_prep = _nid()
+            workflow[cn_prep] = {
+                "class_type": "AIO_Preprocessor",
+                "inputs": {"preprocessor": controlnet_preprocessor, "image": cn_image_ref},
+            }
+            cn_image_ref = [cn_prep, 0]
         workflow[cn_apply] = {
             "class_type": "ControlNetApplyAdvanced",
             "inputs": {
                 "positive": positive_ref,
                 "negative": negative_ref,
                 "control_net": [cn_loader, 0],
-                "image": [cn_img, 0],
+                "image": cn_image_ref,
                 "strength": controlnet_weight,
                 "start_percent": controlnet_start,
                 "end_percent": controlnet_end,
@@ -3782,6 +4399,31 @@ def api_status():
     )
 
 
+@app.route("/api/healthz")
+def api_healthz():
+    """Return backend liveness with build and startup metadata."""
+    text_available = _ollama_available()
+    image_available = _comfy_available()
+    uptime_seconds = max(0, int((datetime.now(timezone.utc) - APP_STARTED_AT_UTC).total_seconds()))
+    disable_log_store = _disable_op_log_store_health()
+    return jsonify(
+        {
+            "ok": True,
+            "app": {
+                "asset_version": ASSET_VERSION,
+                "template_version": TEMPLATE_VERSION,
+                "started_at": APP_STARTED_AT_UTC.isoformat(),
+                "uptime_seconds": uptime_seconds,
+                "disable_log_store": disable_log_store,
+            },
+            "services": {
+                "text_available": text_available,
+                "image_available": image_available,
+            },
+        }
+    )
+
+
 @app.route("/api/diagnostics/service-logs")
 def api_diagnostics_service_logs():
     """Return tail output for managed service logs and last known launch errors."""
@@ -3797,6 +4439,14 @@ def api_diagnostics_service_logs():
             },
         }
     )
+
+
+@app.route("/api/diagnostics/repair-disable-log", methods=["POST"])
+def api_diagnostics_repair_disable_log():
+    """Repair the persisted disable-operation log file and refresh in-memory state."""
+    with _disable_op_log_lock:
+        payload = _repair_disable_op_log_store_locked()
+    return jsonify(payload)
 
 
 @app.route("/api/config/services", methods=["GET", "POST"])
@@ -4151,6 +4801,335 @@ def api_image_models():
     return jsonify({"models": models, "model_details": model_details})
 
 
+@app.route("/api/comfy/custom-nodes")
+def api_comfy_custom_nodes():
+    """List ComfyUI custom nodes (optionally including built-ins)."""
+    if not _comfy_available():
+        return jsonify({"nodes": [], "error": "ComfyUI is not available"}), 503
+
+    include_builtin = request.args.get("include_builtin", "0") in {"1", "true", "yes"}
+    nodes = _comfy_custom_nodes(include_builtin=include_builtin)
+    custom_count = sum(1 for row in nodes if row.get("is_custom"))
+
+    return jsonify(
+        {
+            "nodes": nodes,
+            "include_builtin": include_builtin,
+            "count": len(nodes),
+            "custom_count": custom_count,
+        }
+    )
+
+
+@app.route("/api/comfy/custom-node-packages")
+def api_comfy_custom_node_packages():
+    """List installed ComfyUI custom-node package folders from disk."""
+    if not _comfy_available():
+        return jsonify({"packages": [], "error": "ComfyUI is not available"}), 503
+
+    packages = _comfy_custom_node_packages()
+    return jsonify(
+        {
+            "packages": packages,
+            "count": len(packages),
+            "enabled_count": sum(1 for row in packages if row.get("enabled")),
+        }
+    )
+
+
+@app.route("/api/comfy/custom-node-packages/details")
+def api_comfy_custom_node_package_details():
+    """Return details/status for one installed custom-node package folder."""
+    if not _comfy_available():
+        return jsonify({"ok": False, "error": "ComfyUI is not available"}), 503
+
+    package_name = (request.args.get("name") or "").strip()
+    if not package_name:
+        return jsonify({"ok": False, "error": "name is required"}), 400
+
+    package_path = _resolve_custom_node_package_path(package_name)
+    if not package_path:
+        return jsonify({"ok": False, "error": "package folder not found"}), 404
+
+    git_info = _collect_custom_node_package_git_info(package_path)
+    return jsonify(
+        {
+            "ok": True,
+            "name": package_name,
+            "path": str(package_path),
+            "enabled": not package_name.startswith("_"),
+            "git": git_info,
+        }
+    )
+
+
+@app.route("/api/comfy/custom-node-packages/open", methods=["POST"])
+def api_comfy_custom_node_package_open():
+    """Open a custom-node package folder in the OS file explorer."""
+    if not _comfy_available():
+        return jsonify({"ok": False, "error": "ComfyUI is not available"}), 503
+
+    body = request.get_json(silent=True) or {}
+    package_name = str(body.get("name") or "").strip()
+    if not package_name:
+        return jsonify({"ok": False, "error": "name is required"}), 400
+
+    package_path = _resolve_custom_node_package_path(package_name)
+    if not package_path:
+        return jsonify({"ok": False, "error": "package folder not found"}), 404
+
+    try:
+        if sys.platform.startswith("win"):
+            subprocess.Popen(["explorer", str(package_path)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        elif sys.platform == "darwin":
+            subprocess.Popen(["open", str(package_path)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        else:
+            subprocess.Popen(["xdg-open", str(package_path)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except OSError as exc:
+        logger.error("Failed to open custom-node package folder: %s", exc)
+        return jsonify({"ok": False, "error": f"Failed to open folder: {exc}"}), 500
+
+    return jsonify({"ok": True, "name": package_name})
+
+
+@app.route("/api/comfy/custom-node-packages/toggle", methods=["POST"])
+def api_comfy_custom_node_package_toggle():
+    """Enable or disable a custom-node package by folder rename convention."""
+    if not _comfy_available():
+        return jsonify({"ok": False, "error": "ComfyUI is not available"}), 503
+
+    body = request.get_json(silent=True) or {}
+    package_name = str(body.get("name") or "").strip()
+    enabled = body.get("enabled")
+    if not package_name:
+        return jsonify({"ok": False, "error": "name is required"}), 400
+    if not isinstance(enabled, bool):
+        return jsonify({"ok": False, "error": "enabled must be true or false"}), 400
+
+    package_path = _resolve_custom_node_package_path(package_name)
+    if not package_path:
+        return jsonify({"ok": False, "error": "package folder not found"}), 404
+
+    try:
+        renamed_path = _toggle_custom_node_package_enabled(package_path, enabled)
+    except FileExistsError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 409
+    except Exception as exc:
+        logger.error("Failed to toggle custom-node package %s: %s", package_name, exc)
+        return jsonify({"ok": False, "error": str(exc)}), 500
+
+    return jsonify(
+        {
+            "ok": True,
+            "name": package_name,
+            "enabled": enabled,
+            "renamed_to": renamed_path.name,
+        }
+    )
+
+
+@app.route("/api/comfy/custom-node-packages/update", methods=["POST"])
+def api_comfy_custom_node_package_update():
+    """Run git pull for one custom-node package folder."""
+    if not _comfy_available():
+        return jsonify({"ok": False, "error": "ComfyUI is not available"}), 503
+
+    body = request.get_json(silent=True) or {}
+    package_name = str(body.get("name") or "").strip()
+    if not package_name:
+        return jsonify({"ok": False, "error": "name is required"}), 400
+
+    package_path = _resolve_custom_node_package_path(package_name)
+    if not package_path:
+        return jsonify({"ok": False, "error": "package folder not found"}), 404
+
+    try:
+        result = _run_custom_node_package_git_pull(package_path)
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except RuntimeError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 502
+    except Exception as exc:
+        logger.error("Failed to update custom-node package %s: %s", package_name, exc)
+        return jsonify({"ok": False, "error": str(exc)}), 500
+
+    return jsonify(
+        {
+            "ok": True,
+            "name": package_name,
+            "message": result["message"],
+            "git": result["git"],
+        }
+    )
+
+
+@app.route("/api/comfy/custom-node-packages/bulk", methods=["POST"])
+def api_comfy_custom_node_packages_bulk():
+    """Run bulk operations for custom-node package folders."""
+    if not _comfy_available():
+        return jsonify({"ok": False, "error": "ComfyUI is not available"}), 503
+
+    body = request.get_json(silent=True) or {}
+    action = str(body.get("action") or "").strip().lower()
+    dry_run = bool(body.get("dry_run", False))
+    selected_names_raw = body.get("names")
+    selected_names: set[str] | None = None
+    if selected_names_raw is not None:
+        if not isinstance(selected_names_raw, list):
+            return jsonify({"ok": False, "error": "names must be an array when provided"}), 400
+        selected_names = {
+            str(item).strip()
+            for item in selected_names_raw
+            if str(item).strip()
+        }
+    if action not in {"update_all", "disable_non_core"}:
+        return jsonify({"ok": False, "error": "action must be update_all or disable_non_core"}), 400
+
+    packages = _comfy_custom_node_packages()
+    results: list[dict] = []
+    success = 0
+    skipped = 0
+    failed = 0
+    applied_disable_moves: list[dict] = []
+    logged_batch_id = ""
+
+    for pkg in packages:
+        name = str(pkg.get("name") or "").strip()
+        if not name:
+            continue
+        package_path = _resolve_custom_node_package_path(name)
+        if not package_path:
+            failed += 1
+            results.append({"name": name, "ok": False, "error": "package folder not found"})
+            continue
+
+        if action == "disable_non_core":
+            if selected_names is not None and name not in selected_names:
+                skipped += 1
+                results.append({"name": name, "ok": True, "skipped": True, "reason": "not selected"})
+                continue
+            if _is_core_custom_node_package(name):
+                skipped += 1
+                results.append({"name": name, "ok": True, "skipped": True, "reason": "core package"})
+                continue
+            if name.startswith("_"):
+                skipped += 1
+                results.append({"name": name, "ok": True, "skipped": True, "reason": "already disabled"})
+                continue
+            if dry_run:
+                success += 1
+                results.append({"name": name, "ok": True, "would_disable": True, "renamed_to": f"_{name}"})
+                continue
+            try:
+                renamed = _toggle_custom_node_package_enabled(package_path, False)
+                success += 1
+                results.append({"name": name, "ok": True, "renamed_to": renamed.name})
+                applied_disable_moves.append({"from": name, "to": renamed.name, "reverted": False, "reverted_at": ""})
+            except Exception as exc:
+                failed += 1
+                results.append({"name": name, "ok": False, "error": str(exc)})
+            continue
+
+        # action == update_all
+        try:
+            update_result = _run_custom_node_package_git_pull(package_path)
+            success += 1
+            results.append({"name": name, "ok": True, "message": update_result.get("message", "")})
+        except ValueError as exc:
+            skipped += 1
+            results.append({"name": name, "ok": True, "skipped": True, "reason": str(exc)})
+        except Exception as exc:
+            failed += 1
+            results.append({"name": name, "ok": False, "error": str(exc)})
+
+    if action == "disable_non_core" and not dry_run and applied_disable_moves:
+        logged_batch_id = f"disable-{int(time.time() * 1000)}"
+        _append_disable_op_log_entry(
+            {
+                "id": logged_batch_id,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "action": action,
+                "selected_names": sorted(selected_names) if selected_names else [],
+                "summary": {
+                    "total": len(results),
+                    "success": success,
+                    "skipped": skipped,
+                    "failed": failed,
+                },
+                "moves": applied_disable_moves,
+            }
+        )
+
+    return jsonify(
+        {
+            "ok": failed == 0,
+            "action": action,
+            "dry_run": dry_run,
+            "total": len(results),
+            "success": success,
+            "skipped": skipped,
+            "failed": failed,
+            "results": results,
+            "logged_batch_id": logged_batch_id,
+        }
+    )
+
+
+@app.route("/api/comfy/custom-node-packages/disable-log")
+def api_comfy_custom_node_packages_disable_log():
+    """Return recent disable_non_core operation log entries."""
+    entries = _disable_op_log_snapshot()
+    for entry in entries:
+        moves = entry.get("moves") or []
+        entry["pending_revert_count"] = sum(
+            1
+            for move in moves
+            if isinstance(move, dict) and not bool(move.get("reverted"))
+        )
+    entries.reverse()
+    return jsonify({"ok": True, "total": len(entries), "entries": entries})
+
+
+@app.route("/api/comfy/custom-node-packages/revert-last-disable", methods=["POST"])
+def api_comfy_custom_node_packages_revert_last_disable():
+    """Attempt to revert the most recent disable batch that has pending moves."""
+    if not _comfy_available():
+        return jsonify({"ok": False, "error": "ComfyUI is not available"}), 503
+
+    with _disable_op_log_lock:
+        _ensure_disable_op_log_loaded_locked()
+        entry = _find_last_disable_entry_with_pending_revert()
+        if not entry:
+            return jsonify({"ok": False, "error": "No disable batch available to revert"}), 404
+
+        payload = _revert_disable_log_entry_inplace(entry)
+        return jsonify(payload)
+
+
+@app.route("/api/comfy/custom-node-packages/revert-disable-batch", methods=["POST"])
+def api_comfy_custom_node_packages_revert_disable_batch():
+    """Attempt to revert one disable batch by id."""
+    if not _comfy_available():
+        return jsonify({"ok": False, "error": "ComfyUI is not available"}), 503
+
+    body = request.get_json(silent=True) or {}
+    batch_id = str(body.get("batch_id") or "").strip()
+    if not batch_id:
+        return jsonify({"ok": False, "error": "batch_id is required"}), 400
+
+    with _disable_op_log_lock:
+        _ensure_disable_op_log_loaded_locked()
+        entry = _find_disable_entry_by_id(batch_id)
+        if not entry:
+            return jsonify({"ok": False, "error": "Disable batch not found"}), 404
+        moves = entry.get("moves") or []
+        if not any(not bool(move.get("reverted")) for move in moves if isinstance(move, dict)):
+            return jsonify({"ok": False, "error": "Disable batch is already fully reverted"}), 409
+
+        payload = _revert_disable_log_entry_inplace(entry)
+        return jsonify(payload)
+
+
 @app.route("/api/image/samplers")
 def api_image_samplers():
     """List ComfyUI sampler names."""
@@ -4218,6 +5197,17 @@ def api_image_controlnet_models():
     if not _comfy_available():
         return jsonify({"models": [], "error": "ComfyUI is not available"}), 503
     return jsonify({"models": _image_controlnet_models()})
+
+
+@app.route("/api/image/controlnet-preprocessors")
+def api_image_controlnet_preprocessors():
+    """List available ControlNet preprocessor names.
+
+    Returns the dynamic list from the AIO_Preprocessor node when available,
+    otherwise the curated static fallback.  Does NOT require ComfyUI to be
+    reachable so the UI can populate before a connection is established.
+    """
+    return jsonify({"preprocessors": _image_controlnet_preprocessors()})
 
 
 @app.route("/api/image/upload-image", methods=["POST"])
@@ -4685,26 +5675,45 @@ def api_gallery_bulk_export():
 
     buf = io.BytesIO()
     added = 0
+    existing_names: set[str] = set()
     with zipfile.ZipFile(buf, "w", compression=zipfile.ZIP_DEFLATED, allowZip64=True) as zf:
         for raw_ref in image_refs[:200]:  # cap at 200 per request
             if not isinstance(raw_ref, dict):
                 continue
             image_ref = _normalize_image_ref(raw_ref)
-            try:
-                image_path = _resolve_comfy_image_path(image_ref)
-            except ValueError:
+
+            filename = str(image_ref.get("filename") or "").strip()
+            if not filename:
                 continue
-            if not image_path.exists():
-                continue
-            arcname = image_path.name
-            # Avoid duplicate arc names by appending a counter suffix if needed
-            existing = {zi.filename for zi in zf.infolist()}
+
+            arcname = Path(filename).name
             stem, ext = os.path.splitext(arcname)
             counter = 1
-            while arcname in existing:
+            while arcname in existing_names:
                 arcname = f"{stem}_{counter}{ext}"
                 counter += 1
-            zf.write(image_path, arcname)
+
+            image_path = None
+            try:
+                candidate_path = _resolve_comfy_image_path(image_ref)
+                if candidate_path.exists():
+                    image_path = candidate_path
+            except ValueError:
+                image_path = None
+
+            if image_path is not None:
+                zf.write(image_path, arcname)
+                existing_names.add(arcname)
+                added += 1
+                continue
+
+            # Fallback: pull bytes from ComfyUI /view when local path resolution
+            # misses (common with portable or externally managed Comfy installs).
+            image_bytes = _fetch_comfy_image_bytes(image_ref)
+            if image_bytes is None:
+                continue
+            zf.writestr(arcname, image_bytes)
+            existing_names.add(arcname)
             added += 1
 
     if not added:
@@ -4766,4 +5775,4 @@ if __name__ == "__main__":
     print("  Local AI Model Interface")
     print("  Open http://localhost:5000 in your browser")
     print("=" * 60 + "\n")
-    app.run(host="0.0.0.0", port=5000, debug=False)
+    app.run(host="0.0.0.0", port=5000, debug=False, threaded=True)

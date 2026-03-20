@@ -403,6 +403,85 @@ def test_build_txt2img_workflow_includes_controlnet_nodes(monkeypatch):
     assert meta["controlnet_model"] == "control_v11p_sd15_canny.safetensors"
 
 
+def test_image_controlnet_preprocessors_endpoint(client):
+    resp = client.get("/api/image/controlnet-preprocessors")
+
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert "preprocessors" in data
+    preprocessors = data["preprocessors"]
+    assert isinstance(preprocessors, list)
+    assert preprocessors[0] == "none"
+    assert len(preprocessors) > 1
+
+
+def test_build_txt2img_workflow_includes_controlnet_preprocessor_node(monkeypatch):
+    monkeypatch.setattr(app_module, "_image_models", lambda: ["base.safetensors"])
+
+    workflow, meta = app_module._build_txt2img_workflow(
+        {
+            "prompt": "city skyline",
+            "negative_prompt": "",
+            "model": "base.safetensors",
+            "sampler": "euler",
+            "controlnet_model": "control_v11p_sd15_canny.safetensors",
+            "controlnet_image_name": "cn-input.png",
+            "controlnet_preprocessor": "CannyEdgePreprocessor",
+            "controlnet_weight": 0.8,
+            "controlnet_start": 0.0,
+            "controlnet_end": 1.0,
+        }
+    )
+
+    # AIO_Preprocessor node must be present
+    prep_nodes = [v for v in workflow.values() if v.get("class_type") == "AIO_Preprocessor"]
+    assert len(prep_nodes) == 1
+    assert prep_nodes[0]["inputs"]["preprocessor"] == "CannyEdgePreprocessor"
+
+    # ControlNetApplyAdvanced image input must point to the preprocessor output, not raw LoadImage
+    cn_applies = {k: v for k, v in workflow.items() if v.get("class_type") == "ControlNetApplyAdvanced"}
+    assert len(cn_applies) == 1
+    cn_apply_node = next(iter(cn_applies.values()))
+    cn_image_ref = cn_apply_node["inputs"]["image"]
+    prep_key = next(k for k, v in workflow.items() if v.get("class_type") == "AIO_Preprocessor")
+    assert cn_image_ref == [prep_key, 0]
+
+    assert meta["controlnet_preprocessor"] == "CannyEdgePreprocessor"
+
+
+def test_build_txt2img_workflow_no_preprocessor_node_when_none(monkeypatch):
+    monkeypatch.setattr(app_module, "_image_models", lambda: ["base.safetensors"])
+
+    workflow, meta = app_module._build_txt2img_workflow(
+        {
+            "prompt": "portrait",
+            "negative_prompt": "",
+            "model": "base.safetensors",
+            "sampler": "euler",
+            "controlnet_model": "control_v11p_sd15_canny.safetensors",
+            "controlnet_image_name": "cn-input.png",
+            "controlnet_preprocessor": "none",
+            "controlnet_weight": 1.0,
+            "controlnet_start": 0.0,
+            "controlnet_end": 1.0,
+        }
+    )
+
+    # No preprocessor node for 'none'
+    prep_nodes = [v for v in workflow.values() if v.get("class_type") == "AIO_Preprocessor"]
+    assert len(prep_nodes) == 0
+
+    # ControlNetApplyAdvanced image input points directly to LoadImage output
+    raw_load = next(
+        k for k, v in workflow.items()
+        if v.get("class_type") == "LoadImage" and v["inputs"].get("image") == "cn-input.png"
+    )
+    cn_apply_node = next(v for v in workflow.values() if v.get("class_type") == "ControlNetApplyAdvanced")
+    assert cn_apply_node["inputs"]["image"] == [raw_load, 0]
+
+    assert meta["controlnet_preprocessor"] == "none"
+
+
 def test_image_prompt_suggestions_requires_all_fields(client, monkeypatch):
     monkeypatch.setattr(app_module, "_ollama_available", lambda: True)
 

@@ -145,6 +145,31 @@ def test_app_restart_reports_helper_error(client, monkeypatch):
     assert "helper failed" in resp.get_json()["error"]
 
 
+def test_restart_flask_via_helper_uses_restart_and_wait_script_on_windows(monkeypatch):
+    if app_module.os.name != "nt":
+        pytest.skip("Windows-specific restart helper invocation")
+
+    seen = {}
+
+    class _Proc:
+        pid = 4242
+
+    def fake_popen(args, **kwargs):
+        seen["args"] = args
+        seen["kwargs"] = kwargs
+        return _Proc()
+
+    monkeypatch.setattr(app_module.subprocess, "Popen", fake_popen)
+
+    helper_pid = app_module._restart_flask_via_helper(port=5007)
+
+    assert helper_pid == 4242
+    cmd = " ".join(str(x) for x in seen["args"])
+    assert "restart_and_wait.ps1" in cmd
+    assert "-Port 5007" in cmd
+    assert "-TimeoutSec 45" in cmd
+
+
 def test_comfy_models_root_prefers_shared_path(client, tmp_path):
     shared_root = tmp_path / "shared-models"
     client.post(

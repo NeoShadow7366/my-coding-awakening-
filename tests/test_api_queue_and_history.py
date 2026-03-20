@@ -850,3 +850,58 @@ def test_gallery_bulk_export_returns_zip_with_images(client, monkeypatch, tmp_pa
         assert "exp_b.png" in names
         assert zf.read("exp_a.png") == b"PNG-A"
         assert zf.read("exp_b.png") == b"PNG-B"
+
+
+def test_gallery_bulk_export_falls_back_to_comfy_view_when_local_missing(client, monkeypatch, tmp_path):
+    import zipfile as _zf
+    import io as _io
+
+    missing = tmp_path / "missing.png"
+    ref = {"filename": "from-comfy.png", "subfolder": "", "type": "output"}
+
+    monkeypatch.setattr(app_module, "_resolve_comfy_image_path", lambda _: missing)
+
+    class _Resp:
+        def __init__(self):
+            self.content = b"PNG-FROM-COMFY"
+
+        def raise_for_status(self):
+            return None
+
+    monkeypatch.setattr(app_module.requests, "get", lambda *args, **kwargs: _Resp())
+
+    resp = client.post("/api/gallery/bulk-export", json={"image_refs": [ref]})
+    assert resp.status_code == 200
+    assert resp.mimetype == "application/zip"
+
+    buf = _io.BytesIO(resp.data)
+    with _zf.ZipFile(buf) as zf:
+        names = zf.namelist()
+        assert "from-comfy.png" in names
+        assert zf.read("from-comfy.png") == b"PNG-FROM-COMFY"
+
+
+def test_resolve_comfy_root_dir_prefers_nested_portable_comfy_folder(tmp_path, monkeypatch):
+    portable_root = tmp_path / "ComfyUI_windows_portable"
+    nested_comfy = portable_root / "ComfyUI"
+    (nested_comfy / "output").mkdir(parents=True)
+    (nested_comfy / "main.py").write_text("print('ok')", encoding="utf-8")
+
+    monkeypatch.setattr(app_module, "_load_service_config", lambda: {"comfyui_path": str(portable_root)})
+
+    resolved = app_module._resolve_comfy_root_dir()
+    assert resolved == nested_comfy
+
+
+def test_resolve_comfy_root_dir_uses_parent_for_script_path_and_detects_nested_comfy(tmp_path, monkeypatch):
+    portable_root = tmp_path / "ComfyUI_windows_portable"
+    nested_comfy = portable_root / "ComfyUI"
+    nested_comfy.mkdir(parents=True)
+    (nested_comfy / "main.py").write_text("print('ok')", encoding="utf-8")
+    run_bat = portable_root / "run_nvidia_gpu.bat"
+    run_bat.write_text("@echo off", encoding="utf-8")
+
+    monkeypatch.setattr(app_module, "_load_service_config", lambda: {"comfyui_path": str(run_bat)})
+
+    resolved = app_module._resolve_comfy_root_dir()
+    assert resolved == nested_comfy

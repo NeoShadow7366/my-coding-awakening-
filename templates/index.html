@@ -283,6 +283,13 @@
           </select>
         </div>
 
+        <label for="controlnet-preprocessor-select" class="field-label">Preprocessor</label>
+        <div class="select-wrapper">
+          <select id="controlnet-preprocessor-select">
+            <option value="none">none (raw image)</option>
+          </select>
+        </div>
+
         <label for="controlnet-image-upload" class="field-label">Control Image</label>
         <input id="controlnet-image-upload" type="file" accept="image/*" />
         <div id="controlnet-image-preview-wrap" class="controlnet-image-preview-wrap" hidden>
@@ -353,6 +360,8 @@
         <div class="config-actions-row" role="group" aria-label="Diagnostics actions">
           <button class="btn btn-ghost btn-xs" id="diag-copy-btn" type="button" title="Copy the current diagnostics snapshot">Copy status</button>
           <button class="btn btn-ghost btn-xs" id="diag-ws-retry-btn" type="button">Retry WS</button>
+          <button class="btn btn-ghost btn-xs" id="diag-disable-log-repair-btn" type="button" title="Repair malformed disable log storage">Repair log</button>
+          <button class="btn btn-ghost btn-xs" id="diag-clear-repair-status-btn" type="button" title="Clear last repair status">Clear repair</button>
           <button class="btn btn-ghost btn-xs" id="diagnostics-run-btn" type="button">Run checks</button>
         </div>
       </div>
@@ -362,11 +371,14 @@
         <li><span class="diagnostics-label">Image engine</span><span id="diag-image-status" class="diagnostics-value">-</span></li>
         <li><span class="diagnostics-label">Checkpoints</span><span id="diag-checkpoints" class="diagnostics-value">-</span></li>
         <li><span class="diagnostics-label">Samplers</span><span id="diag-samplers" class="diagnostics-value">-</span></li>
+        <li><span class="diagnostics-label">Backend health</span><span id="diag-backend-health" class="diagnostics-value">-</span></li>
+        <li><span class="diagnostics-label">Disable log store</span><span id="diag-disable-log-health" class="diagnostics-value">-</span></li>
         <li><span class="diagnostics-label">Frontend build</span><span id="diag-frontend-build" class="diagnostics-value">{{ asset_version }}</span></li>
         <li><span class="diagnostics-label">Last run</span><span id="diag-last-run" class="diagnostics-value">never</span></li>
       </ul>
       <p id="poll-owner-status" class="hint poll-owner-status" aria-live="polite">Polling tab: checking lease...</p>
       <p id="ws-transport-status" class="hint poll-owner-status" aria-live="polite">Preview transport: checking...</p>
+      <p id="diag-repair-status" class="hint" aria-live="polite">Last repair: never.</p>
       <p id="diagnostics-hint" class="hint">Use Run checks for quick backend diagnostics.</p>
     </div>
   </aside>
@@ -474,6 +486,11 @@
                 <ul id="prompt-recent-dropdown" class="prompt-recent-dropdown" role="listbox" aria-label="Recent prompts" hidden aria-hidden="true"></ul>
               </div>
             </div>
+          </div>
+          <div class="prompt-weight-toolbar" role="group" aria-label="Prompt weight helpers">
+            <button class="btn btn-ghost btn-xs" id="prompt-weight-up-btn" type="button" title="Wrap selection as (text:1.2)">(text:1.2)</button>
+            <button class="btn btn-ghost btn-xs" id="prompt-weight-down-btn" type="button" title="Wrap selection as [text:0.8]">[text:0.8]</button>
+            <button class="btn btn-ghost btn-xs" id="prompt-break-wrap-btn" type="button" title="Insert or wrap with BREAK">BREAK</button>
           </div>
           <textarea id="image-prompt" rows="4" placeholder="A cinematic forest temple, volumetric light, detailed illustration"></textarea>
           <div class="prompt-history-row" aria-label="Prompt history quick picks">
@@ -685,6 +702,11 @@
               <option value="favorites">&#9733; Favorites</option>
             </select>
           </div>
+          <div class="select-wrapper gallery-tag-filter-wrap">
+            <select id="gallery-tag-filter" aria-label="Filter by tag">
+              <option value="all">All tags</option>
+            </select>
+          </div>
           <button class="btn btn-ghost btn-xs" id="gallery-view-toggle" type="button" aria-pressed="false">Grid</button>
           <button class="btn btn-ghost btn-xs" id="gallery-select-mode-btn" type="button" aria-pressed="false">Select</button>
           <button class="btn btn-ghost btn-xs" id="refresh-gallery" type="button">Refresh</button>
@@ -729,7 +751,10 @@
           <div id="gallery-lightbox-meta-chips" class="gallery-lightbox-meta-chips"></div>
           <div class="gallery-lightbox-meta-actions">
             <button id="gallery-lightbox-reuse" class="btn btn-secondary btn-xs" type="button">&#8617; Re-use settings</button>
+            <input id="gallery-lightbox-tag-input" class="gallery-lightbox-tag-input" type="text" maxlength="40" placeholder="Add tag" aria-label="Add tag to this image" />
+            <button id="gallery-lightbox-add-tag-btn" class="btn btn-ghost btn-xs" type="button">Add tag</button>
           </div>
+          <div id="gallery-lightbox-tags" class="gallery-lightbox-tags" aria-live="polite"></div>
         </div>
       </div>
     </div>
@@ -850,6 +875,71 @@
       </div>
       <p id="config-comfy-version-info" class="hint">Version info: checking...</p>
       <p id="config-comfy-status" class="hint">Awaiting action.</p>
+    </section>
+
+    <section class="config-card" aria-label="ComfyUI custom nodes browser">
+      <h2 class="section-heading">ComfyUI Custom Nodes</h2>
+      <p class="section-desc">Read-only browser for nodes discovered from ComfyUI object metadata.</p>
+      <div class="config-actions-row" role="group" aria-label="ComfyUI custom node browser actions">
+        <input id="config-comfy-nodes-search" type="search" placeholder="Filter by node name, type, category, module" aria-label="Filter ComfyUI custom nodes" autocomplete="off" />
+        <label class="config-inline-checkbox" for="config-comfy-nodes-include-builtins">
+          <input id="config-comfy-nodes-include-builtins" type="checkbox" />
+          Show built-in nodes
+        </label>
+        <button class="btn btn-ghost btn-xs" id="config-comfy-nodes-refresh" type="button">Refresh list</button>
+      </div>
+      <p id="config-comfy-nodes-status" class="hint">Loading ComfyUI nodes...</p>
+      <div id="config-comfy-nodes-list" class="config-comfy-nodes-list" aria-live="polite"></div>
+      <p id="config-comfy-packages-status" class="hint">Loading installed custom-node packages...</p>
+      <div class="config-actions-row" role="group" aria-label="ComfyUI custom node package bulk actions">
+        <button class="btn btn-ghost btn-xs" id="config-comfy-packages-update-all" type="button">Update all packages</button>
+        <button class="btn btn-ghost btn-xs" id="config-comfy-packages-preview-disable-noncore" type="button">Preview disable non-core</button>
+        <button class="btn btn-ghost btn-xs" id="config-comfy-packages-disable-noncore" type="button">Disable non-core</button>
+      </div>
+      <div id="config-comfy-disable-preview" class="config-comfy-disable-preview" hidden>
+        <p id="config-comfy-disable-preview-summary" class="hint">Preview not loaded.</p>
+        <input id="config-comfy-disable-preview-filter" type="search" placeholder="Filter preview packages" aria-label="Filter disable preview packages" autocomplete="off" />
+        <label class="config-inline-checkbox" for="config-comfy-disable-preview-selected-only">
+          <input id="config-comfy-disable-preview-selected-only" type="checkbox" />
+          Show selected only
+        </label>
+        <div class="config-actions-row" role="group" aria-label="Disable preview selection actions">
+          <button class="btn btn-ghost btn-xs" id="config-comfy-disable-preview-select-all" type="button">Select all</button>
+          <button class="btn btn-ghost btn-xs" id="config-comfy-disable-preview-select-visible" type="button">Select visible</button>
+          <button class="btn btn-ghost btn-xs" id="config-comfy-disable-preview-invert" type="button">Invert selection</button>
+          <button class="btn btn-ghost btn-xs" id="config-comfy-disable-preview-clear-visible" type="button">Clear visible</button>
+          <button class="btn btn-ghost btn-xs" id="config-comfy-disable-preview-clear" type="button">Clear selection</button>
+          <button class="btn btn-ghost btn-xs" id="config-comfy-disable-preview-copy-selected" type="button">Copy selected</button>
+          <button class="btn btn-ghost btn-xs" id="config-comfy-disable-preview-copy-csv" type="button">Copy CSV</button>
+          <button class="btn btn-ghost btn-xs" id="config-comfy-disable-preview-download-selected" type="button">Download selected</button>
+          <button class="btn btn-ghost btn-xs" id="config-comfy-disable-preview-download-csv" type="button">Download CSV</button>
+          <button class="btn btn-ghost btn-xs" id="config-comfy-disable-preview-download-json" type="button">Download JSON</button>
+          <button class="btn btn-ghost btn-xs" id="config-comfy-disable-preview-reset-prefs" type="button">Reset preview prefs</button>
+        </div>
+        <p id="config-comfy-disable-preview-export-status" class="hint">No export yet.</p>
+        <button class="btn btn-ghost btn-xs" id="config-comfy-disable-preview-export-history-copy" type="button">Copy export history</button>
+        <button class="btn btn-ghost btn-xs" id="config-comfy-disable-preview-export-history-copy-json" type="button">Copy export history JSON</button>
+        <button class="btn btn-ghost btn-xs" id="config-comfy-disable-preview-export-history-download" type="button">Download export history</button>
+        <button class="btn btn-ghost btn-xs" id="config-comfy-disable-preview-export-history-download-csv" type="button">Download export history CSV</button>
+        <button class="btn btn-ghost btn-xs" id="config-comfy-disable-preview-export-history-download-json" type="button">Download export history JSON</button>
+        <button class="btn btn-ghost btn-xs" id="config-comfy-disable-preview-export-history-clear" type="button">Clear export history</button>
+        <p id="config-comfy-disable-preview-export-history-meta" class="hint">History 0/5</p>
+        <ul id="config-comfy-disable-preview-export-history" class="config-comfy-disable-preview-export-history" aria-live="polite"></ul>
+        <div id="config-comfy-disable-preview-list" class="config-comfy-disable-preview-list" aria-live="polite"></div>
+        <button class="btn btn-primary btn-xs" id="config-comfy-disable-preview-confirm" type="button">Confirm disable non-core</button>
+      </div>
+      <div id="config-comfy-packages-list" class="config-comfy-packages-list" aria-live="polite"></div>
+      <p id="config-comfy-package-details" class="hint">Select a package for details.</p>
+      <div class="config-actions-row" role="group" aria-label="Disable operation log actions">
+        <button class="btn btn-ghost btn-xs" id="config-comfy-disable-log-refresh" type="button">Refresh disable log</button>
+        <button class="btn btn-ghost btn-xs" id="config-comfy-disable-log-revert-last" type="button">Revert last disable batch</button>
+        <label class="config-inline-checkbox" for="config-comfy-disable-log-pending-only">
+          <input id="config-comfy-disable-log-pending-only" type="checkbox" />
+          Show pending only
+        </label>
+      </div>
+      <p id="config-comfy-disable-log-status" class="hint">Disable operation log not loaded.</p>
+      <div id="config-comfy-disable-log-list" class="config-comfy-disable-log-list" aria-live="polite"></div>
     </section>
 
     <section class="config-card" aria-label="Flask app controls">

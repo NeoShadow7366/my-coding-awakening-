@@ -262,6 +262,7 @@ def test_index_config_service_action_group_semantics():
 
     assert '<div class="config-actions-row" role="group" aria-label="Ollama service actions">' in html
     assert '<div class="config-actions-row" role="group" aria-label="ComfyUI service actions">' in html
+    assert '<div class="config-actions-row" role="group" aria-label="ComfyUI custom node browser actions">' in html
     assert '<div class="config-actions-row" role="group" aria-label="Flask app actions">' in html
 
 
@@ -276,6 +277,270 @@ def test_config_service_keyboard_handler_wiring_present_in_js_bundle():
     assert "configComfyStartBtn.addEventListener('keydown', onConfigServiceControlsKeydown);" in content
     assert "configComfyRestartBtn.addEventListener('keydown', onConfigServiceControlsKeydown);" in content
     assert "configComfyStopBtn.addEventListener('keydown', onConfigServiceControlsKeydown);" in content
+
+
+def test_config_comfy_custom_node_browser_markup_and_wiring_present():
+    app_module.app.config["TESTING"] = True
+    client = app_module.app.test_client()
+
+    html = client.get("/").get_data(as_text=True)
+    assert 'id="config-comfy-nodes-search"' in html
+    assert 'id="config-comfy-nodes-include-builtins"' in html
+    assert 'id="config-comfy-nodes-refresh"' in html
+    assert 'id="config-comfy-nodes-status"' in html
+    assert 'id="config-comfy-nodes-list" class="config-comfy-nodes-list" aria-live="polite"' in html
+    assert 'id="config-comfy-packages-status"' in html
+    assert 'id="config-comfy-packages-update-all"' in html
+    assert 'id="config-comfy-packages-preview-disable-noncore"' in html
+    assert 'id="config-comfy-packages-disable-noncore"' in html
+    assert 'id="config-comfy-disable-preview" class="config-comfy-disable-preview" hidden' in html
+    assert 'id="config-comfy-disable-preview-summary"' in html
+    assert 'id="config-comfy-disable-preview-filter"' in html
+    assert 'id="config-comfy-disable-preview-selected-only"' in html
+    assert 'id="config-comfy-disable-preview-select-all"' in html
+    assert 'id="config-comfy-disable-preview-select-visible"' in html
+    assert 'id="config-comfy-disable-preview-invert"' in html
+    assert 'id="config-comfy-disable-preview-clear-visible"' in html
+    assert 'id="config-comfy-disable-preview-clear"' in html
+    assert 'id="config-comfy-disable-preview-copy-selected"' in html
+    assert 'id="config-comfy-disable-preview-copy-csv"' in html
+    assert 'id="config-comfy-disable-preview-download-selected"' in html
+    assert 'id="config-comfy-disable-preview-download-csv"' in html
+    assert 'id="config-comfy-disable-preview-download-json"' in html
+    assert 'id="config-comfy-disable-preview-reset-prefs"' in html
+    assert 'id="config-comfy-disable-preview-export-status"' in html
+    assert 'id="config-comfy-disable-preview-export-history-copy"' in html
+    assert 'id="config-comfy-disable-preview-export-history-copy-json"' in html
+    assert 'id="config-comfy-disable-preview-export-history-download"' in html
+    assert 'id="config-comfy-disable-preview-export-history-download-csv"' in html
+    assert 'id="config-comfy-disable-preview-export-history-download-json"' in html
+    assert 'id="config-comfy-disable-preview-export-history-clear"' in html
+    assert 'id="config-comfy-disable-preview-export-history-meta"' in html
+    assert 'id="config-comfy-disable-preview-export-history"' in html
+    assert 'id="config-comfy-disable-preview-list" class="config-comfy-disable-preview-list" aria-live="polite"' in html
+    assert 'id="config-comfy-disable-preview-confirm"' in html
+    assert 'id="config-comfy-packages-list" class="config-comfy-packages-list" aria-live="polite"' in html
+    assert 'id="config-comfy-package-details"' in html
+    assert 'id="config-comfy-disable-log-refresh"' in html
+    assert 'id="config-comfy-disable-log-revert-last"' in html
+    assert 'id="config-comfy-disable-log-pending-only"' in html
+    assert 'id="config-comfy-disable-log-status"' in html
+    assert 'id="config-comfy-disable-log-list" class="config-comfy-disable-log-list" aria-live="polite"' in html
+
+    js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
+    js = js_path.read_text(encoding="utf-8")
+    assert "const configComfyNodesSearchInput = document.getElementById('config-comfy-nodes-search');" in js
+    assert "const configComfyNodesIncludeBuiltinsToggle = document.getElementById('config-comfy-nodes-include-builtins');" in js
+    assert "const configComfyNodesRefreshBtn = document.getElementById('config-comfy-nodes-refresh');" in js
+    assert "const configComfyPackagesStatus = document.getElementById('config-comfy-packages-status');" in js
+    assert "const configComfyPackagesUpdateAllBtn = document.getElementById('config-comfy-packages-update-all');" in js
+    assert "const configComfyPackagesPreviewDisableNonCoreBtn = document.getElementById('config-comfy-packages-preview-disable-noncore');" in js
+    assert "const configComfyPackagesDisableNonCoreBtn = document.getElementById('config-comfy-packages-disable-noncore');" in js
+    assert "const configComfyDisablePreview = document.getElementById('config-comfy-disable-preview');" in js
+    assert "const configComfyDisablePreviewSummary = document.getElementById('config-comfy-disable-preview-summary');" in js
+    assert "const configComfyDisablePreviewFilter = document.getElementById('config-comfy-disable-preview-filter');" in js
+    assert "const configComfyDisablePreviewSelectedOnly = document.getElementById('config-comfy-disable-preview-selected-only');" in js
+    assert "const configComfyDisablePreviewSelectAllBtn = document.getElementById('config-comfy-disable-preview-select-all');" in js
+    assert "const configComfyDisablePreviewSelectVisibleBtn = document.getElementById('config-comfy-disable-preview-select-visible');" in js
+    assert "const configComfyDisablePreviewInvertBtn = document.getElementById('config-comfy-disable-preview-invert');" in js
+    assert "const configComfyDisablePreviewClearVisibleBtn = document.getElementById('config-comfy-disable-preview-clear-visible');" in js
+    assert "const configComfyDisablePreviewClearBtn = document.getElementById('config-comfy-disable-preview-clear');" in js
+    assert "const configComfyDisablePreviewCopySelectedBtn = document.getElementById('config-comfy-disable-preview-copy-selected');" in js
+    assert "const configComfyDisablePreviewCopyCsvBtn = document.getElementById('config-comfy-disable-preview-copy-csv');" in js
+    assert "const configComfyDisablePreviewDownloadSelectedBtn = document.getElementById('config-comfy-disable-preview-download-selected');" in js
+    assert "const configComfyDisablePreviewDownloadCsvBtn = document.getElementById('config-comfy-disable-preview-download-csv');" in js
+    assert "const configComfyDisablePreviewDownloadJsonBtn = document.getElementById('config-comfy-disable-preview-download-json');" in js
+    assert "const configComfyDisablePreviewResetPrefsBtn = document.getElementById('config-comfy-disable-preview-reset-prefs');" in js
+    assert "const configComfyDisablePreviewExportStatus = document.getElementById('config-comfy-disable-preview-export-status');" in js
+    assert "const configComfyDisablePreviewExportHistoryCopyBtn = document.getElementById('config-comfy-disable-preview-export-history-copy');" in js
+    assert "const configComfyDisablePreviewExportHistoryCopyJsonBtn = document.getElementById('config-comfy-disable-preview-export-history-copy-json');" in js
+    assert "const configComfyDisablePreviewExportHistoryDownloadBtn = document.getElementById('config-comfy-disable-preview-export-history-download');" in js
+    assert "const configComfyDisablePreviewExportHistoryDownloadCsvBtn = document.getElementById('config-comfy-disable-preview-export-history-download-csv');" in js
+    assert "const configComfyDisablePreviewExportHistoryDownloadJsonBtn = document.getElementById('config-comfy-disable-preview-export-history-download-json');" in js
+    assert "const configComfyDisablePreviewExportHistoryClearBtn = document.getElementById('config-comfy-disable-preview-export-history-clear');" in js
+    assert "const configComfyDisablePreviewExportHistoryMeta = document.getElementById('config-comfy-disable-preview-export-history-meta');" in js
+    assert "const configComfyDisablePreviewExportHistory = document.getElementById('config-comfy-disable-preview-export-history');" in js
+    assert "const configComfyDisablePreviewList = document.getElementById('config-comfy-disable-preview-list');" in js
+    assert "const configComfyDisablePreviewConfirmBtn = document.getElementById('config-comfy-disable-preview-confirm');" in js
+    assert "const configComfyPackagesList = document.getElementById('config-comfy-packages-list');" in js
+    assert "const configComfyPackageDetails = document.getElementById('config-comfy-package-details');" in js
+    assert "const configComfyDisableLogRefreshBtn = document.getElementById('config-comfy-disable-log-refresh');" in js
+    assert "const configComfyDisableLogRevertLastBtn = document.getElementById('config-comfy-disable-log-revert-last');" in js
+    assert "const configComfyDisableLogPendingOnlyToggle = document.getElementById('config-comfy-disable-log-pending-only');" in js
+    assert "const configComfyDisableLogStatus = document.getElementById('config-comfy-disable-log-status');" in js
+    assert "const configComfyDisableLogList = document.getElementById('config-comfy-disable-log-list');" in js
+    assert "const CONFIG_COMFY_NODES_INCLUDE_BUILTINS_KEY = 'configComfyNodesIncludeBuiltinsV1';" in js
+    assert "const CONFIG_COMFY_DISABLE_PREVIEW_FILTER_KEY = 'configComfyDisablePreviewFilterV1';" in js
+    assert "const CONFIG_COMFY_DISABLE_PREVIEW_SELECTED_ONLY_KEY = 'configComfyDisablePreviewSelectedOnlyV1';" in js
+    assert "const CONFIG_COMFY_DISABLE_PREVIEW_LAST_EXPORT_KEY = 'configComfyDisablePreviewLastExportV1';" in js
+    assert "const CONFIG_COMFY_DISABLE_PREVIEW_EXPORT_HISTORY_KEY = 'configComfyDisablePreviewExportHistoryV1';" in js
+    assert "const CONFIG_COMFY_DISABLE_PREVIEW_EXPORT_HISTORY_MAX = 5;" in js
+    assert "const CONFIG_COMFY_DISABLE_LOG_PENDING_ONLY_KEY = 'configComfyDisableLogPendingOnlyV1';" in js
+    assert "function renderComfyCustomNodeBrowser()" in js
+    assert "function renderComfyCustomNodePackages()" in js
+    assert "async function loadComfyCustomNodes()" in js
+    assert "async function loadComfyCustomNodePackages()" in js
+    assert "async function loadComfyCustomNodePackageDetails(packageName)" in js
+    assert "async function openComfyCustomNodePackageFolder(packageName)" in js
+    assert "async function toggleComfyCustomNodePackageEnabled(packageName, enable)" in js
+    assert "async function updateComfyCustomNodePackage(packageName)" in js
+    assert "function resetComfyDisablePreview()" in js
+    assert "function getSortedComfyDisablePreviewSelectedNames()" in js
+    assert "function setComfyDisablePreviewExportStatus(message, persist = true)" in js
+    assert "function syncComfyDisablePreviewExportHistoryClearButtonState()" in js
+    assert "function renderComfyDisablePreviewExportHistory()" in js
+    assert "function recordComfyDisablePreviewExportHistory(entry)" in js
+    assert "function clearComfyDisablePreviewExportHistory()" in js
+    assert "configComfyDisablePreviewExportHistoryMeta.textContent = `History ${comfyDisablePreviewExportHistory.length}/${CONFIG_COMFY_DISABLE_PREVIEW_EXPORT_HISTORY_MAX}`;" in js
+    assert "function applyComfyDisablePreviewFilter()" in js
+    assert "function syncComfyDisablePreviewConfirmLabel()" in js
+    assert "function renderComfyDisableNonCorePreview(data)" in js
+    assert "function renderComfyDisableOperationLog(data)" in js
+    assert "async function loadComfyDisableOperationLog()" in js
+    assert "async function revertLastComfyDisableBatch()" in js
+    assert "async function revertComfyDisableBatch(batchId = '', useLast = false, pendingCount = 0)" in js
+    assert "let comfyDisableLogPendingOnly = localStorage.getItem(CONFIG_COMFY_DISABLE_LOG_PENDING_ONLY_KEY) === '1';" in js
+    assert "let comfyDisableLogRevertLastInFlight = false;" in js
+    assert "Would disable" in js
+    assert "Selection" in js
+    assert "let comfyDisablePreviewSelectedNames = new Set();" in js
+    assert "let comfyDisablePreviewFilterQuery = localStorage.getItem(CONFIG_COMFY_DISABLE_PREVIEW_FILTER_KEY) || '';" in js
+    assert "let comfyDisablePreviewSelectedOnlyPref = localStorage.getItem(CONFIG_COMFY_DISABLE_PREVIEW_SELECTED_ONLY_KEY) === '1';" in js
+    assert "let comfyDisablePreviewStats = { wouldDisable: 0, skipped: 0, failed: 0 };" in js
+    assert "async function runComfyCustomNodePackageBulkAction(action, dryRun = false, selectedNames = null)" in js
+    assert "fetch(`/api/comfy/custom-nodes?include_builtin=${includeBuiltins ? '1' : '0'}`)" in js
+    assert "fetch('/api/comfy/custom-node-packages')" in js
+    assert "fetch(`/api/comfy/custom-node-packages/details?name=${encodeURIComponent(packageName)}`)" in js
+    assert "fetch('/api/comfy/custom-node-packages/open', {" in js
+    assert "fetch('/api/comfy/custom-node-packages/toggle', {" in js
+    assert "fetch('/api/comfy/custom-node-packages/update', {" in js
+    assert "fetch('/api/comfy/custom-node-packages/bulk', {" in js
+    assert "fetch('/api/comfy/custom-node-packages/disable-log')" in js
+    assert "const url = useLast ? '/api/comfy/custom-node-packages/revert-last-disable' : '/api/comfy/custom-node-packages/revert-disable-batch';" in js
+    assert "const payload = useLast ? {} : { batch_id: batchId };" in js
+    assert "payload.names = selectedNames;" in js
+    assert "data-package-action=\"details\"" in js
+    assert "data-package-action=\"open\"" in js
+    assert "data-package-action=\"toggle\"" in js
+    assert "data-package-action=\"update\"" in js
+    assert "runComfyCustomNodePackageBulkAction('update_all');" in js
+    assert "runComfyCustomNodePackageBulkAction('disable_non_core', true);" in js
+    assert "runComfyCustomNodePackageBulkAction('disable_non_core');" in js
+    assert "if (!comfyDisablePreviewReady) return;" in js
+    assert "data-disable-preview-select=\"1\"" in js
+    assert "data-disable-preview-row=\"1\"" in js
+    assert "data-disable-preview-selectable=" in js
+    assert "data-disable-preview-selected=" in js
+    assert "data-preview-name=" in js
+    assert "config-comfy-disable-preview-item is-action" in js
+    assert "config-comfy-disable-preview-item is-skip" in js
+    assert "config-comfy-disable-preview-item is-error" in js
+    assert "config-comfy-disable-preview-chip is-action" in js
+    assert "config-comfy-disable-preview-chip is-skip" in js
+    assert "config-comfy-disable-preview-chip is-error" in js
+    assert "configComfyDisablePreviewList.addEventListener('change', (event) => {" in js
+    assert "configComfyDisablePreviewFilter.addEventListener('input', () => {" in js
+    assert "configComfyDisablePreviewSelectedOnly.addEventListener('change', () => {" in js
+    assert "localStorage.setItem(CONFIG_COMFY_DISABLE_PREVIEW_FILTER_KEY, comfyDisablePreviewFilterQuery);" in js
+    assert "localStorage.removeItem(CONFIG_COMFY_DISABLE_PREVIEW_FILTER_KEY);" in js
+    assert "localStorage.setItem(CONFIG_COMFY_DISABLE_PREVIEW_SELECTED_ONLY_KEY, '1');" in js
+    assert "localStorage.removeItem(CONFIG_COMFY_DISABLE_PREVIEW_SELECTED_ONLY_KEY);" in js
+    assert "configComfyDisablePreviewResetPrefsBtn.addEventListener('click', () => {" in js
+    assert "comfyDisablePreviewSelectedNames.add(packageName);" in js
+    assert "comfyDisablePreviewSelectedNames.delete(packageName);" in js
+    assert "configComfyDisablePreviewSelectAllBtn.addEventListener('click', () => {" in js
+    assert "configComfyDisablePreviewSelectVisibleBtn.addEventListener('click', () => {" in js
+    assert "configComfyDisablePreviewInvertBtn.addEventListener('click', () => {" in js
+    assert "configComfyDisablePreviewClearVisibleBtn.addEventListener('click', () => {" in js
+    assert "configComfyDisablePreviewClearBtn.addEventListener('click', () => {" in js
+    assert "configComfyDisablePreviewCopySelectedBtn.addEventListener('click', async () => {" in js
+    assert "await copyTextToClipboard(selected.join('\\n'));" in js
+    assert "configComfyDisablePreviewCopyCsvBtn.addEventListener('click', async () => {" in js
+    assert "await copyTextToClipboard(csvLines.join('\\n'));" in js
+    assert "configComfyDisablePreviewDownloadSelectedBtn.addEventListener('click', () => {" in js
+    assert "anchor.download = `la-disable-selected-${dateStr}.txt`;" in js
+    assert "configComfyDisablePreviewDownloadCsvBtn.addEventListener('click', () => {" in js
+    assert "anchor.download = `la-disable-selected-${dateStr}.csv`;" in js
+    assert "configComfyDisablePreviewDownloadJsonBtn.addEventListener('click', () => {" in js
+    assert "anchor.download = `la-disable-selected-${dateStr}.json`;" in js
+    assert "if (configComfyDisablePreviewExportStatus) {" in js
+    assert "if (configComfyDisablePreviewExportHistoryClearBtn) {" in js
+    assert "configComfyDisablePreviewExportHistoryClearBtn.addEventListener('click', () => {" in js
+    assert "if (configComfyDisablePreviewExportHistoryCopyBtn) {" in js
+    assert "configComfyDisablePreviewExportHistoryCopyBtn.addEventListener('click', async () => {" in js
+    assert "if (configComfyDisablePreviewExportHistoryCopyJsonBtn) {" in js
+    assert "configComfyDisablePreviewExportHistoryCopyJsonBtn.addEventListener('click', async () => {" in js
+    assert "if (configComfyDisablePreviewExportHistoryDownloadBtn) {" in js
+    assert "configComfyDisablePreviewExportHistoryDownloadBtn.addEventListener('click', () => {" in js
+    assert "if (configComfyDisablePreviewExportHistoryDownloadCsvBtn) {" in js
+    assert "configComfyDisablePreviewExportHistoryDownloadCsvBtn.addEventListener('click', () => {" in js
+    assert "if (configComfyDisablePreviewExportHistoryDownloadJsonBtn) {" in js
+    assert "configComfyDisablePreviewExportHistoryDownloadJsonBtn.addEventListener('click', () => {" in js
+    assert "await copyTextToClipboard(comfyDisablePreviewExportHistory.join('\\n'));" in js
+    assert "await copyTextToClipboard(JSON.stringify(payload, null, 2));" in js
+    assert "anchor.download = `la-disable-export-history-${dateStr}.txt`;" in js
+    assert "anchor.download = `la-disable-export-history-${dateStr}.csv`;" in js
+    assert "anchor.download = `la-disable-export-history-${dateStr}.json`;" in js
+    assert "clearComfyDisablePreviewExportHistory();" in js
+    assert "configComfyDisablePreviewExportHistoryCopyBtn.disabled = !hasItems;" in js
+    assert "configComfyDisablePreviewExportHistoryCopyJsonBtn.disabled = !hasItems;" in js
+    assert "configComfyDisablePreviewExportHistoryDownloadBtn.disabled = !hasItems;" in js
+    assert "configComfyDisablePreviewExportHistoryDownloadCsvBtn.disabled = !hasItems;" in js
+    assert "configComfyDisablePreviewExportHistoryDownloadJsonBtn.disabled = !hasItems;" in js
+    assert "const hasItems = comfyDisablePreviewExportHistory.length > 0;" in js
+    assert "configComfyDisablePreviewExportHistoryClearBtn.disabled = !hasItems;" in js
+    assert "setComfyDisablePreviewExportStatus(comfyDisablePreviewLastExport || 'No export yet.', false);" in js
+    assert "setComfyDisablePreviewExportStatus('', true);" in js
+    assert "recordComfyDisablePreviewExportHistory(statusWithTime);" in js
+    assert "renderComfyDisablePreviewExportHistory();" in js
+    assert "const statusWithTime = `${status} (${new Date().toLocaleTimeString()})`;" in js
+    assert "setComfyDisablePreviewExportStatus(statusWithTime);" in js
+    assert "runComfyCustomNodePackageBulkAction('disable_non_core', false, selected);" in js
+    assert "configComfyDisablePreviewConfirmBtn.addEventListener('click', () => {" in js
+    assert "configComfyDisableLogRefreshBtn.addEventListener('click', () => {" in js
+    assert "configComfyDisableLogRevertLastBtn.addEventListener('click', () => {" in js
+    assert "configComfyDisableLogPendingOnlyToggle.addEventListener('change', () => {" in js
+    assert "localStorage.setItem(CONFIG_COMFY_DISABLE_LOG_PENDING_ONLY_KEY, '1');" in js
+    assert "localStorage.removeItem(CONFIG_COMFY_DISABLE_LOG_PENDING_ONLY_KEY);" in js
+    assert "configComfyDisableLogList.addEventListener('click', (event) => {" in js
+    assert "data-disable-log-revert-batch" in js
+    assert "data-disable-log-pending-count" in js
+    assert "if (!window.confirm(`Revert ${targetLabel}? This will attempt to re-enable ${moveLabel}.`)) {" in js
+    assert "if (comfyDisableLogRevertLastInFlight) {" in js
+    assert "comfyDisableLogRevertLastInFlight = true;" in js
+    assert "comfyDisableLogRevertLastInFlight = false;" in js
+    assert "revertComfyDisableBatch(batchId, false, pendingCount);" in js
+    assert "loadComfyDisableOperationLog();" in js
+    assert "revertLastComfyDisableBatch();" in js
+    assert "resetComfyDisablePreview();" in js
+    assert "await loadComfyCustomNodePackages();" in js
+    assert "loadComfyCustomNodes();" in js
+
+    css_path = Path(__file__).resolve().parents[1] / "static" / "css" / "style.css"
+    css = css_path.read_text(encoding="utf-8")
+    assert ".config-inline-checkbox" in css
+    assert ".config-comfy-nodes-list" in css
+    assert ".config-comfy-node-row" in css
+    assert ".config-comfy-node-chip.is-custom" in css
+    assert ".config-comfy-packages-list" in css
+    assert ".config-comfy-package-row" in css
+    assert ".config-comfy-package-chip.is-enabled" in css
+    assert ".config-comfy-package-actions" in css
+    assert ".config-comfy-package-row.is-selected" in css
+    assert ".config-comfy-disable-preview" in css
+    assert ".config-comfy-disable-preview-list" in css
+    assert ".config-comfy-disable-preview-item" in css
+    assert ".config-comfy-disable-preview-item input[type=\"checkbox\"]" in css
+    assert ".config-comfy-disable-preview-item.is-action" in css
+    assert ".config-comfy-disable-preview-item.is-skip" in css
+    assert ".config-comfy-disable-preview-item.is-error" in css
+    assert ".config-comfy-disable-preview-chip" in css
+    assert ".config-comfy-disable-preview-chip.is-action" in css
+    assert ".config-comfy-disable-preview-chip.is-skip" in css
+    assert ".config-comfy-disable-preview-chip.is-error" in css
+    assert ".config-comfy-disable-preview-export-history" in css
+    assert ".config-comfy-disable-preview-export-history li" in css
+    assert ".config-comfy-disable-log-list" in css
 
 
 def test_index_tag_manager_action_group_semantics():
@@ -314,7 +579,14 @@ def test_index_diagnostics_drawer_semantics():
     assert 'id="diag-drawer" class="diag-drawer" hidden aria-hidden="true" aria-label="Diagnostics console"' in html
     assert 'id="diag-copy-btn"' in html
     assert 'id="diag-ws-retry-btn"' in html
+    assert 'id="diag-disable-log-repair-btn"' in html
+    assert 'id="diag-clear-repair-status-btn"' in html
+    assert 'id="diag-backend-health"' in html
+    assert 'id="diag-disable-log-health"' in html
     assert 'id="diag-frontend-build"' in html
+    assert 'id="diag-repair-status"' in html
+    assert 'Backend health' in html
+    assert 'Disable log store' in html
     assert 'Frontend build' in html
     assert 'id="ws-transport-status"' in html
 
@@ -326,7 +598,17 @@ def test_diagnostics_drawer_keyboard_handler_wiring_present_in_js_bundle():
     assert "function setDiagnosticsDrawerOpen(isOpen)" in content
     assert "const diagCopyBtn = document.getElementById('diag-copy-btn');" in content
     assert "const diagWsRetryBtn = document.getElementById('diag-ws-retry-btn');" in content
+    assert "const diagDisableLogRepairBtn = document.getElementById('diag-disable-log-repair-btn');" in content
+    assert "const diagClearRepairStatusBtn = document.getElementById('diag-clear-repair-status-btn');" in content
+    assert "const diagBackendHealth = document.getElementById('diag-backend-health');" in content
+    assert "const diagDisableLogHealth = document.getElementById('diag-disable-log-health');" in content
     assert "const diagFrontendBuild = document.getElementById('diag-frontend-build');" in content
+    assert "const diagRepairStatus = document.getElementById('diag-repair-status');" in content
+    assert "const backend = diagBackendHealth?.textContent || 'unknown';" in content
+    assert "const disableLog = diagDisableLogHealth?.textContent || 'unknown';" in content
+    assert "backend=${backend}" in content
+    assert "disable-log=${disableLog}" in content
+    assert "fetch('/api/healthz')" in content
     assert "async function copyTextToClipboard(text)" in content
     assert "await navigator.clipboard.writeText(value);" in content
     assert "const copied = document.execCommand('copy');" in content
@@ -348,12 +630,26 @@ def test_diagnostics_drawer_keyboard_handler_wiring_present_in_js_bundle():
     assert "ComfyUI HTTP API base: ${COMFY_HTTP_BASE}" in content
     assert "function renderWsRetryButtonState() {" in content
     assert "function onDiagnosticsActionsKeydown(event) {" in content
-    assert "const controls = [diagCopyBtn, diagWsRetryBtn, diagnosticsRunBtn].filter(Boolean);" in content
+    assert "const controls = [diagCopyBtn, diagWsRetryBtn, diagDisableLogRepairBtn, diagClearRepairStatusBtn, diagnosticsRunBtn].filter(Boolean);" in content
     assert "diagCopyBtn.addEventListener('keydown', onDiagnosticsActionsKeydown);" in content
     assert "diagCopyBtn.addEventListener('click', async () => {" in content
     assert "appendDiagnosticsConsoleLine('Copied diagnostics snapshot.', 'info');" in content
     assert "showToast('Diagnostics snapshot copied.', 'pos');" in content
     assert "diagWsRetryBtn.addEventListener('keydown', onDiagnosticsActionsKeydown);" in content
+    assert "diagDisableLogRepairBtn.addEventListener('keydown', onDiagnosticsActionsKeydown);" in content
+    assert "diagDisableLogRepairBtn.addEventListener('click', async () => {" in content
+    assert "await repairDisableLogStore();" in content
+    assert "diagClearRepairStatusBtn.addEventListener('keydown', onDiagnosticsActionsKeydown);" in content
+    assert "diagClearRepairStatusBtn.addEventListener('click', () => {" in content
+    assert "clearDiagRepairStatusLine();" in content
+    assert "function clearDiagRepairStatusLine() {" in content
+    assert "function withDiagStatusTimestamp(text) {" in content
+    assert "return `${text} (${new Date().toLocaleTimeString()})`;" in content
+    assert "setDiagRepairStatusLine(withDiagStatusTimestamp('Last repair: never.'), false);" in content
+    assert "async function repairDisableLogStore() {" in content
+    assert "setDiagRepairStatusLine(withDiagStatusTimestamp(`Last repair: ${status} (${count}) via ${source}.`));" in content
+    assert "setDiagRepairStatusLine(withDiagStatusTimestamp(`Last repair: failed (${err.message}).`));" in content
+    assert "fetch('/api/diagnostics/repair-disable-log', {" in content
     assert "diagnosticsRunBtn.addEventListener('keydown', onDiagnosticsActionsKeydown);" in content
     assert "diagWsRetryBtn.addEventListener('click', () => {" in content
     assert "diagDrawer.setAttribute('aria-hidden', isOpen ? 'false' : 'true');" in content
@@ -401,6 +697,13 @@ def test_diagnostics_command_history_session_persistence_present_in_js_bundle():
     content = js_path.read_text(encoding="utf-8")
 
     assert "const DIAG_COMMAND_HISTORY_KEY = 'diagCommandHistoryV1';" in content
+    assert "const DIAG_REPAIR_STATUS_KEY = 'diagRepairStatusV1';" in content
+    assert "const diagRepairStatusStored = localStorage.getItem(DIAG_REPAIR_STATUS_KEY) || '';" in content
+    assert "function setDiagRepairStatusLine(text, persist = true) {" in content
+    assert "localStorage.setItem(DIAG_REPAIR_STATUS_KEY, value);" in content
+    assert "localStorage.removeItem(DIAG_REPAIR_STATUS_KEY);" in content
+    assert "if (diagRepairStatus && diagRepairStatusStored) {" in content
+    assert "setDiagRepairStatusLine(diagRepairStatusStored, false);" in content
     assert "function getDiagnosticsCommandHistoryState() {" in content
     assert "const parsed = JSON.parse(sessionStorage.getItem(DIAG_COMMAND_HISTORY_KEY) || '[]');" in content
     assert "if (!Array.isArray(parsed)) return [];" in content
@@ -1155,6 +1458,7 @@ def test_controlnet_preview_markup_present_in_index():
     assert 'id="controlnet-image-preview"' in html
     assert 'id="controlnet-image-name"' in html
     assert 'id="controlnet-image-clear"' in html
+    assert 'id="controlnet-preprocessor-select"' in html
 
 
 def test_controlnet_preview_wiring_present_in_js_and_css():
@@ -1167,9 +1471,12 @@ def test_controlnet_preview_wiring_present_in_js_and_css():
     assert "const controlnetImagePreview = document.getElementById('controlnet-image-preview');" in js
     assert "const controlnetImageName = document.getElementById('controlnet-image-name');" in js
     assert "const controlnetImageClearBtn = document.getElementById('controlnet-image-clear');" in js
+    assert "const controlnetPreprocessorSelect = document.getElementById('controlnet-preprocessor-select');" in js
     assert "function updateControlnetImagePreview()" in js
     assert "controlnetImageUpload.addEventListener('change', updateControlnetImagePreview);" in js
     assert "controlnetImageClearBtn.addEventListener('click'" in js
+    assert "function loadControlnetPreprocessors()" in js
+    assert "chip-controlnet" in js
 
     assert ".controlnet-image-preview-wrap" in css
     assert ".controlnet-image-preview" in css
@@ -1349,25 +1656,49 @@ def test_gallery_sort_and_mode_filter_markup_and_wiring_present():
     html = client.get("/").get_data(as_text=True)
     assert 'id="gallery-sort"' in html
     assert 'id="gallery-mode-filter"' in html
+    assert 'id="gallery-tag-filter"' in html
     assert '<option value="newest">' in html
     assert '<option value="oldest">' in html
     assert '<option value="img2img">' in html
+    assert '<option value="all">All tags</option>' in html
 
     js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
     js = js_path.read_text(encoding="utf-8")
     assert "const gallerySortSelect = document.getElementById('gallery-sort');" in js
     assert "const galleryModeFilterSelect = document.getElementById('gallery-mode-filter');" in js
+    assert "const galleryTagFilterSelect = document.getElementById('gallery-tag-filter');" in js
     assert "let gallerySortOrder = " in js
     assert "let galleryModeFilter = " in js
+    assert "let galleryTagFilter = " in js
     assert "gallerySortOrder === 'oldest'" in js
     assert "galleryModeFilter === 'img2img'" in js
+    assert "galleryTagFilter === 'all'" in js
+    assert "GALLERY_TAGS_KEY" in js
+    assert "GALLERY_TAG_FILTER_KEY" in js
+    assert "syncGalleryTagFilterOptions(images);" in js
+    assert "renderLightboxTags(entry);" in js
+    assert "galleryLightboxAddTagBtn.addEventListener('click'" in js
+    assert "data-gallery-tag-remove" in js
     assert "localStorage.setItem('gallerySortOrder'" in js
     assert "localStorage.setItem('galleryModeFilter'" in js
 
     css_path = Path(__file__).resolve().parents[1] / "static" / "css" / "style.css"
     css = css_path.read_text(encoding="utf-8")
     assert ".gallery-sort-wrap," in css
-    assert ".gallery-mode-filter-wrap {" in css
+    assert ".gallery-mode-filter-wrap," in css
+    assert ".gallery-tag-filter-wrap {" in css
+    assert ".gallery-lightbox-tag-input" in css
+    assert ".gallery-lightbox-tags" in css
+
+
+def test_gallery_lightbox_tag_editor_markup_present():
+    app_module.app.config["TESTING"] = True
+    client = app_module.app.test_client()
+
+    html = client.get("/").get_data(as_text=True)
+    assert 'id="gallery-lightbox-tag-input"' in html
+    assert 'id="gallery-lightbox-add-tag-btn"' in html
+    assert 'id="gallery-lightbox-tags" class="gallery-lightbox-tags" aria-live="polite"' in html
 
 
 def test_gallery_favorites_markup_and_wiring_present():
@@ -1463,6 +1794,36 @@ def test_prompt_syntax_popup_markup_and_wiring_present():
     assert "promptSyntaxInfoBtn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');" in js
 
 
+def test_prompt_weight_helpers_markup_and_wiring_present():
+    app_module.app.config["TESTING"] = True
+    client = app_module.app.test_client()
+
+    html = client.get("/").get_data(as_text=True)
+    assert 'class="prompt-weight-toolbar" role="group" aria-label="Prompt weight helpers"' in html
+    assert 'id="prompt-weight-up-btn"' in html
+    assert 'id="prompt-weight-down-btn"' in html
+    assert 'id="prompt-break-wrap-btn"' in html
+    assert '(text:1.2)' in html
+    assert '[text:0.8]' in html
+
+    js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
+    js = js_path.read_text(encoding="utf-8")
+    assert "const promptWeightUpBtn = document.getElementById('prompt-weight-up-btn');" in js
+    assert "const promptWeightDownBtn = document.getElementById('prompt-weight-down-btn');" in js
+    assert "const promptBreakWrapBtn = document.getElementById('prompt-break-wrap-btn');" in js
+    assert "function applyPromptWeightHelper(action)" in js
+    assert "insert = `(${selected}:1.2)`;" in js
+    assert "insert = `[${selected}:0.8]`;" in js
+    assert "insert = selected ? `BREAK ${selected} BREAK` : ' BREAK ';" in js
+    assert "promptWeightUpBtn.addEventListener('click', () => applyPromptWeightHelper('up'));" in js
+    assert "promptWeightDownBtn.addEventListener('click', () => applyPromptWeightHelper('down'));" in js
+    assert "promptBreakWrapBtn.addEventListener('click', () => applyPromptWeightHelper('break'));" in js
+
+    css_path = Path(__file__).resolve().parents[1] / "static" / "css" / "style.css"
+    css = css_path.read_text(encoding="utf-8")
+    assert ".prompt-weight-toolbar" in css
+
+
 def test_prompt_recent_dropdown_semantics_and_keyboard_wiring_present():
     app_module.app.config["TESTING"] = True
     client = app_module.app.test_client()
@@ -1534,6 +1895,8 @@ def test_image_scheduler_select_present_in_html():
     assert 'id="flux-variant-chip"' in html
     assert 'id="image-apply-recommendation-btn"' in html
     assert 'id="image-recommendation-info-btn"' in html
+    assert 'id="image-auto-apply-recommendation-toggle"' in html
+
     assert 'id="image-auto-apply-recommendation-toggle"' in html
     assert 'id="image-auto-apply-recommendation-label"' in html
     assert 'id="image-lock-recommendation-toggle"' in html
@@ -1894,3 +2257,19 @@ def test_gallery_select_mode_elements_in_html_and_js():
     assert ".gallery-select-count" in css
     assert ".gallery-card.is-selected" in css
     assert ".gallery-select-check" in css
+
+
+def test_gentime_helper_and_storage_present_in_js_bundle():
+    js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
+    content = js_path.read_text(encoding="utf-8")
+
+    assert "function _formatGenTime(ms)" in content
+    assert "gallery-gentime-chip" in content
+    assert "generation_time_ms" in content
+    assert "meta.generationTimeMs = Date.now() - meta.startedAt" in content
+
+
+def test_gentime_chip_css_present():
+    css_path = Path(__file__).resolve().parents[1] / "static" / "css" / "style.css"
+    css = css_path.read_text(encoding="utf-8")
+    assert ".gallery-gentime-chip" in css

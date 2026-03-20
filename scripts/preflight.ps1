@@ -3,6 +3,9 @@ param(
     [string]$OllamaUrl = 'http://localhost:11434/api/tags',
     [string]$ComfyUrl = 'http://localhost:8188/system_stats',
     [switch]$StartApp,
+    [switch]$RestartAndSmoke,
+    [int]$WaitTimeoutSec = 45,
+    [switch]$OpenBrowser,
     [switch]$ConfigurePaths,
     [switch]$NoKillPort,
     [switch]$Json
@@ -13,6 +16,8 @@ $ErrorActionPreference = 'Stop'
 $appUrl = "http://127.0.0.1:$Port/api/status"
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot '..')
 $starterScript = Join-Path $PSScriptRoot 'start_app.ps1'
+$restartScript = Join-Path $PSScriptRoot 'restart_and_wait.ps1'
+$smokeScript = Join-Path $PSScriptRoot 'smoke_check.ps1'
 $configPath = Join-Path $repoRoot 'data\service_config.json'
 
 function Load-ServiceConfig {
@@ -98,6 +103,39 @@ if ($ConfigurePaths) {
 
     Save-ServiceConfig -OllamaPath $newOllama -ComfyPath $newComfy -SharedModelsPath $newShared
     Write-Host "Saved path configuration to $configPath" -ForegroundColor Green
+}
+
+if ($RestartAndSmoke) {
+    if (-not (Test-Path $restartScript)) {
+        throw "Missing restart helper: $restartScript"
+    }
+    if (-not (Test-Path $smokeScript)) {
+        throw "Missing smoke-check helper: $smokeScript"
+    }
+
+    if (-not $Json) {
+        Write-Host "\n=== Restart + Smoke Guardrail ===" -ForegroundColor Cyan
+    }
+
+    $restartArgs = @{ Port = $Port; TimeoutSec = $WaitTimeoutSec }
+    if ($NoKillPort) {
+        $restartArgs.NoKillPort = $true
+    }
+    if ($OpenBrowser) {
+        $restartArgs.OpenBrowser = $true
+    }
+
+    & $restartScript @restartArgs
+    if ($LASTEXITCODE -ne 0) {
+        exit $LASTEXITCODE
+    }
+
+    $smokeArgs = @{ Port = $Port }
+    if ($Json) {
+        $smokeArgs.Json = $true
+    }
+    & $smokeScript @smokeArgs
+    exit $LASTEXITCODE
 }
 
 function Test-HttpHealth {
