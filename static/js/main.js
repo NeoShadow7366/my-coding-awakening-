@@ -5218,20 +5218,26 @@ function getImagePresetFamilyLabel() {
 	return 'FLUX Dev';
 }
 
+function getImagePresetModeLabel() {
+	const requestedMode = imageModelFamilySelect?.value || imageModelFamilyMode || 'auto';
+	return requestedMode === 'auto' ? 'Auto mode' : 'Manual mode';
+}
+
 function syncImagePresetButtonLabels() {
 	if (!imagePresetButtons || !imagePresetButtons.length) return;
 	const familyLabel = getImagePresetFamilyLabel();
+	const modeLabel = getImagePresetModeLabel();
 	imagePresetButtons.forEach((btn) => {
 		const presetKey = (btn.dataset.imagePreset || '').toLowerCase();
 		const baseLabel = IMAGE_PRESET_BASE_LABELS[presetKey] || presetKey;
 		if (!baseLabel) return;
 		btn.textContent = `${baseLabel} (${familyLabel})`;
-		btn.title = `${baseLabel} preset tuned for ${familyLabel}`;
-		btn.setAttribute('aria-label', `${baseLabel} preset for ${familyLabel}`);
+		btn.title = `${baseLabel} preset tuned for ${familyLabel} (${modeLabel})`;
+		btn.setAttribute('aria-label', `${baseLabel} preset for ${familyLabel} (${modeLabel})`);
 	});
 	if (imagePresetFamilyBadge) {
-		imagePresetFamilyBadge.textContent = `Preset profile: ${familyLabel}`;
-		imagePresetFamilyBadge.title = `Image presets are tuned for ${familyLabel}`;
+		imagePresetFamilyBadge.textContent = `Preset profile: ${familyLabel} (${modeLabel})`;
+		imagePresetFamilyBadge.title = `Image presets are tuned for ${familyLabel} (${modeLabel})`;
 	}
 }
 

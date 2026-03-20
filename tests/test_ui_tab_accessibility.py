@@ -1590,11 +1590,12 @@ def test_fast_preset_applies_speed_focused_settings():
     assert "const familyPresetMap = {" in js
     assert "const IMAGE_PRESET_BASE_LABELS = {" in js
     assert "function getImagePresetFamilyLabel()" in js
+    assert "function getImagePresetModeLabel()" in js
     assert "function syncImagePresetButtonLabels()" in js
     assert "const imagePresetFamilyBadge = document.getElementById('image-preset-family-badge');" in js
     assert "btn.textContent = `${baseLabel} (${familyLabel})`;" in js
-    assert "btn.title = `${baseLabel} preset tuned for ${familyLabel}`;" in js
-    assert "imagePresetFamilyBadge.textContent = `Preset profile: ${familyLabel}`;" in js
+    assert "btn.title = `${baseLabel} preset tuned for ${familyLabel} (${modeLabel})`;" in js
+    assert "imagePresetFamilyBadge.textContent = `Preset profile: ${familyLabel} (${modeLabel})`;" in js
 
     css_path = Path(__file__).resolve().parents[1] / "static" / "css" / "style.css"
     css = css_path.read_text(encoding="utf-8")
