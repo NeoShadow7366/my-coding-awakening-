@@ -1168,6 +1168,11 @@ textarea {
   padding: 2px 6px;
 }
 
+.prompt-favorites-only-toggle.is-active {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
 .preset-fav-btn.is-favorited {
   color: var(--accent);
 }
@@ -1187,6 +1192,16 @@ textarea {
   background: var(--surface2, #2d2d3a);
   color: var(--text-muted);
   border: 1px solid var(--border-subtle, rgba(255,255,255,0.08));
+}
+
+.preset-tag-chip-btn {
+  cursor: pointer;
+  background: transparent;
+}
+
+.preset-tag-chip-btn.is-active {
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 .prompt-preset-notes-preview {

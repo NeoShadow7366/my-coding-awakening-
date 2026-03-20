@@ -2282,6 +2282,7 @@ def test_prompt_preset_v2_html_elements_present():
     html = html_path.read_text(encoding="utf-8")
     assert 'id="prompt-saved-tags"' in html
     assert 'id="prompt-fav-toggle"' in html
+    assert 'id="prompt-favorites-only-toggle"' in html
     assert 'id="prompt-tag-filter"' in html
     assert 'id="prompt-preset-tag-chips"' in html
     assert 'id="prompt-saved-select"' in html
@@ -2299,6 +2300,9 @@ def test_prompt_preset_v2_js_functions_present():
     assert "function loadPromptSavedPresets()" in js
     assert "function renderPromptSavedSelect()" in js
     assert "function renderPresetTagChips(name)" in js
+    assert "function _getFavoritesOnlyFilter()" in js
+    assert "function _setFavoritesOnlyFilter(enabled)" in js
+    assert "function _updateFavoritesOnlyToggleUi()" in js
     assert "function refreshPromptTagFilterOptions()" in js
     assert "function saveNamedPromptPreset(name, text, tagsRaw)" in js
     assert "function togglePresetFavorite(name)" in js
@@ -2312,6 +2316,11 @@ def test_prompt_preset_v2_js_functions_present():
     assert "starPrefix = presets[k].favorite ? '\\u2605 ' : ''" in js
     # tag filter dropdown wired
     assert "promptTagFilter.addEventListener('change'" in js
+    # favorites-only quick filter wired
+    assert "promptFavoritesOnlyToggle.addEventListener('click'" in js
+    # tag chips are clickable filter buttons
+    assert "promptPresetTagChips.addEventListener('click'" in js
+    assert "preset-tag-chip-btn" in js
     # fav toggle wired
     assert "promptFavToggle.addEventListener('click'" in js
 
@@ -2323,6 +2332,7 @@ def test_prompt_preset_v2_dom_refs_present():
     js = js_path.read_text(encoding="utf-8")
     assert "const promptSavedTags = document.getElementById('prompt-saved-tags');" in js
     assert "const promptFavToggle = document.getElementById('prompt-fav-toggle');" in js
+    assert "const promptFavoritesOnlyToggle = document.getElementById('prompt-favorites-only-toggle');" in js
     assert "const promptTagFilter = document.getElementById('prompt-tag-filter');" in js
     assert "const promptPresetTagChips = document.getElementById('prompt-preset-tag-chips');" in js
 
@@ -2335,8 +2345,10 @@ def test_prompt_preset_v2_css_present():
     assert ".prompt-presets-block" in css
     assert ".prompt-saved-controls-row" in css
     assert ".preset-fav-btn" in css
+    assert ".prompt-favorites-only-toggle.is-active" in css
     assert ".preset-tag-chips" in css
     assert ".preset-tag-chip" in css
+    assert ".preset-tag-chip-btn" in css
     assert ".prompt-tags-input" in css
     assert ".prompt-tag-filter-wrap" in css
 

@@ -203,6 +203,7 @@ const promptSavedSelect = document.getElementById('prompt-saved-select');
 const promptLoadBtn = document.getElementById('prompt-load-btn');
 const promptDeleteSavedBtn = document.getElementById('prompt-delete-saved-btn');
 const promptFavToggle = document.getElementById('prompt-fav-toggle');
+const promptFavoritesOnlyToggle = document.getElementById('prompt-favorites-only-toggle');
 const promptTagFilter = document.getElementById('prompt-tag-filter');
 const promptPresetTagChips = document.getElementById('prompt-preset-tag-chips');
 const promptPresetNotesPreview = document.getElementById('prompt-preset-notes-preview');
@@ -11430,6 +11431,7 @@ function buildRandomPromptFromTags() {
 const PROMPT_RECENT_MAX = 20;
 const PROMPT_RECENT_KEY = 'promptRecentHistory';
 const PROMPT_SAVED_KEY = 'promptSavedPresets';
+const PROMPT_SAVED_FAVORITES_ONLY_KEY = 'promptSavedFavoritesOnlyV1';
 const PROMPT_RECENT_CHIPS_MAX = 8;
 
 function loadPromptRecentHistory() {
@@ -11569,16 +11571,36 @@ function loadPromptSavedPresets() {
 function _getActiveTagFilter() {
 	return promptTagFilter ? promptTagFilter.value : '';
 }
+function _getFavoritesOnlyFilter() {
+	try { return localStorage.getItem(PROMPT_SAVED_FAVORITES_ONLY_KEY) === '1'; }
+	catch { return false; }
+}
+function _setFavoritesOnlyFilter(enabled) {
+	try { localStorage.setItem(PROMPT_SAVED_FAVORITES_ONLY_KEY, enabled ? '1' : '0'); }
+	catch {}
+	_updateFavoritesOnlyToggleUi();
+}
+function _updateFavoritesOnlyToggleUi() {
+	if (!promptFavoritesOnlyToggle) return;
+	const isActive = _getFavoritesOnlyFilter();
+	promptFavoritesOnlyToggle.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+	promptFavoritesOnlyToggle.classList.toggle('is-active', isActive);
+	promptFavoritesOnlyToggle.title = isActive ? 'Showing favorites only' : 'Show favorites only';
+}
 function renderPromptSavedSelect() {
 	if (!promptSavedSelect) return;
 	const presets = loadPromptSavedPresets();
 	const activeTag = _getActiveTagFilter();
+	const favoritesOnly = _getFavoritesOnlyFilter();
 	let keys = Object.keys(presets).sort((a, b) => {
 		const fa = presets[a].favorite ? 0 : 1;
 		const fb = presets[b].favorite ? 0 : 1;
 		if (fa !== fb) return fa - fb;
 		return a.localeCompare(b);
 	});
+	if (favoritesOnly) {
+		keys = keys.filter((k) => presets[k].favorite);
+	}
 	if (activeTag) {
 		keys = keys.filter((k) => presets[k].tags.includes(activeTag));
 	}
@@ -11602,8 +11624,9 @@ function renderPresetTagChips(name) {
 	const presets = loadPromptSavedPresets();
 	const preset = presets[n];
 	if (!preset || !preset.tags.length) { promptPresetTagChips.innerHTML = ''; return; }
+	const activeTag = _getActiveTagFilter();
 	promptPresetTagChips.innerHTML = preset.tags.map((t) =>
-		`<span class="preset-tag-chip">${escHtml(t)}</span>`
+		`<button class="preset-tag-chip preset-tag-chip-btn${activeTag === t ? ' is-active' : ''}" data-tag="${escHtml(t)}" type="button" title="Filter presets by tag ${escHtml(t)}">${escHtml(t)}</button>`
 	).join('');
 }
 function renderPresetNotesPreview(name) {
@@ -12163,6 +12186,21 @@ if (promptTagFilter) {
 		renderPromptSavedSelect();
 	});
 }
+if (promptFavoritesOnlyToggle) {
+	promptFavoritesOnlyToggle.addEventListener('click', () => {
+		_setFavoritesOnlyFilter(!_getFavoritesOnlyFilter());
+		renderPromptSavedSelect();
+	});
+}
+if (promptPresetTagChips) {
+	promptPresetTagChips.addEventListener('click', (e) => {
+		const btn = e.target.closest('.preset-tag-chip-btn');
+		if (!btn || !promptTagFilter) return;
+		const tag = btn.dataset.tag || '';
+		promptTagFilter.value = promptTagFilter.value === tag ? '' : tag;
+		renderPromptSavedSelect();
+	});
+}
 if (promptEditPresetBtn) {
 	promptEditPresetBtn.addEventListener('click', () => {
 		if (!promptSavedSelect?.value) { showToast('Select a preset to edit.', 'neg'); return; }
@@ -12211,6 +12249,7 @@ if (promptRecentClearBtn) {
 renderPromptRecentDropdown();
 renderPromptRecentChips();
 refreshPromptTagFilterOptions();
+_updateFavoritesOnlyToggleUi();
 renderPromptSavedSelect();
 
 // Text prompt history event listeners
