@@ -197,10 +197,14 @@ const textPromptRecentBtn = document.getElementById('text-prompt-recent-btn');
 const textPromptRecentDropdown = document.getElementById('text-prompt-recent-dropdown');
 const textPromptRecentChips = document.getElementById('text-prompt-recent-chips');
 const promptSavedName = document.getElementById('prompt-saved-name');
+const promptSavedTags = document.getElementById('prompt-saved-tags');
 const promptSaveBtn = document.getElementById('prompt-save-btn');
 const promptSavedSelect = document.getElementById('prompt-saved-select');
 const promptLoadBtn = document.getElementById('prompt-load-btn');
 const promptDeleteSavedBtn = document.getElementById('prompt-delete-saved-btn');
+const promptFavToggle = document.getElementById('prompt-fav-toggle');
+const promptTagFilter = document.getElementById('prompt-tag-filter');
+const promptPresetTagChips = document.getElementById('prompt-preset-tag-chips');
 const normalPromptWrap = document.getElementById('normal-prompt-wrap');
 const promptModeHint = document.getElementById('prompt-mode-hint');
 const enhancedPromptToggle = document.getElementById('enhanced-prompt-toggle');
@@ -2002,10 +2006,12 @@ function importPresetsFromJson(file) {
 
 		let promptsImported = 0;
 		if (payload.promptPresets && typeof payload.promptPresets === 'object') {
-			let existing = {};
-			try { existing = JSON.parse(localStorage.getItem(PROMPT_SAVED_KEY) || '{}'); } catch { existing = {}; }
-			Object.assign(existing, payload.promptPresets);
+			const existing = loadPromptSavedPresets();
+			for (const [k, v] of Object.entries(payload.promptPresets)) {
+				existing[k] = _migratePresetV1ToV2(v);
+			}
 			localStorage.setItem(PROMPT_SAVED_KEY, JSON.stringify(existing));
+			refreshPromptTagFilterOptions();
 			renderPromptSavedSelect();
 			promptsImported = Object.keys(payload.promptPresets).length;
 		}
@@ -11523,29 +11529,112 @@ function onPromptRecentControlsKeydown(event) {
 	}
 	controls[nextIndex]?.focus();
 }
+function _migratePresetV1ToV2(value) {
+	if (typeof value === 'string') {
+		return { text: value, tags: [], favorite: false, created_at: 0 };
+	}
+	if (value && typeof value === 'object') {
+		return {
+			text: String(value.text || ''),
+			tags: Array.isArray(value.tags) ? value.tags : [],
+			favorite: Boolean(value.favorite),
+			created_at: Number(value.created_at) || 0,
+		};
+	}
+	return { text: '', tags: [], favorite: false, created_at: 0 };
+}
 function loadPromptSavedPresets() {
-	try { return JSON.parse(localStorage.getItem(PROMPT_SAVED_KEY) || '{}'); }
-	catch { return {}; }
+	let raw = {};
+	try { raw = JSON.parse(localStorage.getItem(PROMPT_SAVED_KEY) || '{}'); }
+	catch { raw = {}; }
+	const result = {};
+	for (const [k, v] of Object.entries(raw)) {
+		result[k] = _migratePresetV1ToV2(v);
+	}
+	return result;
+}
+function _getActiveTagFilter() {
+	return promptTagFilter ? promptTagFilter.value : '';
 }
 function renderPromptSavedSelect() {
 	if (!promptSavedSelect) return;
 	const presets = loadPromptSavedPresets();
-	const keys = Object.keys(presets).sort();
+	const activeTag = _getActiveTagFilter();
+	let keys = Object.keys(presets).sort((a, b) => {
+		const fa = presets[a].favorite ? 0 : 1;
+		const fb = presets[b].favorite ? 0 : 1;
+		if (fa !== fb) return fa - fb;
+		return a.localeCompare(b);
+	});
+	if (activeTag) {
+		keys = keys.filter((k) => presets[k].tags.includes(activeTag));
+	}
 	if (!keys.length) {
 		promptSavedSelect.innerHTML = '<option value="">No saved prompts</option>';
+		renderPresetTagChips('');
 		return;
 	}
-	promptSavedSelect.innerHTML = keys.map((k) => `<option value="${escHtml(k)}">${escHtml(k)}</option>`).join('');
+	promptSavedSelect.innerHTML = keys.map((k) => {
+		const starPrefix = presets[k].favorite ? '\u2605 ' : '';
+		return `<option value="${escHtml(k)}">${escHtml(starPrefix + k)}</option>`;
+	}).join('');
+	renderPresetTagChips(keys[0]);
 }
-function saveNamedPromptPreset(name, text) {
+function renderPresetTagChips(name) {
+	if (!promptPresetTagChips) return;
+	const n = String(name || '').trim();
+	if (!n) { promptPresetTagChips.innerHTML = ''; return; }
+	const presets = loadPromptSavedPresets();
+	const preset = presets[n];
+	if (!preset || !preset.tags.length) { promptPresetTagChips.innerHTML = ''; return; }
+	promptPresetTagChips.innerHTML = preset.tags.map((t) =>
+		`<span class="preset-tag-chip">${escHtml(t)}</span>`
+	).join('');
+}
+function refreshPromptTagFilterOptions() {
+	if (!promptTagFilter) return;
+	const presets = loadPromptSavedPresets();
+	const allTags = new Set();
+	for (const v of Object.values(presets)) {
+		for (const t of v.tags) allTags.add(t);
+	}
+	const currentVal = promptTagFilter.value;
+	const sorted = [...allTags].sort();
+	promptTagFilter.innerHTML = '<option value="">All tags</option>' +
+		sorted.map((t) => `<option value="${escHtml(t)}"${t === currentVal ? ' selected' : ''}>${escHtml(t)}</option>`).join('');
+}
+function saveNamedPromptPreset(name, text, tagsRaw) {
 	const n = String(name || '').trim();
 	const t = String(text || '').trim();
 	if (!n || !t) { showToast('Enter a preset name and prompt text.', 'neg'); return; }
 	const presets = loadPromptSavedPresets();
-	presets[n] = t;
+	const existing = presets[n];
+	const tags = String(tagsRaw || '').split(',').map((s) => s.trim()).filter(Boolean);
+	const favorite = existing ? existing.favorite : false;
+	presets[n] = { text: t, tags, favorite, created_at: existing ? existing.created_at : Date.now() };
 	localStorage.setItem(PROMPT_SAVED_KEY, JSON.stringify(presets));
+	refreshPromptTagFilterOptions();
 	renderPromptSavedSelect();
 	showToast(`Saved prompt preset "${n}".`, 'pos');
+}
+function togglePresetFavorite(name) {
+	const n = String(name || '').trim();
+	if (!n) return;
+	const presets = loadPromptSavedPresets();
+	if (!presets[n]) return;
+	presets[n].favorite = !presets[n].favorite;
+	localStorage.setItem(PROMPT_SAVED_KEY, JSON.stringify(presets));
+	renderPromptSavedSelect();
+	const label = presets[n].favorite ? 'Favorited' : 'Unfavorited';
+	showToast(`${label} preset "${n}".`, 'pos');
+	_updateFavToggleBtn(n, presets[n].favorite);
+}
+function _updateFavToggleBtn(name, isFav) {
+	if (!promptFavToggle) return;
+	promptFavToggle.textContent = isFav ? '\u2605' : '\u2606';
+	promptFavToggle.title = isFav ? 'Remove from favorites' : 'Add to favorites';
+	promptFavToggle.setAttribute('aria-pressed', isFav ? 'true' : 'false');
+	promptFavToggle.classList.toggle('is-favorited', Boolean(isFav));
 }
 function deleteNamedPromptPreset(name) {
 	const n = String(name || '').trim();
@@ -11553,6 +11642,7 @@ function deleteNamedPromptPreset(name) {
 	const presets = loadPromptSavedPresets();
 	delete presets[n];
 	localStorage.setItem(PROMPT_SAVED_KEY, JSON.stringify(presets));
+	refreshPromptTagFilterOptions();
 	renderPromptSavedSelect();
 	showToast(`Deleted prompt preset "${n}".`, 'pos');
 }
@@ -11924,16 +12014,21 @@ document.addEventListener('click', (e) => {
 
 if (promptSaveBtn) {
 	promptSaveBtn.addEventListener('click', () => {
-		saveNamedPromptPreset(promptSavedName?.value, imagePrompt.value.trim());
+		const tagsVal = promptSavedTags ? promptSavedTags.value : '';
+		saveNamedPromptPreset(promptSavedName?.value, imagePrompt.value.trim(), tagsVal);
 	});
 }
 if (promptLoadBtn) {
 	promptLoadBtn.addEventListener('click', () => {
 		if (!promptSavedSelect?.value) { showToast('Select a preset to load.', 'neg'); return; }
 		const presets = loadPromptSavedPresets();
-		if (presets[promptSavedSelect.value] !== undefined) {
-			imagePrompt.value = presets[promptSavedSelect.value];
+		const preset = presets[promptSavedSelect.value];
+		if (preset) {
+			imagePrompt.value = preset.text;
 			imagePrompt.focus();
+			if (promptSavedTags) {
+				promptSavedTags.value = preset.tags.join(', ');
+			}
 			showToast(`Loaded preset "${promptSavedSelect.value}".`, 'pos');
 		}
 	});
@@ -11942,6 +12037,26 @@ if (promptDeleteSavedBtn) {
 	promptDeleteSavedBtn.addEventListener('click', () => {
 		if (!promptSavedSelect?.value) { showToast('Select a preset to delete.', 'neg'); return; }
 		deleteNamedPromptPreset(promptSavedSelect.value);
+	});
+}
+if (promptFavToggle) {
+	promptFavToggle.addEventListener('click', () => {
+		if (!promptSavedSelect?.value) { showToast('Select a preset first.', 'neg'); return; }
+		togglePresetFavorite(promptSavedSelect.value);
+	});
+}
+if (promptSavedSelect) {
+	promptSavedSelect.addEventListener('change', () => {
+		const name = promptSavedSelect.value;
+		renderPresetTagChips(name);
+		const presets = loadPromptSavedPresets();
+		const preset = presets[name];
+		_updateFavToggleBtn(name, preset ? preset.favorite : false);
+	});
+}
+if (promptTagFilter) {
+	promptTagFilter.addEventListener('change', () => {
+		renderPromptSavedSelect();
 	});
 }
 if (promptRecentClearBtn) {
@@ -11956,6 +12071,7 @@ if (promptRecentClearBtn) {
 
 renderPromptRecentDropdown();
 renderPromptRecentChips();
+refreshPromptTagFilterOptions();
 renderPromptSavedSelect();
 
 // Text prompt history event listeners

@@ -512,14 +512,24 @@
               <dt>Commas</dt><dd>Separate concepts; order influences weight (earlier = stronger).</dd>
             </dl>
           </div>
-          <div class="prompt-saved-row">
-            <input id="prompt-saved-name" type="text" class="compact-input" placeholder="Preset name" />
-            <button class="btn btn-ghost btn-xs" id="prompt-save-btn" type="button">Save</button>
-            <div class="select-wrapper prompt-saved-select-wrap">
-              <select id="prompt-saved-select" aria-label="Saved prompt presets"><option value="">No saved prompts</option></select>
+          <div class="prompt-presets-block">
+            <div class="prompt-saved-row">
+              <input id="prompt-saved-name" type="text" class="compact-input" placeholder="Preset name" />
+              <input id="prompt-saved-tags" type="text" class="compact-input prompt-tags-input" placeholder="Tags (comma-separated)" aria-label="Preset tags (comma-separated)" />
+              <button class="btn btn-ghost btn-xs" id="prompt-save-btn" type="button">Save</button>
             </div>
-            <button class="btn btn-ghost btn-xs" id="prompt-load-btn" type="button">Load</button>
-            <button class="btn btn-ghost btn-xs" id="prompt-delete-saved-btn" type="button">Del</button>
+            <div class="prompt-saved-controls-row">
+              <div class="select-wrapper prompt-saved-select-wrap">
+                <select id="prompt-saved-select" aria-label="Saved prompt presets"><option value="">No saved prompts</option></select>
+              </div>
+              <div class="select-wrapper prompt-tag-filter-wrap">
+                <select id="prompt-tag-filter" aria-label="Filter by tag"><option value="">All tags</option></select>
+              </div>
+              <button class="btn btn-ghost btn-xs preset-fav-btn" id="prompt-fav-toggle" type="button" title="Add to favorites" aria-pressed="false">&#9734;</button>
+              <button class="btn btn-ghost btn-xs" id="prompt-load-btn" type="button">Load</button>
+              <button class="btn btn-ghost btn-xs" id="prompt-delete-saved-btn" type="button">Del</button>
+            </div>
+            <div id="prompt-preset-tag-chips" class="preset-tag-chips" aria-label="Selected preset tags"></div>
           </div>
         </div>
 

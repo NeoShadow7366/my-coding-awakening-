@@ -2273,3 +2273,69 @@ def test_gentime_chip_css_present():
     css_path = Path(__file__).resolve().parents[1] / "static" / "css" / "style.css"
     css = css_path.read_text(encoding="utf-8")
     assert ".gallery-gentime-chip" in css
+
+
+def test_prompt_preset_v2_html_elements_present():
+    """Tags input, fav toggle, tag filter, and tag chip container are present in HTML."""
+    from pathlib import Path
+    html_path = Path(__file__).resolve().parents[1] / "templates" / "index.html"
+    html = html_path.read_text(encoding="utf-8")
+    assert 'id="prompt-saved-tags"' in html
+    assert 'id="prompt-fav-toggle"' in html
+    assert 'id="prompt-tag-filter"' in html
+    assert 'id="prompt-preset-tag-chips"' in html
+    assert 'id="prompt-saved-select"' in html
+    assert 'id="prompt-save-btn"' in html
+    assert 'id="prompt-load-btn"' in html
+    assert 'id="prompt-delete-saved-btn"' in html
+
+
+def test_prompt_preset_v2_js_functions_present():
+    """v2 storage functions, migration helper, tag rendering, and fav toggle are in JS."""
+    from pathlib import Path
+    js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
+    js = js_path.read_text(encoding="utf-8")
+    assert "function _migratePresetV1ToV2(value)" in js
+    assert "function loadPromptSavedPresets()" in js
+    assert "function renderPromptSavedSelect()" in js
+    assert "function renderPresetTagChips(name)" in js
+    assert "function refreshPromptTagFilterOptions()" in js
+    assert "function saveNamedPromptPreset(name, text, tagsRaw)" in js
+    assert "function togglePresetFavorite(name)" in js
+    assert "function _updateFavToggleBtn(name, isFav)" in js
+    assert "function deleteNamedPromptPreset(name)" in js
+    # v2 structure written on save
+    assert "text: t, tags, favorite, created_at" in js
+    # migration writes object from string
+    assert "if (typeof value === 'string')" in js
+    # favorites shown with star prefix in select
+    assert "starPrefix = presets[k].favorite ? '\\u2605 ' : ''" in js
+    # tag filter dropdown wired
+    assert "promptTagFilter.addEventListener('change'" in js
+    # fav toggle wired
+    assert "promptFavToggle.addEventListener('click'" in js
+
+
+def test_prompt_preset_v2_dom_refs_present():
+    """New DOM const declarations for v2 preset controls are in JS."""
+    from pathlib import Path
+    js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
+    js = js_path.read_text(encoding="utf-8")
+    assert "const promptSavedTags = document.getElementById('prompt-saved-tags');" in js
+    assert "const promptFavToggle = document.getElementById('prompt-fav-toggle');" in js
+    assert "const promptTagFilter = document.getElementById('prompt-tag-filter');" in js
+    assert "const promptPresetTagChips = document.getElementById('prompt-preset-tag-chips');" in js
+
+
+def test_prompt_preset_v2_css_present():
+    """New preset CSS classes are present in style.css."""
+    from pathlib import Path
+    css_path = Path(__file__).resolve().parents[1] / "static" / "css" / "style.css"
+    css = css_path.read_text(encoding="utf-8")
+    assert ".prompt-presets-block" in css
+    assert ".prompt-saved-controls-row" in css
+    assert ".preset-fav-btn" in css
+    assert ".preset-tag-chips" in css
+    assert ".preset-tag-chip" in css
+    assert ".prompt-tags-input" in css
+    assert ".prompt-tag-filter-wrap" in css
