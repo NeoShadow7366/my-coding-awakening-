@@ -1214,10 +1214,21 @@ textarea {
   align-items: center;
   justify-content: space-between;
   gap: var(--sp-xs);
+  flex-wrap: wrap;
 }
 
 .prompt-preset-filter-status {
   margin: 0;
+}
+
+.prompt-preset-filter-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-xs);
+}
+
+.prompt-preset-filter-shortcut-hint {
+  white-space: nowrap;
 }
 
 /* Preset Edit Modal */

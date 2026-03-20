@@ -2285,7 +2285,9 @@ def test_prompt_preset_v2_html_elements_present():
     assert 'id="prompt-favorites-only-toggle"' in html
     assert 'id="prompt-tag-filter"' in html
     assert 'id="prompt-preset-filter-status"' in html
+    assert 'id="prompt-preset-filter-shortcut-hint"' in html
     assert 'id="prompt-preset-clear-filters"' in html
+    assert 'aria-keyshortcuts="Control+Shift+K"' in html
     assert 'id="prompt-preset-tag-chips"' in html
     assert 'id="prompt-saved-select"' in html
     assert 'id="prompt-save-btn"' in html
@@ -2364,6 +2366,8 @@ def test_prompt_preset_v2_css_present():
     assert ".prompt-favorites-only-toggle.is-active" in css
     assert ".prompt-preset-filter-row" in css
     assert ".prompt-preset-filter-status" in css
+    assert ".prompt-preset-filter-actions" in css
+    assert ".prompt-preset-filter-shortcut-hint" in css
     assert ".preset-tag-chips" in css
     assert ".preset-tag-chip" in css
     assert ".preset-tag-chip-btn" in css

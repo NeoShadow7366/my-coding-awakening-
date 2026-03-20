@@ -533,7 +533,10 @@
             </div>
             <div class="prompt-preset-filter-row">
               <p id="prompt-preset-filter-status" class="hint prompt-preset-filter-status" aria-live="polite">No filters active.</p>
-              <button class="btn btn-ghost btn-xs" id="prompt-preset-clear-filters" type="button">Clear filters</button>
+              <div class="prompt-preset-filter-actions">
+                <span id="prompt-preset-filter-shortcut-hint" class="hint prompt-preset-filter-shortcut-hint">Shortcut: Ctrl+Shift+K</span>
+                <button class="btn btn-ghost btn-xs" id="prompt-preset-clear-filters" type="button" aria-keyshortcuts="Control+Shift+K">Clear filters</button>
+              </div>
             </div>
             <div id="prompt-preset-tag-chips" class="preset-tag-chips" aria-label="Selected preset tags"></div>
             <p id="prompt-preset-notes-preview" class="hint prompt-preset-notes-preview" aria-live="polite"></p>
