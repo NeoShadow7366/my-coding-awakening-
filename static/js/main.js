@@ -206,6 +206,7 @@ const promptFavToggle = document.getElementById('prompt-fav-toggle');
 const promptFavoritesOnlyToggle = document.getElementById('prompt-favorites-only-toggle');
 const promptTagFilter = document.getElementById('prompt-tag-filter');
 const promptPresetFilterStatus = document.getElementById('prompt-preset-filter-status');
+const promptPresetRecentPinnedOnlyToggle = document.getElementById('prompt-preset-recent-pinned-only-toggle');
 const promptPresetClearFilters = document.getElementById('prompt-preset-clear-filters');
 const promptPresetRecentFilters = document.getElementById('prompt-preset-recent-filters');
 const promptPresetTagChips = document.getElementById('prompt-preset-tag-chips');
@@ -11437,6 +11438,7 @@ const PROMPT_SAVED_KEY = 'promptSavedPresets';
 const PROMPT_SAVED_FAVORITES_ONLY_KEY = 'promptSavedFavoritesOnlyV1';
 const PROMPT_SAVED_TAG_FILTER_KEY = 'promptSavedTagFilterV1';
 const PROMPT_SAVED_RECENT_FILTERS_KEY = 'promptSavedRecentFiltersV1';
+const PROMPT_SAVED_RECENT_FILTERS_PINNED_ONLY_KEY = 'promptSavedRecentFiltersPinnedOnlyV1';
 const PROMPT_SAVED_RECENT_FILTERS_MAX = 6;
 const PROMPT_RECENT_CHIPS_MAX = 8;
 
@@ -11614,6 +11616,24 @@ function _updateFavoritesOnlyToggleUi() {
 	promptFavoritesOnlyToggle.classList.toggle('is-active', isActive);
 	promptFavoritesOnlyToggle.title = isActive ? 'Showing favorites only' : 'Show favorites only';
 }
+function _getRecentPinnedOnlyFilter() {
+	try { return localStorage.getItem(PROMPT_SAVED_RECENT_FILTERS_PINNED_ONLY_KEY) === '1'; }
+	catch { return false; }
+}
+function _setRecentPinnedOnlyFilter(enabled) {
+	try { localStorage.setItem(PROMPT_SAVED_RECENT_FILTERS_PINNED_ONLY_KEY, enabled ? '1' : '0'); }
+	catch {}
+	_updateRecentPinnedOnlyToggleUi();
+}
+function _updateRecentPinnedOnlyToggleUi() {
+	if (!promptPresetRecentPinnedOnlyToggle) return;
+	const isActive = _getRecentPinnedOnlyFilter();
+	promptPresetRecentPinnedOnlyToggle.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+	promptPresetRecentPinnedOnlyToggle.classList.toggle('is-active', isActive);
+	promptPresetRecentPinnedOnlyToggle.title = isActive
+		? 'Showing pinned recent filters only'
+		: 'Show pinned recent filters only';
+}
 function _renderPresetFilterStatus(filteredCount, totalCount) {
 	if (!promptPresetFilterStatus) return;
 	const parts = [];
@@ -11698,9 +11718,15 @@ function applyPresetFilterCombo(combo) {
 }
 function renderRecentPresetFilterChips() {
 	if (!promptPresetRecentFilters) return;
-	const items = _loadRecentPresetFilters();
+	const pinnedOnly = _getRecentPinnedOnlyFilter();
+	let items = _loadRecentPresetFilters();
+	if (pinnedOnly) {
+		items = items.filter((it) => Boolean(it.pinned));
+	}
 	if (!items.length) {
-		promptPresetRecentFilters.innerHTML = '';
+		promptPresetRecentFilters.innerHTML = pinnedOnly
+			? '<span class="hint">No pinned recent filters yet.</span>'
+			: '';
 		return;
 	}
 	promptPresetRecentFilters.innerHTML = items.map((it, idx) => {
@@ -11719,6 +11745,7 @@ function clearPromptPresetFilters(showToastOnClear = true) {
 	if (promptTagFilter) promptTagFilter.value = '';
 	_setStoredTagFilter('');
 	_setFavoritesOnlyFilter(false);
+	_setRecentPinnedOnlyFilter(false);
 	renderPromptSavedSelect();
 	renderRecentPresetFilterChips();
 	if (showToastOnClear) showToast('Preset filters cleared.', 'pos');
@@ -12379,6 +12406,13 @@ if (promptPresetClearFilters) {
 		clearPromptPresetFilters(true);
 	});
 }
+if (promptPresetRecentPinnedOnlyToggle) {
+	promptPresetRecentPinnedOnlyToggle.addEventListener('click', () => {
+		_setRecentPinnedOnlyFilter(!_getRecentPinnedOnlyFilter());
+		renderRecentPresetFilterChips();
+		showToast(_getRecentPinnedOnlyFilter() ? 'Pinned-only recent filters on.' : 'Pinned-only recent filters off.', 'pos');
+	});
+}
 if (promptEditPresetBtn) {
 	promptEditPresetBtn.addEventListener('click', () => {
 		if (!promptSavedSelect?.value) { showToast('Select a preset to edit.', 'neg'); return; }
@@ -12440,6 +12474,7 @@ renderPromptRecentChips();
 refreshPromptTagFilterOptions();
 _restoreStoredTagFilterSelection();
 _updateFavoritesOnlyToggleUi();
+_updateRecentPinnedOnlyToggleUi();
 renderPromptSavedSelect();
 
 // Text prompt history event listeners

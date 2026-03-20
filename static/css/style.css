@@ -1231,6 +1231,11 @@ textarea {
   white-space: nowrap;
 }
 
+.prompt-preset-recent-pinned-only-toggle.is-active {
+  border-color: var(--accent-2, rgba(255,255,255,0.35));
+  background: color-mix(in srgb, var(--surface-2, rgba(255,255,255,0.06)) 68%, var(--accent-2, rgba(255,255,255,0.35)) 32%);
+}
+
 .prompt-preset-recent-filters {
   display: flex;
   flex-wrap: wrap;

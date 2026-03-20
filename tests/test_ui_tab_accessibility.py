@@ -2286,6 +2286,7 @@ def test_prompt_preset_v2_html_elements_present():
     assert 'id="prompt-tag-filter"' in html
     assert 'id="prompt-preset-filter-status"' in html
     assert 'id="prompt-preset-filter-shortcut-hint"' in html
+    assert 'id="prompt-preset-recent-pinned-only-toggle"' in html
     assert 'id="prompt-preset-clear-filters"' in html
     assert 'aria-keyshortcuts="Control+Shift+K"' in html
     assert 'id="prompt-preset-recent-filters"' in html
@@ -2342,6 +2343,10 @@ def test_prompt_preset_v2_js_functions_present():
     # persisted tag filter key
     assert "PROMPT_SAVED_TAG_FILTER_KEY = 'promptSavedTagFilterV1'" in js
     assert "PROMPT_SAVED_RECENT_FILTERS_KEY = 'promptSavedRecentFiltersV1'" in js
+    assert "PROMPT_SAVED_RECENT_FILTERS_PINNED_ONLY_KEY = 'promptSavedRecentFiltersPinnedOnlyV1'" in js
+    assert "function _getRecentPinnedOnlyFilter()" in js
+    assert "function _setRecentPinnedOnlyFilter(enabled)" in js
+    assert "function _updateRecentPinnedOnlyToggleUi()" in js
     # tag chips are clickable filter buttons
     assert "promptPresetTagChips.addEventListener('click'" in js
     assert "preset-tag-chip-btn" in js
@@ -2352,6 +2357,8 @@ def test_prompt_preset_v2_js_functions_present():
     assert "data-recent-filter-remove" in js
     assert "Pinned recent filter." in js
     assert "Unpinned recent filter." in js
+    assert "Pinned-only recent filters on." in js
+    assert "Pinned-only recent filters off." in js
     assert "function togglePinRecentPresetFilterCombo(index)" in js
     assert "Removed recent filter." in js
     # fav toggle wired
@@ -2368,6 +2375,7 @@ def test_prompt_preset_v2_dom_refs_present():
     assert "const promptFavoritesOnlyToggle = document.getElementById('prompt-favorites-only-toggle');" in js
     assert "const promptTagFilter = document.getElementById('prompt-tag-filter');" in js
     assert "const promptPresetFilterStatus = document.getElementById('prompt-preset-filter-status');" in js
+    assert "const promptPresetRecentPinnedOnlyToggle = document.getElementById('prompt-preset-recent-pinned-only-toggle');" in js
     assert "const promptPresetClearFilters = document.getElementById('prompt-preset-clear-filters');" in js
     assert "const promptPresetRecentFilters = document.getElementById('prompt-preset-recent-filters');" in js
     assert "const promptPresetTagChips = document.getElementById('prompt-preset-tag-chips');" in js
@@ -2386,6 +2394,7 @@ def test_prompt_preset_v2_css_present():
     assert ".prompt-preset-filter-status" in css
     assert ".prompt-preset-filter-actions" in css
     assert ".prompt-preset-filter-shortcut-hint" in css
+    assert ".prompt-preset-recent-pinned-only-toggle.is-active" in css
     assert ".prompt-preset-recent-filters" in css
     assert ".prompt-preset-recent-filter-chip-wrap" in css
     assert ".prompt-preset-recent-filter-chip-wrap.is-pinned" in css
