@@ -6135,6 +6135,7 @@ function updateLightboxMeta(entry) {
 	if (p.scheduler && p.scheduler !== 'normal') chips.push(`<span class="chip">scheduler: ${escHtml(p.scheduler)}</span>`);
 	if (Number.isFinite(Number(p.steps))) chips.push(`<span class="chip">steps: ${escHtml(String(p.steps))}</span>`);
 	if (Number.isFinite(Number(p.cfg))) chips.push(`<span class="chip">cfg: ${escHtml(String(p.cfg))}</span>`);
+	if (Number.isFinite(Number(p.batch_size)) && Number(p.batch_size) > 1) chips.push(`<span class="chip">batch: ${escHtml(String(p.batch_size))}</span>`);
 	if (Number.isFinite(Number(p.width)) && Number.isFinite(Number(p.height))) {
 		chips.push(`<span class="chip">${escHtml(String(p.width))}×${escHtml(String(p.height))}</span>`);
 	}

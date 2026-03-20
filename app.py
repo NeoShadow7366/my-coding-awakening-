@@ -3011,6 +3011,7 @@ def _build_img2img_workflow(body: dict, uploaded_name: str) -> tuple[dict, dict]
     seed = _coerce_seed(body.get("seed"))
     steps = _clamp_int(int(body.get("steps", DEFAULT_IMAGE_STEPS)), MIN_STEPS, MAX_STEPS)
     cfg = _clamp_float(float(body.get("cfg", DEFAULT_IMAGE_CFG)), MIN_CFG, MAX_CFG)
+    batch_size = _clamp_int(int(body.get("batch_size", 1)), 1, 8)
     denoise = _clamp_float(float(body.get("denoise", DEFAULT_IMAGE_DENOISE)), 0.05, 1.0)
 
     # Multi-LoRA stack (same logic as txt2img)
@@ -3052,6 +3053,7 @@ def _build_img2img_workflow(body: dict, uploaded_name: str) -> tuple[dict, dict]
         "seed": seed,
         "steps": steps,
         "cfg": cfg,
+        "batch_size": batch_size,
         "denoise": denoise,
         "image": uploaded_name,
         "loras": loras,

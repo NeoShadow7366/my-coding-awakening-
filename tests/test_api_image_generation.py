@@ -664,3 +664,59 @@ def test_build_img2img_workflow_flux_model_family_uses_flux_guidance_node(monkey
     ks_nodes = [v for v in workflow.values() if v.get("class_type") == "KSampler"]
     assert len(ks_nodes) == 1
     assert ks_nodes[0]["inputs"]["cfg"] == 1.0
+
+
+def test_build_img2img_workflow_includes_batch_size(monkeypatch):
+    """img2img workflow metadata must include batch_size parameter."""
+    monkeypatch.setattr(app_module, "_image_models", lambda: ["base.safetensors"])
+
+    workflow, meta = app_module._build_img2img_workflow(
+        {
+            "prompt": "refined landscape",
+            "model": "base.safetensors",
+            "sampler": "euler",
+            "batch_size": 3,
+        },
+        "landscape.png",
+    )
+
+    assert meta["batch_size"] == 3
+    assert meta["prompt"] == "refined landscape"
+
+
+def test_build_img2img_workflow_clamps_batch_size(monkeypatch):
+    """img2img batch_size must be clamped to [1, 8] range."""
+    monkeypatch.setattr(app_module, "_image_models", lambda: ["base.safetensors"])
+
+    # Test lower bound (0 -> 1)
+    workflow, meta = app_module._build_img2img_workflow(
+        {
+            "prompt": "test",
+            "model": "base.safetensors",
+            "batch_size": 0,
+        },
+        "input.png",
+    )
+    assert meta["batch_size"] == 1
+
+    # Test upper bound (50 -> 8)
+    workflow, meta = app_module._build_img2img_workflow(
+        {
+            "prompt": "test",
+            "model": "base.safetensors",
+            "batch_size": 50,
+        },
+        "input.png",
+    )
+    assert meta["batch_size"] == 8
+
+    # Test valid value passthrough
+    workflow, meta = app_module._build_img2img_workflow(
+        {
+            "prompt": "test",
+            "model": "base.safetensors",
+            "batch_size": 4,
+        },
+        "input.png",
+    )
+    assert meta["batch_size"] == 4
