@@ -173,6 +173,9 @@ const imageSteps = document.getElementById('image-steps');
 const imageStepsVal = document.getElementById('image-steps-val');
 const imageCfg = document.getElementById('image-cfg');
 const imageCfgVal = document.getElementById('image-cfg-val');
+const imageCfgLabelText = document.getElementById('image-cfg-label-text');
+const imageCfgFluxHint = document.getElementById('image-cfg-flux-hint');
+const fluxPromptTips = document.getElementById('flux-prompt-tips');
 const imageDenoise = document.getElementById('image-denoise');
 const imageDenoiseVal = document.getElementById('image-denoise-val');
 const imageEngineStatus = document.getElementById('image-engine-status');
@@ -329,6 +332,13 @@ const gallerySortSelect = document.getElementById('gallery-sort');
 const galleryModeFilterSelect = document.getElementById('gallery-mode-filter');
 const galleryLightboxStarBtn = document.getElementById('gallery-lightbox-star');
 const galleryViewToggle = document.getElementById('gallery-view-toggle');
+const gallerySelectModeBtn = document.getElementById('gallery-select-mode-btn');
+const gallerySelectToolbar = document.getElementById('gallery-select-toolbar');
+const gallerySelectCountEl = document.getElementById('gallery-select-count');
+const gallerySelectAllBtn = document.getElementById('gallery-select-all-btn');
+const galleryBulkDeleteBtn = document.getElementById('gallery-bulk-delete-btn');
+const galleryBulkExportBtn = document.getElementById('gallery-bulk-export-btn');
+const galleryDeselectAllBtn = document.getElementById('gallery-deselect-all-btn');
 const galleryFilterHint = document.getElementById('gallery-filter-hint');
 const galleryLightboxPrev = document.getElementById('gallery-lightbox-prev');
 const galleryLightboxNext = document.getElementById('gallery-lightbox-next');
@@ -464,6 +474,9 @@ const VALID_GALLERY_SORT_ORDERS = new Set(['newest', 'oldest', 'favorites-first'
 if (!VALID_GALLERY_SORT_ORDERS.has(gallerySortOrder)) {
 	gallerySortOrder = 'newest';
 }
+let gallerySelectMode = false;
+const gallerySelectedIds = new Set();
+let galleryLastSelectedIndex = -1;
 let lightboxCurrentIndex = 0;
 let lightboxCompareEnabled = false;
 let lightboxCompareSplit = 50;
@@ -984,6 +997,7 @@ function persistTrackedQueueState() {
 				status: String(meta.status || 'queued'),
 				miss_count: Number.isFinite(Number(meta.missCount)) ? Number(meta.missCount) : 0,
 				updated_at: Number.isFinite(Number(meta.updatedAt)) ? Number(meta.updatedAt) : Date.now(),
+				started_at: Number.isFinite(Number(meta.startedAt)) ? Number(meta.startedAt) : undefined,
 				snapshot,
 			};
 		})
@@ -1024,6 +1038,7 @@ function restoreTrackedQueueState() {
 		const status = ['queued', 'running', 'processing'].includes(rawStatus) ? rawStatus : 'queued';
 		const missCount = Number.isFinite(Number(entry?.miss_count)) ? Math.max(0, Number(entry.miss_count)) : 0;
 		const updatedAt = Number.isFinite(Number(entry?.updated_at)) ? Number(entry.updated_at) : Date.now();
+		const startedAt = Number.isFinite(Number(entry?.started_at)) ? Number(entry.started_at) : undefined;
 
 		trackedPromptIds.add(promptId);
 		if (snapshot && Object.keys(snapshot).length) {
@@ -1033,6 +1048,7 @@ function restoreTrackedQueueState() {
 			status,
 			missCount,
 			updatedAt,
+			startedAt,
 			snapshot,
 		});
 		restoredCount += 1;
@@ -3990,6 +4006,9 @@ function renderQueueStatus(running, pending, donePromptIds = new Set()) {
 		const meta = queueJobMeta.get(promptId) || {};
 		const prevStatus = meta.status || '';
 		if (runningIds.has(promptId)) {
+			if (prevStatus !== 'running' && !meta.startedAt) {
+				meta.startedAt = Date.now();
+			}
 			meta.status = 'running';
 			meta.missCount = 0;
 		} else if (pendingIds.has(promptId)) {
@@ -4049,7 +4068,7 @@ function renderQueueStatus(running, pending, donePromptIds = new Set()) {
 			const pendingPosition = pendingPositions.get(promptId) || 0;
 			const isFrontQueued = pendingPosition === 1;
 			const badge =
-				status === 'running' ? '<span class="history-badge positive">RUN</span>' :
+				status === 'running' ? `<span class="history-badge positive">RUN${meta.startedAt ? ` <span class="queue-elapsed" data-started-at="${meta.startedAt}">0s</span>` : ''}</span>` :
 				status === 'queued' ? '<span class="history-badge">WAIT</span>' :
 				(status === 'processing' && meta.failReason === HISTORY_PERSIST_PENDING_REASON) ? '<span class="history-badge">SAVE</span>' :
 				status === 'completed' ? '<span class="history-badge positive">DONE</span>' :
@@ -5244,8 +5263,11 @@ function buildGalleryCardHtml(entry, index) {
 	const cfg = escHtml(String(entry.params?.cfg || ''));
 	const entryId = entry.id || '';
 	const isFav = isGalleryFavorite(entryId);
+	const isSelected = gallerySelectMode && gallerySelectedIds.has(entryId);
+	const selectCheck = gallerySelectMode ? `<span class="gallery-select-check" aria-hidden="true">${isSelected ? '\u2713' : ''}</span>` : '';
 	return `
-		<article class="gallery-card" draggable="true" data-preview-payload="${dragPayload}" data-image-ref="${imageRefPayload}" data-export-base-name="${escHtml(exportBaseName)}" data-prompt="${prompt}" data-lightbox-index="${index}" data-entry-id="${escHtml(entryId)}">
+		<article class="gallery-card${isSelected ? ' is-selected' : ''}" draggable="${gallerySelectMode ? 'false' : 'true'}" data-preview-payload="${dragPayload}" data-image-ref="${imageRefPayload}" data-export-base-name="${escHtml(exportBaseName)}" data-prompt="${prompt}" data-lightbox-index="${index}" data-entry-id="${escHtml(entryId)}">
+			${selectCheck}
 			<button class="gallery-star-btn${isFav ? ' is-favorited' : ''}" type="button" aria-pressed="${isFav}" aria-label="${isFav ? 'Remove from favorites' : 'Add to favorites'}" data-entry-id="${escHtml(entryId)}">${isFav ? '\u2605' : '\u2606'}</button>
 			<img src="${imgUrl}" alt="Generated image" loading="${eagerLoad}" fetchpriority="${fetchPriority}" decoding="async" data-lightbox-src="${imgUrl}" data-lightbox-caption="${prompt}" draggable="false" />
 			<div class="gallery-meta">
@@ -5395,6 +5417,147 @@ function renderGallery(history) {
 	renderChunk(0);
 }
 
+function updateGallerySelectToolbar() {
+	const count = gallerySelectedIds.size;
+	if (gallerySelectCountEl) gallerySelectCountEl.textContent = `${count} selected`;
+	if (galleryBulkDeleteBtn) galleryBulkDeleteBtn.disabled = count === 0;
+	if (galleryBulkExportBtn) galleryBulkExportBtn.disabled = count === 0;
+	if (gallerySelectToolbar) gallerySelectToolbar.hidden = !gallerySelectMode;
+	if (gallerySelectModeBtn) {
+		gallerySelectModeBtn.setAttribute('aria-pressed', gallerySelectMode ? 'true' : 'false');
+		gallerySelectModeBtn.textContent = gallerySelectMode ? 'Exit select' : 'Select';
+	}
+	if (galleryGrid) galleryGrid.classList.toggle('is-select-mode', gallerySelectMode);
+}
+
+function enterGallerySelectMode() {
+	gallerySelectMode = true;
+	gallerySelectedIds.clear();
+	galleryLastSelectedIndex = -1;
+	updateGallerySelectToolbar();
+	renderGallery(currentFullHistory);
+}
+
+function exitGallerySelectMode() {
+	gallerySelectMode = false;
+	gallerySelectedIds.clear();
+	galleryLastSelectedIndex = -1;
+	updateGallerySelectToolbar();
+	renderGallery(currentFullHistory);
+}
+
+function toggleGalleryCardSelection(entryId, index, isShift) {
+	if (isShift && galleryLastSelectedIndex >= 0 && currentGalleryImages.length) {
+		const start = Math.min(galleryLastSelectedIndex, index);
+		const end = Math.max(galleryLastSelectedIndex, index);
+		for (let i = start; i <= end; i += 1) {
+			const id = currentGalleryImages[i]?.id || '';
+			if (id) gallerySelectedIds.add(id);
+		}
+	} else {
+		if (gallerySelectedIds.has(entryId)) {
+			gallerySelectedIds.delete(entryId);
+		} else {
+			gallerySelectedIds.add(entryId);
+		}
+	}
+	galleryLastSelectedIndex = index;
+	updateGallerySelectToolbar();
+	// Update card classes directly for instant feedback without full re-render
+	if (galleryGrid) {
+		galleryGrid.querySelectorAll('.gallery-card').forEach((card) => {
+			const id = card.dataset.entryId || '';
+			const selected = gallerySelectedIds.has(id);
+			card.classList.toggle('is-selected', selected);
+			const check = card.querySelector('.gallery-select-check');
+			if (check) check.textContent = selected ? '\u2713' : '';
+		});
+	}
+}
+
+async function bulkDeleteSelectedGalleryItems() {
+	if (!gallerySelectedIds.size) return;
+	const ids = Array.from(gallerySelectedIds);
+	// Collect image_refs from the current gallery entries matching selected ids
+	const imageRefs = currentGalleryImages
+		.filter((e) => ids.includes(e.id || ''))
+		.flatMap((e) => {
+			const imgs = e.images || [];
+			return imgs.map((img) => ({
+				filename: img.filename || '',
+				subfolder: img.subfolder || '',
+				type: img.type || 'output',
+			}));
+		});
+
+	if (!imageRefs.length) return;
+	if (!confirm(`Delete ${ids.length} selected image${ids.length === 1 ? '' : 's'} from disk? This cannot be undone.`)) return;
+
+	try {
+		const resp = await fetch('/api/gallery/bulk-delete', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ image_refs: imageRefs }),
+		});
+		const data = await resp.json().catch(() => ({}));
+		if (!resp.ok) {
+			showToast(data.error || 'Bulk delete failed', 'error');
+			return;
+		}
+		showToast(`Deleted ${data.deleted ?? 0} image${(data.deleted ?? 0) === 1 ? '' : 's'}.`);
+		gallerySelectedIds.clear();
+		galleryLastSelectedIndex = -1;
+		updateGallerySelectToolbar();
+		await loadGallery();
+	} catch (err) {
+		showToast('Bulk delete error: ' + String(err), 'error');
+	}
+}
+
+async function bulkExportSelectedGalleryItems() {
+	if (!gallerySelectedIds.size) return;
+	const ids = Array.from(gallerySelectedIds);
+	const imageRefs = currentGalleryImages
+		.filter((e) => ids.includes(e.id || ''))
+		.flatMap((e) => {
+			const imgs = e.images || [];
+			return imgs.map((img) => ({
+				filename: img.filename || '',
+				subfolder: img.subfolder || '',
+				type: img.type || 'output',
+			}));
+		});
+
+	if (!imageRefs.length) return;
+
+	try {
+		const resp = await fetch('/api/gallery/bulk-export', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ image_refs: imageRefs }),
+		});
+		if (!resp.ok) {
+			const data = await resp.json().catch(() => ({}));
+			showToast(data.error || 'Export failed', 'error');
+			return;
+		}
+		const blob = await resp.blob();
+		const url = URL.createObjectURL(blob);
+		const a = document.createElement('a');
+		const cd = resp.headers.get('Content-Disposition') || '';
+		const match = cd.match(/filename="?([^"]+)"?/);
+		a.download = match ? match[1] : 'gallery_export.zip';
+		a.href = url;
+		document.body.appendChild(a);
+		a.click();
+		a.remove();
+		URL.revokeObjectURL(url);
+		showToast(`Exported ${ids.length} image${ids.length === 1 ? '' : 's'} as ZIP.`);
+	} catch (err) {
+		showToast('Export error: ' + String(err), 'error');
+	}
+}
+
 if (galleryGrid) {
 	galleryGrid.addEventListener('scroll', () => {
 		_scheduleVirtualGalleryWindowRender();
@@ -5426,6 +5589,19 @@ if (galleryGrid) {
 
 	galleryGrid.addEventListener('click', (event) => {
 		const target = event.target;
+
+		// In select mode, clicking a card toggles its selection
+		if (gallerySelectMode) {
+			if (target instanceof HTMLElement && target.classList.contains('gallery-star-btn')) return;
+			const card = target instanceof HTMLElement ? target.closest('.gallery-card') : null;
+			if (!(card instanceof HTMLElement)) return;
+			const entryId = card.dataset.entryId || '';
+			const index = parseInt(card.dataset.lightboxIndex || '0', 10);
+			if (!entryId) return;
+			toggleGalleryCardSelection(entryId, index, event.shiftKey);
+			return;
+		}
+
 		if (target instanceof HTMLElement && target.classList.contains('gallery-star-btn')) {
 			const entryId = target.dataset.entryId || '';
 			if (!entryId) return;
@@ -5777,6 +5953,32 @@ if (galleryViewToggle) {
 	galleryViewToggle.addEventListener('keydown', onGalleryToolbarButtonKeydown);
 	galleryViewToggle.textContent = galleryViewMode === 'grid' ? 'List' : 'Grid';
 	galleryViewToggle.setAttribute('aria-pressed', String(galleryViewMode === 'grid'));
+}
+
+if (gallerySelectModeBtn) {
+	gallerySelectModeBtn.addEventListener('click', () => {
+		if (gallerySelectMode) { exitGallerySelectMode(); } else { enterGallerySelectMode(); }
+	});
+}
+
+if (gallerySelectAllBtn) {
+	gallerySelectAllBtn.addEventListener('click', () => {
+		currentGalleryImages.forEach((e) => { if (e.id) gallerySelectedIds.add(e.id); });
+		updateGallerySelectToolbar();
+		renderGallery(currentFullHistory);
+	});
+}
+
+if (galleryDeselectAllBtn) {
+	galleryDeselectAllBtn.addEventListener('click', exitGallerySelectMode);
+}
+
+if (galleryBulkDeleteBtn) {
+	galleryBulkDeleteBtn.addEventListener('click', bulkDeleteSelectedGalleryItems);
+}
+
+if (galleryBulkExportBtn) {
+	galleryBulkExportBtn.addEventListener('click', bulkExportSelectedGalleryItems);
 }
 
 if (refreshGalleryBtn) {
@@ -6711,6 +6913,9 @@ function applyImageFamilyModeUi() {
 	if (imageCfgRow) imageCfgRow.hidden = false;
 
 	const isFluxActive = activeFamily === 'flux';
+	if (imageCfgLabelText) imageCfgLabelText.textContent = isFluxActive ? 'Guidance' : 'CFG';
+	if (imageCfgFluxHint) imageCfgFluxHint.hidden = !isFluxActive;
+	if (fluxPromptTips) fluxPromptTips.hidden = !isFluxActive;
 	if (imageNegativePromptSection) imageNegativePromptSection.hidden = isFluxActive;
 	if (fluxNoNegHint) fluxNoNegHint.hidden = !isFluxActive;
 	if (fluxSamplerHint) {
@@ -10620,6 +10825,16 @@ loadLivePreview();
 loadServiceConfig();
 startPollingLeaseHeartbeat();
 syncBackgroundPollingOwnership();
+
+// Live elapsed timer for running queue jobs
+window.setInterval(() => {
+	document.querySelectorAll('.queue-elapsed[data-started-at]').forEach((el) => {
+		const startedAt = parseInt(el.dataset.startedAt, 10);
+		if (!startedAt) return;
+		const sec = Math.floor((Date.now() - startedAt) / 1000);
+		el.textContent = sec >= 60 ? `${Math.floor(sec / 60)}m${String(sec % 60).padStart(2, '0')}s` : `${sec}s`;
+	});
+}, 1000);
 
 document.addEventListener('visibilitychange', () => {
 	if (document.hidden) {

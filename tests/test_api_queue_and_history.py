@@ -739,3 +739,114 @@ def test_image_generate_clamps_out_of_range_workflow_params(client, monkeypatch)
     assert captured_meta["width"] == 256
     assert captured_meta["height"] == 2048
     assert captured_meta["batch_size"] == 8
+
+
+# ---------------------------------------------------------------------------
+# Gallery bulk-delete
+# ---------------------------------------------------------------------------
+
+def test_gallery_bulk_delete_requires_image_refs(client):
+    resp = client.post("/api/gallery/bulk-delete", json={})
+    assert resp.status_code == 400
+    assert "image_refs" in resp.get_json()["error"]
+
+
+def test_gallery_bulk_delete_rejects_empty_list(client):
+    resp = client.post("/api/gallery/bulk-delete", json={"image_refs": []})
+    assert resp.status_code == 400
+    assert "image_refs" in resp.get_json()["error"]
+
+
+def test_gallery_bulk_delete_removes_files_and_history(client, monkeypatch, tmp_path):
+    file_a = tmp_path / "img_a.png"
+    file_b = tmp_path / "img_b.png"
+    file_a.write_bytes(b"a")
+    file_b.write_bytes(b"b")
+
+    ref_a = {"filename": "img_a.png", "subfolder": "", "type": "output"}
+    ref_b = {"filename": "img_b.png", "subfolder": "", "type": "output"}
+
+    path_map = {"img_a.png": file_a, "img_b.png": file_b}
+
+    def fake_resolve(image_ref):
+        return path_map[image_ref["filename"]]
+
+    monkeypatch.setattr(app_module, "_resolve_comfy_image_path", fake_resolve)
+
+    for ref, label in [(ref_a, "entry-a"), (ref_b, "entry-b")]:
+        client.post("/api/history", json={
+            "type": "image", "prompt": label, "negative_prompt": "",
+            "engine": "comfyui", "model": "m", "params": {}, "images": [ref],
+        })
+
+    resp = client.post("/api/gallery/bulk-delete", json={"image_refs": [ref_a, ref_b]})
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["ok"] is True
+    assert data["deleted"] == 2
+    assert data["removed_history_entries"] == 2
+    assert not file_a.exists()
+    assert not file_b.exists()
+
+    history = client.get("/api/history?type=image").get_json()["history"]
+    assert history == []
+
+
+def test_gallery_bulk_delete_counts_missing_files(client, monkeypatch, tmp_path):
+    missing = tmp_path / "missing.png"
+    ref = {"filename": "missing.png", "subfolder": "", "type": "output"}
+    monkeypatch.setattr(app_module, "_resolve_comfy_image_path", lambda _: missing)
+
+    resp = client.post("/api/gallery/bulk-delete", json={"image_refs": [ref]})
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["ok"] is True
+    assert data["deleted"] == 0
+    assert data["missing"] == 1
+
+
+# ---------------------------------------------------------------------------
+# Gallery bulk-export
+# ---------------------------------------------------------------------------
+
+def test_gallery_bulk_export_requires_image_refs(client):
+    resp = client.post("/api/gallery/bulk-export", json={})
+    assert resp.status_code == 400
+    assert "image_refs" in resp.get_json()["error"]
+
+
+def test_gallery_bulk_export_returns_404_when_no_files_found(client, monkeypatch, tmp_path):
+    missing = tmp_path / "nope.png"
+    ref = {"filename": "nope.png", "subfolder": "", "type": "output"}
+    monkeypatch.setattr(app_module, "_resolve_comfy_image_path", lambda _: missing)
+
+    resp = client.post("/api/gallery/bulk-export", json={"image_refs": [ref]})
+    assert resp.status_code == 404
+
+
+def test_gallery_bulk_export_returns_zip_with_images(client, monkeypatch, tmp_path):
+    import zipfile as _zf
+    import io as _io
+
+    file_a = tmp_path / "exp_a.png"
+    file_b = tmp_path / "exp_b.png"
+    file_a.write_bytes(b"PNG-A")
+    file_b.write_bytes(b"PNG-B")
+
+    ref_a = {"filename": "exp_a.png", "subfolder": "", "type": "output"}
+    ref_b = {"filename": "exp_b.png", "subfolder": "", "type": "output"}
+
+    path_map = {"exp_a.png": file_a, "exp_b.png": file_b}
+    monkeypatch.setattr(app_module, "_resolve_comfy_image_path", lambda ref: path_map[ref["filename"]])
+
+    resp = client.post("/api/gallery/bulk-export", json={"image_refs": [ref_a, ref_b]})
+    assert resp.status_code == 200
+    assert resp.mimetype == "application/zip"
+
+    buf = _io.BytesIO(resp.data)
+    with _zf.ZipFile(buf) as zf:
+        names = zf.namelist()
+        assert "exp_a.png" in names
+        assert "exp_b.png" in names
+        assert zf.read("exp_a.png") == b"PNG-A"
+        assert zf.read("exp_b.png") == b"PNG-B"

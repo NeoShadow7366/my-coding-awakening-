@@ -5,6 +5,7 @@ The app uses:
 - ComfyUI for local image generation
 """
 
+import io
 import json
 import logging
 import os
@@ -14,6 +15,7 @@ import subprocess
 import sys
 import threading
 import time
+import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
 from random import randint
@@ -4619,6 +4621,103 @@ def api_image_delete():
             "removed_history_refs": removed_refs,
             "removed_history_entries": removed_entries,
         }
+    )
+
+
+@app.route("/api/gallery/bulk-delete", methods=["POST"])
+def api_gallery_bulk_delete():
+    """Delete multiple gallery images and remove their history entries in one request."""
+    body = request.get_json(silent=True) or {}
+    image_refs = body.get("image_refs")
+    if not isinstance(image_refs, list) or not image_refs:
+        return jsonify({"error": "image_refs must be a non-empty list"}), 400
+
+    total_deleted = 0
+    total_missing = 0
+    total_refs_removed = 0
+    total_entries_removed = 0
+    errors: list[str] = []
+
+    for raw_ref in image_refs[:200]:  # cap at 200 per request
+        if not isinstance(raw_ref, dict):
+            continue
+        image_ref = _normalize_image_ref(raw_ref)
+        try:
+            image_path = _resolve_comfy_image_path(image_ref)
+        except ValueError as exc:
+            errors.append(str(exc))
+            continue
+
+        if not image_path.exists():
+            total_missing += 1
+        else:
+            try:
+                image_path.unlink()
+                total_deleted += 1
+            except OSError as exc:
+                logger.error("Bulk delete failed for %s: %s", image_path, exc)
+                errors.append(str(exc))
+                continue
+
+        removed_refs, removed_entries = _prune_history_image_references(image_ref)
+        total_refs_removed += removed_refs
+        total_entries_removed += removed_entries
+
+    return jsonify(
+        {
+            "ok": True,
+            "deleted": total_deleted,
+            "missing": total_missing,
+            "removed_history_refs": total_refs_removed,
+            "removed_history_entries": total_entries_removed,
+            "errors": errors,
+        }
+    )
+
+
+@app.route("/api/gallery/bulk-export", methods=["POST"])
+def api_gallery_bulk_export():
+    """Return a ZIP archive containing the requested gallery images."""
+    body = request.get_json(silent=True) or {}
+    image_refs = body.get("image_refs")
+    if not isinstance(image_refs, list) or not image_refs:
+        return jsonify({"error": "image_refs must be a non-empty list"}), 400
+
+    buf = io.BytesIO()
+    added = 0
+    with zipfile.ZipFile(buf, "w", compression=zipfile.ZIP_DEFLATED, allowZip64=True) as zf:
+        for raw_ref in image_refs[:200]:  # cap at 200 per request
+            if not isinstance(raw_ref, dict):
+                continue
+            image_ref = _normalize_image_ref(raw_ref)
+            try:
+                image_path = _resolve_comfy_image_path(image_ref)
+            except ValueError:
+                continue
+            if not image_path.exists():
+                continue
+            arcname = image_path.name
+            # Avoid duplicate arc names by appending a counter suffix if needed
+            existing = {zi.filename for zi in zf.infolist()}
+            stem, ext = os.path.splitext(arcname)
+            counter = 1
+            while arcname in existing:
+                arcname = f"{stem}_{counter}{ext}"
+                counter += 1
+            zf.write(image_path, arcname)
+            added += 1
+
+    if not added:
+        return jsonify({"error": "No accessible images found for the given refs"}), 404
+
+    buf.seek(0)
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    filename = f"gallery_export_{timestamp}.zip"
+    return send_file(
+        buf,
+        mimetype="application/zip",
+        as_attachment=True,
+        download_name=filename,
     )
 
 

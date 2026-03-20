@@ -528,6 +528,17 @@ textarea {
   background: color-mix(in srgb, var(--clr-surface) 86%, var(--clr-primary));
 }
 
+.flux-prompt-tips-block {
+  margin-top: 0.3rem;
+}
+
+.flux-tips-list {
+  margin: 0.2rem 0 0 1rem;
+  padding: 0;
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+
 .recommendation-expiry-tag {
   display: inline-flex;
   align-items: center;
@@ -1509,6 +1520,13 @@ textarea {
   background: color-mix(in srgb, var(--clr-primary) 14%, transparent);
 }
 
+.queue-elapsed {
+  font-size: 0.72rem;
+  opacity: 0.82;
+  letter-spacing: 0.01em;
+  margin-left: 2px;
+}
+
 .queue-shortcuts-hint {
   margin-top: 0.2rem;
 }
@@ -2042,6 +2060,70 @@ textarea {
 
 .gallery-card.is-dragging {
   opacity: 0.68;
+}
+
+/* Gallery multi-select mode */
+.gallery-select-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-xs);
+  flex-wrap: wrap;
+  padding: 0.3rem 0.5rem;
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--clr-primary) 10%, var(--clr-surface));
+  border: 1px solid color-mix(in srgb, var(--clr-primary) 40%, var(--clr-border));
+  margin-bottom: 0.4rem;
+  font-size: 0.78rem;
+}
+
+.gallery-select-count {
+  font-weight: 600;
+  color: var(--clr-primary);
+  min-width: 5rem;
+}
+
+.gallery-grid.is-select-mode .gallery-card {
+  cursor: pointer;
+  user-select: none;
+}
+
+.gallery-grid.is-select-mode .gallery-card img {
+  cursor: pointer;
+}
+
+.gallery-grid.is-select-mode .gallery-card:hover {
+  outline: 2px solid var(--clr-primary);
+  outline-offset: -2px;
+}
+
+.gallery-card.is-selected {
+  outline: 2px solid var(--clr-primary) !important;
+  outline-offset: -2px;
+  background: color-mix(in srgb, var(--clr-primary) 8%, var(--clr-surface));
+}
+
+.gallery-card .gallery-select-check {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  z-index: 3;
+  width: 18px;
+  height: 18px;
+  border-radius: 3px;
+  border: 2px solid rgba(255, 255, 255, 0.8);
+  background: rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  color: #fff;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+
+.gallery-card.is-selected .gallery-select-check {
+  background: var(--clr-primary);
+  border-color: var(--clr-primary);
 }
 
 .gallery-star-btn {

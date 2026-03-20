@@ -1807,3 +1807,90 @@ def test_flux_variant_chip_color_classes_present_in_css():
     assert ".flux-variant-chip.is-auto" in css
     assert "#image-auto-apply-recommendation-label" in css
     assert ".recommendation-drift-hint.is-warning" in css
+
+
+def test_flux_cfg_guidance_label_rename_in_html_and_js():
+    """CFG label wraps text in a span for dynamic renaming; Flux guidance hint present."""
+    app_module.app.config["TESTING"] = True
+    client = app_module.app.test_client()
+    html = client.get("/").get_data(as_text=True)
+
+    assert 'id="image-cfg-label-text"' in html
+    assert 'id="image-cfg-flux-hint"' in html
+
+    js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
+    content = js_path.read_text(encoding="utf-8")
+
+    assert "imageCfgLabelText" in content
+    assert "imageCfgFluxHint" in content
+    assert "isFluxActive ? 'Guidance' : 'CFG'" in content
+
+
+def test_flux_prompt_tips_block_in_html_and_js():
+    """Flux prompt tips div is present in the template and toggled in applyImageFamilyModeUi."""
+    app_module.app.config["TESTING"] = True
+    client = app_module.app.test_client()
+    html = client.get("/").get_data(as_text=True)
+
+    assert 'id="flux-prompt-tips"' in html
+    assert "flux-prompt-tips-block" in html
+    assert "Flux Prompt Tips:" in html
+
+    js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
+    content = js_path.read_text(encoding="utf-8")
+    assert "fluxPromptTips" in content
+    assert "fluxPromptTips.hidden = !isFluxActive" in content
+
+    css_path = Path(__file__).resolve().parents[1] / "static" / "css" / "style.css"
+    css = css_path.read_text(encoding="utf-8")
+    assert ".flux-prompt-tips-block" in css
+    assert ".flux-tips-list" in css
+
+
+def test_queue_elapsed_timer_present_in_js():
+    """Running jobs stamp startedAt and the live elapsed interval is wired."""
+    js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
+    content = js_path.read_text(encoding="utf-8")
+
+    assert "meta.startedAt = Date.now();" in content
+    assert "queue-elapsed" in content
+    assert "data-started-at=" in content
+    assert ".queue-elapsed[data-started-at]" in content
+
+    css_path = Path(__file__).resolve().parents[1] / "static" / "css" / "style.css"
+    css = css_path.read_text(encoding="utf-8")
+    assert ".queue-elapsed" in css
+
+
+def test_gallery_select_mode_elements_in_html_and_js():
+    """Gallery select mode toolbar is present in the template and wired in JS."""
+    app_module.app.config["TESTING"] = True
+    client = app_module.app.test_client()
+    html = client.get("/").get_data(as_text=True)
+
+    assert 'id="gallery-select-mode-btn"' in html
+    assert 'id="gallery-select-toolbar"' in html
+    assert 'id="gallery-select-count"' in html
+    assert 'id="gallery-select-all-btn"' in html
+    assert 'id="gallery-bulk-delete-btn"' in html
+    assert 'id="gallery-bulk-export-btn"' in html
+    assert 'id="gallery-deselect-all-btn"' in html
+
+    js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
+    content = js_path.read_text(encoding="utf-8")
+
+    assert "gallerySelectMode" in content
+    assert "gallerySelectedIds" in content
+    assert "enterGallerySelectMode" in content
+    assert "exitGallerySelectMode" in content
+    assert "bulkDeleteSelectedGalleryItems" in content
+    assert "bulkExportSelectedGalleryItems" in content
+    assert "/api/gallery/bulk-delete" in content
+    assert "/api/gallery/bulk-export" in content
+
+    css_path = Path(__file__).resolve().parents[1] / "static" / "css" / "style.css"
+    css = css_path.read_text(encoding="utf-8")
+    assert ".gallery-select-toolbar" in css
+    assert ".gallery-select-count" in css
+    assert ".gallery-card.is-selected" in css
+    assert ".gallery-select-check" in css

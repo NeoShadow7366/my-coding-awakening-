@@ -263,6 +263,14 @@
       <p id="image-recommendation-drift-hint" class="hint recommendation-drift-hint" aria-live="polite" hidden></p>
       <span id="image-recommendation-source-tag" class="hint recommendation-source-tag" hidden></span>
       <p class="hint flux-sampler-hint" id="flux-sampler-hint" hidden>FLUX tip: <code>euler</code> sampler with <code>simple</code> or <code>normal</code> scheduler is recommended for best results.</p>
+      <div id="flux-prompt-tips" class="hint flux-prompt-tips-block" hidden aria-live="polite">
+        <strong>Flux Prompt Tips:</strong>
+        <ul class="flux-tips-list">
+          <li>Write descriptive sentences rather than keyword lists — the T5 encoder understands natural language well.</li>
+          <li>Most Flux checkpoints don't need trigger words or LoRA activation phrases.</li>
+          <li>Higher guidance = stronger prompt adherence; lower = more creative variation.</li>
+        </ul>
+      </div>
     </div>
 
     <details class="sidebar-section cn-panel" id="controlnet-panel">
@@ -324,9 +332,10 @@
         <input id="image-steps" type="range" min="1" max="150" step="1" value="30" />
       </div>
       <div class="slider-group" id="image-cfg-row">
-        <label for="image-cfg" class="inline-label">CFG <span id="image-cfg-val">7.0</span></label>
+        <label for="image-cfg" class="inline-label"><span id="image-cfg-label-text">CFG</span> <span id="image-cfg-val">7.0</span></label>
         <input id="image-cfg" type="range" min="1" max="30" step="0.1" value="7" />
       </div>
+      <p class="hint" id="image-cfg-flux-hint" hidden>Flux guidance controls prompt adherence — typical range 1.5–4.0 for Dev, 0–1 for Schnell.</p>
       <div class="slider-group">
         <label for="image-denoise" class="inline-label">Denoise <span id="image-denoise-val">0.75</span></label>
         <input id="image-denoise" type="range" min="0.05" max="1" step="0.01" value="0.75" />
@@ -677,8 +686,16 @@
             </select>
           </div>
           <button class="btn btn-ghost btn-xs" id="gallery-view-toggle" type="button" aria-pressed="false">Grid</button>
+          <button class="btn btn-ghost btn-xs" id="gallery-select-mode-btn" type="button" aria-pressed="false">Select</button>
           <button class="btn btn-ghost btn-xs" id="refresh-gallery" type="button">Refresh</button>
         </div>
+      </div>
+      <div id="gallery-select-toolbar" class="gallery-select-toolbar" hidden role="toolbar" aria-label="Gallery selection actions">
+        <span id="gallery-select-count" class="gallery-select-count">0 selected</span>
+        <button class="btn btn-ghost btn-xs" id="gallery-select-all-btn" type="button">Select all</button>
+        <button class="btn btn-ghost btn-xs" id="gallery-bulk-delete-btn" type="button" disabled>Delete selected</button>
+        <button class="btn btn-ghost btn-xs" id="gallery-bulk-export-btn" type="button" disabled>Export ZIP</button>
+        <button class="btn btn-ghost btn-xs" id="gallery-deselect-all-btn" type="button">Clear &amp; exit</button>
       </div>
       <p id="gallery-filter-hint" class="hint" hidden></p>
       <div id="gallery-grid" class="gallery-grid"></div>
