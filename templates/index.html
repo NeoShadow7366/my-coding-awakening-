@@ -527,6 +527,7 @@
               </div>
               <button class="btn btn-ghost btn-xs preset-fav-btn" id="prompt-fav-toggle" type="button" title="Add to favorites" aria-pressed="false">&#9734;</button>
               <button class="btn btn-ghost btn-xs" id="prompt-load-btn" type="button">Load</button>
+              <button class="btn btn-ghost btn-xs" id="prompt-edit-preset-btn" type="button" title="Edit this preset">Edit</button>
               <button class="btn btn-ghost btn-xs" id="prompt-delete-saved-btn" type="button">Del</button>
             </div>
             <div id="prompt-preset-tag-chips" class="preset-tag-chips" aria-label="Selected preset tags"></div>
@@ -1280,5 +1281,37 @@
 
   </div>
 </section>
+
+<div id="preset-edit-modal" class="preset-edit-modal" hidden aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="preset-edit-modal-title">
+  <div class="preset-edit-modal-backdrop"></div>
+  <div class="preset-edit-modal-panel" role="document">
+    <div class="preset-edit-modal-head">
+      <h3 id="preset-edit-modal-title" class="section-heading">Edit Preset</h3>
+      <button id="preset-edit-modal-close" class="btn btn-ghost btn-xs" type="button" aria-label="Close preset editor">Close</button>
+    </div>
+    <div class="form-field">
+      <label for="preset-edit-name" class="field-label">Name</label>
+      <input id="preset-edit-name" type="text" class="compact-input" autocomplete="off" />
+    </div>
+    <div class="form-field">
+      <label for="preset-edit-text" class="field-label">Prompt</label>
+      <textarea id="preset-edit-text" rows="5" aria-label="Edit preset prompt text"></textarea>
+    </div>
+    <div class="form-field">
+      <label for="preset-edit-tags" class="field-label">Tags <span class="hint">(comma-separated)</span></label>
+      <input id="preset-edit-tags" type="text" class="compact-input" placeholder="e.g. portrait, landscape" autocomplete="off" />
+    </div>
+    <div class="form-field">
+      <label for="preset-edit-notes" class="field-label">Notes</label>
+      <textarea id="preset-edit-notes" rows="3" placeholder="Your notes about this preset…" aria-label="Preset notes"></textarea>
+    </div>
+    <p id="preset-edit-created" class="hint preset-edit-created"></p>
+    <div class="preset-edit-modal-actions">
+      <button id="preset-edit-save" class="btn btn-primary btn-sm" type="button">Save changes</button>
+      <button id="preset-edit-cancel" class="btn btn-ghost btn-sm" type="button">Cancel</button>
+      <button id="preset-edit-delete" class="btn btn-ghost btn-sm preset-edit-delete-btn" type="button">Delete preset</button>
+    </div>
+  </div>
+</div>
 
 {% endblock %}

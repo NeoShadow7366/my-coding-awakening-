@@ -2339,3 +2339,74 @@ def test_prompt_preset_v2_css_present():
     assert ".preset-tag-chip" in css
     assert ".prompt-tags-input" in css
     assert ".prompt-tag-filter-wrap" in css
+
+
+def test_preset_edit_modal_html_elements_present():
+    """Edit button, modal container, and all modal form fields are in HTML."""
+    from pathlib import Path
+    html_path = Path(__file__).resolve().parents[1] / "templates" / "index.html"
+    html = html_path.read_text(encoding="utf-8")
+    assert 'id="prompt-edit-preset-btn"' in html
+    assert 'id="preset-edit-modal"' in html
+    assert 'id="preset-edit-modal-close"' in html
+    assert 'id="preset-edit-name"' in html
+    assert 'id="preset-edit-text"' in html
+    assert 'id="preset-edit-tags"' in html
+    assert 'id="preset-edit-notes"' in html
+    assert 'id="preset-edit-created"' in html
+    assert 'id="preset-edit-save"' in html
+    assert 'id="preset-edit-cancel"' in html
+    assert 'id="preset-edit-delete"' in html
+    assert 'role="dialog"' in html
+    assert 'aria-modal="true"' in html
+
+
+def test_preset_edit_modal_js_functions_and_wiring_present():
+    """openPresetEditModal, savePresetEditModal, closePresetEditModal and event wiring in JS."""
+    from pathlib import Path
+    js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
+    js = js_path.read_text(encoding="utf-8")
+    assert "let _presetEditOriginalName = '';" in js
+    assert "function openPresetEditModal(name)" in js
+    assert "function closePresetEditModal()" in js
+    assert "function savePresetEditModal()" in js
+    # rename: delete old key and write new
+    assert "delete presets[original];" in js
+    # notes preserved on save
+    assert "notes: existing.notes" in js or "notes," in js
+    # edit button wired
+    assert "promptEditPresetBtn.addEventListener('click'" in js
+    # save/cancel/close wired
+    assert "presetEditSave.addEventListener('click', savePresetEditModal);" in js
+    assert "presetEditCancel.addEventListener('click', closePresetEditModal);" in js
+    assert "presetEditModalClose.addEventListener('click', closePresetEditModal);" in js
+    # escape key
+    assert "e.key === 'Escape' && presetEditModal && !presetEditModal.hidden" in js
+    # backdrop click
+    assert "classList.contains('preset-edit-modal-backdrop')" in js
+    # DOM refs
+    assert "const presetEditModal = document.getElementById('preset-edit-modal');" in js
+    assert "const presetEditName = document.getElementById('preset-edit-name');" in js
+    assert "const presetEditNotes = document.getElementById('preset-edit-notes');" in js
+
+
+def test_preset_edit_modal_css_present():
+    """Modal CSS classes are present in style.css."""
+    from pathlib import Path
+    css_path = Path(__file__).resolve().parents[1] / "static" / "css" / "style.css"
+    css = css_path.read_text(encoding="utf-8")
+    assert ".preset-edit-modal {" in css
+    assert ".preset-edit-modal[hidden]" in css
+    assert ".preset-edit-modal-backdrop {" in css
+    assert ".preset-edit-modal-panel {" in css
+    assert ".preset-edit-modal-head {" in css
+    assert ".preset-edit-modal-actions {" in css
+    assert ".preset-edit-delete-btn {" in css
+
+
+def test_preset_notes_field_in_v2_migration():
+    """notes: '' field is included in _migratePresetV1ToV2 for both v1 string and v2 object."""
+    from pathlib import Path
+    js = (Path(__file__).resolve().parents[1] / "static" / "js" / "main.js").read_text(encoding="utf-8")
+    assert "notes: ''" in js
+    assert "notes: String(value.notes || '')" in js

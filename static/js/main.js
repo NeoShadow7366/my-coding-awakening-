@@ -205,6 +205,17 @@ const promptDeleteSavedBtn = document.getElementById('prompt-delete-saved-btn');
 const promptFavToggle = document.getElementById('prompt-fav-toggle');
 const promptTagFilter = document.getElementById('prompt-tag-filter');
 const promptPresetTagChips = document.getElementById('prompt-preset-tag-chips');
+const promptEditPresetBtn = document.getElementById('prompt-edit-preset-btn');
+const presetEditModal = document.getElementById('preset-edit-modal');
+const presetEditModalClose = document.getElementById('preset-edit-modal-close');
+const presetEditName = document.getElementById('preset-edit-name');
+const presetEditText = document.getElementById('preset-edit-text');
+const presetEditTags = document.getElementById('preset-edit-tags');
+const presetEditNotes = document.getElementById('preset-edit-notes');
+const presetEditCreated = document.getElementById('preset-edit-created');
+const presetEditSave = document.getElementById('preset-edit-save');
+const presetEditCancel = document.getElementById('preset-edit-cancel');
+const presetEditDelete = document.getElementById('preset-edit-delete');
 const normalPromptWrap = document.getElementById('normal-prompt-wrap');
 const promptModeHint = document.getElementById('prompt-mode-hint');
 const enhancedPromptToggle = document.getElementById('enhanced-prompt-toggle');
@@ -11531,7 +11542,7 @@ function onPromptRecentControlsKeydown(event) {
 }
 function _migratePresetV1ToV2(value) {
 	if (typeof value === 'string') {
-		return { text: value, tags: [], favorite: false, created_at: 0 };
+		return { text: value, tags: [], favorite: false, created_at: 0, notes: '' };
 	}
 	if (value && typeof value === 'object') {
 		return {
@@ -11539,9 +11550,10 @@ function _migratePresetV1ToV2(value) {
 			tags: Array.isArray(value.tags) ? value.tags : [],
 			favorite: Boolean(value.favorite),
 			created_at: Number(value.created_at) || 0,
+			notes: String(value.notes || ''),
 		};
 	}
-	return { text: '', tags: [], favorite: false, created_at: 0 };
+	return { text: '', tags: [], favorite: false, created_at: 0, notes: '' };
 }
 function loadPromptSavedPresets() {
 	let raw = {};
@@ -11611,7 +11623,8 @@ function saveNamedPromptPreset(name, text, tagsRaw) {
 	const existing = presets[n];
 	const tags = String(tagsRaw || '').split(',').map((s) => s.trim()).filter(Boolean);
 	const favorite = existing ? existing.favorite : false;
-	presets[n] = { text: t, tags, favorite, created_at: existing ? existing.created_at : Date.now() };
+	const notes = existing ? existing.notes : '';
+	presets[n] = { text: t, tags, favorite, created_at: existing ? existing.created_at : Date.now(), notes };
 	localStorage.setItem(PROMPT_SAVED_KEY, JSON.stringify(presets));
 	refreshPromptTagFilterOptions();
 	renderPromptSavedSelect();
@@ -11645,6 +11658,70 @@ function deleteNamedPromptPreset(name) {
 	refreshPromptTagFilterOptions();
 	renderPromptSavedSelect();
 	showToast(`Deleted prompt preset "${n}".`, 'pos');
+}
+
+// --- Preset Edit Modal ---
+let _presetEditOriginalName = '';
+
+function openPresetEditModal(name) {
+	const n = String(name || '').trim();
+	if (!n || !presetEditModal) return;
+	const presets = loadPromptSavedPresets();
+	const preset = presets[n];
+	if (!preset) { showToast('Preset not found.', 'neg'); return; }
+	_presetEditOriginalName = n;
+	if (presetEditName) presetEditName.value = n;
+	if (presetEditText) presetEditText.value = preset.text;
+	if (presetEditTags) presetEditTags.value = preset.tags.join(', ');
+	if (presetEditNotes) presetEditNotes.value = preset.notes || '';
+	if (presetEditCreated) {
+		const d = preset.created_at ? new Date(preset.created_at).toLocaleString() : 'unknown';
+		presetEditCreated.textContent = `Created: ${d}`;
+	}
+	presetEditModal.hidden = false;
+	presetEditModal.setAttribute('aria-hidden', 'false');
+	if (presetEditName) presetEditName.focus();
+}
+
+function closePresetEditModal() {
+	if (!presetEditModal) return;
+	presetEditModal.hidden = true;
+	presetEditModal.setAttribute('aria-hidden', 'true');
+	_presetEditOriginalName = '';
+}
+
+function savePresetEditModal() {
+	const newName = presetEditName ? presetEditName.value.trim() : '';
+	const text = presetEditText ? presetEditText.value.trim() : '';
+	const tagsRaw = presetEditTags ? presetEditTags.value : '';
+	const notes = presetEditNotes ? presetEditNotes.value.trim() : '';
+	if (!newName || !text) { showToast('Name and prompt text are required.', 'neg'); return; }
+	const presets = loadPromptSavedPresets();
+	const original = _presetEditOriginalName;
+	const existing = presets[original];
+	if (!existing) { showToast('Preset no longer exists.', 'neg'); closePresetEditModal(); return; }
+	const tags = tagsRaw.split(',').map((s) => s.trim()).filter(Boolean);
+	const updated = {
+		text,
+		tags,
+		favorite: existing.favorite,
+		created_at: existing.created_at,
+		notes,
+	};
+	if (newName !== original) {
+		delete presets[original];
+	}
+	presets[newName] = updated;
+	localStorage.setItem(PROMPT_SAVED_KEY, JSON.stringify(presets));
+	refreshPromptTagFilterOptions();
+	renderPromptSavedSelect();
+	if (promptSavedSelect && newName) {
+		promptSavedSelect.value = newName;
+		renderPresetTagChips(newName);
+		_updateFavToggleBtn(newName, updated.favorite);
+	}
+	closePresetEditModal();
+	showToast(`Saved preset "${newName}".`, 'pos');
 }
 
 // --- Text Prompt Recent History ---
@@ -12059,6 +12136,41 @@ if (promptTagFilter) {
 		renderPromptSavedSelect();
 	});
 }
+if (promptEditPresetBtn) {
+	promptEditPresetBtn.addEventListener('click', () => {
+		if (!promptSavedSelect?.value) { showToast('Select a preset to edit.', 'neg'); return; }
+		openPresetEditModal(promptSavedSelect.value);
+	});
+}
+if (presetEditModalClose) {
+	presetEditModalClose.addEventListener('click', closePresetEditModal);
+}
+if (presetEditCancel) {
+	presetEditCancel.addEventListener('click', closePresetEditModal);
+}
+if (presetEditSave) {
+	presetEditSave.addEventListener('click', savePresetEditModal);
+}
+if (presetEditDelete) {
+	presetEditDelete.addEventListener('click', () => {
+		const name = _presetEditOriginalName;
+		if (!name) return;
+		closePresetEditModal();
+		deleteNamedPromptPreset(name);
+	});
+}
+if (presetEditModal) {
+	presetEditModal.addEventListener('click', (e) => {
+		if (e.target === presetEditModal || e.target.classList.contains('preset-edit-modal-backdrop')) {
+			closePresetEditModal();
+		}
+	});
+}
+document.addEventListener('keydown', (e) => {
+	if (e.key === 'Escape' && presetEditModal && !presetEditModal.hidden) {
+		closePresetEditModal();
+	}
+});
 if (promptRecentClearBtn) {
 	promptRecentClearBtn.addEventListener('click', () => {
 		localStorage.removeItem(PROMPT_RECENT_KEY);

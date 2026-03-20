@@ -1189,6 +1189,66 @@ textarea {
   border: 1px solid var(--border-subtle, rgba(255,255,255,0.08));
 }
 
+/* Preset Edit Modal */
+.preset-edit-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 250;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--sp-lg);
+}
+
+.preset-edit-modal[hidden] {
+  display: none;
+}
+
+.preset-edit-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(8, 14, 30, 0.56);
+}
+
+.preset-edit-modal-panel {
+  position: relative;
+  width: min(540px, 100%);
+  max-height: calc(100dvh - 3rem);
+  overflow-y: auto;
+  border: 1px solid var(--clr-border);
+  border-radius: var(--radius-lg);
+  background: var(--clr-surface);
+  box-shadow: var(--shadow-md);
+  padding: var(--sp-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-sm);
+}
+
+.preset-edit-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-sm);
+}
+
+.preset-edit-modal-actions {
+  display: flex;
+  gap: var(--sp-xs);
+  flex-wrap: wrap;
+  margin-top: var(--sp-xs);
+}
+
+.preset-edit-delete-btn {
+  margin-left: auto;
+  color: var(--clr-error, #e05a5a);
+}
+
+.preset-edit-created {
+  margin: 0;
+  opacity: 0.6;
+}
+
 .prompt-history-row {
   margin-top: var(--sp-xs);
   display: flex;
