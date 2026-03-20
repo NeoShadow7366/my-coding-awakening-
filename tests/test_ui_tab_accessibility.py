@@ -1596,10 +1596,19 @@ def test_fast_preset_applies_speed_focused_settings():
     assert "btn.textContent = `${baseLabel} (${familyLabel})`;" in js
     assert "btn.title = `${baseLabel} preset tuned for ${familyLabel} (${modeLabel})`;" in js
     assert "imagePresetFamilyBadge.textContent = `Preset profile: ${familyLabel} (${modeLabel})`;" in js
+    assert "imagePresetFamilyBadge.setAttribute('aria-label', `Preset profile ${familyLabel} in ${modeLabel}`);" in js
+    assert "imagePresetFamilyBadge.classList.toggle('is-auto', modeLabel === 'Auto mode');" in js
+    assert "imagePresetFamilyBadge.classList.toggle('is-manual', modeLabel === 'Manual mode');" in js
+    assert "imagePresetFamilyBadge.classList.toggle('is-flux', familyLabel.startsWith('FLUX'));" in js
+    assert "imagePresetFamilyBadge.classList.toggle('is-sd', familyLabel === 'SD');" in js
 
     css_path = Path(__file__).resolve().parents[1] / "static" / "css" / "style.css"
     css = css_path.read_text(encoding="utf-8")
     assert ".preset-family-badge" in css
+    assert ".preset-family-badge.is-auto" in css
+    assert ".preset-family-badge.is-manual" in css
+    assert ".preset-family-badge.is-flux" in css
+    assert ".preset-family-badge.is-sd" in css
     assert "sd:" in js
     assert "flux:" in js
     assert "const fluxRecommendation = family === 'flux' ? getFluxWorkflowRecommendation(imageModelSelect?.value || '') : null;" in js

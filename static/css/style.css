@@ -413,6 +413,22 @@ textarea {
   background: color-mix(in srgb, var(--clr-surface) 88%, var(--clr-primary) 12%);
 }
 
+.preset-family-badge.is-auto {
+  border-style: dashed;
+}
+
+.preset-family-badge.is-manual {
+  border-style: solid;
+}
+
+.preset-family-badge.is-flux {
+  background: color-mix(in srgb, var(--clr-surface) 76%, var(--clr-primary) 24%);
+}
+
+.preset-family-badge.is-sd {
+  background: color-mix(in srgb, var(--clr-surface) 90%, var(--clr-border) 10%);
+}
+
 .model-stack-panel {
   border: none;
   border-radius: 0;

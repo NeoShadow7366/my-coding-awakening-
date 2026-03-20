@@ -5238,6 +5238,11 @@ function syncImagePresetButtonLabels() {
 	if (imagePresetFamilyBadge) {
 		imagePresetFamilyBadge.textContent = `Preset profile: ${familyLabel} (${modeLabel})`;
 		imagePresetFamilyBadge.title = `Image presets are tuned for ${familyLabel} (${modeLabel})`;
+		imagePresetFamilyBadge.setAttribute('aria-label', `Preset profile ${familyLabel} in ${modeLabel}`);
+		imagePresetFamilyBadge.classList.toggle('is-auto', modeLabel === 'Auto mode');
+		imagePresetFamilyBadge.classList.toggle('is-manual', modeLabel === 'Manual mode');
+		imagePresetFamilyBadge.classList.toggle('is-flux', familyLabel.startsWith('FLUX'));
+		imagePresetFamilyBadge.classList.toggle('is-sd', familyLabel === 'SD');
 	}
 }
 
