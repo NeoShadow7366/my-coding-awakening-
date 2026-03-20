@@ -1587,6 +1587,11 @@ def test_fast_preset_applies_speed_focused_settings():
 
     assert "const family = resolveActiveImageFamily(imageModelSelect?.value || '');" in js
     assert "const familyPresetMap = {" in js
+    assert "const IMAGE_PRESET_BASE_LABELS = {" in js
+    assert "function getImagePresetFamilyLabel()" in js
+    assert "function syncImagePresetButtonLabels()" in js
+    assert "btn.textContent = `${baseLabel} (${familyLabel})`;" in js
+    assert "btn.title = `${baseLabel} preset tuned for ${familyLabel}`;" in js
     assert "sd:" in js
     assert "flux:" in js
     assert "const fluxRecommendation = family === 'flux' ? getFluxWorkflowRecommendation(imageModelSelect?.value || '') : null;" in js

@@ -516,6 +516,11 @@ let imageFluxLockBypassOnce = false;
 let lastAutoRecommendationModelKey = '';
 let activeImagePreset = '';
 let lastResolvedPresetFamily = '';
+const IMAGE_PRESET_BASE_LABELS = {
+	fast: 'Fast',
+	quality: 'Quality',
+	creative: 'Creative',
+};
 let comfyCustomNodeRows = [];
 let comfyCustomNodePackages = [];
 let comfyCustomNodeIncludeBuiltins = localStorage.getItem(CONFIG_COMFY_NODES_INCLUDE_BUILTINS_KEY) === '1';
@@ -5204,6 +5209,27 @@ function applyImagePreset(preset) {
 	updateModelStackCompatibilityHint();
 }
 
+function getImagePresetFamilyLabel() {
+	const family = resolveActiveImageFamily(imageModelSelect?.value || '');
+	if (family !== 'flux') return 'SD';
+	const variant = inferFluxVariant(imageModelSelect?.value || '');
+	if (variant === 'schnell') return 'FLUX Schnell';
+	return 'FLUX Dev';
+}
+
+function syncImagePresetButtonLabels() {
+	if (!imagePresetButtons || !imagePresetButtons.length) return;
+	const familyLabel = getImagePresetFamilyLabel();
+	imagePresetButtons.forEach((btn) => {
+		const presetKey = (btn.dataset.imagePreset || '').toLowerCase();
+		const baseLabel = IMAGE_PRESET_BASE_LABELS[presetKey] || presetKey;
+		if (!baseLabel) return;
+		btn.textContent = `${baseLabel} (${familyLabel})`;
+		btn.title = `${baseLabel} preset tuned for ${familyLabel}`;
+		btn.setAttribute('aria-label', `${baseLabel} preset for ${familyLabel}`);
+	});
+}
+
 function setActiveImagePresetButton(activePreset) {
 	activeImagePreset = activePreset || '';
 	if (!imagePresetButtons || !imagePresetButtons.length) return;
@@ -8521,6 +8547,7 @@ function applyImageFamilyModeUi() {
 			imageModelFamilyHint.textContent = 'Family mode: SD / SDXL. Full model-stack controls are available.';
 		}
 	}
+	syncImagePresetButtonLabels();
 	if (activeImagePreset && activeFamily !== lastResolvedPresetFamily) {
 		applyImagePreset(activeImagePreset);
 	}
