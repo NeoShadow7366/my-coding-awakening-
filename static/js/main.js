@@ -11434,6 +11434,7 @@ const PROMPT_RECENT_MAX = 20;
 const PROMPT_RECENT_KEY = 'promptRecentHistory';
 const PROMPT_SAVED_KEY = 'promptSavedPresets';
 const PROMPT_SAVED_FAVORITES_ONLY_KEY = 'promptSavedFavoritesOnlyV1';
+const PROMPT_SAVED_TAG_FILTER_KEY = 'promptSavedTagFilterV1';
 const PROMPT_RECENT_CHIPS_MAX = 8;
 
 function loadPromptRecentHistory() {
@@ -11573,6 +11574,27 @@ function loadPromptSavedPresets() {
 function _getActiveTagFilter() {
 	return promptTagFilter ? promptTagFilter.value : '';
 }
+function _getStoredTagFilter() {
+	try { return localStorage.getItem(PROMPT_SAVED_TAG_FILTER_KEY) || ''; }
+	catch { return ''; }
+}
+function _setStoredTagFilter(value) {
+	const v = String(value || '').trim();
+	try {
+		if (v) localStorage.setItem(PROMPT_SAVED_TAG_FILTER_KEY, v);
+		else localStorage.removeItem(PROMPT_SAVED_TAG_FILTER_KEY);
+	} catch {}
+}
+function _restoreStoredTagFilterSelection() {
+	if (!promptTagFilter) return;
+	const saved = _getStoredTagFilter();
+	if (!saved) {
+		promptTagFilter.value = '';
+		return;
+	}
+	const hasOption = [...promptTagFilter.options].some((o) => o.value === saved);
+	promptTagFilter.value = hasOption ? saved : '';
+}
 function _getFavoritesOnlyFilter() {
 	try { return localStorage.getItem(PROMPT_SAVED_FAVORITES_ONLY_KEY) === '1'; }
 	catch { return false; }
@@ -11602,6 +11624,13 @@ function _renderPresetFilterStatus(filteredCount, totalCount) {
 	}
 	promptPresetFilterStatus.textContent = `Filters: ${parts.join(', ')}. Showing ${filteredCount}/${totalCount}.`;
 	if (promptPresetClearFilters) promptPresetClearFilters.disabled = false;
+}
+function clearPromptPresetFilters(showToastOnClear = true) {
+	if (promptTagFilter) promptTagFilter.value = '';
+	_setStoredTagFilter('');
+	_setFavoritesOnlyFilter(false);
+	renderPromptSavedSelect();
+	if (showToastOnClear) showToast('Preset filters cleared.', 'pos');
 }
 function renderPromptSavedSelect() {
 	if (!promptSavedSelect) return;
@@ -11674,6 +11703,7 @@ function refreshPromptTagFilterOptions() {
 	const sorted = [...allTags].sort();
 	promptTagFilter.innerHTML = '<option value="">All tags</option>' +
 		sorted.map((t) => `<option value="${escHtml(t)}"${t === currentVal ? ' selected' : ''}>${escHtml(t)}</option>`).join('');
+	_restoreStoredTagFilterSelection();
 }
 function saveNamedPromptPreset(name, text, tagsRaw) {
 	const n = String(name || '').trim();
@@ -12202,6 +12232,7 @@ if (promptSavedSelect) {
 }
 if (promptTagFilter) {
 	promptTagFilter.addEventListener('change', () => {
+		_setStoredTagFilter(promptTagFilter.value);
 		renderPromptSavedSelect();
 	});
 }
@@ -12217,15 +12248,13 @@ if (promptPresetTagChips) {
 		if (!btn || !promptTagFilter) return;
 		const tag = btn.dataset.tag || '';
 		promptTagFilter.value = promptTagFilter.value === tag ? '' : tag;
+		_setStoredTagFilter(promptTagFilter.value);
 		renderPromptSavedSelect();
 	});
 }
 if (promptPresetClearFilters) {
 	promptPresetClearFilters.addEventListener('click', () => {
-		if (promptTagFilter) promptTagFilter.value = '';
-		_setFavoritesOnlyFilter(false);
-		renderPromptSavedSelect();
-		showToast('Preset filters cleared.', 'pos');
+		clearPromptPresetFilters(true);
 	});
 }
 if (promptEditPresetBtn) {
@@ -12261,7 +12290,18 @@ if (presetEditModal) {
 document.addEventListener('keydown', (e) => {
 	if (e.key === 'Escape' && presetEditModal && !presetEditModal.hidden) {
 		closePresetEditModal();
+		return;
 	}
+	if (!(e.ctrlKey && e.shiftKey && String(e.key || '').toLowerCase() === 'k')) return;
+	const panelImage = document.getElementById('panel-image');
+	if (!panelImage || panelImage.hidden) return;
+	const target = e.target;
+	if (target instanceof HTMLElement) {
+		const tag = String(target.tagName || '').toLowerCase();
+		if (target.isContentEditable || tag === 'input' || tag === 'textarea' || tag === 'select') return;
+	}
+	e.preventDefault();
+	clearPromptPresetFilters(true);
 });
 if (promptRecentClearBtn) {
 	promptRecentClearBtn.addEventListener('click', () => {
@@ -12276,6 +12316,7 @@ if (promptRecentClearBtn) {
 renderPromptRecentDropdown();
 renderPromptRecentChips();
 refreshPromptTagFilterOptions();
+_restoreStoredTagFilterSelection();
 _updateFavoritesOnlyToggleUi();
 renderPromptSavedSelect();
 

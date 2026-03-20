@@ -2305,7 +2305,11 @@ def test_prompt_preset_v2_js_functions_present():
     assert "function _getFavoritesOnlyFilter()" in js
     assert "function _setFavoritesOnlyFilter(enabled)" in js
     assert "function _updateFavoritesOnlyToggleUi()" in js
+    assert "function _getStoredTagFilter()" in js
+    assert "function _setStoredTagFilter(value)" in js
+    assert "function _restoreStoredTagFilterSelection()" in js
     assert "function _renderPresetFilterStatus(filteredCount, totalCount)" in js
+    assert "function clearPromptPresetFilters(showToastOnClear = true)" in js
     assert "function refreshPromptTagFilterOptions()" in js
     assert "function saveNamedPromptPreset(name, text, tagsRaw)" in js
     assert "function togglePresetFavorite(name)" in js
@@ -2323,6 +2327,11 @@ def test_prompt_preset_v2_js_functions_present():
     assert "promptFavoritesOnlyToggle.addEventListener('click'" in js
     assert "promptPresetClearFilters.addEventListener('click'" in js
     assert "Preset filters cleared." in js
+    # keyboard shortcut for quick clear
+    assert "e.ctrlKey && e.shiftKey && String(e.key || '').toLowerCase() === 'k'" in js
+    assert "clearPromptPresetFilters(true);" in js
+    # persisted tag filter key
+    assert "PROMPT_SAVED_TAG_FILTER_KEY = 'promptSavedTagFilterV1'" in js
     # tag chips are clickable filter buttons
     assert "promptPresetTagChips.addEventListener('click'" in js
     assert "preset-tag-chip-btn" in js
