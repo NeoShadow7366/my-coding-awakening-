@@ -11643,6 +11643,15 @@ function _saveRecentPresetFilters(list) {
 	try { localStorage.setItem(PROMPT_SAVED_RECENT_FILTERS_KEY, JSON.stringify(list.slice(0, 6))); }
 	catch {}
 }
+function removeRecentPresetFilterCombo(index) {
+	const idx = Number(index);
+	if (!Number.isFinite(idx) || idx < 0) return;
+	const items = _loadRecentPresetFilters();
+	if (idx >= items.length) return;
+	items.splice(idx, 1);
+	_saveRecentPresetFilters(items);
+	renderRecentPresetFilterChips();
+}
 function rememberCurrentPresetFilterCombo() {
 	const tag = _getActiveTagFilter();
 	const favoritesOnly = _getFavoritesOnlyFilter();
@@ -11677,7 +11686,7 @@ function renderRecentPresetFilterChips() {
 		if (it.favoritesOnly) parts.push('favorites');
 		if (it.tag) parts.push(`tag:${it.tag}`);
 		const label = parts.length ? parts.join(' + ') : 'no filters';
-		return `<button class="btn btn-ghost btn-xs prompt-preset-recent-filter-chip" type="button" data-recent-filter-index="${idx}" title="Apply filter ${escHtml(label)}">${escHtml(label)}</button>`;
+		return `<span class="prompt-preset-recent-filter-chip-wrap" data-recent-filter-index="${idx}"><button class="btn btn-ghost btn-xs prompt-preset-recent-filter-chip" type="button" title="Apply filter ${escHtml(label)}">${escHtml(label)}</button><button class="btn btn-ghost btn-xs prompt-preset-recent-filter-remove" type="button" data-recent-filter-remove="1" title="Remove this recent filter" aria-label="Remove recent filter ${escHtml(label)}">\u00d7</button></span>`;
 	}).join('');
 }
 function clearPromptPresetFilters(showToastOnClear = true) {
@@ -12315,9 +12324,17 @@ if (promptPresetTagChips) {
 }
 if (promptPresetRecentFilters) {
 	promptPresetRecentFilters.addEventListener('click', (e) => {
-		const btn = e.target.closest('[data-recent-filter-index]');
-		if (!btn) return;
-		const idx = Number(btn.dataset.recentFilterIndex);
+		const removeBtn = e.target.closest('[data-recent-filter-remove]');
+		if (removeBtn) {
+			const wrap = removeBtn.closest('[data-recent-filter-index]');
+			if (!wrap) return;
+			removeRecentPresetFilterCombo(Number(wrap.dataset.recentFilterIndex));
+			showToast('Removed recent filter.', 'pos');
+			return;
+		}
+		const wrap = e.target.closest('[data-recent-filter-index]');
+		if (!wrap) return;
+		const idx = Number(wrap.dataset.recentFilterIndex);
 		const items = _loadRecentPresetFilters();
 		if (!Number.isFinite(idx) || idx < 0 || idx >= items.length) return;
 		applyPresetFilterCombo(items[idx]);

@@ -1237,11 +1237,24 @@ textarea {
   gap: var(--sp-xs);
 }
 
+.prompt-preset-recent-filter-chip-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
 .prompt-preset-recent-filter-chip {
   border: 1px dashed var(--border-subtle, rgba(255,255,255,0.12));
   border-radius: 999px;
   padding: 2px 8px;
   font-size: 0.72rem;
+}
+
+.prompt-preset-recent-filter-remove {
+  min-width: 1.4rem;
+  line-height: 1;
+  padding: 2px 4px;
+  border-radius: 999px;
 }
 
 /* Preset Edit Modal */

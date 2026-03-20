@@ -2315,6 +2315,7 @@ def test_prompt_preset_v2_js_functions_present():
     assert "function clearPromptPresetFilters(showToastOnClear = true)" in js
     assert "function _loadRecentPresetFilters()" in js
     assert "function _saveRecentPresetFilters(list)" in js
+    assert "function removeRecentPresetFilterCombo(index)" in js
     assert "function rememberCurrentPresetFilterCombo()" in js
     assert "function applyPresetFilterCombo(combo)" in js
     assert "function renderRecentPresetFilterChips()" in js
@@ -2347,6 +2348,8 @@ def test_prompt_preset_v2_js_functions_present():
     # recent filter chips are clickable
     assert "promptPresetRecentFilters.addEventListener('click'" in js
     assert "data-recent-filter-index" in js
+    assert "data-recent-filter-remove" in js
+    assert "Removed recent filter." in js
     # fav toggle wired
     assert "promptFavToggle.addEventListener('click'" in js
 
@@ -2380,7 +2383,9 @@ def test_prompt_preset_v2_css_present():
     assert ".prompt-preset-filter-actions" in css
     assert ".prompt-preset-filter-shortcut-hint" in css
     assert ".prompt-preset-recent-filters" in css
+    assert ".prompt-preset-recent-filter-chip-wrap" in css
     assert ".prompt-preset-recent-filter-chip" in css
+    assert ".prompt-preset-recent-filter-remove" in css
     assert ".preset-tag-chips" in css
     assert ".preset-tag-chip" in css
     assert ".preset-tag-chip-btn" in css
