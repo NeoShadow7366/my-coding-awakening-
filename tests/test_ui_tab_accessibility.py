@@ -1631,6 +1631,29 @@ def test_fast_preset_applies_speed_focused_settings():
     assert "if (hiresfixEnable) hiresfixEnable.checked = false;" in js
 
 
+def test_flux_lora_hint_and_strength_clamp_wiring():
+    js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
+    js = js_path.read_text(encoding="utf-8")
+    assert "const loraFluxHint = document.getElementById('lora-flux-hint');" in js
+    assert "function updateLoraFluxHint()" in js
+    assert "function clampAllLoraStrengthsForFamily(isFlux)" in js
+    assert "loraFluxHint.hidden = false;" in js
+    assert "loraFluxHint.hidden = true;" in js
+    assert "updateLoraFluxHint();" in js
+    assert "clampAllLoraStrengthsForFamily(isFluxActive);" in js
+    assert "const _isFlux = resolveActiveImageFamily(imageModelSelect?.value || '') === 'flux';" in js
+    assert "if (_strInput && _isFlux) _strInput.max = '1';" in js
+
+    html_path = Path(__file__).resolve().parents[1] / "templates" / "index.html"
+    tpl = html_path.read_text(encoding="utf-8")
+    assert 'id="lora-flux-hint" class="hint lora-flux-hint" hidden' in tpl
+
+    css_path = Path(__file__).resolve().parents[1] / "static" / "css" / "style.css"
+    css = css_path.read_text(encoding="utf-8")
+    assert ".lora-flux-hint" in css
+    assert "--clr-caution" in css
+
+
 def test_profile_export_import_markup_and_wiring_present():
     app_module.app.config["TESTING"] = True
     client = app_module.app.test_client()

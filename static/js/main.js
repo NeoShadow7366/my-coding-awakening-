@@ -146,6 +146,7 @@ const imageRecommendationDriftHint = document.getElementById('image-recommendati
 const imageRecommendationSourceTag = document.getElementById('image-recommendation-source-tag');
 const loraAddBtn = document.getElementById('lora-add-btn');
 const loraStackContainer = document.getElementById('lora-stack-container');
+const loraFluxHint = document.getElementById('lora-flux-hint');
 // NOTE: loraModelSelect / loraStrength / loraStrengthVal replaced by multi-LoRA stack
 const controlnetModelSelect = document.getElementById('controlnet-model-select');
 const controlnetPreprocessorSelect = document.getElementById('controlnet-preprocessor-select');
@@ -3028,6 +3029,31 @@ async function loadImageLoraModels() {
 	}
 }
 
+function updateLoraFluxHint() {
+	if (!loraFluxHint) return;
+	const activeFamily = resolveActiveImageFamily(imageModelSelect?.value || '');
+	if (activeFamily === 'flux') {
+		loraFluxHint.textContent = 'Flux mode: use Flux-compatible LoRAs only. Keep strength ≤ 1.0 to avoid artifacts.';
+		loraFluxHint.hidden = false;
+	} else {
+		loraFluxHint.hidden = true;
+	}
+}
+
+function clampAllLoraStrengthsForFamily(isFlux) {
+	if (!loraStackContainer) return;
+	const maxVal = isFlux ? 1.0 : 2.0;
+	loraStackContainer.querySelectorAll('.lora-row-strength').forEach((input) => {
+		input.max = String(maxVal);
+		const cur = Number(input.value);
+		if (Number.isFinite(cur) && cur > maxVal) {
+			input.value = String(maxVal);
+			const valSpan = input.closest('.lora-row')?.querySelector('.lora-strength-val');
+			if (valSpan) valSpan.textContent = maxVal.toFixed(2);
+		}
+	});
+}
+
 function _buildLoraOptions() {
 	return '<option value="">None</option>' +
 		buildCompatGroupedOptions(_loraModelsCache, getBaseCheckpointFamily(), inferCheckpointFamily);
@@ -3128,6 +3154,12 @@ function addLoraRow() {
 	});
 
 	loraStackContainer.appendChild(row);
+	// Apply family-appropriate strength max to the new row
+	{
+		const _isFlux = resolveActiveImageFamily(imageModelSelect?.value || '') === 'flux';
+		const _strInput = row.querySelector('.lora-row-strength');
+		if (_strInput && _isFlux) _strInput.max = '1';
+	}
 	updateModelStackBadges();
 }
 
@@ -8594,6 +8626,8 @@ function applyImageFamilyModeUi() {
 	if (activeImagePreset && activeFamily !== lastResolvedPresetFamily) {
 		applyImagePreset(activeImagePreset);
 	}
+	updateLoraFluxHint();
+	clampAllLoraStrengthsForFamily(isFluxActive);
 
 	syncImageControlLabels();
 	updateModelStackBadges();

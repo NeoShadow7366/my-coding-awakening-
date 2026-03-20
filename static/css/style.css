@@ -12,6 +12,7 @@
   --clr-primary-hov: #0b5ed7;
   --clr-accent-pos: #17a673;
   --clr-accent-neg: #d64545;
+  --clr-caution: #7c5400;
   --clr-user-bubble: #0d6efd;
   --clr-ai-bubble: #ebf2ff;
   --clr-ai-text: #13263f;
@@ -44,6 +45,7 @@
   --clr-border: #2a3858;
   --clr-text: #e8edf9;
   --clr-text-muted: #9eb0d4;
+  --clr-caution: #d4a800;
   --clr-ai-bubble: #202c46;
   --clr-ai-text: #e8edf9;
   --shadow-sm: 0 1px 4px rgba(0, 0, 0, 0.4);
@@ -435,6 +437,13 @@ textarea {
   opacity: 0.75;
   margin-top: 0.1rem;
   padding: 0;
+}
+
+.lora-flux-hint {
+  color: var(--clr-caution);
+  border-left: 2px solid var(--clr-caution);
+  padding-left: 0.4rem;
+  margin-bottom: 0.3rem;
 }
 
 .model-stack-panel {
