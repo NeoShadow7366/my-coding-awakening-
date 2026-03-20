@@ -2494,6 +2494,23 @@ textarea {
   margin-right: 2px;
 }
 
+.gallery-lightbox-stats {
+  padding: var(--sp-xs) 0;
+  margin: var(--sp-xs) 0;
+  border-top: 1px solid var(--clr-border);
+  border-bottom: 1px solid var(--clr-border);
+  font-size: 0.8rem;
+  color: var(--clr-text);
+}
+
+.stats-row {
+  padding: var(--sp-xs) 0;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-xs);
+  opacity: 0.85;
+}
+
 .gallery-lightbox-meta-actions {
   display: flex;
   gap: var(--sp-xs);

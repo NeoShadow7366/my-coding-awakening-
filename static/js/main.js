@@ -369,6 +369,7 @@ const galleryLightboxCloseBtn = document.getElementById('gallery-lightbox-close'
 const galleryLightboxMetaToggle = document.getElementById('gallery-lightbox-meta-toggle');
 const galleryLightboxMeta = document.getElementById('gallery-lightbox-meta');
 const galleryLightboxMetaChips = document.getElementById('gallery-lightbox-meta-chips');
+const galleryLightboxStats = document.getElementById('gallery-lightbox-stats');
 const galleryLightboxReuseBtn = document.getElementById('gallery-lightbox-reuse');
 const galleryLightboxCompareToggle = document.getElementById('gallery-lightbox-compare-toggle');
 const galleryLightboxSourceUploadInput = document.getElementById('gallery-lightbox-source-upload');
@@ -6119,6 +6120,21 @@ function getImg2ImgSourceImageUrl(entry) {
 	return `/api/image/view?filename=${encodeURIComponent(imageName)}&subfolder=&type=input`;
 }
 
+function computeGenerationStats(params) {
+	if (!params) return null;
+	const genTimeMs = Number.isFinite(Number(params.generation_time_ms)) ? Number(params.generation_time_ms) : null;
+	const steps = Number.isFinite(Number(params.steps)) ? Number(params.steps) : null;
+	if (!genTimeMs || !steps) return null;
+	const genTimeSec = genTimeMs / 1000;
+	const stepsPerSec = steps / genTimeSec;
+	return {
+		totalTime: genTimeMs,
+		totalTimeSec: genTimeSec,
+		steps: steps,
+		stepsPerSec: stepsPerSec,
+	};
+}
+
 function updateLightboxMeta(entry) {
 	const hasParams = entry && (entry.model || entry.params);
 	if (galleryLightboxMetaToggle) {
@@ -6163,6 +6179,19 @@ function updateLightboxMeta(entry) {
 	const tags = getGalleryTags(entry);
 	if (tags.length) chips.push(`<span class="chip" title="Tags">#${escHtml(tags.join(' #'))}</span>`);
 	galleryLightboxMetaChips.innerHTML = chips.join('');
+	// Populate stats section
+	const stats = computeGenerationStats(p);
+	if (galleryLightboxStats) {
+		if (stats) {
+			galleryLightboxStats.hidden = false;
+			const timeStr = _formatGenTime(stats.totalTime);
+			const throughputStr = stats.stepsPerSec.toFixed(2);
+			galleryLightboxStats.innerHTML = `<div class="stats-row" aria-label="Generation stats">Generated in ${escHtml(timeStr)} (${escHtml(String(stats.steps))} steps @ ${escHtml(throughputStr)} step/s)</div>`;
+		} else {
+			galleryLightboxStats.hidden = true;
+			galleryLightboxStats.innerHTML = '';
+		}
+	}
 }
 
 function renderLightboxTags(entry) {
@@ -6527,6 +6556,10 @@ function closeGalleryLightbox() {
 		galleryLightboxMetaToggle.setAttribute('aria-hidden', 'true');
 	}
 	if (galleryLightboxMetaChips) galleryLightboxMetaChips.innerHTML = '';
+	if (galleryLightboxStats) {
+		galleryLightboxStats.innerHTML = '';
+		galleryLightboxStats.hidden = true;
+	}
 	if (galleryLightboxTags) galleryLightboxTags.innerHTML = '';
 	if (galleryLightboxTagInput) galleryLightboxTagInput.value = '';
 	if (galleryLightboxCaption) {
