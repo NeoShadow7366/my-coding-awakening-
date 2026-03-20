@@ -11719,8 +11719,11 @@ function savePresetEditModal() {
 	const existing = presets[original];
 	if (!existing) { showToast('Preset no longer exists.', 'neg'); closePresetEditModal(); return; }
 	if (newName !== original && presets[newName]) {
-		showToast(`Preset \"${newName}\" already exists. Choose a different name.`, 'neg');
-		return;
+		const accepted = window.confirm(`Preset "${newName}" already exists. Overwrite it?`);
+		if (!accepted) {
+			showToast('Rename canceled.', 'neg');
+			return;
+		}
 	}
 	const tags = tagsRaw.split(',').map((s) => s.trim()).filter(Boolean);
 	const updated = {

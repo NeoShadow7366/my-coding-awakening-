@@ -2374,9 +2374,10 @@ def test_preset_edit_modal_js_functions_and_wiring_present():
     assert "function renderPresetNotesPreview(name)" in js
     # rename: delete old key and write new
     assert "delete presets[original];" in js
-    # rename conflict guard prevents accidental overwrite
+    # rename conflict path requests explicit overwrite confirmation
     assert "if (newName !== original && presets[newName])" in js
-    assert "already exists. Choose a different name." in js
+    assert "already exists. Overwrite it?" in js
+    assert "showToast('Rename canceled.', 'neg');" in js
     # notes preserved on save
     assert "notes: existing.notes" in js or "notes," in js
     # edit button wired
