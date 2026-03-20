@@ -11437,6 +11437,7 @@ const PROMPT_SAVED_KEY = 'promptSavedPresets';
 const PROMPT_SAVED_FAVORITES_ONLY_KEY = 'promptSavedFavoritesOnlyV1';
 const PROMPT_SAVED_TAG_FILTER_KEY = 'promptSavedTagFilterV1';
 const PROMPT_SAVED_RECENT_FILTERS_KEY = 'promptSavedRecentFiltersV1';
+const PROMPT_SAVED_RECENT_FILTERS_MAX = 6;
 const PROMPT_RECENT_CHIPS_MAX = 8;
 
 function loadPromptRecentHistory() {
@@ -11634,14 +11635,24 @@ function _loadRecentPresetFilters() {
 		return parsed.filter((it) => it && typeof it === 'object').map((it) => ({
 			tag: String(it.tag || ''),
 			favoritesOnly: Boolean(it.favoritesOnly),
+			pinned: Boolean(it.pinned),
 		}));
 	} catch {
 		return [];
 	}
 }
 function _saveRecentPresetFilters(list) {
-	try { localStorage.setItem(PROMPT_SAVED_RECENT_FILTERS_KEY, JSON.stringify(list.slice(0, 6))); }
+	try { localStorage.setItem(PROMPT_SAVED_RECENT_FILTERS_KEY, JSON.stringify(list.slice(0, PROMPT_SAVED_RECENT_FILTERS_MAX))); }
 	catch {}
+}
+function _trimRecentPresetFilters(list) {
+	if (!Array.isArray(list)) return [];
+	if (list.length <= PROMPT_SAVED_RECENT_FILTERS_MAX) return list;
+	const pinned = list.filter((it) => Boolean(it?.pinned));
+	const unpinned = list.filter((it) => !Boolean(it?.pinned));
+	const keepPinned = pinned.slice(0, PROMPT_SAVED_RECENT_FILTERS_MAX);
+	const roomForUnpinned = Math.max(0, PROMPT_SAVED_RECENT_FILTERS_MAX - keepPinned.length);
+	return keepPinned.concat(unpinned.slice(0, roomForUnpinned));
 }
 function removeRecentPresetFilterCombo(index) {
 	const idx = Number(index);
@@ -11652,15 +11663,26 @@ function removeRecentPresetFilterCombo(index) {
 	_saveRecentPresetFilters(items);
 	renderRecentPresetFilterChips();
 }
+function togglePinRecentPresetFilterCombo(index) {
+	const idx = Number(index);
+	if (!Number.isFinite(idx) || idx < 0) return false;
+	const items = _loadRecentPresetFilters();
+	if (idx >= items.length) return false;
+	items[idx].pinned = !Boolean(items[idx].pinned);
+	_saveRecentPresetFilters(_trimRecentPresetFilters(items));
+	renderRecentPresetFilterChips();
+	return Boolean(items[idx].pinned);
+}
 function rememberCurrentPresetFilterCombo() {
 	const tag = _getActiveTagFilter();
 	const favoritesOnly = _getFavoritesOnlyFilter();
 	if (!tag && !favoritesOnly) return;
 	const key = `${favoritesOnly ? '1' : '0'}|${tag}`;
 	let recent = _loadRecentPresetFilters();
+	const existing = recent.find((it) => `${it.favoritesOnly ? '1' : '0'}|${it.tag}` === key);
 	recent = recent.filter((it) => `${it.favoritesOnly ? '1' : '0'}|${it.tag}` !== key);
-	recent.unshift({ tag, favoritesOnly });
-	_saveRecentPresetFilters(recent);
+	recent.unshift({ tag, favoritesOnly, pinned: Boolean(existing?.pinned) });
+	_saveRecentPresetFilters(_trimRecentPresetFilters(recent));
 	renderRecentPresetFilterChips();
 }
 function applyPresetFilterCombo(combo) {
@@ -11686,7 +11708,11 @@ function renderRecentPresetFilterChips() {
 		if (it.favoritesOnly) parts.push('favorites');
 		if (it.tag) parts.push(`tag:${it.tag}`);
 		const label = parts.length ? parts.join(' + ') : 'no filters';
-		return `<span class="prompt-preset-recent-filter-chip-wrap" data-recent-filter-index="${idx}"><button class="btn btn-ghost btn-xs prompt-preset-recent-filter-chip" type="button" title="Apply filter ${escHtml(label)}">${escHtml(label)}</button><button class="btn btn-ghost btn-xs prompt-preset-recent-filter-remove" type="button" data-recent-filter-remove="1" title="Remove this recent filter" aria-label="Remove recent filter ${escHtml(label)}">\u00d7</button></span>`;
+		const isPinned = Boolean(it.pinned);
+		const pinTitle = isPinned ? 'Unpin this recent filter' : 'Pin this recent filter';
+		const pinLabel = isPinned ? 'Unpin recent filter' : 'Pin recent filter';
+		const pinText = isPinned ? 'Unpin' : 'Pin';
+		return `<span class="prompt-preset-recent-filter-chip-wrap${isPinned ? ' is-pinned' : ''}" data-recent-filter-index="${idx}"><button class="btn btn-ghost btn-xs prompt-preset-recent-filter-chip" type="button" title="Apply filter ${escHtml(label)}">${escHtml(label)}</button><button class="btn btn-ghost btn-xs prompt-preset-recent-filter-pin" type="button" data-recent-filter-pin="1" title="${pinTitle}" aria-label="${pinLabel}" aria-pressed="${isPinned ? 'true' : 'false'}">${pinText}</button><button class="btn btn-ghost btn-xs prompt-preset-recent-filter-remove" type="button" data-recent-filter-remove="1" title="Remove this recent filter" aria-label="Remove recent filter ${escHtml(label)}">x</button></span>`;
 	}).join('');
 }
 function clearPromptPresetFilters(showToastOnClear = true) {
@@ -12324,6 +12350,14 @@ if (promptPresetTagChips) {
 }
 if (promptPresetRecentFilters) {
 	promptPresetRecentFilters.addEventListener('click', (e) => {
+		const pinBtn = e.target.closest('[data-recent-filter-pin]');
+		if (pinBtn) {
+			const wrap = pinBtn.closest('[data-recent-filter-index]');
+			if (!wrap) return;
+			const pinned = togglePinRecentPresetFilterCombo(Number(wrap.dataset.recentFilterIndex));
+			showToast(pinned ? 'Pinned recent filter.' : 'Unpinned recent filter.', 'pos');
+			return;
+		}
 		const removeBtn = e.target.closest('[data-recent-filter-remove]');
 		if (removeBtn) {
 			const wrap = removeBtn.closest('[data-recent-filter-index]');

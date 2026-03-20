@@ -2348,7 +2348,11 @@ def test_prompt_preset_v2_js_functions_present():
     # recent filter chips are clickable
     assert "promptPresetRecentFilters.addEventListener('click'" in js
     assert "data-recent-filter-index" in js
+    assert "data-recent-filter-pin" in js
     assert "data-recent-filter-remove" in js
+    assert "Pinned recent filter." in js
+    assert "Unpinned recent filter." in js
+    assert "function togglePinRecentPresetFilterCombo(index)" in js
     assert "Removed recent filter." in js
     # fav toggle wired
     assert "promptFavToggle.addEventListener('click'" in js
@@ -2384,7 +2388,9 @@ def test_prompt_preset_v2_css_present():
     assert ".prompt-preset-filter-shortcut-hint" in css
     assert ".prompt-preset-recent-filters" in css
     assert ".prompt-preset-recent-filter-chip-wrap" in css
+    assert ".prompt-preset-recent-filter-chip-wrap.is-pinned" in css
     assert ".prompt-preset-recent-filter-chip" in css
+    assert ".prompt-preset-recent-filter-pin" in css
     assert ".prompt-preset-recent-filter-remove" in css
     assert ".preset-tag-chips" in css
     assert ".preset-tag-chip" in css
