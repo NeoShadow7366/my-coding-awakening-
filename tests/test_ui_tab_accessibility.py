@@ -1639,10 +1639,16 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert "function clampAllLoraStrengthsForFamily(isFlux)" in js
     assert "function getActiveLoraCompatibilityFamily()" in js
     assert "function refreshLoraOptionsForCurrentFamily()" in js
+    assert "const loraCompatModeHint = document.getElementById('lora-compat-mode-hint');" in js
+    assert "function updateLoraCompatibilityModeHint()" in js
+    assert "LoRA grouping source: manual Flux mode." in js
+    assert "LoRA grouping source: manual SD mode." in js
+    assert "LoRA grouping source: generic list (family unknown)." in js
     assert "buildCompatGroupedOptions(_loraModelsCache, getActiveLoraCompatibilityFamily(), inferCheckpointFamily);" in js
     assert "loraFluxHint.hidden = false;" in js
     assert "loraFluxHint.hidden = true;" in js
     assert "updateLoraFluxHint();" in js
+    assert "updateLoraCompatibilityModeHint();" in js
     assert "refreshLoraOptionsForCurrentFamily();" in js
     assert "clampAllLoraStrengthsForFamily(isFluxActive);" in js
     assert "const _isFlux = resolveActiveImageFamily(imageModelSelect?.value || '') === 'flux';" in js
@@ -1656,10 +1662,12 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     html_path = Path(__file__).resolve().parents[1] / "templates" / "index.html"
     tpl = html_path.read_text(encoding="utf-8")
     assert 'id="lora-flux-hint" class="hint lora-flux-hint" hidden' in tpl
+    assert 'id="lora-compat-mode-hint" class="hint lora-compat-mode-hint" aria-live="polite"' in tpl
 
     css_path = Path(__file__).resolve().parents[1] / "static" / "css" / "style.css"
     css = css_path.read_text(encoding="utf-8")
     assert ".lora-flux-hint" in css
+    assert ".lora-compat-mode-hint" in css
     assert "--clr-caution" in css
 
 

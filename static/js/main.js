@@ -147,6 +147,7 @@ const imageRecommendationSourceTag = document.getElementById('image-recommendati
 const loraAddBtn = document.getElementById('lora-add-btn');
 const loraStackContainer = document.getElementById('lora-stack-container');
 const loraFluxHint = document.getElementById('lora-flux-hint');
+const loraCompatModeHint = document.getElementById('lora-compat-mode-hint');
 // NOTE: loraModelSelect / loraStrength / loraStrengthVal replaced by multi-LoRA stack
 const controlnetModelSelect = document.getElementById('controlnet-model-select');
 const controlnetPreprocessorSelect = document.getElementById('controlnet-preprocessor-select');
@@ -3077,6 +3078,33 @@ function refreshLoraOptionsForCurrentFamily() {
 			sel.value = cur;
 		}
 	});
+}
+
+function updateLoraCompatibilityModeHint() {
+	if (!loraCompatModeHint) return;
+	const selectedModel = imageModelSelect?.value || '';
+	const activeFamily = resolveActiveImageFamily(selectedModel);
+	const requestedMode = imageModelFamilySelect?.value || imageModelFamilyMode || 'auto';
+	if (activeFamily === 'flux') {
+		if (requestedMode === 'flux') {
+			loraCompatModeHint.textContent = 'LoRA grouping source: manual Flux mode.';
+		} else {
+			loraCompatModeHint.textContent = 'LoRA grouping source: detected Flux family from selected checkpoint.';
+		}
+		return;
+	}
+	if (requestedMode === 'sd') {
+		loraCompatModeHint.textContent = 'LoRA grouping source: manual SD mode.';
+		return;
+	}
+	const baseFamily = getBaseCheckpointFamily();
+	if (baseFamily === 'sdxl') {
+		loraCompatModeHint.textContent = 'LoRA grouping source: detected SDXL checkpoint family.';
+	} else if (baseFamily === 'sd15') {
+		loraCompatModeHint.textContent = 'LoRA grouping source: detected SD 1.5 checkpoint family.';
+	} else {
+		loraCompatModeHint.textContent = 'LoRA grouping source: generic list (family unknown).';
+	}
 }
 
 function addLoraRow() {
@@ -8647,6 +8675,7 @@ function applyImageFamilyModeUi() {
 		applyImagePreset(activeImagePreset);
 	}
 	updateLoraFluxHint();
+	updateLoraCompatibilityModeHint();
 	refreshLoraOptionsForCurrentFamily();
 	clampAllLoraStrengthsForFamily(isFluxActive);
 

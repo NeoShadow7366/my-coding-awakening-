@@ -446,6 +446,12 @@ textarea {
   margin-bottom: 0.3rem;
 }
 
+.lora-compat-mode-hint {
+  font-size: 0.72rem;
+  opacity: 0.72;
+  margin-bottom: 0.3rem;
+}
+
 .model-stack-panel {
   border: none;
   border-radius: 0;
