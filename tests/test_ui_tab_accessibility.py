@@ -1637,9 +1637,13 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert "const loraFluxHint = document.getElementById('lora-flux-hint');" in js
     assert "function updateLoraFluxHint()" in js
     assert "function clampAllLoraStrengthsForFamily(isFlux)" in js
+    assert "function getActiveLoraCompatibilityFamily()" in js
+    assert "function refreshLoraOptionsForCurrentFamily()" in js
+    assert "buildCompatGroupedOptions(_loraModelsCache, getActiveLoraCompatibilityFamily(), inferCheckpointFamily);" in js
     assert "loraFluxHint.hidden = false;" in js
     assert "loraFluxHint.hidden = true;" in js
     assert "updateLoraFluxHint();" in js
+    assert "refreshLoraOptionsForCurrentFamily();" in js
     assert "clampAllLoraStrengthsForFamily(isFluxActive);" in js
     assert "const _isFlux = resolveActiveImageFamily(imageModelSelect?.value || '') === 'flux';" in js
     assert "if (_strInput && _isFlux) _strInput.max = '1';" in js

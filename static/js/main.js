@@ -3057,9 +3057,26 @@ function clampAllLoraStrengthsForFamily(isFlux) {
 	});
 }
 
+function getActiveLoraCompatibilityFamily() {
+	const activeFamily = resolveActiveImageFamily(imageModelSelect?.value || '');
+	if (activeFamily === 'flux') return 'flux';
+	return getBaseCheckpointFamily();
+}
+
 function _buildLoraOptions() {
 	return '<option value="">None</option>' +
-		buildCompatGroupedOptions(_loraModelsCache, getBaseCheckpointFamily(), inferCheckpointFamily);
+		buildCompatGroupedOptions(_loraModelsCache, getActiveLoraCompatibilityFamily(), inferCheckpointFamily);
+}
+
+function refreshLoraOptionsForCurrentFamily() {
+	if (!loraStackContainer) return;
+	loraStackContainer.querySelectorAll('.lora-row-select').forEach((sel) => {
+		const cur = sel.value;
+		sel.innerHTML = _buildLoraOptions();
+		if (cur && [...sel.options].some((o) => o.value === cur)) {
+			sel.value = cur;
+		}
+	});
 }
 
 function addLoraRow() {
@@ -8630,6 +8647,7 @@ function applyImageFamilyModeUi() {
 		applyImagePreset(activeImagePreset);
 	}
 	updateLoraFluxHint();
+	refreshLoraOptionsForCurrentFamily();
 	clampAllLoraStrengthsForFamily(isFluxActive);
 
 	syncImageControlLabels();
