@@ -1840,6 +1840,8 @@ function applyImageSettings(settings) {
 	// Restore LoRA stack
 	if (loraStackContainer && Array.isArray(settings.loras)) {
 		loraStackContainer.innerHTML = '';
+		const isFluxFamily = resolveActiveImageFamily(imageModelSelect?.value || '') === 'flux';
+		const maxStrength = isFluxFamily ? 1 : 2;
 		for (const entry of settings.loras) {
 			addLoraRow();
 			const lastRow = loraStackContainer.lastElementChild;
@@ -1849,8 +1851,9 @@ function applyImageSettings(settings) {
 			const strVal = lastRow.querySelector('.lora-strength-val');
 			if (sel && entry.name && [...sel.options].some((o) => o.value === entry.name)) sel.value = entry.name;
 			if (str && Number.isFinite(entry.strength)) {
-				str.value = String(entry.strength);
-				if (strVal) strVal.textContent = Number(entry.strength).toFixed(2);
+				const safeStrength = Math.max(0, Math.min(maxStrength, Number(entry.strength)));
+				str.value = String(safeStrength);
+				if (strVal) strVal.textContent = safeStrength.toFixed(2);
 			}
 		}
 	}
@@ -8639,6 +8642,7 @@ function normalizeImageRequestByFamily(common) {
 	const activeFamily = resolveActiveImageFamily(common.model || '');
 	const capabilities = getImageFamilyCapabilities(activeFamily);
 	const normalized = { ...common, model_family: activeFamily };
+	const isFluxFamily = activeFamily === 'flux';
 
 	if (!capabilities.supports_refiner) normalized.refiner_model = '';
 	if (!capabilities.supports_vae) normalized.vae = '';
@@ -8659,6 +8663,24 @@ function normalizeImageRequestByFamily(common) {
 		normalized.cfg = Math.max(capabilities.cfg_min, Math.min(capabilities.cfg_max, cfgValue));
 	} else {
 		normalized.cfg = capabilities.cfg_default;
+	}
+	if (Array.isArray(normalized.loras)) {
+		const maxLoraStrength = isFluxFamily ? 1 : 2;
+		normalized.loras = normalized.loras
+			.map((entry) => {
+				if (!entry || typeof entry !== 'object') return null;
+				const name = typeof entry.name === 'string' ? entry.name : '';
+				if (!name) return null;
+				const parsedStrength = Number(entry.strength);
+				const safeStrength = Number.isFinite(parsedStrength)
+					? Math.max(0, Math.min(maxLoraStrength, parsedStrength))
+					: (isFluxFamily ? 0.8 : 1.0);
+				return {
+					name,
+					strength: safeStrength,
+				};
+			})
+			.filter(Boolean);
 	}
 
 	return normalized;

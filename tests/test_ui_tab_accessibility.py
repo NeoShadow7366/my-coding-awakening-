@@ -1643,6 +1643,11 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert "clampAllLoraStrengthsForFamily(isFluxActive);" in js
     assert "const _isFlux = resolveActiveImageFamily(imageModelSelect?.value || '') === 'flux';" in js
     assert "if (_strInput && _isFlux) _strInput.max = '1';" in js
+    assert "const isFluxFamily = resolveActiveImageFamily(imageModelSelect?.value || '') === 'flux';" in js
+    assert "const safeStrength = Math.max(0, Math.min(maxStrength, Number(entry.strength)));" in js
+    assert "const maxLoraStrength = isFluxFamily ? 1 : 2;" in js
+    assert "normalized.loras = normalized.loras" in js
+    assert "strength: safeStrength," in js
 
     html_path = Path(__file__).resolve().parents[1] / "templates" / "index.html"
     tpl = html_path.read_text(encoding="utf-8")
