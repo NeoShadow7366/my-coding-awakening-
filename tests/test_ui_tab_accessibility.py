@@ -2357,6 +2357,7 @@ def test_preset_edit_modal_html_elements_present():
     assert 'id="preset-edit-save"' in html
     assert 'id="preset-edit-cancel"' in html
     assert 'id="preset-edit-delete"' in html
+    assert 'id="prompt-preset-notes-preview"' in html
     assert 'role="dialog"' in html
     assert 'aria-modal="true"' in html
 
@@ -2370,8 +2371,12 @@ def test_preset_edit_modal_js_functions_and_wiring_present():
     assert "function openPresetEditModal(name)" in js
     assert "function closePresetEditModal()" in js
     assert "function savePresetEditModal()" in js
+    assert "function renderPresetNotesPreview(name)" in js
     # rename: delete old key and write new
     assert "delete presets[original];" in js
+    # rename conflict guard prevents accidental overwrite
+    assert "if (newName !== original && presets[newName])" in js
+    assert "already exists. Choose a different name." in js
     # notes preserved on save
     assert "notes: existing.notes" in js or "notes," in js
     # edit button wired
@@ -2388,6 +2393,7 @@ def test_preset_edit_modal_js_functions_and_wiring_present():
     assert "const presetEditModal = document.getElementById('preset-edit-modal');" in js
     assert "const presetEditName = document.getElementById('preset-edit-name');" in js
     assert "const presetEditNotes = document.getElementById('preset-edit-notes');" in js
+    assert "const promptPresetNotesPreview = document.getElementById('prompt-preset-notes-preview');" in js
 
 
 def test_preset_edit_modal_css_present():

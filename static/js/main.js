@@ -205,6 +205,7 @@ const promptDeleteSavedBtn = document.getElementById('prompt-delete-saved-btn');
 const promptFavToggle = document.getElementById('prompt-fav-toggle');
 const promptTagFilter = document.getElementById('prompt-tag-filter');
 const promptPresetTagChips = document.getElementById('prompt-preset-tag-chips');
+const promptPresetNotesPreview = document.getElementById('prompt-preset-notes-preview');
 const promptEditPresetBtn = document.getElementById('prompt-edit-preset-btn');
 const presetEditModal = document.getElementById('preset-edit-modal');
 const presetEditModalClose = document.getElementById('preset-edit-modal-close');
@@ -11584,6 +11585,7 @@ function renderPromptSavedSelect() {
 	if (!keys.length) {
 		promptSavedSelect.innerHTML = '<option value="">No saved prompts</option>';
 		renderPresetTagChips('');
+		renderPresetNotesPreview('');
 		return;
 	}
 	promptSavedSelect.innerHTML = keys.map((k) => {
@@ -11591,6 +11593,7 @@ function renderPromptSavedSelect() {
 		return `<option value="${escHtml(k)}">${escHtml(starPrefix + k)}</option>`;
 	}).join('');
 	renderPresetTagChips(keys[0]);
+	renderPresetNotesPreview(keys[0]);
 }
 function renderPresetTagChips(name) {
 	if (!promptPresetTagChips) return;
@@ -11602,6 +11605,21 @@ function renderPresetTagChips(name) {
 	promptPresetTagChips.innerHTML = preset.tags.map((t) =>
 		`<span class="preset-tag-chip">${escHtml(t)}</span>`
 	).join('');
+}
+function renderPresetNotesPreview(name) {
+	if (!promptPresetNotesPreview) return;
+	const n = String(name || '').trim();
+	if (!n) { promptPresetNotesPreview.textContent = ''; return; }
+	const presets = loadPromptSavedPresets();
+	const preset = presets[n];
+	const notes = preset ? String(preset.notes || '').trim() : '';
+	if (!notes) {
+		promptPresetNotesPreview.textContent = '';
+		return;
+	}
+	const compact = notes.replace(/\s+/g, ' ').trim();
+	const preview = compact.length > 140 ? `${compact.slice(0, 140)}\u2026` : compact;
+	promptPresetNotesPreview.textContent = `Notes: ${preview}`;
 }
 function refreshPromptTagFilterOptions() {
 	if (!promptTagFilter) return;
@@ -11700,6 +11718,10 @@ function savePresetEditModal() {
 	const original = _presetEditOriginalName;
 	const existing = presets[original];
 	if (!existing) { showToast('Preset no longer exists.', 'neg'); closePresetEditModal(); return; }
+	if (newName !== original && presets[newName]) {
+		showToast(`Preset \"${newName}\" already exists. Choose a different name.`, 'neg');
+		return;
+	}
 	const tags = tagsRaw.split(',').map((s) => s.trim()).filter(Boolean);
 	const updated = {
 		text,
@@ -11718,6 +11740,7 @@ function savePresetEditModal() {
 	if (promptSavedSelect && newName) {
 		promptSavedSelect.value = newName;
 		renderPresetTagChips(newName);
+		renderPresetNotesPreview(newName);
 		_updateFavToggleBtn(newName, updated.favorite);
 	}
 	closePresetEditModal();
@@ -12126,6 +12149,7 @@ if (promptSavedSelect) {
 	promptSavedSelect.addEventListener('change', () => {
 		const name = promptSavedSelect.value;
 		renderPresetTagChips(name);
+		renderPresetNotesPreview(name);
 		const presets = loadPromptSavedPresets();
 		const preset = presets[name];
 		_updateFavToggleBtn(name, preset ? preset.favorite : false);
