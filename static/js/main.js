@@ -207,6 +207,7 @@ const promptFavoritesOnlyToggle = document.getElementById('prompt-favorites-only
 const promptTagFilter = document.getElementById('prompt-tag-filter');
 const promptPresetFilterStatus = document.getElementById('prompt-preset-filter-status');
 const promptPresetClearFilters = document.getElementById('prompt-preset-clear-filters');
+const promptPresetRecentFilters = document.getElementById('prompt-preset-recent-filters');
 const promptPresetTagChips = document.getElementById('prompt-preset-tag-chips');
 const promptPresetNotesPreview = document.getElementById('prompt-preset-notes-preview');
 const promptEditPresetBtn = document.getElementById('prompt-edit-preset-btn');
@@ -11435,6 +11436,7 @@ const PROMPT_RECENT_KEY = 'promptRecentHistory';
 const PROMPT_SAVED_KEY = 'promptSavedPresets';
 const PROMPT_SAVED_FAVORITES_ONLY_KEY = 'promptSavedFavoritesOnlyV1';
 const PROMPT_SAVED_TAG_FILTER_KEY = 'promptSavedTagFilterV1';
+const PROMPT_SAVED_RECENT_FILTERS_KEY = 'promptSavedRecentFiltersV1';
 const PROMPT_RECENT_CHIPS_MAX = 8;
 
 function loadPromptRecentHistory() {
@@ -11625,11 +11627,65 @@ function _renderPresetFilterStatus(filteredCount, totalCount) {
 	promptPresetFilterStatus.textContent = `Filters: ${parts.join(', ')}. Showing ${filteredCount}/${totalCount}.`;
 	if (promptPresetClearFilters) promptPresetClearFilters.disabled = false;
 }
+function _loadRecentPresetFilters() {
+	try {
+		const parsed = JSON.parse(localStorage.getItem(PROMPT_SAVED_RECENT_FILTERS_KEY) || '[]');
+		if (!Array.isArray(parsed)) return [];
+		return parsed.filter((it) => it && typeof it === 'object').map((it) => ({
+			tag: String(it.tag || ''),
+			favoritesOnly: Boolean(it.favoritesOnly),
+		}));
+	} catch {
+		return [];
+	}
+}
+function _saveRecentPresetFilters(list) {
+	try { localStorage.setItem(PROMPT_SAVED_RECENT_FILTERS_KEY, JSON.stringify(list.slice(0, 6))); }
+	catch {}
+}
+function rememberCurrentPresetFilterCombo() {
+	const tag = _getActiveTagFilter();
+	const favoritesOnly = _getFavoritesOnlyFilter();
+	if (!tag && !favoritesOnly) return;
+	const key = `${favoritesOnly ? '1' : '0'}|${tag}`;
+	let recent = _loadRecentPresetFilters();
+	recent = recent.filter((it) => `${it.favoritesOnly ? '1' : '0'}|${it.tag}` !== key);
+	recent.unshift({ tag, favoritesOnly });
+	_saveRecentPresetFilters(recent);
+	renderRecentPresetFilterChips();
+}
+function applyPresetFilterCombo(combo) {
+	if (!combo) return;
+	const tag = String(combo.tag || '');
+	if (promptTagFilter) {
+		const hasOption = [...promptTagFilter.options].some((o) => o.value === tag);
+		promptTagFilter.value = hasOption ? tag : '';
+	}
+	_setStoredTagFilter(tag);
+	_setFavoritesOnlyFilter(Boolean(combo.favoritesOnly));
+	renderPromptSavedSelect();
+}
+function renderRecentPresetFilterChips() {
+	if (!promptPresetRecentFilters) return;
+	const items = _loadRecentPresetFilters();
+	if (!items.length) {
+		promptPresetRecentFilters.innerHTML = '';
+		return;
+	}
+	promptPresetRecentFilters.innerHTML = items.map((it, idx) => {
+		const parts = [];
+		if (it.favoritesOnly) parts.push('favorites');
+		if (it.tag) parts.push(`tag:${it.tag}`);
+		const label = parts.length ? parts.join(' + ') : 'no filters';
+		return `<button class="btn btn-ghost btn-xs prompt-preset-recent-filter-chip" type="button" data-recent-filter-index="${idx}" title="Apply filter ${escHtml(label)}">${escHtml(label)}</button>`;
+	}).join('');
+}
 function clearPromptPresetFilters(showToastOnClear = true) {
 	if (promptTagFilter) promptTagFilter.value = '';
 	_setStoredTagFilter('');
 	_setFavoritesOnlyFilter(false);
 	renderPromptSavedSelect();
+	renderRecentPresetFilterChips();
 	if (showToastOnClear) showToast('Preset filters cleared.', 'pos');
 }
 function renderPromptSavedSelect() {
@@ -11655,6 +11711,7 @@ function renderPromptSavedSelect() {
 		renderPresetTagChips('');
 		renderPresetNotesPreview('');
 		_renderPresetFilterStatus(0, totalCount);
+		renderRecentPresetFilterChips();
 		return;
 	}
 	promptSavedSelect.innerHTML = keys.map((k) => {
@@ -11664,6 +11721,7 @@ function renderPromptSavedSelect() {
 	renderPresetTagChips(keys[0]);
 	renderPresetNotesPreview(keys[0]);
 	_renderPresetFilterStatus(keys.length, totalCount);
+	renderRecentPresetFilterChips();
 }
 function renderPresetTagChips(name) {
 	if (!promptPresetTagChips) return;
@@ -12233,12 +12291,14 @@ if (promptSavedSelect) {
 if (promptTagFilter) {
 	promptTagFilter.addEventListener('change', () => {
 		_setStoredTagFilter(promptTagFilter.value);
+		rememberCurrentPresetFilterCombo();
 		renderPromptSavedSelect();
 	});
 }
 if (promptFavoritesOnlyToggle) {
 	promptFavoritesOnlyToggle.addEventListener('click', () => {
 		_setFavoritesOnlyFilter(!_getFavoritesOnlyFilter());
+		rememberCurrentPresetFilterCombo();
 		renderPromptSavedSelect();
 	});
 }
@@ -12249,7 +12309,18 @@ if (promptPresetTagChips) {
 		const tag = btn.dataset.tag || '';
 		promptTagFilter.value = promptTagFilter.value === tag ? '' : tag;
 		_setStoredTagFilter(promptTagFilter.value);
+		rememberCurrentPresetFilterCombo();
 		renderPromptSavedSelect();
+	});
+}
+if (promptPresetRecentFilters) {
+	promptPresetRecentFilters.addEventListener('click', (e) => {
+		const btn = e.target.closest('[data-recent-filter-index]');
+		if (!btn) return;
+		const idx = Number(btn.dataset.recentFilterIndex);
+		const items = _loadRecentPresetFilters();
+		if (!Number.isFinite(idx) || idx < 0 || idx >= items.length) return;
+		applyPresetFilterCombo(items[idx]);
 	});
 }
 if (promptPresetClearFilters) {

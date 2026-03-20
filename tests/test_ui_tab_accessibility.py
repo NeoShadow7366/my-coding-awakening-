@@ -2288,6 +2288,7 @@ def test_prompt_preset_v2_html_elements_present():
     assert 'id="prompt-preset-filter-shortcut-hint"' in html
     assert 'id="prompt-preset-clear-filters"' in html
     assert 'aria-keyshortcuts="Control+Shift+K"' in html
+    assert 'id="prompt-preset-recent-filters"' in html
     assert 'id="prompt-preset-tag-chips"' in html
     assert 'id="prompt-saved-select"' in html
     assert 'id="prompt-save-btn"' in html
@@ -2312,6 +2313,11 @@ def test_prompt_preset_v2_js_functions_present():
     assert "function _restoreStoredTagFilterSelection()" in js
     assert "function _renderPresetFilterStatus(filteredCount, totalCount)" in js
     assert "function clearPromptPresetFilters(showToastOnClear = true)" in js
+    assert "function _loadRecentPresetFilters()" in js
+    assert "function _saveRecentPresetFilters(list)" in js
+    assert "function rememberCurrentPresetFilterCombo()" in js
+    assert "function applyPresetFilterCombo(combo)" in js
+    assert "function renderRecentPresetFilterChips()" in js
     assert "function refreshPromptTagFilterOptions()" in js
     assert "function saveNamedPromptPreset(name, text, tagsRaw)" in js
     assert "function togglePresetFavorite(name)" in js
@@ -2334,9 +2340,13 @@ def test_prompt_preset_v2_js_functions_present():
     assert "clearPromptPresetFilters(true);" in js
     # persisted tag filter key
     assert "PROMPT_SAVED_TAG_FILTER_KEY = 'promptSavedTagFilterV1'" in js
+    assert "PROMPT_SAVED_RECENT_FILTERS_KEY = 'promptSavedRecentFiltersV1'" in js
     # tag chips are clickable filter buttons
     assert "promptPresetTagChips.addEventListener('click'" in js
     assert "preset-tag-chip-btn" in js
+    # recent filter chips are clickable
+    assert "promptPresetRecentFilters.addEventListener('click'" in js
+    assert "data-recent-filter-index" in js
     # fav toggle wired
     assert "promptFavToggle.addEventListener('click'" in js
 
@@ -2352,6 +2362,7 @@ def test_prompt_preset_v2_dom_refs_present():
     assert "const promptTagFilter = document.getElementById('prompt-tag-filter');" in js
     assert "const promptPresetFilterStatus = document.getElementById('prompt-preset-filter-status');" in js
     assert "const promptPresetClearFilters = document.getElementById('prompt-preset-clear-filters');" in js
+    assert "const promptPresetRecentFilters = document.getElementById('prompt-preset-recent-filters');" in js
     assert "const promptPresetTagChips = document.getElementById('prompt-preset-tag-chips');" in js
 
 
@@ -2368,6 +2379,8 @@ def test_prompt_preset_v2_css_present():
     assert ".prompt-preset-filter-status" in css
     assert ".prompt-preset-filter-actions" in css
     assert ".prompt-preset-filter-shortcut-hint" in css
+    assert ".prompt-preset-recent-filters" in css
+    assert ".prompt-preset-recent-filter-chip" in css
     assert ".preset-tag-chips" in css
     assert ".preset-tag-chip" in css
     assert ".preset-tag-chip-btn" in css

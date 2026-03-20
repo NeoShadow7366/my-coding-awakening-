@@ -1231,6 +1231,19 @@ textarea {
   white-space: nowrap;
 }
 
+.prompt-preset-recent-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-xs);
+}
+
+.prompt-preset-recent-filter-chip {
+  border: 1px dashed var(--border-subtle, rgba(255,255,255,0.12));
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 0.72rem;
+}
+
 /* Preset Edit Modal */
 .preset-edit-modal {
   position: fixed;
