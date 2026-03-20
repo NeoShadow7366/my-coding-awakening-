@@ -1209,6 +1209,17 @@ textarea {
   min-height: 1rem;
 }
 
+.prompt-preset-filter-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-xs);
+}
+
+.prompt-preset-filter-status {
+  margin: 0;
+}
+
 /* Preset Edit Modal */
 .preset-edit-modal {
   position: fixed;

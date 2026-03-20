@@ -205,6 +205,8 @@ const promptDeleteSavedBtn = document.getElementById('prompt-delete-saved-btn');
 const promptFavToggle = document.getElementById('prompt-fav-toggle');
 const promptFavoritesOnlyToggle = document.getElementById('prompt-favorites-only-toggle');
 const promptTagFilter = document.getElementById('prompt-tag-filter');
+const promptPresetFilterStatus = document.getElementById('prompt-preset-filter-status');
+const promptPresetClearFilters = document.getElementById('prompt-preset-clear-filters');
 const promptPresetTagChips = document.getElementById('prompt-preset-tag-chips');
 const promptPresetNotesPreview = document.getElementById('prompt-preset-notes-preview');
 const promptEditPresetBtn = document.getElementById('prompt-edit-preset-btn');
@@ -11587,9 +11589,24 @@ function _updateFavoritesOnlyToggleUi() {
 	promptFavoritesOnlyToggle.classList.toggle('is-active', isActive);
 	promptFavoritesOnlyToggle.title = isActive ? 'Showing favorites only' : 'Show favorites only';
 }
+function _renderPresetFilterStatus(filteredCount, totalCount) {
+	if (!promptPresetFilterStatus) return;
+	const parts = [];
+	const activeTag = _getActiveTagFilter();
+	if (_getFavoritesOnlyFilter()) parts.push('favorites');
+	if (activeTag) parts.push(`tag:${activeTag}`);
+	if (!parts.length) {
+		promptPresetFilterStatus.textContent = `No filters active. Showing ${filteredCount}/${totalCount}.`;
+		if (promptPresetClearFilters) promptPresetClearFilters.disabled = true;
+		return;
+	}
+	promptPresetFilterStatus.textContent = `Filters: ${parts.join(', ')}. Showing ${filteredCount}/${totalCount}.`;
+	if (promptPresetClearFilters) promptPresetClearFilters.disabled = false;
+}
 function renderPromptSavedSelect() {
 	if (!promptSavedSelect) return;
 	const presets = loadPromptSavedPresets();
+	const totalCount = Object.keys(presets).length;
 	const activeTag = _getActiveTagFilter();
 	const favoritesOnly = _getFavoritesOnlyFilter();
 	let keys = Object.keys(presets).sort((a, b) => {
@@ -11608,6 +11625,7 @@ function renderPromptSavedSelect() {
 		promptSavedSelect.innerHTML = '<option value="">No saved prompts</option>';
 		renderPresetTagChips('');
 		renderPresetNotesPreview('');
+		_renderPresetFilterStatus(0, totalCount);
 		return;
 	}
 	promptSavedSelect.innerHTML = keys.map((k) => {
@@ -11616,6 +11634,7 @@ function renderPromptSavedSelect() {
 	}).join('');
 	renderPresetTagChips(keys[0]);
 	renderPresetNotesPreview(keys[0]);
+	_renderPresetFilterStatus(keys.length, totalCount);
 }
 function renderPresetTagChips(name) {
 	if (!promptPresetTagChips) return;
@@ -12199,6 +12218,14 @@ if (promptPresetTagChips) {
 		const tag = btn.dataset.tag || '';
 		promptTagFilter.value = promptTagFilter.value === tag ? '' : tag;
 		renderPromptSavedSelect();
+	});
+}
+if (promptPresetClearFilters) {
+	promptPresetClearFilters.addEventListener('click', () => {
+		if (promptTagFilter) promptTagFilter.value = '';
+		_setFavoritesOnlyFilter(false);
+		renderPromptSavedSelect();
+		showToast('Preset filters cleared.', 'pos');
 	});
 }
 if (promptEditPresetBtn) {
