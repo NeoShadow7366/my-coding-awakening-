@@ -429,6 +429,14 @@ textarea {
   background: color-mix(in srgb, var(--clr-surface) 90%, var(--clr-border) 10%);
 }
 
+.preset-summary {
+  font-size: 0.72rem;
+  letter-spacing: 0.01em;
+  opacity: 0.75;
+  margin-top: 0.1rem;
+  padding: 0;
+}
+
 .model-stack-panel {
   border: none;
   border-radius: 0;

@@ -1618,6 +1618,16 @@ def test_fast_preset_applies_speed_focused_settings():
     assert "if (activeImagePreset && activeFamily !== lastResolvedPresetFamily) {" in js
     assert "applyImagePreset(activeImagePreset);" in js
     assert "if (refinerModelSelect) refinerModelSelect.value = '';" in js
+    assert "const IMAGE_ACTIVE_PRESET_KEY = 'imageActivePresetV1';" in js
+    assert "function updateImagePresetSummary(presetData)" in js
+    assert "localStorage.setItem(IMAGE_ACTIVE_PRESET_KEY, preset);" in js
+    assert "localStorage.removeItem(IMAGE_ACTIVE_PRESET_KEY);" in js
+    assert "const _persistedImagePreset = localStorage.getItem(IMAGE_ACTIVE_PRESET_KEY);" in js
+
+    html_path = Path(__file__).resolve().parents[1] / "templates" / "index.html"
+    tpl = html_path.read_text(encoding="utf-8")
+    assert 'id="image-preset-summary" class="hint preset-summary" hidden' in tpl
+    assert ".preset-summary" in css
     assert "if (hiresfixEnable) hiresfixEnable.checked = false;" in js
 
 

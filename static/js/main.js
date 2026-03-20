@@ -478,6 +478,7 @@ const IMAGE_RECENT_MODELS_KEY = 'imageRecentModelsV1';
 const IMAGE_FAVORITE_MODELS_KEY = 'imageFavoriteModelsV1';
 const IMAGE_MODEL_FILTER_MODE_KEY = 'imageModelFilterModeV1';
 const IMAGE_MODEL_FAMILY_MODE_KEY = 'imageModelFamilyModeV1';
+const IMAGE_ACTIVE_PRESET_KEY = 'imageActivePresetV1';
 const IMAGE_SAMPLER_FILTER_QUERY_KEY = 'imageSamplerFilterQueryV1';
 const IMAGE_SCHEDULER_FILTER_QUERY_KEY = 'imageSchedulerFilterQueryV1';
 const IMAGE_FLUX_AUTO_APPLY_RECOMMENDATION_KEY = 'imageFluxAutoApplyRecommendationV1';
@@ -1960,6 +1961,9 @@ function applySelectedImageProfile() {
 	applyImageSettings(settings);
 	localStorage.setItem(IMAGE_PROFILE_SELECTED_KEY, name);
 	showToast(`Applied profile: ${name}.`, 'pos');
+	setActiveImagePresetButton('');
+	updateImagePresetSummary(null);
+	localStorage.removeItem(IMAGE_ACTIVE_PRESET_KEY);
 }
 
 function deleteSelectedImageProfile() {
@@ -5206,8 +5210,26 @@ function applyImagePreset(preset) {
 	setSelectValueIfOptionExists(imageSchedulerSelect, presetData.scheduler || 'normal');
 	activeImagePreset = preset;
 	lastResolvedPresetFamily = family;
+	localStorage.setItem(IMAGE_ACTIVE_PRESET_KEY, preset);
+	updateImagePresetSummary(presetData);
 	syncImageControlLabels();
 	updateModelStackCompatibilityHint();
+}
+
+function updateImagePresetSummary(presetData) {
+	const el = document.getElementById('image-preset-summary');
+	if (!el) return;
+	if (!presetData) {
+		el.textContent = '';
+		el.hidden = true;
+		return;
+	}
+	const parts = [];
+	if (presetData.steps != null) parts.push(`${presetData.steps} steps`);
+	if (presetData.cfg != null) parts.push(`CFG ${presetData.cfg}`);
+	if (presetData.width != null && presetData.height != null) parts.push(`${presetData.width}\u00d7${presetData.height}`);
+	el.textContent = parts.join(' \u00b7 ');
+	el.hidden = false;
 }
 
 function getImagePresetFamilyLabel() {
@@ -5295,6 +5317,11 @@ imagePresetButtons.forEach((btn) => {
 });
 
 setActiveImagePresetButton('');
+const _persistedImagePreset = localStorage.getItem(IMAGE_ACTIVE_PRESET_KEY);
+if (_persistedImagePreset && IMAGE_PRESET_BASE_LABELS[_persistedImagePreset]) {
+	applyImagePreset(_persistedImagePreset);
+	setActiveImagePresetButton(_persistedImagePreset);
+}
 
 if (imageProfileSelect) {
 	imageProfileSelect.addEventListener('change', () => {
