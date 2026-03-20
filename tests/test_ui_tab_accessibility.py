@@ -59,6 +59,7 @@ def test_index_image_preset_buttons_expose_toggle_semantics():
     assert 'data-image-preset="fast" aria-pressed="false"' in html
     assert 'data-image-preset="quality" aria-pressed="false"' in html
     assert 'data-image-preset="creative" aria-pressed="false"' in html
+    assert 'id="image-preset-family-badge" class="hint preset-family-badge" aria-live="polite"' in html
 
 
 def test_index_model_browser_quick_filters_group_semantics():
@@ -1590,8 +1591,14 @@ def test_fast_preset_applies_speed_focused_settings():
     assert "const IMAGE_PRESET_BASE_LABELS = {" in js
     assert "function getImagePresetFamilyLabel()" in js
     assert "function syncImagePresetButtonLabels()" in js
+    assert "const imagePresetFamilyBadge = document.getElementById('image-preset-family-badge');" in js
     assert "btn.textContent = `${baseLabel} (${familyLabel})`;" in js
     assert "btn.title = `${baseLabel} preset tuned for ${familyLabel}`;" in js
+    assert "imagePresetFamilyBadge.textContent = `Preset profile: ${familyLabel}`;" in js
+
+    css_path = Path(__file__).resolve().parents[1] / "static" / "css" / "style.css"
+    css = css_path.read_text(encoding="utf-8")
+    assert ".preset-family-badge" in css
     assert "sd:" in js
     assert "flux:" in js
     assert "const fluxRecommendation = family === 'flux' ? getFluxWorkflowRecommendation(imageModelSelect?.value || '') : null;" in js

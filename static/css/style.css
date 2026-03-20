@@ -403,6 +403,16 @@ textarea {
   gap: var(--sp-xs);
 }
 
+.preset-family-badge {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 0.35rem;
+  padding: 0.15rem 0.5rem;
+  border: 1px solid var(--clr-border);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--clr-surface) 88%, var(--clr-primary) 12%);
+}
+
 .model-stack-panel {
   border: none;
   border-radius: 0;

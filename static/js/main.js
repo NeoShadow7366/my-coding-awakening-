@@ -421,6 +421,7 @@ const galleryLightboxTagInput = document.getElementById('gallery-lightbox-tag-in
 const galleryLightboxAddTagBtn = document.getElementById('gallery-lightbox-add-tag-btn');
 const galleryLightboxTags = document.getElementById('gallery-lightbox-tags');
 const imagePresetButtons = document.querySelectorAll('[data-image-preset]');
+const imagePresetFamilyBadge = document.getElementById('image-preset-family-badge');
 const previewUpdated = document.getElementById('preview-updated');
 const previewTransportBadge = document.getElementById('preview-transport-badge');
 const previewEmpty = document.getElementById('preview-empty');
@@ -5228,6 +5229,10 @@ function syncImagePresetButtonLabels() {
 		btn.title = `${baseLabel} preset tuned for ${familyLabel}`;
 		btn.setAttribute('aria-label', `${baseLabel} preset for ${familyLabel}`);
 	});
+	if (imagePresetFamilyBadge) {
+		imagePresetFamilyBadge.textContent = `Preset profile: ${familyLabel}`;
+		imagePresetFamilyBadge.title = `Image presets are tuned for ${familyLabel}`;
+	}
 }
 
 function setActiveImagePresetButton(activePreset) {
