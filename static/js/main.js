@@ -3188,12 +3188,16 @@ function updateLoraClearPreservedButton() {
 	if (count === 0) {
 		loraClearPreservedBtn.hidden = true;
 		loraClearPreservedBtn.disabled = true;
+		loraClearPreservedBtn.textContent = 'Clear preserved';
 		loraClearPreservedBtn.title = 'Clear preserved hidden mismatches';
+		loraClearPreservedBtn.setAttribute('aria-label', loraClearPreservedBtn.title);
 		return;
 	}
 	loraClearPreservedBtn.hidden = false;
 	loraClearPreservedBtn.disabled = false;
+	loraClearPreservedBtn.textContent = `Clear preserved (${count})`;
 	loraClearPreservedBtn.title = `Clear ${count} preserved hidden mismatch${count === 1 ? '' : 'es'}.`;
+	loraClearPreservedBtn.setAttribute('aria-label', loraClearPreservedBtn.title);
 }
 
 function updateLoraCompatUiResetButtonState() {

@@ -1711,6 +1711,9 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert "No incompatible options to hide for ${baseFamilyLabel}." in js
     assert "loraClearPreservedBtn.hidden = true;" in js
     assert "loraClearPreservedBtn.hidden = false;" in js
+    assert "loraClearPreservedBtn.textContent = 'Clear preserved';" in js
+    assert "loraClearPreservedBtn.textContent = `Clear preserved (${count})`;" in js
+    assert "loraClearPreservedBtn.setAttribute('aria-label', loraClearPreservedBtn.title);" in js
     assert "loraHideIncompatibleToggle.checked = loraHideIncompatibleOptions;" in js
     assert "localStorage.setItem(LORA_HIDE_INCOMPATIBLE_OPTIONS_KEY, loraHideIncompatibleOptions ? '1' : '0');" in js
     assert "localStorage.removeItem(LORA_HIDE_INCOMPATIBLE_OPTIONS_KEY);" in js
