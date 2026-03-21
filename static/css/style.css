@@ -1625,6 +1625,14 @@ textarea {
   margin: 0.25rem 0 0;
 }
 
+.lora-display-options[data-mode='compact'] .lora-display-options-active-hint {
+  color: color-mix(in srgb, var(--clr-text) 82%, var(--clr-link));
+}
+
+.lora-display-options[data-mode='default'] .lora-display-options-active-hint {
+  color: var(--clr-text-muted);
+}
+
 .lora-stack-container {
   display: flex;
   flex-direction: column;

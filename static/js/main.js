@@ -3240,21 +3240,23 @@ function updateLoraDisplayOptionsSummary() {
 	if (loraCompactPreservedIndicators) activeOptionLabels.push('compact preserved');
 	if (loraCompactRowClearButtons) activeOptionLabels.push('compact row clear');
 	if (loraCompactMismatchBadges) activeOptionLabels.push('compact mismatch');
+	const isCompactPreset = !loraShowRowHints && loraCompactPreservedIndicators && loraCompactRowClearButtons && loraCompactMismatchBadges;
 	const activeCount = Number(!loraShowRowHints) + Number(loraCompactPreservedIndicators) + Number(loraCompactRowClearButtons) + Number(loraCompactMismatchBadges);
+	const displayMode = activeCount === 0 ? 'default' : (isCompactPreset ? 'compact' : 'custom');
 	loraDisplayOptionsToggle.textContent = activeCount > 0 ? `Display options (${activeCount} active)` : 'Display options';
 	loraDisplayOptionsToggle.dataset.active = activeCount > 0 ? '1' : '0';
 	loraDisplayOptionsToggle.setAttribute('aria-label', activeCount > 0 ? `Display options, ${activeCount} active: ${activeOptionLabels.join(', ')}` : 'Display options, defaults active');
 	loraDisplayOptionsToggle.title = activeCount > 0
 		? `${activeCount} non-default LoRA display option${activeCount === 1 ? '' : 's'} enabled: ${activeOptionLabels.join(', ')}.`
 		: 'All LoRA display options are using defaults.';
+	if (loraDisplayOptions) {
+		loraDisplayOptions.dataset.mode = displayMode;
+	}
 	if (loraDisplayOptionsActiveHint) {
-		if (activeCount > 0) {
-			loraDisplayOptionsActiveHint.hidden = false;
-			loraDisplayOptionsActiveHint.textContent = `Active display options: ${activeOptionLabels.join(', ')}.`;
-		} else {
-			loraDisplayOptionsActiveHint.hidden = true;
-			loraDisplayOptionsActiveHint.textContent = '';
-		}
+		loraDisplayOptionsActiveHint.hidden = false;
+		loraDisplayOptionsActiveHint.textContent = activeCount > 0
+			? `Display mode: ${displayMode}. Active display options: ${activeOptionLabels.join(', ')}.`
+			: 'Display mode: default. Active display options: none.';
 	}
 	if (loraDisplayOptionsResetBtn) {
 		loraDisplayOptionsResetBtn.disabled = activeCount === 0;
@@ -3263,7 +3265,6 @@ function updateLoraDisplayOptionsSummary() {
 			: 'LoRA display options are already using defaults.';
 	}
 	if (loraDisplayOptionsCompactBtn) {
-		const isCompactPreset = !loraShowRowHints && loraCompactPreservedIndicators && loraCompactRowClearButtons && loraCompactMismatchBadges;
 		loraDisplayOptionsCompactBtn.disabled = isCompactPreset;
 		loraDisplayOptionsCompactBtn.title = isCompactPreset
 			? 'LoRA display options are already set to compact mode.'

@@ -1749,12 +1749,14 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert "if (loraCompactPreservedIndicators) activeOptionLabels.push('compact preserved');" in js
     assert "if (loraCompactRowClearButtons) activeOptionLabels.push('compact row clear');" in js
     assert "if (loraCompactMismatchBadges) activeOptionLabels.push('compact mismatch');" in js
+    assert "const displayMode = activeCount === 0 ? 'default' : (isCompactPreset ? 'compact' : 'custom');" in js
     assert "loraDisplayOptionsToggle.setAttribute('aria-label', activeCount > 0 ? `Display options, ${activeCount} active: ${activeOptionLabels.join(', ')}` : 'Display options, defaults active');" in js
     assert "enabled: ${activeOptionLabels.join(', ')}." in js
+    assert "loraDisplayOptions.dataset.mode = displayMode;" in js
     assert "loraDisplayOptionsActiveHint.hidden = false;" in js
-    assert "loraDisplayOptionsActiveHint.textContent = `Active display options: ${activeOptionLabels.join(', ')}.`;" in js
-    assert "loraDisplayOptionsActiveHint.hidden = true;" in js
-    assert "loraDisplayOptionsActiveHint.textContent = '';" in js
+    assert "loraDisplayOptionsActiveHint.textContent = activeCount > 0" in js
+    assert "Display mode: ${displayMode}. Active display options: ${activeOptionLabels.join(', ')}." in js
+    assert "Display mode: default. Active display options: none." in js
     assert "loraDisplayOptionsResetBtn.disabled = activeCount === 0;" in js
     assert "Reset only LoRA display options to defaults." in js
     assert "LoRA display options are already using defaults." in js
@@ -1901,6 +1903,8 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert ".lora-display-options-grid" in css
     assert ".lora-display-options-actions" in css
     assert ".lora-display-options-active-hint" in css
+    assert ".lora-display-options[data-mode='compact'] .lora-display-options-active-hint" in css
+    assert ".lora-display-options[data-mode='default'] .lora-display-options-active-hint" in css
     assert ".lora-hide-incompatible-status" in css
     assert ".lora-family-legend > summary" in css
     assert ".lora-row-compat-badge" in css
