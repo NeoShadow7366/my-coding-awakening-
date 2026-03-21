@@ -1741,7 +1741,13 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert "loraClearPreservedBtn.setAttribute('aria-label', loraClearPreservedBtn.title);" in js
     assert "loraDisplayOptionsToggle.textContent = activeCount > 0 ? `Display options (${activeCount} active)` : 'Display options';" in js
     assert "loraDisplayOptionsToggle.dataset.active = activeCount > 0 ? '1' : '0';" in js
-    assert "loraDisplayOptionsToggle.setAttribute('aria-label', activeCount > 0 ? `Display options, ${activeCount} active` : 'Display options, defaults active');" in js
+    assert "const activeOptionLabels = [];" in js
+    assert "if (!loraShowRowHints) activeOptionLabels.push('row hints hidden');" in js
+    assert "if (loraCompactPreservedIndicators) activeOptionLabels.push('compact preserved');" in js
+    assert "if (loraCompactRowClearButtons) activeOptionLabels.push('compact row clear');" in js
+    assert "if (loraCompactMismatchBadges) activeOptionLabels.push('compact mismatch');" in js
+    assert "loraDisplayOptionsToggle.setAttribute('aria-label', activeCount > 0 ? `Display options, ${activeCount} active: ${activeOptionLabels.join(', ')}` : 'Display options, defaults active');" in js
+    assert "enabled: ${activeOptionLabels.join(', ')}." in js
     assert "loraDisplayOptionsResetBtn.disabled = activeCount === 0;" in js
     assert "Reset only LoRA display options to defaults." in js
     assert "LoRA display options are already using defaults." in js

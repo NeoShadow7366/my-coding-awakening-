@@ -3233,12 +3233,17 @@ function updateLoraClearPreservedButton() {
 
 function updateLoraDisplayOptionsSummary() {
 	if (!loraDisplayOptionsToggle) return;
+	const activeOptionLabels = [];
+	if (!loraShowRowHints) activeOptionLabels.push('row hints hidden');
+	if (loraCompactPreservedIndicators) activeOptionLabels.push('compact preserved');
+	if (loraCompactRowClearButtons) activeOptionLabels.push('compact row clear');
+	if (loraCompactMismatchBadges) activeOptionLabels.push('compact mismatch');
 	const activeCount = Number(!loraShowRowHints) + Number(loraCompactPreservedIndicators) + Number(loraCompactRowClearButtons) + Number(loraCompactMismatchBadges);
 	loraDisplayOptionsToggle.textContent = activeCount > 0 ? `Display options (${activeCount} active)` : 'Display options';
 	loraDisplayOptionsToggle.dataset.active = activeCount > 0 ? '1' : '0';
-	loraDisplayOptionsToggle.setAttribute('aria-label', activeCount > 0 ? `Display options, ${activeCount} active` : 'Display options, defaults active');
+	loraDisplayOptionsToggle.setAttribute('aria-label', activeCount > 0 ? `Display options, ${activeCount} active: ${activeOptionLabels.join(', ')}` : 'Display options, defaults active');
 	loraDisplayOptionsToggle.title = activeCount > 0
-		? `${activeCount} non-default LoRA display option${activeCount === 1 ? '' : 's'} enabled.`
+		? `${activeCount} non-default LoRA display option${activeCount === 1 ? '' : 's'} enabled: ${activeOptionLabels.join(', ')}.`
 		: 'All LoRA display options are using defaults.';
 	if (loraDisplayOptionsResetBtn) {
 		loraDisplayOptionsResetBtn.disabled = activeCount === 0;
