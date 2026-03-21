@@ -159,6 +159,7 @@ const loraCompatUiResetBtn = document.getElementById('lora-compat-ui-reset');
 const loraDisplayOptions = document.getElementById('lora-display-options');
 const loraDisplayOptionsToggle = document.getElementById('lora-display-options-toggle');
 const loraDisplayOptionsResetBtn = document.getElementById('lora-display-options-reset');
+const loraDisplayOptionsActiveHint = document.getElementById('lora-display-options-active-hint');
 const loraFamilyLegend = document.getElementById('lora-family-legend');
 const loraMismatchSummary = document.getElementById('lora-mismatch-summary');
 const loraDisableIncompatibleBtn = document.getElementById('lora-disable-incompatible-btn');
@@ -3245,6 +3246,15 @@ function updateLoraDisplayOptionsSummary() {
 	loraDisplayOptionsToggle.title = activeCount > 0
 		? `${activeCount} non-default LoRA display option${activeCount === 1 ? '' : 's'} enabled: ${activeOptionLabels.join(', ')}.`
 		: 'All LoRA display options are using defaults.';
+	if (loraDisplayOptionsActiveHint) {
+		if (activeCount > 0) {
+			loraDisplayOptionsActiveHint.hidden = false;
+			loraDisplayOptionsActiveHint.textContent = `Active display options: ${activeOptionLabels.join(', ')}.`;
+		} else {
+			loraDisplayOptionsActiveHint.hidden = true;
+			loraDisplayOptionsActiveHint.textContent = '';
+		}
+	}
 	if (loraDisplayOptionsResetBtn) {
 		loraDisplayOptionsResetBtn.disabled = activeCount === 0;
 		loraDisplayOptionsResetBtn.title = activeCount > 0

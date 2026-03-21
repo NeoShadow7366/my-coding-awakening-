@@ -1656,6 +1656,7 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert "const loraDisplayOptions = document.getElementById('lora-display-options');" in js
     assert "const loraDisplayOptionsToggle = document.getElementById('lora-display-options-toggle');" in js
     assert "const loraDisplayOptionsResetBtn = document.getElementById('lora-display-options-reset');" in js
+    assert "const loraDisplayOptionsActiveHint = document.getElementById('lora-display-options-active-hint');" in js
     assert "const loraFamilyLegend = document.getElementById('lora-family-legend');" in js
     assert "function resolveLoraCompatibilityHintState(selectedModel, requestedMode)" in js
     assert "function updateLoraCompatibilityModeHint()" in js
@@ -1748,6 +1749,10 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert "if (loraCompactMismatchBadges) activeOptionLabels.push('compact mismatch');" in js
     assert "loraDisplayOptionsToggle.setAttribute('aria-label', activeCount > 0 ? `Display options, ${activeCount} active: ${activeOptionLabels.join(', ')}` : 'Display options, defaults active');" in js
     assert "enabled: ${activeOptionLabels.join(', ')}." in js
+    assert "loraDisplayOptionsActiveHint.hidden = false;" in js
+    assert "loraDisplayOptionsActiveHint.textContent = `Active display options: ${activeOptionLabels.join(', ')}.`;" in js
+    assert "loraDisplayOptionsActiveHint.hidden = true;" in js
+    assert "loraDisplayOptionsActiveHint.textContent = '';" in js
     assert "loraDisplayOptionsResetBtn.disabled = activeCount === 0;" in js
     assert "Reset only LoRA display options to defaults." in js
     assert "LoRA display options are already using defaults." in js
@@ -1789,6 +1794,7 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert 'id="lora-display-options" class="lora-display-options"' in tpl
     assert 'id="lora-display-options-toggle"' in tpl
     assert 'id="lora-display-options-reset"' in tpl
+    assert 'id="lora-display-options-active-hint" class="hint lora-display-options-active-hint" hidden aria-live="polite"' in tpl
     assert 'Reset display options' in tpl
     assert 'Display options' in tpl
     assert 'class="lora-display-options-grid"' in tpl
@@ -1886,6 +1892,7 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert ".lora-display-options > summary[data-active='1']" in css
     assert ".lora-display-options-grid" in css
     assert ".lora-display-options-actions" in css
+    assert ".lora-display-options-active-hint" in css
     assert ".lora-hide-incompatible-status" in css
     assert ".lora-family-legend > summary" in css
     assert ".lora-row-compat-badge" in css
