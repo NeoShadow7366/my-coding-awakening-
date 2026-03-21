@@ -1693,6 +1693,19 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert ".lora-compat-mode-hint.detail-sd15" in css
     assert ".lora-compat-mode-hint.detail-unknown" in css
     assert "--clr-caution" in css
+    # per-row compat badge
+    assert "function updateLoraRowCompatBadge(row)" in js
+    assert "function updateAllLoraRowCompatBadges()" in js
+    assert "'lora-row-compat-badge'" in js
+    assert "badge.className = 'lora-row-compat-badge is-mismatch';" in js
+    assert "'\u26a0 Not Flux'" in js
+    assert "'\u26a0 Flux LoRA'" in js
+    assert "'\u26a0 SDXL\u2192SD1.5'" in js
+    assert "'\u26a0 SD1.5\u2192SDXL'" in js
+    assert "updateLoraRowCompatBadge(row);" in js
+    assert "updateAllLoraRowCompatBadges();" in js
+    assert ".lora-row-compat-badge" in css
+    assert ".lora-row-compat-badge.is-mismatch" in css
 
 
 def test_profile_export_import_markup_and_wiring_present():

@@ -3078,6 +3078,7 @@ function refreshLoraOptionsForCurrentFamily() {
 			sel.value = cur;
 		}
 	});
+	updateAllLoraRowCompatBadges();
 }
 
 function resolveLoraCompatibilityHintState(selectedModel, requestedMode) {
@@ -3165,6 +3166,52 @@ function updateLoraCompatibilityModeHint() {
 	setHint(state.text, state.classNames, state.source, state.family, state.familyDetail);
 }
 
+function updateLoraRowCompatBadge(row) {
+	const sel = row.querySelector('.lora-row-select');
+	const badge = row.querySelector('.lora-row-compat-badge');
+	if (!sel || !badge) return;
+	const loraName = sel.value;
+	if (!loraName) {
+		badge.hidden = true;
+		badge.textContent = '';
+		badge.className = 'lora-row-compat-badge';
+		return;
+	}
+	const loraFamily = inferCheckpointFamily(loraName);
+	const activeFamily = getActiveLoraCompatibilityFamily();
+	if (!loraFamily || !activeFamily || loraFamily === activeFamily) {
+		badge.hidden = true;
+		badge.textContent = '';
+		badge.className = 'lora-row-compat-badge';
+		return;
+	}
+	let badgeText = '⚠ Cross-family';
+	let titleText = `LoRA family (${loraFamily}) may not match active family (${activeFamily}).`;
+	if (activeFamily === 'flux' && loraFamily !== 'flux') {
+		badgeText = '⚠ Not Flux';
+		titleText = `This LoRA appears ${loraFamily.toUpperCase()}-based, but Flux mode is active.`;
+	} else if (loraFamily === 'flux' && activeFamily !== 'flux') {
+		badgeText = '⚠ Flux LoRA';
+		titleText = `This is a Flux LoRA but ${activeFamily.toUpperCase()} mode is active.`;
+	} else if (loraFamily === 'sdxl' && activeFamily === 'sd15') {
+		badgeText = '⚠ SDXL→SD1.5';
+		titleText = 'SDXL LoRA selected but SD 1.5 checkpoint is active.';
+	} else if (loraFamily === 'sd15' && activeFamily === 'sdxl') {
+		badgeText = '⚠ SD1.5→SDXL';
+		titleText = 'SD 1.5 LoRA selected but SDXL checkpoint is active.';
+	}
+	badge.textContent = badgeText;
+	badge.title = titleText;
+	badge.setAttribute('aria-label', titleText);
+	badge.className = 'lora-row-compat-badge is-mismatch';
+	badge.hidden = false;
+}
+
+function updateAllLoraRowCompatBadges() {
+	if (!loraStackContainer) return;
+	loraStackContainer.querySelectorAll('.lora-row').forEach(updateLoraRowCompatBadge);
+}
+
 function addLoraRow() {
 	if (!loraStackContainer) return;
 	const id = ++_loraRowCounter;
@@ -3174,6 +3221,7 @@ function addLoraRow() {
 	row.innerHTML = `
 		<div class="lora-row-header">
 			<span class="lora-row-label hint">LoRA ${id}</span>
+			<span class="lora-row-compat-badge" hidden aria-live="polite"></span>
 			<button class="lora-row-enable btn btn-ghost btn-xs" type="button" aria-pressed="true" title="Toggle this LoRA on/off">On</button>
 			<button class="lora-row-collapse btn btn-ghost btn-xs" type="button" aria-expanded="true" aria-controls="lora-row-body-${id}" aria-label="Collapse LoRA row">&#9660;</button>
 			<button class="lora-row-remove btn btn-ghost btn-xs" type="button" aria-label="Remove LoRA row">&#x2212;</button>
@@ -3221,6 +3269,7 @@ function addLoraRow() {
 
 	sel.addEventListener('change', async () => {
 		updateModelStackBadges();
+		updateLoraRowCompatBadge(row);
 		tagCloud.hidden = true;
 		tagHint.hidden = true;
 		tagCloud.innerHTML = '';

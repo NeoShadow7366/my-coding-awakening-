@@ -1551,6 +1551,21 @@ textarea {
   margin: 0;
 }
 
+.lora-row-compat-badge {
+  flex-shrink: 0;
+  font-size: 0.67rem;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 3px;
+  line-height: 1.5;
+}
+
+.lora-row-compat-badge.is-mismatch {
+  background: color-mix(in srgb, transparent 84%, var(--clr-caution));
+  color: var(--clr-caution);
+  border: 1px solid color-mix(in srgb, transparent 65%, var(--clr-caution));
+}
+
 .lora-row-enable {
   flex-shrink: 0;
   min-width: 2.2rem;
