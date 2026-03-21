@@ -1534,6 +1534,10 @@ textarea {
   display: none;
 }
 
+#lora-clear-preserved-btn[hidden] {
+  display: none;
+}
+
 .lora-options-row {
   display: flex;
   align-items: center;

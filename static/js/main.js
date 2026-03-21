@@ -150,6 +150,7 @@ const loraFluxHint = document.getElementById('lora-flux-hint');
 const loraCompatModeHint = document.getElementById('lora-compat-mode-hint');
 const loraHideIncompatibleToggle = document.getElementById('lora-hide-incompatible-toggle');
 const loraHideIncompatibleStatus = document.getElementById('lora-hide-incompatible-status');
+const loraClearPreservedBtn = document.getElementById('lora-clear-preserved-btn');
 const loraCompatUiResetBtn = document.getElementById('lora-compat-ui-reset');
 const loraFamilyLegend = document.getElementById('lora-family-legend');
 const loraMismatchSummary = document.getElementById('lora-mismatch-summary');
@@ -3138,6 +3139,19 @@ function getPreservedHiddenIncompatibleSelectionCount() {
 	}).length;
 }
 
+function getPreservedHiddenIncompatibleRows() {
+	if (!loraStackContainer || !loraHideIncompatibleOptions) return [];
+	const baseFamily = getActiveLoraCompatibilityFamily();
+	if (!baseFamily) return [];
+	return [...loraStackContainer.querySelectorAll('.lora-row')].filter((row) => {
+		const sel = row.querySelector('.lora-row-select');
+		const currentValue = sel?.value || '';
+		if (!currentValue) return false;
+		const currentFamily = inferCheckpointFamily(currentValue);
+		return Boolean(currentFamily && currentFamily !== baseFamily);
+	});
+}
+
 function updateLoraHideIncompatibleStatus() {
 	if (!loraHideIncompatibleStatus) return;
 	if (!loraHideIncompatibleOptions) {
@@ -3166,6 +3180,20 @@ function updateLoraHideIncompatibleStatus() {
 		? `Hiding ${hiddenCount} incompatible option${hiddenCount === 1 ? '' : 's'} for ${baseFamilyLabel}.${preservedSuffix}`
 		: `No incompatible options to hide for ${baseFamilyLabel}.${preservedSuffix}`;
 	loraHideIncompatibleStatus.hidden = false;
+}
+
+function updateLoraClearPreservedButton() {
+	if (!loraClearPreservedBtn) return;
+	const count = getPreservedHiddenIncompatibleRows().length;
+	if (count === 0) {
+		loraClearPreservedBtn.hidden = true;
+		loraClearPreservedBtn.disabled = true;
+		loraClearPreservedBtn.title = 'Clear preserved hidden mismatches';
+		return;
+	}
+	loraClearPreservedBtn.hidden = false;
+	loraClearPreservedBtn.disabled = false;
+	loraClearPreservedBtn.title = `Clear ${count} preserved hidden mismatch${count === 1 ? '' : 'es'}.`;
 }
 
 function updateLoraCompatUiResetButtonState() {
@@ -3400,6 +3428,7 @@ function updateAllLoraRowCompatBadges() {
 	loraStackContainer.querySelectorAll('.lora-row').forEach(updateLoraRowCompatBadge);
 	updateLoraStackMismatchSummary();
 	updateDisableIncompatibleLoraButton();
+	updateLoraClearPreservedButton();
 	updateLoraSubmitSkipHint();
 	updateLoraHideIncompatibleStatus();
 }
@@ -3447,6 +3476,29 @@ function disableIncompatibleLoraRows() {
 	updateLoraStackMismatchSummary();
 	updateDisableIncompatibleLoraButton();
 	updateLoraSubmitSkipHint();
+	return rows.length;
+}
+
+function clearPreservedHiddenIncompatibleRows() {
+	const rows = getPreservedHiddenIncompatibleRows();
+	if (!rows.length) return 0;
+	rows.forEach((row) => {
+		const sel = row.querySelector('.lora-row-select');
+		const tagCloud = row.querySelector('.lora-tag-cloud');
+		const tagHint = row.querySelector('.lora-tag-hint');
+		if (sel) {
+			sel.value = '';
+		}
+		if (tagCloud) {
+			tagCloud.hidden = true;
+			tagCloud.innerHTML = '';
+		}
+		if (tagHint) {
+			tagHint.hidden = true;
+		}
+	});
+	updateModelStackBadges();
+	updateAllLoraRowCompatBadges();
 	return rows.length;
 }
 
@@ -3595,6 +3647,7 @@ if (loraHideIncompatibleToggle) {
 }
 
 updateLoraHideIncompatibleStatus();
+updateLoraClearPreservedButton();
 updateLoraCompatUiResetButtonState();
 
 if (loraCompatUiResetBtn) {
@@ -3608,6 +3661,14 @@ if (loraDisableIncompatibleBtn) {
 		const disabledCount = disableIncompatibleLoraRows();
 		if (!disabledCount) return;
 		showToast(`Disabled ${disabledCount} incompatible LoRA${disabledCount === 1 ? '' : 's'}.`, '');
+	});
+}
+
+if (loraClearPreservedBtn) {
+	loraClearPreservedBtn.addEventListener('click', () => {
+		const clearedCount = clearPreservedHiddenIncompatibleRows();
+		if (!clearedCount) return;
+		showToast(`Cleared ${clearedCount} preserved hidden mismatch${clearedCount === 1 ? '' : 'es'}.`, '');
 	});
 }
 

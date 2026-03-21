@@ -1647,6 +1647,7 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert "const loraCompatModeHint = document.getElementById('lora-compat-mode-hint');" in js
     assert "const loraHideIncompatibleToggle = document.getElementById('lora-hide-incompatible-toggle');" in js
     assert "const loraHideIncompatibleStatus = document.getElementById('lora-hide-incompatible-status');" in js
+    assert "const loraClearPreservedBtn = document.getElementById('lora-clear-preserved-btn');" in js
     assert "const loraCompatUiResetBtn = document.getElementById('lora-compat-ui-reset');" in js
     assert "const loraFamilyLegend = document.getElementById('lora-family-legend');" in js
     assert "function resolveLoraCompatibilityHintState(selectedModel, requestedMode)" in js
@@ -1695,7 +1696,9 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert "localStorage.setItem(LORA_FAMILY_LEGEND_EXPANDED_KEY, loraFamilyLegend.open ? '1' : '0');" in js
     assert "function getFilteredLoraModels(baseFamily)" in js
     assert "function getPreservedHiddenIncompatibleSelectionCount()" in js
+    assert "function getPreservedHiddenIncompatibleRows()" in js
     assert "function updateLoraHideIncompatibleStatus()" in js
+    assert "function updateLoraClearPreservedButton()" in js
     assert "function updateLoraCompatUiResetButtonState()" in js
     assert "function resetLoraCompatibilityUiPrefs()" in js
     assert "const models = getFilteredLoraModels(baseFamily);" in js
@@ -1706,6 +1709,8 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert "Preserving ${preservedCount} selected mismatch${preservedCount === 1 ? '' : 'es'}." in js
     assert "Hiding ${hiddenCount} incompatible option${hiddenCount === 1 ? '' : 's'} for ${baseFamilyLabel}." in js
     assert "No incompatible options to hide for ${baseFamilyLabel}." in js
+    assert "loraClearPreservedBtn.hidden = true;" in js
+    assert "loraClearPreservedBtn.hidden = false;" in js
     assert "loraHideIncompatibleToggle.checked = loraHideIncompatibleOptions;" in js
     assert "localStorage.setItem(LORA_HIDE_INCOMPATIBLE_OPTIONS_KEY, loraHideIncompatibleOptions ? '1' : '0');" in js
     assert "localStorage.removeItem(LORA_HIDE_INCOMPATIBLE_OPTIONS_KEY);" in js
@@ -1722,6 +1727,8 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert 'id="lora-hide-incompatible-toggle"' in tpl
     assert 'id="lora-hide-incompatible-status"' in tpl
     assert 'Hide incompatible options' in tpl
+    assert 'id="lora-clear-preserved-btn"' in tpl
+    assert 'Clear preserved' in tpl
     assert 'id="lora-compat-ui-reset"' in tpl
     assert 'Reset LoRA UI' in tpl
     assert 'id="lora-family-legend"' in tpl
@@ -1746,6 +1753,7 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert "function updateLoraRowCompatBadge(row)" in js
     assert "function updateAllLoraRowCompatBadges()" in js
     assert "function updateDisableIncompatibleLoraButton()" in js
+    assert "function clearPreservedHiddenIncompatibleRows()" in js
     assert "function disableIncompatibleLoraRows()" in js
     assert "function updateLoraSubmitSkipHint()" in js
     assert "const familyChip = row.querySelector('.lora-row-family-chip');" in js
@@ -1765,6 +1773,7 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert "updateLoraRowCompatBadge(row);" in js
     assert "updateAllLoraRowCompatBadges();" in js
     assert "updateDisableIncompatibleLoraButton();" in js
+    assert "updateLoraClearPreservedButton();" in js
     assert "updateLoraSubmitSkipHint();" in js
     assert "updateLoraHideIncompatibleStatus();" in js
     assert "collectLoraStack();" in js
@@ -1792,9 +1801,11 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert "updateAllLoraRowCompatBadges();" in js
     assert 'id="lora-mismatch-summary"' in tpl
     assert 'id="lora-disable-incompatible-btn"' in tpl
+    assert "Cleared ${clearedCount} preserved hidden mismatch" in js
     assert ".lora-mismatch-summary" in css
     assert "Disabled ${disabledCount} incompatible LoRA" in js
     assert "#lora-disable-incompatible-btn[hidden]" in css
+    assert "#lora-clear-preserved-btn[hidden]" in css
     assert 'id="lora-submit-skip-hint"' in tpl
     assert "will be skipped on submit." in js
     assert ".lora-submit-skip-hint" in css
