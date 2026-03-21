@@ -1613,6 +1613,10 @@ textarea {
   margin-top: 0.15rem;
 }
 
+.lora-display-options-actions {
+  margin-top: 0.2rem;
+}
+
 .lora-stack-container {
   display: flex;
   flex-direction: column;

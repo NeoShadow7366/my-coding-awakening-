@@ -1655,6 +1655,7 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert "const loraCompatUiResetBtn = document.getElementById('lora-compat-ui-reset');" in js
     assert "const loraDisplayOptions = document.getElementById('lora-display-options');" in js
     assert "const loraDisplayOptionsToggle = document.getElementById('lora-display-options-toggle');" in js
+    assert "const loraDisplayOptionsResetBtn = document.getElementById('lora-display-options-reset');" in js
     assert "const loraFamilyLegend = document.getElementById('lora-family-legend');" in js
     assert "function resolveLoraCompatibilityHintState(selectedModel, requestedMode)" in js
     assert "function updateLoraCompatibilityModeHint()" in js
@@ -1722,6 +1723,7 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert "function updateLoraHideIncompatibleStatus()" in js
     assert "function updateLoraClearPreservedButton()" in js
     assert "function updateLoraDisplayOptionsSummary()" in js
+    assert "function resetLoraDisplayOptionsPrefs()" in js
     assert "function updateLoraCompatUiResetButtonState()" in js
     assert "function resetLoraCompatibilityUiPrefs()" in js
     assert "const models = getFilteredLoraModels(baseFamily);" in js
@@ -1740,6 +1742,9 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert "loraDisplayOptionsToggle.textContent = activeCount > 0 ? `Display options (${activeCount} active)` : 'Display options';" in js
     assert "loraDisplayOptionsToggle.dataset.active = activeCount > 0 ? '1' : '0';" in js
     assert "loraDisplayOptionsToggle.setAttribute('aria-label', activeCount > 0 ? `Display options, ${activeCount} active` : 'Display options, defaults active');" in js
+    assert "loraDisplayOptionsResetBtn.disabled = activeCount === 0;" in js
+    assert "Reset only LoRA display options to defaults." in js
+    assert "LoRA display options are already using defaults." in js
     assert "non-default LoRA display option" in js
     assert "All LoRA display options are using defaults." in js
     assert "loraHideIncompatibleToggle.checked = loraHideIncompatibleOptions;" in js
@@ -1757,6 +1762,7 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert "localStorage.removeItem(LORA_COMPACT_ROW_CLEAR_KEY);" in js
     assert "localStorage.setItem(LORA_COMPACT_MISMATCH_KEY, '1');" in js
     assert "localStorage.removeItem(LORA_COMPACT_MISMATCH_KEY);" in js
+    assert "showToast('LoRA display options reset.', 'pos');" in js
     assert "localStorage.removeItem(LORA_FAMILY_LEGEND_EXPANDED_KEY);" in js
     assert "localStorage.removeItem(LORA_DISPLAY_OPTIONS_EXPANDED_KEY);" in js
     assert "updateLoraDisplayOptionsSummary();" in js
@@ -1776,6 +1782,8 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert 'id="lora-compact-mismatch-toggle"' in tpl
     assert 'id="lora-display-options" class="lora-display-options"' in tpl
     assert 'id="lora-display-options-toggle"' in tpl
+    assert 'id="lora-display-options-reset"' in tpl
+    assert 'Reset display options' in tpl
     assert 'Display options' in tpl
     assert 'class="lora-display-options-grid"' in tpl
     assert 'id="lora-hide-incompatible-status"' in tpl
@@ -1871,6 +1879,7 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert ".lora-display-options > summary" in css
     assert ".lora-display-options > summary[data-active='1']" in css
     assert ".lora-display-options-grid" in css
+    assert ".lora-display-options-actions" in css
     assert ".lora-hide-incompatible-status" in css
     assert ".lora-family-legend > summary" in css
     assert ".lora-row-compat-badge" in css

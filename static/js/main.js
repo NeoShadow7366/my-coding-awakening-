@@ -158,6 +158,7 @@ const loraClearPreservedBtn = document.getElementById('lora-clear-preserved-btn'
 const loraCompatUiResetBtn = document.getElementById('lora-compat-ui-reset');
 const loraDisplayOptions = document.getElementById('lora-display-options');
 const loraDisplayOptionsToggle = document.getElementById('lora-display-options-toggle');
+const loraDisplayOptionsResetBtn = document.getElementById('lora-display-options-reset');
 const loraFamilyLegend = document.getElementById('lora-family-legend');
 const loraMismatchSummary = document.getElementById('lora-mismatch-summary');
 const loraDisableIncompatibleBtn = document.getElementById('lora-disable-incompatible-btn');
@@ -3239,6 +3240,39 @@ function updateLoraDisplayOptionsSummary() {
 	loraDisplayOptionsToggle.title = activeCount > 0
 		? `${activeCount} non-default LoRA display option${activeCount === 1 ? '' : 's'} enabled.`
 		: 'All LoRA display options are using defaults.';
+	if (loraDisplayOptionsResetBtn) {
+		loraDisplayOptionsResetBtn.disabled = activeCount === 0;
+		loraDisplayOptionsResetBtn.title = activeCount > 0
+			? 'Reset only LoRA display options to defaults.'
+			: 'LoRA display options are already using defaults.';
+	}
+}
+
+function resetLoraDisplayOptionsPrefs() {
+	loraShowRowHints = true;
+	loraCompactPreservedIndicators = false;
+	loraCompactRowClearButtons = false;
+	loraCompactMismatchBadges = false;
+	localStorage.removeItem(LORA_SHOW_ROW_HINTS_KEY);
+	localStorage.removeItem(LORA_COMPACT_PRESERVED_KEY);
+	localStorage.removeItem(LORA_COMPACT_ROW_CLEAR_KEY);
+	localStorage.removeItem(LORA_COMPACT_MISMATCH_KEY);
+	if (loraShowRowHintsToggle) {
+		loraShowRowHintsToggle.checked = true;
+	}
+	if (loraCompactPreservedToggle) {
+		loraCompactPreservedToggle.checked = false;
+	}
+	if (loraCompactRowClearToggle) {
+		loraCompactRowClearToggle.checked = false;
+	}
+	if (loraCompactMismatchToggle) {
+		loraCompactMismatchToggle.checked = false;
+	}
+	updateAllLoraRowCompatBadges();
+	updateLoraDisplayOptionsSummary();
+	updateLoraCompatUiResetButtonState();
+	showToast('LoRA display options reset.', 'pos');
 }
 
 function updateLoraCompatUiResetButtonState() {
@@ -3832,6 +3866,12 @@ updateLoraCompatUiResetButtonState();
 if (loraCompatUiResetBtn) {
 	loraCompatUiResetBtn.addEventListener('click', () => {
 		resetLoraCompatibilityUiPrefs();
+	});
+}
+
+if (loraDisplayOptionsResetBtn) {
+	loraDisplayOptionsResetBtn.addEventListener('click', () => {
+		resetLoraDisplayOptionsPrefs();
 	});
 }
 
