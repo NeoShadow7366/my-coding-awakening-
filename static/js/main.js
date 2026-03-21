@@ -3257,11 +3257,17 @@ function updateLoraDisplayOptionsSummary() {
 		const modeLabel = displayMode === 'compact' ? 'Compact' : (displayMode === 'custom' ? 'Custom' : 'Default');
 		loraDisplayOptionsModeChip.dataset.mode = displayMode;
 		loraDisplayOptionsModeChip.textContent = `Mode: ${modeLabel}`;
+		loraDisplayOptionsModeChip.setAttribute('aria-pressed', displayMode === 'compact' ? 'true' : 'false');
 		loraDisplayOptionsModeChip.title = displayMode === 'compact'
-			? 'Compact mode: all compact options enabled and row hints hidden.'
+			? 'Compact mode active. Click to switch to default display options.'
 			: (displayMode === 'custom'
-				? 'Custom mode: mixed display options are active.'
-				: 'Default mode: all display options are at defaults.');
+				? 'Custom mode active. Click to switch to compact display options.'
+				: 'Default mode active. Click to switch to compact display options.');
+		loraDisplayOptionsModeChip.setAttribute('aria-label', displayMode === 'compact'
+			? 'Display mode compact. Activate to switch to default display options.'
+			: (displayMode === 'custom'
+				? 'Display mode custom. Activate to switch to compact display options.'
+				: 'Display mode default. Activate to switch to compact display options.'));
 	}
 	if (loraDisplayOptionsActiveHint) {
 		loraDisplayOptionsActiveHint.hidden = false;
@@ -3939,6 +3945,17 @@ if (loraDisplayOptionsResetBtn) {
 
 if (loraDisplayOptionsCompactBtn) {
 	loraDisplayOptionsCompactBtn.addEventListener('click', () => {
+		applyLoraDisplayOptionsCompactPreset();
+	});
+}
+
+if (loraDisplayOptionsModeChip) {
+	loraDisplayOptionsModeChip.addEventListener('click', () => {
+		const mode = loraDisplayOptionsModeChip.dataset.mode || 'default';
+		if (mode === 'compact') {
+			resetLoraDisplayOptionsPrefs();
+			return;
+		}
 		applyLoraDisplayOptionsCompactPreset();
 	});
 }
