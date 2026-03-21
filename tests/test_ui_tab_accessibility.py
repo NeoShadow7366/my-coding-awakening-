@@ -1695,6 +1695,7 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert "localStorage.setItem(LORA_FAMILY_LEGEND_EXPANDED_KEY, loraFamilyLegend.open ? '1' : '0');" in js
     assert "function getFilteredLoraModels(baseFamily)" in js
     assert "function updateLoraHideIncompatibleStatus()" in js
+    assert "function updateLoraCompatUiResetButtonState()" in js
     assert "function resetLoraCompatibilityUiPrefs()" in js
     assert "const models = getFilteredLoraModels(baseFamily);" in js
     assert "(hidden incompatible)" in js
@@ -1705,6 +1706,8 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert "localStorage.setItem(LORA_HIDE_INCOMPATIBLE_OPTIONS_KEY, loraHideIncompatibleOptions ? '1' : '0');" in js
     assert "localStorage.removeItem(LORA_HIDE_INCOMPATIBLE_OPTIONS_KEY);" in js
     assert "localStorage.removeItem(LORA_FAMILY_LEGEND_EXPANDED_KEY);" in js
+    assert "loraCompatUiResetBtn.disabled = !hasCustomPrefs;" in js
+    assert "updateLoraCompatUiResetButtonState();" in js
     assert "showToast('LoRA compatibility UI preferences reset.', 'pos');" in js
     assert "strength: safeStrength," in js
 

@@ -1317,6 +1317,7 @@ if (loraFamilyLegend) {
 	loraFamilyLegend.open = localStorage.getItem(LORA_FAMILY_LEGEND_EXPANDED_KEY) === '1';
 	loraFamilyLegend.addEventListener('toggle', () => {
 		localStorage.setItem(LORA_FAMILY_LEGEND_EXPANDED_KEY, loraFamilyLegend.open ? '1' : '0');
+		updateLoraCompatUiResetButtonState();
 	});
 }
 
@@ -3151,6 +3152,15 @@ function updateLoraHideIncompatibleStatus() {
 	loraHideIncompatibleStatus.hidden = false;
 }
 
+function updateLoraCompatUiResetButtonState() {
+	if (!loraCompatUiResetBtn) return;
+	const hasCustomPrefs = Boolean(loraHideIncompatibleOptions || loraFamilyLegend?.open);
+	loraCompatUiResetBtn.disabled = !hasCustomPrefs;
+	loraCompatUiResetBtn.title = hasCustomPrefs
+		? 'Reset LoRA compatibility UI preferences to defaults.'
+		: 'LoRA compatibility UI is already using defaults.';
+}
+
 function resetLoraCompatibilityUiPrefs() {
 	loraHideIncompatibleOptions = false;
 	localStorage.removeItem(LORA_HIDE_INCOMPATIBLE_OPTIONS_KEY);
@@ -3162,6 +3172,7 @@ function resetLoraCompatibilityUiPrefs() {
 	}
 	localStorage.removeItem(LORA_FAMILY_LEGEND_EXPANDED_KEY);
 	refreshLoraOptionsForCurrentFamily();
+	updateLoraCompatUiResetButtonState();
 	showToast('LoRA compatibility UI preferences reset.', 'pos');
 }
 
@@ -3540,10 +3551,12 @@ if (loraHideIncompatibleToggle) {
 		loraHideIncompatibleOptions = loraHideIncompatibleToggle.checked;
 		localStorage.setItem(LORA_HIDE_INCOMPATIBLE_OPTIONS_KEY, loraHideIncompatibleOptions ? '1' : '0');
 		refreshLoraOptionsForCurrentFamily();
+		updateLoraCompatUiResetButtonState();
 	});
 }
 
 updateLoraHideIncompatibleStatus();
+updateLoraCompatUiResetButtonState();
 
 if (loraCompatUiResetBtn) {
 	loraCompatUiResetBtn.addEventListener('click', () => {
