@@ -157,6 +157,7 @@ const loraHideIncompatibleStatus = document.getElementById('lora-hide-incompatib
 const loraClearPreservedBtn = document.getElementById('lora-clear-preserved-btn');
 const loraCompatUiResetBtn = document.getElementById('lora-compat-ui-reset');
 const loraDisplayOptions = document.getElementById('lora-display-options');
+const loraDisplayOptionsToggle = document.getElementById('lora-display-options-toggle');
 const loraFamilyLegend = document.getElementById('lora-family-legend');
 const loraMismatchSummary = document.getElementById('lora-mismatch-summary');
 const loraDisableIncompatibleBtn = document.getElementById('lora-disable-incompatible-btn');
@@ -3227,6 +3228,16 @@ function updateLoraClearPreservedButton() {
 	loraClearPreservedBtn.setAttribute('aria-label', loraClearPreservedBtn.title);
 }
 
+function updateLoraDisplayOptionsSummary() {
+	if (!loraDisplayOptionsToggle) return;
+	const activeCount = Number(!loraShowRowHints) + Number(loraCompactPreservedIndicators) + Number(loraCompactRowClearButtons) + Number(loraCompactMismatchBadges);
+	loraDisplayOptionsToggle.textContent = activeCount > 0 ? `Display options (${activeCount} active)` : 'Display options';
+	loraDisplayOptionsToggle.dataset.active = activeCount > 0 ? '1' : '0';
+	loraDisplayOptionsToggle.title = activeCount > 0
+		? `${activeCount} non-default LoRA display option${activeCount === 1 ? '' : 's'} enabled.`
+		: 'All LoRA display options are using defaults.';
+}
+
 function updateLoraCompatUiResetButtonState() {
 	if (!loraCompatUiResetBtn) return;
 	const hasCustomPrefs = Boolean(loraHideIncompatibleOptions || loraFamilyLegend?.open || loraDisplayOptions?.open || !loraShowRowHints || loraCompactPreservedIndicators || loraCompactRowClearButtons || loraCompactMismatchBadges);
@@ -3271,6 +3282,7 @@ function resetLoraCompatibilityUiPrefs() {
 	localStorage.removeItem(LORA_FAMILY_LEGEND_EXPANDED_KEY);
 	localStorage.removeItem(LORA_DISPLAY_OPTIONS_EXPANDED_KEY);
 	refreshLoraOptionsForCurrentFamily();
+	updateLoraDisplayOptionsSummary();
 	updateLoraCompatUiResetButtonState();
 	showToast('LoRA compatibility UI preferences reset.', 'pos');
 }
@@ -3759,6 +3771,7 @@ if (loraShowRowHintsToggle) {
 			localStorage.setItem(LORA_SHOW_ROW_HINTS_KEY, '0');
 		}
 		updateAllLoraRowCompatBadges();
+		updateLoraDisplayOptionsSummary();
 		updateLoraCompatUiResetButtonState();
 	});
 }
@@ -3773,6 +3786,7 @@ if (loraCompactPreservedToggle) {
 			localStorage.removeItem(LORA_COMPACT_PRESERVED_KEY);
 		}
 		updateAllLoraRowCompatBadges();
+		updateLoraDisplayOptionsSummary();
 		updateLoraCompatUiResetButtonState();
 	});
 }
@@ -3787,6 +3801,7 @@ if (loraCompactRowClearToggle) {
 			localStorage.removeItem(LORA_COMPACT_ROW_CLEAR_KEY);
 		}
 		updateAllLoraRowCompatBadges();
+		updateLoraDisplayOptionsSummary();
 		updateLoraCompatUiResetButtonState();
 	});
 }
@@ -3801,12 +3816,14 @@ if (loraCompactMismatchToggle) {
 			localStorage.removeItem(LORA_COMPACT_MISMATCH_KEY);
 		}
 		updateAllLoraRowCompatBadges();
+		updateLoraDisplayOptionsSummary();
 		updateLoraCompatUiResetButtonState();
 	});
 }
 
 updateLoraHideIncompatibleStatus();
 updateLoraClearPreservedButton();
+updateLoraDisplayOptionsSummary();
 updateLoraCompatUiResetButtonState();
 
 if (loraCompatUiResetBtn) {

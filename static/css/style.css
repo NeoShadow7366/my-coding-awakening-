@@ -1596,6 +1596,11 @@ textarea {
   user-select: none;
 }
 
+.lora-display-options > summary[data-active='1'] {
+  color: color-mix(in srgb, var(--clr-text) 82%, var(--clr-link));
+  font-weight: 600;
+}
+
 .lora-display-options[open] > summary {
   color: var(--clr-text);
 }
