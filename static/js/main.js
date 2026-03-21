@@ -3082,6 +3082,7 @@ function refreshLoraOptionsForCurrentFamily() {
 
 function resolveLoraCompatibilityHintState(selectedModel, requestedMode) {
 	const activeFamily = resolveActiveImageFamily(selectedModel || '');
+	const baseFamily = getBaseCheckpointFamily();
 	if (activeFamily === 'flux') {
 		if (requestedMode === 'flux') {
 			return {
@@ -3101,15 +3102,20 @@ function resolveLoraCompatibilityHintState(selectedModel, requestedMode) {
 		};
 	}
 	if (requestedMode === 'sd') {
+		let manualSdText = 'LoRA grouping source: manual SD mode.';
+		if (baseFamily === 'sdxl') {
+			manualSdText = 'LoRA grouping source: manual SD mode (SDXL checkpoint selected).';
+		} else if (baseFamily === 'sd15') {
+			manualSdText = 'LoRA grouping source: manual SD mode (SD 1.5 checkpoint selected).';
+		}
 		return {
-			text: 'LoRA grouping source: manual SD mode.',
+			text: manualSdText,
 			source: 'manual',
 			family: 'sd',
-			familyDetail: getBaseCheckpointFamily() || 'sd',
+			familyDetail: baseFamily || 'sd',
 			classNames: ['is-manual', 'is-sd'],
 		};
 	}
-	const baseFamily = getBaseCheckpointFamily();
 	if (baseFamily === 'sdxl') {
 		return {
 			text: 'LoRA grouping source: detected SDXL checkpoint family.',

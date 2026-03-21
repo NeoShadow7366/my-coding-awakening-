@@ -1644,6 +1644,8 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert "function updateLoraCompatibilityModeHint()" in js
     assert "LoRA grouping source: manual Flux mode." in js
     assert "LoRA grouping source: manual SD mode." in js
+    assert "LoRA grouping source: manual SD mode (SDXL checkpoint selected)." in js
+    assert "LoRA grouping source: manual SD mode (SD 1.5 checkpoint selected)." in js
     assert "LoRA grouping source: generic list (family unknown)." in js
     assert "loraCompatModeHint.classList.remove('is-manual', 'is-detected', 'is-generic', 'is-flux', 'is-sd', 'detail-flux', 'detail-sd', 'detail-sdxl', 'detail-sd15', 'detail-unknown');" in js
     assert "loraCompatModeHint.classList.add(`detail-${familyDetail}`);" in js
