@@ -1644,6 +1644,7 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert "function getIncompatibleEnabledLoraRows()" in js
     assert "function refreshLoraOptionsForCurrentFamily()" in js
     assert "const loraCompatModeHint = document.getElementById('lora-compat-mode-hint');" in js
+    assert "const loraFamilyLegend = document.getElementById('lora-family-legend');" in js
     assert "function resolveLoraCompatibilityHintState(selectedModel, requestedMode)" in js
     assert "function updateLoraCompatibilityModeHint()" in js
     assert "LoRA grouping source: manual Flux mode." in js
@@ -1682,6 +1683,10 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert "const filteredLoraCount = Math.max(0, (common.loras?.length || 0) - (normalizedCommon.loras?.length || 0));" in js
     assert "incompatible LoRA" in js
     assert "Skipped ${filteredLoraCount} incompatible LoRA" in js
+    assert "const LORA_FAMILY_LEGEND_EXPANDED_KEY = 'loraFamilyLegendExpandedV1';" in js
+    assert "loraFamilyLegend.open = localStorage.getItem(LORA_FAMILY_LEGEND_EXPANDED_KEY) === '1';" in js
+    assert "loraFamilyLegend.addEventListener('toggle', () => {" in js
+    assert "localStorage.setItem(LORA_FAMILY_LEGEND_EXPANDED_KEY, loraFamilyLegend.open ? '1' : '0');" in js
     assert "strength: safeStrength," in js
 
     html_path = Path(__file__).resolve().parents[1] / "templates" / "index.html"
