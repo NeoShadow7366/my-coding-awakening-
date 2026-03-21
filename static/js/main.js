@@ -260,6 +260,7 @@ const imageWidth = document.getElementById('image-width');
 const imageHeight = document.getElementById('image-height');
 const imageBatchSize = document.getElementById('image-batch-size');
 const imageUpload = document.getElementById('image-upload');
+const loraSubmitSkipHint = document.getElementById('lora-submit-skip-hint');
 const imageGenerateBtn = document.getElementById('image-generate-btn');
 const queueTelemetry = document.getElementById('queue-telemetry');
 const queueTelemetryResetBtn = document.getElementById('queue-telemetry-reset');
@@ -3081,6 +3082,13 @@ function sanitizeLoraStackForCompatibilityFamily(entries, compatibilityFamily) {
 	});
 }
 
+function getIncompatibleEnabledLoraCount() {
+	const compatibilityFamily = getActiveLoraCompatibilityFamily();
+	if (!compatibilityFamily) return 0;
+	const enabledLoras = collectLoraStack();
+	return Math.max(0, enabledLoras.length - sanitizeLoraStackForCompatibilityFamily(enabledLoras, compatibilityFamily).length);
+}
+
 function _buildLoraOptions() {
 	return '<option value="">None</option>' +
 		buildCompatGroupedOptions(_loraModelsCache, getActiveLoraCompatibilityFamily(), inferCheckpointFamily);
@@ -3228,11 +3236,12 @@ function updateAllLoraRowCompatBadges() {
 	if (!loraStackContainer) return;
 	loraStackContainer.querySelectorAll('.lora-row').forEach(updateLoraRowCompatBadge);
 	updateLoraStackMismatchSummary();
+	updateLoraSubmitSkipHint();
 }
 
 function updateLoraStackMismatchSummary() {
 	if (!loraMismatchSummary || !loraStackContainer) return;
-	const count = loraStackContainer.querySelectorAll('.lora-row-compat-badge.is-mismatch:not([hidden])').length;
+	const count = loraStackContainer.querySelectorAll('.lora-row:not(.lora-disabled) .lora-row-compat-badge.is-mismatch:not([hidden])').length;
 	if (count === 0) {
 		loraMismatchSummary.hidden = true;
 		loraMismatchSummary.textContent = '';
@@ -3242,6 +3251,20 @@ function updateLoraStackMismatchSummary() {
 	loraMismatchSummary.title = `${count} LoRA${count === 1 ? '' : 's'} may be incompatible with the active checkpoint family.`;
 	loraMismatchSummary.setAttribute('aria-label', loraMismatchSummary.title);
 	loraMismatchSummary.hidden = false;
+}
+
+function updateLoraSubmitSkipHint() {
+	if (!loraSubmitSkipHint) return;
+	const incompatibleCount = getIncompatibleEnabledLoraCount();
+	if (incompatibleCount === 0) {
+		loraSubmitSkipHint.hidden = true;
+		loraSubmitSkipHint.textContent = '';
+		loraSubmitSkipHint.classList.remove('is-warning');
+		return;
+	}
+	loraSubmitSkipHint.textContent = `${incompatibleCount} incompatible LoRA${incompatibleCount === 1 ? '' : 's'} will be skipped on submit.`;
+	loraSubmitSkipHint.classList.add('is-warning');
+	loraSubmitSkipHint.hidden = false;
 }
 
 function addLoraRow() {
@@ -3289,6 +3312,8 @@ function addLoraRow() {
 		enableBtn.setAttribute('aria-pressed', String(enabled));
 		enableBtn.textContent = enabled ? 'On' : 'Off';
 		updateModelStackBadges();
+		updateLoraStackMismatchSummary();
+		updateLoraSubmitSkipHint();
 	});
 
 	collapseBtn.addEventListener('click', () => {
@@ -3338,6 +3363,8 @@ function addLoraRow() {
 	removeBtn.addEventListener('click', () => {
 		row.remove();
 		updateModelStackBadges();
+		updateLoraStackMismatchSummary();
+		updateLoraSubmitSkipHint();
 	});
 
 	loraStackContainer.appendChild(row);
@@ -3348,6 +3375,7 @@ function addLoraRow() {
 		if (_strInput && _isFlux) _strInput.max = '1';
 	}
 	updateModelStackBadges();
+	updateLoraSubmitSkipHint();
 }
 
 if (loraAddBtn) {

@@ -1640,6 +1640,7 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert "function getActiveLoraCompatibilityFamily()" in js
     assert "function resolveLoraCompatibilityFamilyForModel(modelName = '')" in js
     assert "function sanitizeLoraStackForCompatibilityFamily(entries, compatibilityFamily)" in js
+    assert "function getIncompatibleEnabledLoraCount()" in js
     assert "function refreshLoraOptionsForCurrentFamily()" in js
     assert "const loraCompatModeHint = document.getElementById('lora-compat-mode-hint');" in js
     assert "function resolveLoraCompatibilityHintState(selectedModel, requestedMode)" in js
@@ -1703,6 +1704,7 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     # per-row compat badge
     assert "function updateLoraRowCompatBadge(row)" in js
     assert "function updateAllLoraRowCompatBadges()" in js
+    assert "function updateLoraSubmitSkipHint()" in js
     assert "'lora-row-compat-badge'" in js
     assert "badge.className = 'lora-row-compat-badge is-mismatch';" in js
     assert "'\u26a0 Not Flux'" in js
@@ -1711,6 +1713,8 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert "'\u26a0 SD1.5\u2192SDXL'" in js
     assert "updateLoraRowCompatBadge(row);" in js
     assert "updateAllLoraRowCompatBadges();" in js
+    assert "updateLoraSubmitSkipHint();" in js
+    assert "collectLoraStack();" in js
     assert ".lora-row-compat-badge" in css
     assert ".lora-row-compat-badge.is-mismatch" in css
     # mismatch summary at stack header
@@ -1719,11 +1723,15 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert "updateLoraStackMismatchSummary();" in js
     assert "loraMismatchSummary.hidden = true;" in js
     assert "loraMismatchSummary.hidden = false;" in js
-    assert ".lora-row-compat-badge.is-mismatch:not([hidden])" in js
+    assert ".lora-row:not(.lora-disabled) .lora-row-compat-badge.is-mismatch:not([hidden])" in js
     assert "mismatch${count === 1 ? '' : 'es'}" in js
     assert "updateAllLoraRowCompatBadges();" in js
     assert 'id="lora-mismatch-summary"' in tpl
     assert ".lora-mismatch-summary" in css
+    assert 'id="lora-submit-skip-hint"' in tpl
+    assert "will be skipped on submit." in js
+    assert ".lora-submit-skip-hint" in css
+    assert ".lora-submit-skip-hint.is-warning" in css
 
 
 def test_profile_export_import_markup_and_wiring_present():

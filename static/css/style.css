@@ -1905,6 +1905,15 @@ textarea {
   gap: var(--sp-sm);
 }
 
+.lora-submit-skip-hint {
+  flex: 1;
+  margin: 0;
+}
+
+.lora-submit-skip-hint.is-warning {
+  color: color-mix(in srgb, var(--clr-accent-neg) 76%, var(--clr-text));
+}
+
 .image-actions .btn-primary {
   flex: 1;
 }
