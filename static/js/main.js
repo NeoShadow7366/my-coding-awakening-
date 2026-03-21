@@ -3311,6 +3311,7 @@ function updateLoraRowCompatBadge(row) {
 	const sel = row.querySelector('.lora-row-select');
 	const badge = row.querySelector('.lora-row-compat-badge');
 	const familyChip = row.querySelector('.lora-row-family-chip');
+	const preservedChip = row.querySelector('.lora-row-preserved-chip');
 	if (!sel || !badge) return;
 	const loraName = sel.value;
 	const applyFamilyChip = (family) => {
@@ -3336,8 +3337,26 @@ function updateLoraRowCompatBadge(row) {
 		);
 		familyChip.hidden = false;
 	};
+	const applyPreservedChip = (show, family) => {
+		if (!preservedChip) return;
+		if (!show || !family) {
+			preservedChip.hidden = true;
+			preservedChip.textContent = '';
+			preservedChip.title = '';
+			preservedChip.removeAttribute('aria-label');
+			return;
+		}
+		const label = family === 'flux'
+			? 'FLUX'
+			: (family === 'sdxl' ? 'SDXL' : (family === 'sd15' ? 'SD1.5' : family.toUpperCase()));
+		preservedChip.textContent = 'Preserved';
+		preservedChip.title = `Selected ${label} mismatch is preserved while incompatible options are hidden.`;
+		preservedChip.setAttribute('aria-label', preservedChip.title);
+		preservedChip.hidden = false;
+	};
 	if (!loraName) {
 		applyFamilyChip('');
+		applyPreservedChip(false, '');
 		badge.hidden = true;
 		badge.textContent = '';
 		badge.className = 'lora-row-compat-badge';
@@ -3346,6 +3365,8 @@ function updateLoraRowCompatBadge(row) {
 	const loraFamily = inferCheckpointFamily(loraName);
 	applyFamilyChip(loraFamily || 'unknown');
 	const activeFamily = getActiveLoraCompatibilityFamily();
+	const preservedMismatch = Boolean(loraHideIncompatibleOptions && loraFamily && activeFamily && loraFamily !== activeFamily);
+	applyPreservedChip(preservedMismatch, loraFamily || '');
 	if (!loraFamily || !activeFamily || loraFamily === activeFamily) {
 		badge.hidden = true;
 		badge.textContent = '';
@@ -3453,6 +3474,7 @@ function addLoraRow() {
 		<div class="lora-row-header">
 			<span class="lora-row-label hint">LoRA ${id}</span>
 			<span class="lora-row-family-chip" hidden aria-live="polite"></span>
+			<span class="lora-row-preserved-chip" hidden aria-live="polite"></span>
 			<span class="lora-row-compat-badge" hidden aria-live="polite"></span>
 			<button class="lora-row-enable btn btn-ghost btn-xs" type="button" aria-pressed="true" title="Toggle this LoRA on/off">On</button>
 			<button class="lora-row-collapse btn btn-ghost btn-xs" type="button" aria-expanded="true" aria-controls="lora-row-body-${id}" aria-label="Collapse LoRA row">&#9660;</button>

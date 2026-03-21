@@ -1612,6 +1612,17 @@ textarea {
   opacity: 0.82;
 }
 
+.lora-row-preserved-chip {
+  flex-shrink: 0;
+  font-size: 0.65rem;
+  padding: 1px 6px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, transparent 60%, var(--clr-link));
+  background: color-mix(in srgb, transparent 88%, var(--clr-link));
+  color: color-mix(in srgb, var(--clr-text) 84%, var(--clr-link));
+  line-height: 1.4;
+}
+
 .lora-row-compat-badge {
   flex-shrink: 0;
   font-size: 0.67rem;
