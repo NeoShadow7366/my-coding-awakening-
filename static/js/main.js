@@ -161,6 +161,7 @@ const loraDisplayOptionsToggle = document.getElementById('lora-display-options-t
 const loraDisplayOptionsCompactBtn = document.getElementById('lora-display-options-compact');
 const loraDisplayOptionsResetBtn = document.getElementById('lora-display-options-reset');
 const loraDisplayOptionsModeChip = document.getElementById('lora-display-options-mode-chip');
+const loraDisplayOptionsChipHint = document.getElementById('lora-display-options-chip-hint');
 const loraDisplayOptionsActiveHint = document.getElementById('lora-display-options-active-hint');
 const loraFamilyLegend = document.getElementById('lora-family-legend');
 const loraMismatchSummary = document.getElementById('lora-mismatch-summary');
@@ -3269,6 +3270,11 @@ function updateLoraDisplayOptionsSummary() {
 			: (displayMode === 'custom'
 				? `Display mode custom with ${activeCount} active options. Activate to switch to compact display options.`
 				: 'Display mode default with 0 active options. Activate to switch to compact display options.'));
+	}
+	if (loraDisplayOptionsChipHint) {
+		loraDisplayOptionsChipHint.textContent = displayMode === 'compact'
+			? 'Mode chip action: switch to default display options.'
+			: 'Mode chip action: switch to compact display options.';
 	}
 	if (loraDisplayOptionsActiveHint) {
 		loraDisplayOptionsActiveHint.hidden = false;

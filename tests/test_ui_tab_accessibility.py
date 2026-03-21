@@ -1658,6 +1658,7 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert "const loraDisplayOptionsCompactBtn = document.getElementById('lora-display-options-compact');" in js
     assert "const loraDisplayOptionsResetBtn = document.getElementById('lora-display-options-reset');" in js
     assert "const loraDisplayOptionsModeChip = document.getElementById('lora-display-options-mode-chip');" in js
+    assert "const loraDisplayOptionsChipHint = document.getElementById('lora-display-options-chip-hint');" in js
     assert "const loraDisplayOptionsActiveHint = document.getElementById('lora-display-options-active-hint');" in js
     assert "const loraFamilyLegend = document.getElementById('lora-family-legend');" in js
     assert "function resolveLoraCompatibilityHintState(selectedModel, requestedMode)" in js
@@ -1765,6 +1766,9 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert "Display mode compact with ${activeCount} active options. Activate to switch to default display options." in js
     assert "Display mode custom with ${activeCount} active options. Activate to switch to compact display options." in js
     assert "Display mode default with 0 active options. Activate to switch to compact display options." in js
+    assert "loraDisplayOptionsChipHint.textContent = displayMode === 'compact'" in js
+    assert "Mode chip action: switch to default display options." in js
+    assert "Mode chip action: switch to compact display options." in js
     assert "loraDisplayOptionsActiveHint.hidden = false;" in js
     assert "loraDisplayOptionsActiveHint.textContent = activeCount > 0" in js
     assert "Display mode: ${displayMode}. Active display options: ${activeOptionLabels.join(', ')}." in js
@@ -1821,6 +1825,7 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert 'id="lora-display-options-reset"' in tpl
     assert 'id="lora-display-options-mode-chip" type="button" aria-live="polite"' in tpl
     assert 'Mode: default (0)' in tpl
+    assert 'id="lora-display-options-chip-hint" class="hint lora-display-options-chip-hint" aria-live="polite"' in tpl
     assert 'id="lora-display-options-active-hint" class="hint lora-display-options-active-hint" hidden aria-live="polite"' in tpl
     assert 'Compact all' in tpl
     assert 'Reset display options' in tpl
@@ -1925,6 +1930,7 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert ".lora-display-options-mode-chip[data-count]:not([data-count='0'])" in css
     assert ".lora-display-options-mode-chip[data-mode='compact']" in css
     assert ".lora-display-options-mode-chip[data-mode='custom']" in css
+    assert ".lora-display-options-chip-hint" in css
     assert ".lora-display-options-active-hint" in css
     assert ".lora-display-options[data-mode='compact'] .lora-display-options-active-hint" in css
     assert ".lora-display-options[data-mode='default'] .lora-display-options-active-hint" in css

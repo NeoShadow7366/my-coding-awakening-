@@ -1652,6 +1652,11 @@ textarea {
   border-color: color-mix(in srgb, var(--clr-border) 60%, var(--clr-caution));
 }
 
+.lora-display-options-chip-hint {
+  margin: 0.2rem 0 0;
+  color: var(--clr-text-muted);
+}
+
 .lora-display-options-active-hint {
   margin: 0.25rem 0 0;
 }
