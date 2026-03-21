@@ -6632,7 +6632,7 @@ function updateLightboxMeta(entry) {
 	chips.push(`<span class="chip chip-mode">${escHtml(mode)}</span>`);
 	if (entry.model) chips.push(`<span class="chip chip-model" title="${escHtml(entry.model)}">${escHtml(entry.model.split('/').pop() || entry.model)}</span>`);
 	if (p.sampler) chips.push(`<span class="chip">sampler: ${escHtml(p.sampler)}</span>`);
-	if (p.scheduler && p.scheduler !== 'normal') chips.push(`<span class="chip">scheduler: ${escHtml(p.scheduler)}</span>`);
+	if (p.scheduler) chips.push(`<span class="chip">scheduler: ${escHtml(p.scheduler)}</span>`);
 	if (Number.isFinite(Number(p.steps))) chips.push(`<span class="chip">steps: ${escHtml(String(p.steps))}</span>`);
 	if (Number.isFinite(Number(p.cfg))) chips.push(`<span class="chip">cfg: ${escHtml(String(p.cfg))}</span>`);
 	if (Number.isFinite(Number(p.batch_size)) && Number(p.batch_size) > 1) chips.push(`<span class="chip">batch: ${escHtml(String(p.batch_size))}</span>`);

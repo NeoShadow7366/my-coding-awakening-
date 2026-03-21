@@ -1572,6 +1572,7 @@ def test_gallery_lightbox_meta_panel_markup_and_wiring_present():
     assert "if (galleryLightboxLastFocus && document.contains(galleryLightboxLastFocus)) {" in js
     assert "galleryLightboxMetaToggle.hidden = !hasParams;" in js
     assert "galleryLightboxMetaToggle.setAttribute('aria-hidden', hasParams ? 'false' : 'true');" in js
+    assert "if (p.scheduler) chips.push(`<span class=\"chip\">scheduler: ${escHtml(p.scheduler)}</span>`);" in js
     assert "galleryLightboxMetaToggle.hidden = true;" in js
     assert "galleryLightboxMetaToggle.setAttribute('aria-hidden', 'true');" in js
 
