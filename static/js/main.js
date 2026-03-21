@@ -3256,6 +3256,7 @@ function updateLoraDisplayOptionsSummary() {
 	if (loraDisplayOptionsModeChip) {
 		const modeLabel = displayMode === 'compact' ? 'Compact' : (displayMode === 'custom' ? 'Custom' : 'Default');
 		loraDisplayOptionsModeChip.dataset.mode = displayMode;
+		loraDisplayOptionsModeChip.dataset.count = String(activeCount);
 		loraDisplayOptionsModeChip.textContent = `Mode: ${modeLabel} (${activeCount})`;
 		loraDisplayOptionsModeChip.setAttribute('aria-pressed', displayMode === 'compact' ? 'true' : 'false');
 		loraDisplayOptionsModeChip.title = displayMode === 'compact'

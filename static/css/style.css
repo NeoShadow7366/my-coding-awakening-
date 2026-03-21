@@ -1634,6 +1634,14 @@ textarea {
   background: color-mix(in srgb, var(--clr-surface) 84%, var(--clr-bg));
 }
 
+.lora-display-options-mode-chip[data-count='0'] {
+  opacity: 0.82;
+}
+
+.lora-display-options-mode-chip[data-count]:not([data-count='0']) {
+  font-weight: 600;
+}
+
 .lora-display-options-mode-chip[data-mode='compact'] {
   color: color-mix(in srgb, var(--clr-text) 82%, var(--clr-link));
   border-color: color-mix(in srgb, var(--clr-border) 60%, var(--clr-link));

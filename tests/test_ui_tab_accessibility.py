@@ -1756,6 +1756,7 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert "loraDisplayOptions.dataset.mode = displayMode;" in js
     assert "const modeLabel = displayMode === 'compact' ? 'Compact' : (displayMode === 'custom' ? 'Custom' : 'Default');" in js
     assert "loraDisplayOptionsModeChip.dataset.mode = displayMode;" in js
+    assert "loraDisplayOptionsModeChip.dataset.count = String(activeCount);" in js
     assert "loraDisplayOptionsModeChip.textContent = `Mode: ${modeLabel} (${activeCount})`;" in js
     assert "loraDisplayOptionsModeChip.setAttribute('aria-pressed', displayMode === 'compact' ? 'true' : 'false');" in js
     assert "Compact mode active with ${activeCount} non-default display options. Click to switch to default display options." in js
@@ -1920,6 +1921,8 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert ".lora-display-options-grid" in css
     assert ".lora-display-options-actions" in css
     assert ".lora-display-options-mode-chip" in css
+    assert ".lora-display-options-mode-chip[data-count='0']" in css
+    assert ".lora-display-options-mode-chip[data-count]:not([data-count='0'])" in css
     assert ".lora-display-options-mode-chip[data-mode='compact']" in css
     assert ".lora-display-options-mode-chip[data-mode='custom']" in css
     assert ".lora-display-options-active-hint" in css
