@@ -1350,6 +1350,14 @@ if (loraDisplayOptions) {
 		localStorage.setItem(LORA_DISPLAY_OPTIONS_EXPANDED_KEY, loraDisplayOptions.open ? '1' : '0');
 		updateLoraCompatUiResetButtonState();
 	});
+	loraDisplayOptions.addEventListener('keydown', (event) => {
+		if ((event.key || '').toLowerCase() !== 'm') return;
+		const targetTag = String(event.target?.tagName || '').toLowerCase();
+		if (targetTag === 'input' || targetTag === 'textarea' || targetTag === 'select' || event.target?.isContentEditable) return;
+		if (!loraDisplayOptionsModeChip) return;
+		event.preventDefault();
+		loraDisplayOptionsModeChip.click();
+	});
 }
 
 renderQueueTelemetry();
@@ -3273,8 +3281,8 @@ function updateLoraDisplayOptionsSummary() {
 	}
 	if (loraDisplayOptionsChipHint) {
 		loraDisplayOptionsChipHint.textContent = displayMode === 'compact'
-			? 'Mode chip action: switch to default display options.'
-			: 'Mode chip action: switch to compact display options.';
+			? 'Mode chip action: switch to default display options. Shortcut: press M while Display options is focused.'
+			: 'Mode chip action: switch to compact display options. Shortcut: press M while Display options is focused.';
 	}
 	if (loraDisplayOptionsActiveHint) {
 		loraDisplayOptionsActiveHint.hidden = false;
