@@ -1646,6 +1646,7 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert "function refreshLoraOptionsForCurrentFamily()" in js
     assert "const loraCompatModeHint = document.getElementById('lora-compat-mode-hint');" in js
     assert "const loraHideIncompatibleToggle = document.getElementById('lora-hide-incompatible-toggle');" in js
+    assert "const loraShowRowHintsToggle = document.getElementById('lora-show-row-hints-toggle');" in js
     assert "const loraHideIncompatibleStatus = document.getElementById('lora-hide-incompatible-status');" in js
     assert "const loraClearPreservedBtn = document.getElementById('lora-clear-preserved-btn');" in js
     assert "const loraCompatUiResetBtn = document.getElementById('lora-compat-ui-reset');" in js
@@ -1690,7 +1691,9 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert "Skipped ${filteredLoraCount} incompatible LoRA" in js
     assert "const LORA_FAMILY_LEGEND_EXPANDED_KEY = 'loraFamilyLegendExpandedV1';" in js
     assert "const LORA_HIDE_INCOMPATIBLE_OPTIONS_KEY = 'loraHideIncompatibleOptionsV1';" in js
+    assert "const LORA_SHOW_ROW_HINTS_KEY = 'loraShowRowHintsV1';" in js
     assert "let loraHideIncompatibleOptions = localStorage.getItem(LORA_HIDE_INCOMPATIBLE_OPTIONS_KEY) === '1';" in js
+    assert "let loraShowRowHints = localStorage.getItem(LORA_SHOW_ROW_HINTS_KEY) !== '0';" in js
     assert "loraFamilyLegend.open = localStorage.getItem(LORA_FAMILY_LEGEND_EXPANDED_KEY) === '1';" in js
     assert "loraFamilyLegend.addEventListener('toggle', () => {" in js
     assert "localStorage.setItem(LORA_FAMILY_LEGEND_EXPANDED_KEY, loraFamilyLegend.open ? '1' : '0');" in js
@@ -1717,8 +1720,11 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert "loraClearPreservedBtn.textContent = `Clear preserved (${count})`;" in js
     assert "loraClearPreservedBtn.setAttribute('aria-label', loraClearPreservedBtn.title);" in js
     assert "loraHideIncompatibleToggle.checked = loraHideIncompatibleOptions;" in js
+    assert "loraShowRowHintsToggle.checked = loraShowRowHints;" in js
     assert "localStorage.setItem(LORA_HIDE_INCOMPATIBLE_OPTIONS_KEY, loraHideIncompatibleOptions ? '1' : '0');" in js
     assert "localStorage.removeItem(LORA_HIDE_INCOMPATIBLE_OPTIONS_KEY);" in js
+    assert "localStorage.removeItem(LORA_SHOW_ROW_HINTS_KEY);" in js
+    assert "localStorage.setItem(LORA_SHOW_ROW_HINTS_KEY, '0');" in js
     assert "localStorage.removeItem(LORA_FAMILY_LEGEND_EXPANDED_KEY);" in js
     assert "loraCompatUiResetBtn.disabled = !hasCustomPrefs;" in js
     assert "updateLoraCompatUiResetButtonState();" in js
@@ -1730,8 +1736,10 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert 'id="lora-flux-hint" class="hint lora-flux-hint" hidden' in tpl
     assert 'id="lora-compat-mode-hint" class="hint lora-compat-mode-hint" aria-live="polite"' in tpl
     assert 'id="lora-hide-incompatible-toggle"' in tpl
+    assert 'id="lora-show-row-hints-toggle"' in tpl
     assert 'id="lora-hide-incompatible-status"' in tpl
     assert 'Hide incompatible options' in tpl
+    assert 'Show row hints' in tpl
     assert 'id="lora-clear-preserved-btn"' in tpl
     assert 'Clear preserved' in tpl
     assert 'id="lora-compat-ui-reset"' in tpl
@@ -1809,6 +1817,7 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert ".lora-family-legend" in css
     assert ".lora-options-row" in css
     assert ".lora-hide-incompatible-toggle" in css
+    assert ".lora-show-row-hints-toggle" in css
     assert ".lora-hide-incompatible-status" in css
     assert ".lora-family-legend > summary" in css
     assert ".lora-row-compat-badge" in css

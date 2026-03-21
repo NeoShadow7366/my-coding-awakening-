@@ -149,6 +149,7 @@ const loraStackContainer = document.getElementById('lora-stack-container');
 const loraFluxHint = document.getElementById('lora-flux-hint');
 const loraCompatModeHint = document.getElementById('lora-compat-mode-hint');
 const loraHideIncompatibleToggle = document.getElementById('lora-hide-incompatible-toggle');
+const loraShowRowHintsToggle = document.getElementById('lora-show-row-hints-toggle');
 const loraHideIncompatibleStatus = document.getElementById('lora-hide-incompatible-status');
 const loraClearPreservedBtn = document.getElementById('lora-clear-preserved-btn');
 const loraCompatUiResetBtn = document.getElementById('lora-compat-ui-reset');
@@ -495,6 +496,7 @@ const IMAGE_FLUX_AUTO_APPLY_RECOMMENDATION_KEY = 'imageFluxAutoApplyRecommendati
 const IMAGE_FLUX_LOCK_RECOMMENDATION_KEY = 'imageFluxLockRecommendationV1';
 const LORA_FAMILY_LEGEND_EXPANDED_KEY = 'loraFamilyLegendExpandedV1';
 const LORA_HIDE_INCOMPATIBLE_OPTIONS_KEY = 'loraHideIncompatibleOptionsV1';
+const LORA_SHOW_ROW_HINTS_KEY = 'loraShowRowHintsV1';
 const CONFIG_COMFY_NODES_INCLUDE_BUILTINS_KEY = 'configComfyNodesIncludeBuiltinsV1';
 const CONFIG_COMFY_DISABLE_PREVIEW_FILTER_KEY = 'configComfyDisablePreviewFilterV1';
 const CONFIG_COMFY_DISABLE_PREVIEW_SELECTED_ONLY_KEY = 'configComfyDisablePreviewSelectedOnlyV1';
@@ -525,6 +527,7 @@ if (!['auto', 'sd', 'flux'].includes(imageModelFamilyMode)) {
 	imageModelFamilyMode = 'auto';
 }
 let loraHideIncompatibleOptions = localStorage.getItem(LORA_HIDE_INCOMPATIBLE_OPTIONS_KEY) === '1';
+let loraShowRowHints = localStorage.getItem(LORA_SHOW_ROW_HINTS_KEY) !== '0';
 let imageFluxAutoApplyRecommendation = localStorage.getItem(IMAGE_FLUX_AUTO_APPLY_RECOMMENDATION_KEY) === '1';
 let imageFluxLockRecommendation = localStorage.getItem(IMAGE_FLUX_LOCK_RECOMMENDATION_KEY) === '1';
 let imageFluxLockBypassOnce = false;
@@ -3207,7 +3210,7 @@ function updateLoraClearPreservedButton() {
 
 function updateLoraCompatUiResetButtonState() {
 	if (!loraCompatUiResetBtn) return;
-	const hasCustomPrefs = Boolean(loraHideIncompatibleOptions || loraFamilyLegend?.open);
+	const hasCustomPrefs = Boolean(loraHideIncompatibleOptions || loraFamilyLegend?.open || !loraShowRowHints);
 	loraCompatUiResetBtn.disabled = !hasCustomPrefs;
 	loraCompatUiResetBtn.title = hasCustomPrefs
 		? 'Reset LoRA compatibility UI preferences to defaults.'
@@ -3216,9 +3219,14 @@ function updateLoraCompatUiResetButtonState() {
 
 function resetLoraCompatibilityUiPrefs() {
 	loraHideIncompatibleOptions = false;
+	loraShowRowHints = true;
 	localStorage.removeItem(LORA_HIDE_INCOMPATIBLE_OPTIONS_KEY);
+	localStorage.removeItem(LORA_SHOW_ROW_HINTS_KEY);
 	if (loraHideIncompatibleToggle) {
 		loraHideIncompatibleToggle.checked = false;
+	}
+	if (loraShowRowHintsToggle) {
+		loraShowRowHintsToggle.checked = true;
 	}
 	if (loraFamilyLegend) {
 		loraFamilyLegend.open = false;
@@ -3404,7 +3412,7 @@ function updateLoraRowCompatBadge(row) {
 			? 'FLUX'
 			: (family === 'sdxl' ? 'SDXL' : (family === 'sd15' ? 'SD1.5' : family.toUpperCase()));
 		preservedHint.textContent = `Preserved ${label} mismatch: hidden options are enabled.`;
-		preservedHint.hidden = false;
+		preservedHint.hidden = !loraShowRowHints;
 	};
 	const applyClearPreservedButton = (show, family) => {
 		if (!clearPreservedBtn) return;
@@ -3699,6 +3707,20 @@ if (loraHideIncompatibleToggle) {
 		loraHideIncompatibleOptions = loraHideIncompatibleToggle.checked;
 		localStorage.setItem(LORA_HIDE_INCOMPATIBLE_OPTIONS_KEY, loraHideIncompatibleOptions ? '1' : '0');
 		refreshLoraOptionsForCurrentFamily();
+		updateLoraCompatUiResetButtonState();
+	});
+}
+
+if (loraShowRowHintsToggle) {
+	loraShowRowHintsToggle.checked = loraShowRowHints;
+	loraShowRowHintsToggle.addEventListener('change', () => {
+		loraShowRowHints = loraShowRowHintsToggle.checked;
+		if (loraShowRowHints) {
+			localStorage.removeItem(LORA_SHOW_ROW_HINTS_KEY);
+		} else {
+			localStorage.setItem(LORA_SHOW_ROW_HINTS_KEY, '0');
+		}
+		updateAllLoraRowCompatBadges();
 		updateLoraCompatUiResetButtonState();
 	});
 }
