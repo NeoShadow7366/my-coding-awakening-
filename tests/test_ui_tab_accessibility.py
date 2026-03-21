@@ -1772,6 +1772,8 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert 'class="lora-row-clear-preserved btn btn-ghost btn-xs"' in js
     assert "preservedChip.textContent = 'Preserved';" in js
     assert "mismatch is preserved while incompatible options are hidden." in js
+    assert "clearPreservedBtn.textContent = 'Clear';" in js
+    assert "clearPreservedBtn.textContent = `Clear ${label}`;" in js
     assert "Clear preserved ${label} mismatch from this row." in js
     assert "badge.className = 'lora-row-compat-badge is-mismatch';" in js
     assert "'\u26a0 Not Flux'" in js

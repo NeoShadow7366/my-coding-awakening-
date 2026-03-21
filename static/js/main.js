@@ -3391,6 +3391,7 @@ function updateLoraRowCompatBadge(row) {
 		if (!clearPreservedBtn) return;
 		if (!show || !family) {
 			clearPreservedBtn.hidden = true;
+			clearPreservedBtn.textContent = 'Clear';
 			clearPreservedBtn.title = 'Clear this preserved mismatch';
 			clearPreservedBtn.setAttribute('aria-label', clearPreservedBtn.title);
 			return;
@@ -3399,6 +3400,7 @@ function updateLoraRowCompatBadge(row) {
 			? 'FLUX'
 			: (family === 'sdxl' ? 'SDXL' : (family === 'sd15' ? 'SD1.5' : family.toUpperCase()));
 		clearPreservedBtn.hidden = false;
+		clearPreservedBtn.textContent = `Clear ${label}`;
 		clearPreservedBtn.title = `Clear preserved ${label} mismatch from this row.`;
 		clearPreservedBtn.setAttribute('aria-label', clearPreservedBtn.title);
 	};
