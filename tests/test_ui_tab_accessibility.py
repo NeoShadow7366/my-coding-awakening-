@@ -1647,9 +1647,11 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert "loraCompatModeHint.classList.remove('is-manual', 'is-detected', 'is-generic', 'is-flux', 'is-sd');" in js
     assert "loraCompatModeHint.setAttribute('aria-label', text);" in js
     assert "loraCompatModeHint.title = text;" in js
-    assert "setHint('LoRA grouping source: manual Flux mode.', ['is-manual', 'is-flux']);" in js
-    assert "setHint('LoRA grouping source: manual SD mode.', ['is-manual', 'is-sd']);" in js
-    assert "setHint('LoRA grouping source: generic list (family unknown).', ['is-generic']);" in js
+    assert "loraCompatModeHint.dataset.source = source;" in js
+    assert "loraCompatModeHint.dataset.family = family;" in js
+    assert "setHint('LoRA grouping source: manual Flux mode.', ['is-manual', 'is-flux'], 'manual', 'flux');" in js
+    assert "setHint('LoRA grouping source: manual SD mode.', ['is-manual', 'is-sd'], 'manual', 'sd');" in js
+    assert "setHint('LoRA grouping source: generic list (family unknown).', ['is-generic'], 'generic', 'unknown');" in js
     assert "buildCompatGroupedOptions(_loraModelsCache, getActiveLoraCompatibilityFamily(), inferCheckpointFamily);" in js
     assert "loraFluxHint.hidden = false;" in js
     assert "loraFluxHint.hidden = true;" in js

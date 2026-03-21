@@ -3086,31 +3086,35 @@ function updateLoraCompatibilityModeHint() {
 	const activeFamily = resolveActiveImageFamily(selectedModel);
 	const requestedMode = imageModelFamilySelect?.value || imageModelFamilyMode || 'auto';
 	loraCompatModeHint.classList.remove('is-manual', 'is-detected', 'is-generic', 'is-flux', 'is-sd');
-	const setHint = (text, classNames) => {
+	loraCompatModeHint.dataset.source = '';
+	loraCompatModeHint.dataset.family = '';
+	const setHint = (text, classNames, source, family) => {
 		loraCompatModeHint.textContent = text;
 		classNames.forEach((className) => loraCompatModeHint.classList.add(className));
 		loraCompatModeHint.title = text;
 		loraCompatModeHint.setAttribute('aria-label', text);
+		loraCompatModeHint.dataset.source = source;
+		loraCompatModeHint.dataset.family = family;
 	};
 	if (activeFamily === 'flux') {
 		if (requestedMode === 'flux') {
-			setHint('LoRA grouping source: manual Flux mode.', ['is-manual', 'is-flux']);
+			setHint('LoRA grouping source: manual Flux mode.', ['is-manual', 'is-flux'], 'manual', 'flux');
 		} else {
-			setHint('LoRA grouping source: detected Flux family from selected checkpoint.', ['is-detected', 'is-flux']);
+			setHint('LoRA grouping source: detected Flux family from selected checkpoint.', ['is-detected', 'is-flux'], 'detected', 'flux');
 		}
 		return;
 	}
 	if (requestedMode === 'sd') {
-		setHint('LoRA grouping source: manual SD mode.', ['is-manual', 'is-sd']);
+		setHint('LoRA grouping source: manual SD mode.', ['is-manual', 'is-sd'], 'manual', 'sd');
 		return;
 	}
 	const baseFamily = getBaseCheckpointFamily();
 	if (baseFamily === 'sdxl') {
-		setHint('LoRA grouping source: detected SDXL checkpoint family.', ['is-detected', 'is-sd']);
+		setHint('LoRA grouping source: detected SDXL checkpoint family.', ['is-detected', 'is-sd'], 'detected', 'sd');
 	} else if (baseFamily === 'sd15') {
-		setHint('LoRA grouping source: detected SD 1.5 checkpoint family.', ['is-detected', 'is-sd']);
+		setHint('LoRA grouping source: detected SD 1.5 checkpoint family.', ['is-detected', 'is-sd'], 'detected', 'sd');
 	} else {
-		setHint('LoRA grouping source: generic list (family unknown).', ['is-generic']);
+		setHint('LoRA grouping source: generic list (family unknown).', ['is-generic'], 'generic', 'unknown');
 	}
 }
 
