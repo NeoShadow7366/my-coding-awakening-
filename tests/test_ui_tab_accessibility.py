@@ -1756,14 +1756,14 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert "loraDisplayOptions.dataset.mode = displayMode;" in js
     assert "const modeLabel = displayMode === 'compact' ? 'Compact' : (displayMode === 'custom' ? 'Custom' : 'Default');" in js
     assert "loraDisplayOptionsModeChip.dataset.mode = displayMode;" in js
-    assert "loraDisplayOptionsModeChip.textContent = `Mode: ${modeLabel}`;" in js
+    assert "loraDisplayOptionsModeChip.textContent = `Mode: ${modeLabel} (${activeCount})`;" in js
     assert "loraDisplayOptionsModeChip.setAttribute('aria-pressed', displayMode === 'compact' ? 'true' : 'false');" in js
-    assert "Compact mode active. Click to switch to default display options." in js
-    assert "Custom mode active. Click to switch to compact display options." in js
-    assert "Default mode active. Click to switch to compact display options." in js
-    assert "Display mode compact. Activate to switch to default display options." in js
-    assert "Display mode custom. Activate to switch to compact display options." in js
-    assert "Display mode default. Activate to switch to compact display options." in js
+    assert "Compact mode active with ${activeCount} non-default display options. Click to switch to default display options." in js
+    assert "Custom mode active with ${activeCount} non-default display options. Click to switch to compact display options." in js
+    assert "Default mode active with 0 non-default display options. Click to switch to compact display options." in js
+    assert "Display mode compact with ${activeCount} active options. Activate to switch to default display options." in js
+    assert "Display mode custom with ${activeCount} active options. Activate to switch to compact display options." in js
+    assert "Display mode default with 0 active options. Activate to switch to compact display options." in js
     assert "loraDisplayOptionsActiveHint.hidden = false;" in js
     assert "loraDisplayOptionsActiveHint.textContent = activeCount > 0" in js
     assert "Display mode: ${displayMode}. Active display options: ${activeOptionLabels.join(', ')}." in js
@@ -1819,7 +1819,7 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert 'id="lora-display-options-compact"' in tpl
     assert 'id="lora-display-options-reset"' in tpl
     assert 'id="lora-display-options-mode-chip" type="button" aria-live="polite"' in tpl
-    assert 'Mode: default' in tpl
+    assert 'Mode: default (0)' in tpl
     assert 'id="lora-display-options-active-hint" class="hint lora-display-options-active-hint" hidden aria-live="polite"' in tpl
     assert 'Compact all' in tpl
     assert 'Reset display options' in tpl

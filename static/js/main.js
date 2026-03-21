@@ -3256,18 +3256,18 @@ function updateLoraDisplayOptionsSummary() {
 	if (loraDisplayOptionsModeChip) {
 		const modeLabel = displayMode === 'compact' ? 'Compact' : (displayMode === 'custom' ? 'Custom' : 'Default');
 		loraDisplayOptionsModeChip.dataset.mode = displayMode;
-		loraDisplayOptionsModeChip.textContent = `Mode: ${modeLabel}`;
+		loraDisplayOptionsModeChip.textContent = `Mode: ${modeLabel} (${activeCount})`;
 		loraDisplayOptionsModeChip.setAttribute('aria-pressed', displayMode === 'compact' ? 'true' : 'false');
 		loraDisplayOptionsModeChip.title = displayMode === 'compact'
-			? 'Compact mode active. Click to switch to default display options.'
+			? `Compact mode active with ${activeCount} non-default display options. Click to switch to default display options.`
 			: (displayMode === 'custom'
-				? 'Custom mode active. Click to switch to compact display options.'
-				: 'Default mode active. Click to switch to compact display options.');
+				? `Custom mode active with ${activeCount} non-default display options. Click to switch to compact display options.`
+				: 'Default mode active with 0 non-default display options. Click to switch to compact display options.');
 		loraDisplayOptionsModeChip.setAttribute('aria-label', displayMode === 'compact'
-			? 'Display mode compact. Activate to switch to default display options.'
+			? `Display mode compact with ${activeCount} active options. Activate to switch to default display options.`
 			: (displayMode === 'custom'
-				? 'Display mode custom. Activate to switch to compact display options.'
-				: 'Display mode default. Activate to switch to compact display options.'));
+				? `Display mode custom with ${activeCount} active options. Activate to switch to compact display options.`
+				: 'Display mode default with 0 active options. Activate to switch to compact display options.'));
 	}
 	if (loraDisplayOptionsActiveHint) {
 		loraDisplayOptionsActiveHint.hidden = false;
