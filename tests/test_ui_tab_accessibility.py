@@ -1638,6 +1638,8 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert "function updateLoraFluxHint()" in js
     assert "function clampAllLoraStrengthsForFamily(isFlux)" in js
     assert "function getActiveLoraCompatibilityFamily()" in js
+    assert "function resolveLoraCompatibilityFamilyForModel(modelName = '')" in js
+    assert "function sanitizeLoraStackForCompatibilityFamily(entries, compatibilityFamily)" in js
     assert "function refreshLoraOptionsForCurrentFamily()" in js
     assert "const loraCompatModeHint = document.getElementById('lora-compat-mode-hint');" in js
     assert "function resolveLoraCompatibilityHintState(selectedModel, requestedMode)" in js
@@ -1670,9 +1672,14 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert "const _isFlux = resolveActiveImageFamily(imageModelSelect?.value || '') === 'flux';" in js
     assert "if (_strInput && _isFlux) _strInput.max = '1';" in js
     assert "const isFluxFamily = resolveActiveImageFamily(imageModelSelect?.value || '') === 'flux';" in js
+    assert "const compatibilityFamily = resolveLoraCompatibilityFamilyForModel(common.model || '');" in js
     assert "const safeStrength = Math.max(0, Math.min(maxStrength, Number(entry.strength)));" in js
     assert "const maxLoraStrength = isFluxFamily ? 1 : 2;" in js
     assert "normalized.loras = normalized.loras" in js
+    assert "normalized.loras = sanitizeLoraStackForCompatibilityFamily(normalized.loras, compatibilityFamily);" in js
+    assert "const filteredLoraCount = Math.max(0, (common.loras?.length || 0) - (normalizedCommon.loras?.length || 0));" in js
+    assert "incompatible LoRA" in js
+    assert "Skipped ${filteredLoraCount} incompatible LoRA" in js
     assert "strength: safeStrength," in js
 
     html_path = Path(__file__).resolve().parents[1] / "templates" / "index.html"

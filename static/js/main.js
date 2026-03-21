@@ -3061,9 +3061,24 @@ function clampAllLoraStrengthsForFamily(isFlux) {
 }
 
 function getActiveLoraCompatibilityFamily() {
-	const activeFamily = resolveActiveImageFamily(imageModelSelect?.value || '');
+	return resolveLoraCompatibilityFamilyForModel(imageModelSelect?.value || '');
+}
+
+function resolveLoraCompatibilityFamilyForModel(modelName = '') {
+	const targetModel = modelName || imageModelSelect?.value || '';
+	const activeFamily = resolveActiveImageFamily(targetModel);
 	if (activeFamily === 'flux') return 'flux';
-	return getBaseCheckpointFamily();
+	return inferCheckpointFamily(targetModel);
+}
+
+function sanitizeLoraStackForCompatibilityFamily(entries, compatibilityFamily) {
+	if (!Array.isArray(entries) || !entries.length) return [];
+	return entries.filter((entry) => {
+		if (!entry || typeof entry !== 'object') return false;
+		if (!compatibilityFamily) return true;
+		const loraFamily = inferCheckpointFamily(entry.name || '');
+		return !loraFamily || loraFamily === compatibilityFamily;
+	});
 }
 
 function _buildLoraOptions() {
@@ -8814,6 +8829,7 @@ function normalizeImageRequestByFamily(common) {
 	const capabilities = getImageFamilyCapabilities(activeFamily);
 	const normalized = { ...common, model_family: activeFamily };
 	const isFluxFamily = activeFamily === 'flux';
+	const compatibilityFamily = resolveLoraCompatibilityFamilyForModel(common.model || '');
 
 	if (!capabilities.supports_refiner) normalized.refiner_model = '';
 	if (!capabilities.supports_vae) normalized.vae = '';
@@ -8852,6 +8868,7 @@ function normalizeImageRequestByFamily(common) {
 				};
 			})
 			.filter(Boolean);
+		normalized.loras = sanitizeLoraStackForCompatibilityFamily(normalized.loras, compatibilityFamily);
 	}
 
 	return normalized;
@@ -13043,6 +13060,7 @@ imageForm.addEventListener('submit', async (e) => {
 		}
 
 		const normalizedCommon = normalizeImageRequestByFamily(common);
+		const filteredLoraCount = Math.max(0, (common.loras?.length || 0) - (normalizedCommon.loras?.length || 0));
 
 		let res;
 		if (imageUpload.files && imageUpload.files[0]) {
@@ -13124,7 +13142,12 @@ imageForm.addEventListener('submit', async (e) => {
 		persistTrackedQueueState();
 		ensureQueuePolling();
 
-		queueSummary.textContent = `Submitted: ${promptId}`;
+		queueSummary.textContent = filteredLoraCount > 0
+			? `Submitted: ${promptId} (${filteredLoraCount} incompatible LoRA${filteredLoraCount === 1 ? '' : 's'} skipped)`
+			: `Submitted: ${promptId}`;
+		if (filteredLoraCount > 0) {
+			showToast(`Skipped ${filteredLoraCount} incompatible LoRA${filteredLoraCount === 1 ? '' : 's'} for this run.`, '');
+		}
 		if (imageFluxLockBypassOnce) {
 			imageFluxLockBypassOnce = false;
 			applyImageFamilyModeUi();
