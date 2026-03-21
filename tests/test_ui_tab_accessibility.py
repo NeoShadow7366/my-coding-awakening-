@@ -1645,6 +1645,7 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert "function refreshLoraOptionsForCurrentFamily()" in js
     assert "const loraCompatModeHint = document.getElementById('lora-compat-mode-hint');" in js
     assert "const loraHideIncompatibleToggle = document.getElementById('lora-hide-incompatible-toggle');" in js
+    assert "const loraCompatUiResetBtn = document.getElementById('lora-compat-ui-reset');" in js
     assert "const loraFamilyLegend = document.getElementById('lora-family-legend');" in js
     assert "function resolveLoraCompatibilityHintState(selectedModel, requestedMode)" in js
     assert "function updateLoraCompatibilityModeHint()" in js
@@ -1691,10 +1692,14 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert "loraFamilyLegend.addEventListener('toggle', () => {" in js
     assert "localStorage.setItem(LORA_FAMILY_LEGEND_EXPANDED_KEY, loraFamilyLegend.open ? '1' : '0');" in js
     assert "function getFilteredLoraModels(baseFamily)" in js
+    assert "function resetLoraCompatibilityUiPrefs()" in js
     assert "const models = getFilteredLoraModels(baseFamily);" in js
     assert "(hidden incompatible)" in js
     assert "loraHideIncompatibleToggle.checked = loraHideIncompatibleOptions;" in js
     assert "localStorage.setItem(LORA_HIDE_INCOMPATIBLE_OPTIONS_KEY, loraHideIncompatibleOptions ? '1' : '0');" in js
+    assert "localStorage.removeItem(LORA_HIDE_INCOMPATIBLE_OPTIONS_KEY);" in js
+    assert "localStorage.removeItem(LORA_FAMILY_LEGEND_EXPANDED_KEY);" in js
+    assert "showToast('LoRA compatibility UI preferences reset.', 'pos');" in js
     assert "strength: safeStrength," in js
 
     html_path = Path(__file__).resolve().parents[1] / "templates" / "index.html"
@@ -1703,6 +1708,8 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert 'id="lora-compat-mode-hint" class="hint lora-compat-mode-hint" aria-live="polite"' in tpl
     assert 'id="lora-hide-incompatible-toggle"' in tpl
     assert 'Hide incompatible options' in tpl
+    assert 'id="lora-compat-ui-reset"' in tpl
+    assert 'Reset LoRA UI' in tpl
     assert 'id="lora-family-legend"' in tpl
     assert 'id="lora-family-legend-toggle"' in tpl
     assert 'Family legend' in tpl
@@ -1747,6 +1754,7 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert ".lora-row-family-chip.is-sd15" in css
     assert ".lora-row-family-chip.is-unknown" in css
     assert ".lora-family-legend" in css
+    assert ".lora-options-row" in css
     assert ".lora-hide-incompatible-toggle" in css
     assert ".lora-family-legend > summary" in css
     assert ".lora-row-compat-badge" in css
