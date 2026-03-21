@@ -1688,6 +1688,10 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     tpl = html_path.read_text(encoding="utf-8")
     assert 'id="lora-flux-hint" class="hint lora-flux-hint" hidden' in tpl
     assert 'id="lora-compat-mode-hint" class="hint lora-compat-mode-hint" aria-live="polite"' in tpl
+    assert 'id="lora-family-legend"' in tpl
+    assert 'id="lora-family-legend-toggle"' in tpl
+    assert 'Family legend' in tpl
+    assert 'Chip labels indicate inferred LoRA family' in tpl
 
     css_path = Path(__file__).resolve().parents[1] / "static" / "css" / "style.css"
     css = css_path.read_text(encoding="utf-8")
@@ -1727,6 +1731,8 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert ".lora-row-family-chip.is-sdxl" in css
     assert ".lora-row-family-chip.is-sd15" in css
     assert ".lora-row-family-chip.is-unknown" in css
+    assert ".lora-family-legend" in css
+    assert ".lora-family-legend > summary" in css
     assert ".lora-row-compat-badge" in css
     assert ".lora-row-compat-badge.is-mismatch" in css
     # mismatch summary at stack header

@@ -1638,6 +1638,25 @@ textarea {
   color: var(--clr-accent-neg);
 }
 
+.lora-family-legend {
+  margin: 0.2rem 0 0.45rem;
+}
+
+.lora-family-legend > summary {
+  cursor: pointer;
+  font-size: 0.72rem;
+  color: var(--clr-text-muted);
+  user-select: none;
+}
+
+.lora-family-legend[open] > summary {
+  color: var(--clr-text);
+}
+
+.lora-family-legend p {
+  margin: 0.35rem 0 0;
+}
+
 .lora-tag-cloud {
   display: flex;
   flex-wrap: wrap;
