@@ -160,6 +160,7 @@ const loraDisplayOptions = document.getElementById('lora-display-options');
 const loraDisplayOptionsToggle = document.getElementById('lora-display-options-toggle');
 const loraDisplayOptionsCompactBtn = document.getElementById('lora-display-options-compact');
 const loraDisplayOptionsResetBtn = document.getElementById('lora-display-options-reset');
+const loraDisplayOptionsModeChip = document.getElementById('lora-display-options-mode-chip');
 const loraDisplayOptionsActiveHint = document.getElementById('lora-display-options-active-hint');
 const loraFamilyLegend = document.getElementById('lora-family-legend');
 const loraMismatchSummary = document.getElementById('lora-mismatch-summary');
@@ -3251,6 +3252,16 @@ function updateLoraDisplayOptionsSummary() {
 		: 'All LoRA display options are using defaults.';
 	if (loraDisplayOptions) {
 		loraDisplayOptions.dataset.mode = displayMode;
+	}
+	if (loraDisplayOptionsModeChip) {
+		const modeLabel = displayMode === 'compact' ? 'Compact' : (displayMode === 'custom' ? 'Custom' : 'Default');
+		loraDisplayOptionsModeChip.dataset.mode = displayMode;
+		loraDisplayOptionsModeChip.textContent = `Mode: ${modeLabel}`;
+		loraDisplayOptionsModeChip.title = displayMode === 'compact'
+			? 'Compact mode: all compact options enabled and row hints hidden.'
+			: (displayMode === 'custom'
+				? 'Custom mode: mixed display options are active.'
+				: 'Default mode: all display options are at defaults.');
 	}
 	if (loraDisplayOptionsActiveHint) {
 		loraDisplayOptionsActiveHint.hidden = false;

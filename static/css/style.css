@@ -1621,6 +1621,27 @@ textarea {
   margin-top: 0.2rem;
 }
 
+.lora-display-options-mode-chip {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--clr-border);
+  border-radius: 999px;
+  padding: 0.05rem 0.45rem;
+  font-size: 0.67rem;
+  color: var(--clr-text-muted);
+  background: color-mix(in srgb, var(--clr-surface) 84%, var(--clr-bg));
+}
+
+.lora-display-options-mode-chip[data-mode='compact'] {
+  color: color-mix(in srgb, var(--clr-text) 82%, var(--clr-link));
+  border-color: color-mix(in srgb, var(--clr-border) 60%, var(--clr-link));
+}
+
+.lora-display-options-mode-chip[data-mode='custom'] {
+  color: color-mix(in srgb, var(--clr-text) 82%, var(--clr-caution));
+  border-color: color-mix(in srgb, var(--clr-border) 60%, var(--clr-caution));
+}
+
 .lora-display-options-active-hint {
   margin: 0.25rem 0 0;
 }
