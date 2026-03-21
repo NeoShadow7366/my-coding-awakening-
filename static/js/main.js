@@ -3080,10 +3080,60 @@ function refreshLoraOptionsForCurrentFamily() {
 	});
 }
 
+function resolveLoraCompatibilityHintState(selectedModel, requestedMode) {
+	const activeFamily = resolveActiveImageFamily(selectedModel || '');
+	if (activeFamily === 'flux') {
+		if (requestedMode === 'flux') {
+			return {
+				text: 'LoRA grouping source: manual Flux mode.',
+				source: 'manual',
+				family: 'flux',
+				classNames: ['is-manual', 'is-flux'],
+			};
+		}
+		return {
+			text: 'LoRA grouping source: detected Flux family from selected checkpoint.',
+			source: 'detected',
+			family: 'flux',
+			classNames: ['is-detected', 'is-flux'],
+		};
+	}
+	if (requestedMode === 'sd') {
+		return {
+			text: 'LoRA grouping source: manual SD mode.',
+			source: 'manual',
+			family: 'sd',
+			classNames: ['is-manual', 'is-sd'],
+		};
+	}
+	const baseFamily = getBaseCheckpointFamily();
+	if (baseFamily === 'sdxl') {
+		return {
+			text: 'LoRA grouping source: detected SDXL checkpoint family.',
+			source: 'detected',
+			family: 'sd',
+			classNames: ['is-detected', 'is-sd'],
+		};
+	}
+	if (baseFamily === 'sd15') {
+		return {
+			text: 'LoRA grouping source: detected SD 1.5 checkpoint family.',
+			source: 'detected',
+			family: 'sd',
+			classNames: ['is-detected', 'is-sd'],
+		};
+	}
+	return {
+		text: 'LoRA grouping source: generic list (family unknown).',
+		source: 'generic',
+		family: 'unknown',
+		classNames: ['is-generic'],
+	};
+}
+
 function updateLoraCompatibilityModeHint() {
 	if (!loraCompatModeHint) return;
 	const selectedModel = imageModelSelect?.value || '';
-	const activeFamily = resolveActiveImageFamily(selectedModel);
 	const requestedMode = imageModelFamilySelect?.value || imageModelFamilyMode || 'auto';
 	loraCompatModeHint.classList.remove('is-manual', 'is-detected', 'is-generic', 'is-flux', 'is-sd');
 	loraCompatModeHint.dataset.source = '';
@@ -3096,26 +3146,8 @@ function updateLoraCompatibilityModeHint() {
 		loraCompatModeHint.dataset.source = source;
 		loraCompatModeHint.dataset.family = family;
 	};
-	if (activeFamily === 'flux') {
-		if (requestedMode === 'flux') {
-			setHint('LoRA grouping source: manual Flux mode.', ['is-manual', 'is-flux'], 'manual', 'flux');
-		} else {
-			setHint('LoRA grouping source: detected Flux family from selected checkpoint.', ['is-detected', 'is-flux'], 'detected', 'flux');
-		}
-		return;
-	}
-	if (requestedMode === 'sd') {
-		setHint('LoRA grouping source: manual SD mode.', ['is-manual', 'is-sd'], 'manual', 'sd');
-		return;
-	}
-	const baseFamily = getBaseCheckpointFamily();
-	if (baseFamily === 'sdxl') {
-		setHint('LoRA grouping source: detected SDXL checkpoint family.', ['is-detected', 'is-sd'], 'detected', 'sd');
-	} else if (baseFamily === 'sd15') {
-		setHint('LoRA grouping source: detected SD 1.5 checkpoint family.', ['is-detected', 'is-sd'], 'detected', 'sd');
-	} else {
-		setHint('LoRA grouping source: generic list (family unknown).', ['is-generic'], 'generic', 'unknown');
-	}
+	const state = resolveLoraCompatibilityHintState(selectedModel, requestedMode);
+	setHint(state.text, state.classNames, state.source, state.family);
 }
 
 function addLoraRow() {

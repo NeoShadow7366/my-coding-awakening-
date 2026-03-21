@@ -1640,6 +1640,7 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert "function getActiveLoraCompatibilityFamily()" in js
     assert "function refreshLoraOptionsForCurrentFamily()" in js
     assert "const loraCompatModeHint = document.getElementById('lora-compat-mode-hint');" in js
+    assert "function resolveLoraCompatibilityHintState(selectedModel, requestedMode)" in js
     assert "function updateLoraCompatibilityModeHint()" in js
     assert "LoRA grouping source: manual Flux mode." in js
     assert "LoRA grouping source: manual SD mode." in js
@@ -1649,9 +1650,8 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert "loraCompatModeHint.title = text;" in js
     assert "loraCompatModeHint.dataset.source = source;" in js
     assert "loraCompatModeHint.dataset.family = family;" in js
-    assert "setHint('LoRA grouping source: manual Flux mode.', ['is-manual', 'is-flux'], 'manual', 'flux');" in js
-    assert "setHint('LoRA grouping source: manual SD mode.', ['is-manual', 'is-sd'], 'manual', 'sd');" in js
-    assert "setHint('LoRA grouping source: generic list (family unknown).', ['is-generic'], 'generic', 'unknown');" in js
+    assert "const state = resolveLoraCompatibilityHintState(selectedModel, requestedMode);" in js
+    assert "setHint(state.text, state.classNames, state.source, state.family);" in js
     assert "buildCompatGroupedOptions(_loraModelsCache, getActiveLoraCompatibilityFamily(), inferCheckpointFamily);" in js
     assert "loraFluxHint.hidden = false;" in js
     assert "loraFluxHint.hidden = true;" in js
