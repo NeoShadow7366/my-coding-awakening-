@@ -1650,8 +1650,13 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert "loraCompatModeHint.title = text;" in js
     assert "loraCompatModeHint.dataset.source = source;" in js
     assert "loraCompatModeHint.dataset.family = family;" in js
+    assert "loraCompatModeHint.dataset.familyDetail = familyDetail;" in js
+    assert "familyDetail: 'flux'," in js
+    assert "familyDetail: 'sdxl'," in js
+    assert "familyDetail: 'sd15'," in js
+    assert "familyDetail: 'unknown'," in js
     assert "const state = resolveLoraCompatibilityHintState(selectedModel, requestedMode);" in js
-    assert "setHint(state.text, state.classNames, state.source, state.family);" in js
+    assert "setHint(state.text, state.classNames, state.source, state.family, state.familyDetail);" in js
     assert "buildCompatGroupedOptions(_loraModelsCache, getActiveLoraCompatibilityFamily(), inferCheckpointFamily);" in js
     assert "loraFluxHint.hidden = false;" in js
     assert "loraFluxHint.hidden = true;" in js

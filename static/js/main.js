@@ -3088,6 +3088,7 @@ function resolveLoraCompatibilityHintState(selectedModel, requestedMode) {
 				text: 'LoRA grouping source: manual Flux mode.',
 				source: 'manual',
 				family: 'flux',
+				familyDetail: 'flux',
 				classNames: ['is-manual', 'is-flux'],
 			};
 		}
@@ -3095,6 +3096,7 @@ function resolveLoraCompatibilityHintState(selectedModel, requestedMode) {
 			text: 'LoRA grouping source: detected Flux family from selected checkpoint.',
 			source: 'detected',
 			family: 'flux',
+			familyDetail: 'flux',
 			classNames: ['is-detected', 'is-flux'],
 		};
 	}
@@ -3103,6 +3105,7 @@ function resolveLoraCompatibilityHintState(selectedModel, requestedMode) {
 			text: 'LoRA grouping source: manual SD mode.',
 			source: 'manual',
 			family: 'sd',
+			familyDetail: getBaseCheckpointFamily() || 'sd',
 			classNames: ['is-manual', 'is-sd'],
 		};
 	}
@@ -3112,6 +3115,7 @@ function resolveLoraCompatibilityHintState(selectedModel, requestedMode) {
 			text: 'LoRA grouping source: detected SDXL checkpoint family.',
 			source: 'detected',
 			family: 'sd',
+			familyDetail: 'sdxl',
 			classNames: ['is-detected', 'is-sd'],
 		};
 	}
@@ -3120,6 +3124,7 @@ function resolveLoraCompatibilityHintState(selectedModel, requestedMode) {
 			text: 'LoRA grouping source: detected SD 1.5 checkpoint family.',
 			source: 'detected',
 			family: 'sd',
+			familyDetail: 'sd15',
 			classNames: ['is-detected', 'is-sd'],
 		};
 	}
@@ -3127,6 +3132,7 @@ function resolveLoraCompatibilityHintState(selectedModel, requestedMode) {
 		text: 'LoRA grouping source: generic list (family unknown).',
 		source: 'generic',
 		family: 'unknown',
+		familyDetail: 'unknown',
 		classNames: ['is-generic'],
 	};
 }
@@ -3138,16 +3144,18 @@ function updateLoraCompatibilityModeHint() {
 	loraCompatModeHint.classList.remove('is-manual', 'is-detected', 'is-generic', 'is-flux', 'is-sd');
 	loraCompatModeHint.dataset.source = '';
 	loraCompatModeHint.dataset.family = '';
-	const setHint = (text, classNames, source, family) => {
+	loraCompatModeHint.dataset.familyDetail = '';
+	const setHint = (text, classNames, source, family, familyDetail) => {
 		loraCompatModeHint.textContent = text;
 		classNames.forEach((className) => loraCompatModeHint.classList.add(className));
 		loraCompatModeHint.title = text;
 		loraCompatModeHint.setAttribute('aria-label', text);
 		loraCompatModeHint.dataset.source = source;
 		loraCompatModeHint.dataset.family = family;
+		loraCompatModeHint.dataset.familyDetail = familyDetail;
 	};
 	const state = resolveLoraCompatibilityHintState(selectedModel, requestedMode);
-	setHint(state.text, state.classNames, state.source, state.family);
+	setHint(state.text, state.classNames, state.source, state.family, state.familyDetail);
 }
 
 function addLoraRow() {
