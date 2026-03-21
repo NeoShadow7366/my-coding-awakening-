@@ -1764,9 +1764,11 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert "function updateLoraSubmitSkipHint()" in js
     assert "const familyChip = row.querySelector('.lora-row-family-chip');" in js
     assert "const preservedChip = row.querySelector('.lora-row-preserved-chip');" in js
+    assert "const preservedHint = row.querySelector('.lora-row-preserved-hint');" in js
     assert "const clearPreservedBtn = row.querySelector('.lora-row-clear-preserved');" in js
     assert "const applyFamilyChip = (family) => {" in js
     assert "const applyPreservedChip = (show, family) => {" in js
+    assert "const applyPreservedHint = (show, family) => {" in js
     assert "const applyClearPreservedButton = (show, family) => {" in js
     assert "const rowEnabled = !row.classList.contains('lora-disabled');" in js
     assert "const preservedMismatch = Boolean(rowEnabled && loraHideIncompatibleOptions" in js
@@ -1776,6 +1778,7 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert 'class="lora-row-clear-preserved btn btn-ghost btn-xs"' in js
     assert "preservedChip.textContent = 'Preserved';" in js
     assert "mismatch is preserved while incompatible options are hidden." in js
+    assert "Preserved ${label} mismatch: hidden options are enabled." in js
     assert "clearPreservedBtn.textContent = 'Clear';" in js
     assert "clearPreservedBtn.textContent = `Clear ${label}`;" in js
     assert "Clear preserved ${label} mismatch from this row." in js
@@ -1797,6 +1800,7 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert "collectLoraStack();" in js
     assert ".lora-row-family-chip" in css
     assert ".lora-row-preserved-chip" in css
+    assert ".lora-row-preserved-hint" in css
     assert ".lora-row-clear-preserved" in css
     assert ".lora-row-family-chip.is-flux" in css
     assert ".lora-row-family-chip.is-sdxl" in css

@@ -1672,6 +1672,11 @@ textarea {
   flex: 1;
 }
 
+.lora-row-preserved-hint {
+  margin: 0.1rem 0 0;
+  color: color-mix(in srgb, var(--clr-text) 78%, var(--clr-link));
+}
+
 .lora-row-remove {
   flex-shrink: 0;
   color: var(--clr-accent-neg);

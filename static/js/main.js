@@ -3349,6 +3349,7 @@ function updateLoraRowCompatBadge(row) {
 	const badge = row.querySelector('.lora-row-compat-badge');
 	const familyChip = row.querySelector('.lora-row-family-chip');
 	const preservedChip = row.querySelector('.lora-row-preserved-chip');
+	const preservedHint = row.querySelector('.lora-row-preserved-hint');
 	const clearPreservedBtn = row.querySelector('.lora-row-clear-preserved');
 	if (!sel || !badge) return;
 	const loraName = sel.value;
@@ -3392,6 +3393,19 @@ function updateLoraRowCompatBadge(row) {
 		preservedChip.setAttribute('aria-label', preservedChip.title);
 		preservedChip.hidden = false;
 	};
+	const applyPreservedHint = (show, family) => {
+		if (!preservedHint) return;
+		if (!show || !family) {
+			preservedHint.hidden = true;
+			preservedHint.textContent = '';
+			return;
+		}
+		const label = family === 'flux'
+			? 'FLUX'
+			: (family === 'sdxl' ? 'SDXL' : (family === 'sd15' ? 'SD1.5' : family.toUpperCase()));
+		preservedHint.textContent = `Preserved ${label} mismatch: hidden options are enabled.`;
+		preservedHint.hidden = false;
+	};
 	const applyClearPreservedButton = (show, family) => {
 		if (!clearPreservedBtn) return;
 		if (!show || !family) {
@@ -3412,6 +3426,7 @@ function updateLoraRowCompatBadge(row) {
 	if (!loraName) {
 		applyFamilyChip('');
 		applyPreservedChip(false, '');
+		applyPreservedHint(false, '');
 		applyClearPreservedButton(false, '');
 		badge.hidden = true;
 		badge.textContent = '';
@@ -3424,6 +3439,7 @@ function updateLoraRowCompatBadge(row) {
 	const rowEnabled = !row.classList.contains('lora-disabled');
 	const preservedMismatch = Boolean(rowEnabled && loraHideIncompatibleOptions && loraFamily && activeFamily && loraFamily !== activeFamily);
 	applyPreservedChip(preservedMismatch, loraFamily || '');
+	applyPreservedHint(preservedMismatch, loraFamily || '');
 	applyClearPreservedButton(preservedMismatch, loraFamily || '');
 	if (!loraFamily || !activeFamily || loraFamily === activeFamily) {
 		badge.hidden = true;
@@ -3578,6 +3594,7 @@ function addLoraRow() {
 					<input class="lora-row-strength" type="range" min="0" max="2" step="0.01" value="0.8" />
 				</label>
 			</div>
+			<p class="hint lora-row-preserved-hint" hidden aria-live="polite"></p>
 			<div class="lora-tag-cloud" hidden></div>
 			<p class="lora-tag-hint" hidden>Click a tag to add it to your prompt.</p>
 		</div>
