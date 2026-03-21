@@ -3205,15 +3205,41 @@ function updateLoraCompatibilityModeHint() {
 function updateLoraRowCompatBadge(row) {
 	const sel = row.querySelector('.lora-row-select');
 	const badge = row.querySelector('.lora-row-compat-badge');
+	const familyChip = row.querySelector('.lora-row-family-chip');
 	if (!sel || !badge) return;
 	const loraName = sel.value;
+	const applyFamilyChip = (family) => {
+		if (!familyChip) return;
+		familyChip.classList.remove('is-flux', 'is-sdxl', 'is-sd15', 'is-unknown');
+		if (!family) {
+			familyChip.hidden = true;
+			familyChip.textContent = '';
+			familyChip.title = '';
+			familyChip.removeAttribute('aria-label');
+			return;
+		}
+		const label = family === 'flux'
+			? 'Flux'
+			: (family === 'sdxl' ? 'SDXL' : (family === 'sd15' ? 'SD1.5' : 'Unknown'));
+		familyChip.textContent = label;
+		familyChip.title = `Inferred LoRA family: ${label}`;
+		familyChip.setAttribute('aria-label', familyChip.title);
+		familyChip.classList.add(
+			family === 'flux'
+				? 'is-flux'
+				: (family === 'sdxl' ? 'is-sdxl' : (family === 'sd15' ? 'is-sd15' : 'is-unknown'))
+		);
+		familyChip.hidden = false;
+	};
 	if (!loraName) {
+		applyFamilyChip('');
 		badge.hidden = true;
 		badge.textContent = '';
 		badge.className = 'lora-row-compat-badge';
 		return;
 	}
 	const loraFamily = inferCheckpointFamily(loraName);
+	applyFamilyChip(loraFamily || 'unknown');
 	const activeFamily = getActiveLoraCompatibilityFamily();
 	if (!loraFamily || !activeFamily || loraFamily === activeFamily) {
 		badge.hidden = true;
@@ -3320,6 +3346,7 @@ function addLoraRow() {
 	row.innerHTML = `
 		<div class="lora-row-header">
 			<span class="lora-row-label hint">LoRA ${id}</span>
+			<span class="lora-row-family-chip" hidden aria-live="polite"></span>
 			<span class="lora-row-compat-badge" hidden aria-live="polite"></span>
 			<button class="lora-row-enable btn btn-ghost btn-xs" type="button" aria-pressed="true" title="Toggle this LoRA on/off">On</button>
 			<button class="lora-row-collapse btn btn-ghost btn-xs" type="button" aria-expanded="true" aria-controls="lora-row-body-${id}" aria-label="Collapse LoRA row">&#9660;</button>

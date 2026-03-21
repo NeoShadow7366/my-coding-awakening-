@@ -1565,6 +1565,34 @@ textarea {
   margin: 0;
 }
 
+.lora-row-family-chip {
+  flex-shrink: 0;
+  font-size: 0.65rem;
+  padding: 1px 6px;
+  border-radius: 999px;
+  border: 1px solid var(--clr-border);
+  background: color-mix(in srgb, var(--clr-surface) 78%, var(--clr-bg));
+  color: var(--clr-text-muted);
+  line-height: 1.4;
+}
+
+.lora-row-family-chip.is-flux {
+  color: color-mix(in srgb, var(--clr-text) 84%, #ff934d);
+}
+
+.lora-row-family-chip.is-sdxl {
+  color: color-mix(in srgb, var(--clr-text) 86%, #4fb6ff);
+}
+
+.lora-row-family-chip.is-sd15 {
+  color: color-mix(in srgb, var(--clr-text) 84%, #81d474);
+}
+
+.lora-row-family-chip.is-unknown {
+  color: var(--clr-text-muted);
+  opacity: 0.82;
+}
+
 .lora-row-compat-badge {
   flex-shrink: 0;
   font-size: 0.67rem;

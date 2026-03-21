@@ -1708,7 +1708,10 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert "function updateDisableIncompatibleLoraButton()" in js
     assert "function disableIncompatibleLoraRows()" in js
     assert "function updateLoraSubmitSkipHint()" in js
+    assert "const familyChip = row.querySelector('.lora-row-family-chip');" in js
+    assert "const applyFamilyChip = (family) => {" in js
     assert "'lora-row-compat-badge'" in js
+    assert 'class="lora-row-family-chip"' in js
     assert "badge.className = 'lora-row-compat-badge is-mismatch';" in js
     assert "'\u26a0 Not Flux'" in js
     assert "'\u26a0 Flux LoRA'" in js
@@ -1719,6 +1722,11 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert "updateDisableIncompatibleLoraButton();" in js
     assert "updateLoraSubmitSkipHint();" in js
     assert "collectLoraStack();" in js
+    assert ".lora-row-family-chip" in css
+    assert ".lora-row-family-chip.is-flux" in css
+    assert ".lora-row-family-chip.is-sdxl" in css
+    assert ".lora-row-family-chip.is-sd15" in css
+    assert ".lora-row-family-chip.is-unknown" in css
     assert ".lora-row-compat-badge" in css
     assert ".lora-row-compat-badge.is-mismatch" in css
     # mismatch summary at stack header
