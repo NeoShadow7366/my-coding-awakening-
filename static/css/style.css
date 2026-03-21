@@ -1548,6 +1548,11 @@ textarea {
   margin: 0.15rem 0 0.25rem;
 }
 
+.lora-hide-incompatible-status {
+  margin-left: auto;
+  text-align: right;
+}
+
 .lora-stack-container {
   display: flex;
   flex-direction: column;

@@ -149,6 +149,7 @@ const loraStackContainer = document.getElementById('lora-stack-container');
 const loraFluxHint = document.getElementById('lora-flux-hint');
 const loraCompatModeHint = document.getElementById('lora-compat-mode-hint');
 const loraHideIncompatibleToggle = document.getElementById('lora-hide-incompatible-toggle');
+const loraHideIncompatibleStatus = document.getElementById('lora-hide-incompatible-status');
 const loraCompatUiResetBtn = document.getElementById('lora-compat-ui-reset');
 const loraFamilyLegend = document.getElementById('lora-family-legend');
 const loraMismatchSummary = document.getElementById('lora-mismatch-summary');
@@ -3045,8 +3046,10 @@ async function loadImageLoraModels() {
 			sel.innerHTML = _buildLoraOptions();
 			if (cur && [...sel.options].some((o) => o.value === cur)) sel.value = cur;
 		});
+		updateLoraHideIncompatibleStatus();
 	} catch {
 		_loraModelsCache = [];
+		updateLoraHideIncompatibleStatus();
 	}
 }
 
@@ -3122,6 +3125,29 @@ function getFilteredLoraModels(baseFamily) {
 	});
 }
 
+function updateLoraHideIncompatibleStatus() {
+	if (!loraHideIncompatibleStatus) return;
+	if (!loraHideIncompatibleOptions) {
+		loraHideIncompatibleStatus.hidden = true;
+		loraHideIncompatibleStatus.textContent = '';
+		return;
+	}
+	const baseFamily = getActiveLoraCompatibilityFamily();
+	if (!baseFamily) {
+		loraHideIncompatibleStatus.hidden = true;
+		loraHideIncompatibleStatus.textContent = '';
+		return;
+	}
+	const hiddenCount = (_loraModelsCache || []).filter((name) => {
+		const fam = inferCheckpointFamily(name);
+		return Boolean(fam && fam !== baseFamily);
+	}).length;
+	loraHideIncompatibleStatus.textContent = hiddenCount > 0
+		? `Hiding ${hiddenCount} incompatible option${hiddenCount === 1 ? '' : 's'}.`
+		: 'No incompatible options to hide.';
+	loraHideIncompatibleStatus.hidden = false;
+}
+
 function resetLoraCompatibilityUiPrefs() {
 	loraHideIncompatibleOptions = false;
 	localStorage.removeItem(LORA_HIDE_INCOMPATIBLE_OPTIONS_KEY);
@@ -3162,6 +3188,7 @@ function refreshLoraOptionsForCurrentFamily() {
 			}
 		}
 	});
+	updateLoraHideIncompatibleStatus();
 	updateAllLoraRowCompatBadges();
 }
 
@@ -3512,6 +3539,8 @@ if (loraHideIncompatibleToggle) {
 		refreshLoraOptionsForCurrentFamily();
 	});
 }
+
+updateLoraHideIncompatibleStatus();
 
 if (loraCompatUiResetBtn) {
 	loraCompatUiResetBtn.addEventListener('click', () => {
