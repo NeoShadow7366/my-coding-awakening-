@@ -3194,9 +3194,10 @@ function refreshLoraOptionsForCurrentFamily() {
 		} else if (cur && loraHideIncompatibleOptions) {
 			const curFamily = inferCheckpointFamily(cur);
 			if (baseFamily && curFamily && curFamily !== baseFamily) {
+				const curFamilyLabel = curFamily === 'flux' ? 'FLUX' : (curFamily === 'sdxl' ? 'SDXL' : (curFamily === 'sd15' ? 'SD1.5' : curFamily.toUpperCase()));
 				const hiddenOpt = document.createElement('option');
 				hiddenOpt.value = cur;
-				hiddenOpt.textContent = `${cur} (hidden incompatible)`;
+				hiddenOpt.textContent = `${cur} (hidden incompatible: ${curFamilyLabel})`;
 				sel.appendChild(hiddenOpt);
 				sel.value = cur;
 			}

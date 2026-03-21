@@ -1698,7 +1698,8 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert "function updateLoraCompatUiResetButtonState()" in js
     assert "function resetLoraCompatibilityUiPrefs()" in js
     assert "const models = getFilteredLoraModels(baseFamily);" in js
-    assert "(hidden incompatible)" in js
+    assert "const curFamilyLabel = curFamily === 'flux' ? 'FLUX'" in js
+    assert "(hidden incompatible: ${curFamilyLabel})" in js
     assert "const baseFamilyLabel = baseFamily === 'flux'" in js
     assert "Hiding ${hiddenCount} incompatible option${hiddenCount === 1 ? '' : 's'} for ${baseFamilyLabel}." in js
     assert "No incompatible options to hide for ${baseFamilyLabel}." in js
