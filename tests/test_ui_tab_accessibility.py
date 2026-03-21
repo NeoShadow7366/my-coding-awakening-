@@ -1655,6 +1655,7 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert "const loraCompatUiResetBtn = document.getElementById('lora-compat-ui-reset');" in js
     assert "const loraDisplayOptions = document.getElementById('lora-display-options');" in js
     assert "const loraDisplayOptionsToggle = document.getElementById('lora-display-options-toggle');" in js
+    assert "const loraDisplayOptionsCompactBtn = document.getElementById('lora-display-options-compact');" in js
     assert "const loraDisplayOptionsResetBtn = document.getElementById('lora-display-options-reset');" in js
     assert "const loraDisplayOptionsActiveHint = document.getElementById('lora-display-options-active-hint');" in js
     assert "const loraFamilyLegend = document.getElementById('lora-family-legend');" in js
@@ -1725,6 +1726,7 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert "function updateLoraClearPreservedButton()" in js
     assert "function updateLoraDisplayOptionsSummary()" in js
     assert "function resetLoraDisplayOptionsPrefs()" in js
+    assert "function applyLoraDisplayOptionsCompactPreset()" in js
     assert "function updateLoraCompatUiResetButtonState()" in js
     assert "function resetLoraCompatibilityUiPrefs()" in js
     assert "const models = getFilteredLoraModels(baseFamily);" in js
@@ -1756,6 +1758,9 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert "loraDisplayOptionsResetBtn.disabled = activeCount === 0;" in js
     assert "Reset only LoRA display options to defaults." in js
     assert "LoRA display options are already using defaults." in js
+    assert "loraDisplayOptionsCompactBtn.disabled = isCompactPreset;" in js
+    assert "LoRA display options are already set to compact mode." in js
+    assert "Enable all compact LoRA display options and hide row hints." in js
     assert "non-default LoRA display option" in js
     assert "All LoRA display options are using defaults." in js
     assert "loraHideIncompatibleToggle.checked = loraHideIncompatibleOptions;" in js
@@ -1773,6 +1778,7 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert "localStorage.removeItem(LORA_COMPACT_ROW_CLEAR_KEY);" in js
     assert "localStorage.setItem(LORA_COMPACT_MISMATCH_KEY, '1');" in js
     assert "localStorage.removeItem(LORA_COMPACT_MISMATCH_KEY);" in js
+    assert "showToast('LoRA display options set to compact mode.', 'pos');" in js
     assert "showToast('LoRA display options reset.', 'pos');" in js
     assert "localStorage.removeItem(LORA_FAMILY_LEGEND_EXPANDED_KEY);" in js
     assert "localStorage.removeItem(LORA_DISPLAY_OPTIONS_EXPANDED_KEY);" in js
@@ -1793,8 +1799,10 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert 'id="lora-compact-mismatch-toggle"' in tpl
     assert 'id="lora-display-options" class="lora-display-options"' in tpl
     assert 'id="lora-display-options-toggle"' in tpl
+    assert 'id="lora-display-options-compact"' in tpl
     assert 'id="lora-display-options-reset"' in tpl
     assert 'id="lora-display-options-active-hint" class="hint lora-display-options-active-hint" hidden aria-live="polite"' in tpl
+    assert 'Compact all' in tpl
     assert 'Reset display options' in tpl
     assert 'Display options' in tpl
     assert 'class="lora-display-options-grid"' in tpl

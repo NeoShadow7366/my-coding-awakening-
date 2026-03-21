@@ -158,6 +158,7 @@ const loraClearPreservedBtn = document.getElementById('lora-clear-preserved-btn'
 const loraCompatUiResetBtn = document.getElementById('lora-compat-ui-reset');
 const loraDisplayOptions = document.getElementById('lora-display-options');
 const loraDisplayOptionsToggle = document.getElementById('lora-display-options-toggle');
+const loraDisplayOptionsCompactBtn = document.getElementById('lora-display-options-compact');
 const loraDisplayOptionsResetBtn = document.getElementById('lora-display-options-reset');
 const loraDisplayOptionsActiveHint = document.getElementById('lora-display-options-active-hint');
 const loraFamilyLegend = document.getElementById('lora-family-legend');
@@ -3261,6 +3262,13 @@ function updateLoraDisplayOptionsSummary() {
 			? 'Reset only LoRA display options to defaults.'
 			: 'LoRA display options are already using defaults.';
 	}
+	if (loraDisplayOptionsCompactBtn) {
+		const isCompactPreset = !loraShowRowHints && loraCompactPreservedIndicators && loraCompactRowClearButtons && loraCompactMismatchBadges;
+		loraDisplayOptionsCompactBtn.disabled = isCompactPreset;
+		loraDisplayOptionsCompactBtn.title = isCompactPreset
+			? 'LoRA display options are already set to compact mode.'
+			: 'Enable all compact LoRA display options and hide row hints.';
+	}
 }
 
 function resetLoraDisplayOptionsPrefs() {
@@ -3288,6 +3296,33 @@ function resetLoraDisplayOptionsPrefs() {
 	updateLoraDisplayOptionsSummary();
 	updateLoraCompatUiResetButtonState();
 	showToast('LoRA display options reset.', 'pos');
+}
+
+function applyLoraDisplayOptionsCompactPreset() {
+	loraShowRowHints = false;
+	loraCompactPreservedIndicators = true;
+	loraCompactRowClearButtons = true;
+	loraCompactMismatchBadges = true;
+	localStorage.setItem(LORA_SHOW_ROW_HINTS_KEY, '0');
+	localStorage.setItem(LORA_COMPACT_PRESERVED_KEY, '1');
+	localStorage.setItem(LORA_COMPACT_ROW_CLEAR_KEY, '1');
+	localStorage.setItem(LORA_COMPACT_MISMATCH_KEY, '1');
+	if (loraShowRowHintsToggle) {
+		loraShowRowHintsToggle.checked = false;
+	}
+	if (loraCompactPreservedToggle) {
+		loraCompactPreservedToggle.checked = true;
+	}
+	if (loraCompactRowClearToggle) {
+		loraCompactRowClearToggle.checked = true;
+	}
+	if (loraCompactMismatchToggle) {
+		loraCompactMismatchToggle.checked = true;
+	}
+	updateAllLoraRowCompatBadges();
+	updateLoraDisplayOptionsSummary();
+	updateLoraCompatUiResetButtonState();
+	showToast('LoRA display options set to compact mode.', 'pos');
 }
 
 function updateLoraCompatUiResetButtonState() {
@@ -3887,6 +3922,12 @@ if (loraCompatUiResetBtn) {
 if (loraDisplayOptionsResetBtn) {
 	loraDisplayOptionsResetBtn.addEventListener('click', () => {
 		resetLoraDisplayOptionsPrefs();
+	});
+}
+
+if (loraDisplayOptionsCompactBtn) {
+	loraDisplayOptionsCompactBtn.addEventListener('click', () => {
+		applyLoraDisplayOptionsCompactPreset();
 	});
 }
 

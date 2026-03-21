@@ -1614,6 +1614,10 @@ textarea {
 }
 
 .lora-display-options-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-xs);
   margin-top: 0.2rem;
 }
 
