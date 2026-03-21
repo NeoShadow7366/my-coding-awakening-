@@ -1627,6 +1627,11 @@ textarea {
   line-height: 1.4;
 }
 
+.lora-row-clear-preserved {
+  flex-shrink: 0;
+  padding: 0 0.4rem;
+}
+
 .lora-row-compat-badge {
   flex-shrink: 0;
   font-size: 0.67rem;

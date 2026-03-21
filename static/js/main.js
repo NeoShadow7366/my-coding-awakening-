@@ -3344,6 +3344,7 @@ function updateLoraRowCompatBadge(row) {
 	const badge = row.querySelector('.lora-row-compat-badge');
 	const familyChip = row.querySelector('.lora-row-family-chip');
 	const preservedChip = row.querySelector('.lora-row-preserved-chip');
+	const clearPreservedBtn = row.querySelector('.lora-row-clear-preserved');
 	if (!sel || !badge) return;
 	const loraName = sel.value;
 	const applyFamilyChip = (family) => {
@@ -3386,9 +3387,25 @@ function updateLoraRowCompatBadge(row) {
 		preservedChip.setAttribute('aria-label', preservedChip.title);
 		preservedChip.hidden = false;
 	};
+	const applyClearPreservedButton = (show, family) => {
+		if (!clearPreservedBtn) return;
+		if (!show || !family) {
+			clearPreservedBtn.hidden = true;
+			clearPreservedBtn.title = 'Clear this preserved mismatch';
+			clearPreservedBtn.setAttribute('aria-label', clearPreservedBtn.title);
+			return;
+		}
+		const label = family === 'flux'
+			? 'FLUX'
+			: (family === 'sdxl' ? 'SDXL' : (family === 'sd15' ? 'SD1.5' : family.toUpperCase()));
+		clearPreservedBtn.hidden = false;
+		clearPreservedBtn.title = `Clear preserved ${label} mismatch from this row.`;
+		clearPreservedBtn.setAttribute('aria-label', clearPreservedBtn.title);
+	};
 	if (!loraName) {
 		applyFamilyChip('');
 		applyPreservedChip(false, '');
+		applyClearPreservedButton(false, '');
 		badge.hidden = true;
 		badge.textContent = '';
 		badge.className = 'lora-row-compat-badge';
@@ -3399,6 +3416,7 @@ function updateLoraRowCompatBadge(row) {
 	const activeFamily = getActiveLoraCompatibilityFamily();
 	const preservedMismatch = Boolean(loraHideIncompatibleOptions && loraFamily && activeFamily && loraFamily !== activeFamily);
 	applyPreservedChip(preservedMismatch, loraFamily || '');
+	applyClearPreservedButton(preservedMismatch, loraFamily || '');
 	if (!loraFamily || !activeFamily || loraFamily === activeFamily) {
 		badge.hidden = true;
 		badge.textContent = '';
@@ -3486,24 +3504,28 @@ function disableIncompatibleLoraRows() {
 function clearPreservedHiddenIncompatibleRows() {
 	const rows = getPreservedHiddenIncompatibleRows();
 	if (!rows.length) return 0;
-	rows.forEach((row) => {
-		const sel = row.querySelector('.lora-row-select');
-		const tagCloud = row.querySelector('.lora-tag-cloud');
-		const tagHint = row.querySelector('.lora-tag-hint');
-		if (sel) {
-			sel.value = '';
-		}
-		if (tagCloud) {
-			tagCloud.hidden = true;
-			tagCloud.innerHTML = '';
-		}
-		if (tagHint) {
-			tagHint.hidden = true;
-		}
-	});
+	rows.forEach((row) => clearLoraRowSelection(row));
 	updateModelStackBadges();
 	updateAllLoraRowCompatBadges();
 	return rows.length;
+}
+
+function clearLoraRowSelection(row) {
+	if (!row) return false;
+	const sel = row.querySelector('.lora-row-select');
+	const tagCloud = row.querySelector('.lora-tag-cloud');
+	const tagHint = row.querySelector('.lora-tag-hint');
+	if (sel) {
+		sel.value = '';
+	}
+	if (tagCloud) {
+		tagCloud.hidden = true;
+		tagCloud.innerHTML = '';
+	}
+	if (tagHint) {
+		tagHint.hidden = true;
+	}
+	return true;
 }
 
 function updateLoraSubmitSkipHint() {
@@ -3531,6 +3553,7 @@ function addLoraRow() {
 			<span class="lora-row-label hint">LoRA ${id}</span>
 			<span class="lora-row-family-chip" hidden aria-live="polite"></span>
 			<span class="lora-row-preserved-chip" hidden aria-live="polite"></span>
+			<button class="lora-row-clear-preserved btn btn-ghost btn-xs" type="button" hidden aria-label="Clear this preserved mismatch">Clear</button>
 			<span class="lora-row-compat-badge" hidden aria-live="polite"></span>
 			<button class="lora-row-enable btn btn-ghost btn-xs" type="button" aria-pressed="true" title="Toggle this LoRA on/off">On</button>
 			<button class="lora-row-collapse btn btn-ghost btn-xs" type="button" aria-expanded="true" aria-controls="lora-row-body-${id}" aria-label="Collapse LoRA row">&#9660;</button>
@@ -3559,6 +3582,7 @@ function addLoraRow() {
 	const tagHint = row.querySelector('.lora-tag-hint');
 	const removeBtn = row.querySelector('.lora-row-remove');
 	const enableBtn = row.querySelector('.lora-row-enable');
+	const clearPreservedBtn = row.querySelector('.lora-row-clear-preserved');
 	const collapseBtn = row.querySelector('.lora-row-collapse');
 	const rowBody = row.querySelector('.lora-row-body');
 
@@ -3579,6 +3603,15 @@ function addLoraRow() {
 		collapseBtn.setAttribute('aria-expanded', String(expanded));
 		collapseBtn.innerHTML = expanded ? '&#9660;' : '&#9654;';
 	});
+
+	if (clearPreservedBtn) {
+		clearPreservedBtn.addEventListener('click', () => {
+			clearLoraRowSelection(row);
+			updateModelStackBadges();
+			updateAllLoraRowCompatBadges();
+			showToast(`Cleared preserved mismatch from LoRA ${id}.`, '');
+		});
+	}
 
 	sel.addEventListener('change', async () => {
 		updateModelStackBadges();

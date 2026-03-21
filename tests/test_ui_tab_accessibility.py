@@ -1756,18 +1756,23 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert "function updateLoraRowCompatBadge(row)" in js
     assert "function updateAllLoraRowCompatBadges()" in js
     assert "function updateDisableIncompatibleLoraButton()" in js
+    assert "function clearLoraRowSelection(row)" in js
     assert "function clearPreservedHiddenIncompatibleRows()" in js
     assert "function disableIncompatibleLoraRows()" in js
     assert "function updateLoraSubmitSkipHint()" in js
     assert "const familyChip = row.querySelector('.lora-row-family-chip');" in js
     assert "const preservedChip = row.querySelector('.lora-row-preserved-chip');" in js
+    assert "const clearPreservedBtn = row.querySelector('.lora-row-clear-preserved');" in js
     assert "const applyFamilyChip = (family) => {" in js
     assert "const applyPreservedChip = (show, family) => {" in js
+    assert "const applyClearPreservedButton = (show, family) => {" in js
     assert "'lora-row-compat-badge'" in js
     assert 'class="lora-row-family-chip"' in js
     assert 'class="lora-row-preserved-chip"' in js
+    assert 'class="lora-row-clear-preserved btn btn-ghost btn-xs"' in js
     assert "preservedChip.textContent = 'Preserved';" in js
     assert "mismatch is preserved while incompatible options are hidden." in js
+    assert "Clear preserved ${label} mismatch from this row." in js
     assert "badge.className = 'lora-row-compat-badge is-mismatch';" in js
     assert "'\u26a0 Not Flux'" in js
     assert "'\u26a0 Flux LoRA'" in js
@@ -1779,9 +1784,12 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert "updateLoraClearPreservedButton();" in js
     assert "updateLoraSubmitSkipHint();" in js
     assert "updateLoraHideIncompatibleStatus();" in js
+    assert "clearLoraRowSelection(row);" in js
+    assert "Cleared preserved mismatch from LoRA ${id}." in js
     assert "collectLoraStack();" in js
     assert ".lora-row-family-chip" in css
     assert ".lora-row-preserved-chip" in css
+    assert ".lora-row-clear-preserved" in css
     assert ".lora-row-family-chip.is-flux" in css
     assert ".lora-row-family-chip.is-sdxl" in css
     assert ".lora-row-family-chip.is-sd15" in css
