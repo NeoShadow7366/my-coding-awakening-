@@ -3138,13 +3138,16 @@ function updateLoraHideIncompatibleStatus() {
 		loraHideIncompatibleStatus.textContent = '';
 		return;
 	}
+	const baseFamilyLabel = baseFamily === 'flux'
+		? 'FLUX'
+		: (baseFamily === 'sdxl' ? 'SDXL' : (baseFamily === 'sd15' ? 'SD1.5' : baseFamily.toUpperCase()));
 	const hiddenCount = (_loraModelsCache || []).filter((name) => {
 		const fam = inferCheckpointFamily(name);
 		return Boolean(fam && fam !== baseFamily);
 	}).length;
 	loraHideIncompatibleStatus.textContent = hiddenCount > 0
-		? `Hiding ${hiddenCount} incompatible option${hiddenCount === 1 ? '' : 's'}.`
-		: 'No incompatible options to hide.';
+		? `Hiding ${hiddenCount} incompatible option${hiddenCount === 1 ? '' : 's'} for ${baseFamilyLabel}.`
+		: `No incompatible options to hide for ${baseFamilyLabel}.`;
 	loraHideIncompatibleStatus.hidden = false;
 }
 
