@@ -1697,6 +1697,8 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert "function getFilteredLoraModels(baseFamily)" in js
     assert "function getPreservedHiddenIncompatibleSelectionCount()" in js
     assert "function getPreservedHiddenIncompatibleRows()" in js
+    assert ".filter((row) => !row.classList.contains('lora-disabled'))" in js
+    assert "if (row.classList.contains('lora-disabled')) return false;" in js
     assert "function updateLoraHideIncompatibleStatus()" in js
     assert "function updateLoraClearPreservedButton()" in js
     assert "function updateLoraCompatUiResetButtonState()" in js
@@ -1766,6 +1768,8 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert "const applyFamilyChip = (family) => {" in js
     assert "const applyPreservedChip = (show, family) => {" in js
     assert "const applyClearPreservedButton = (show, family) => {" in js
+    assert "const rowEnabled = !row.classList.contains('lora-disabled');" in js
+    assert "const preservedMismatch = Boolean(rowEnabled && loraHideIncompatibleOptions" in js
     assert "'lora-row-compat-badge'" in js
     assert 'class="lora-row-family-chip"' in js
     assert 'class="lora-row-preserved-chip"' in js
@@ -1780,12 +1784,14 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert "'\u26a0 Flux LoRA'" in js
     assert "'\u26a0 SDXL\u2192SD1.5'" in js
     assert "'\u26a0 SD1.5\u2192SDXL'" in js
-    assert "updateLoraRowCompatBadge(row);" in js
     assert "updateAllLoraRowCompatBadges();" in js
     assert "updateDisableIncompatibleLoraButton();" in js
     assert "updateLoraClearPreservedButton();" in js
     assert "updateLoraSubmitSkipHint();" in js
     assert "updateLoraHideIncompatibleStatus();" in js
+    assert "enableBtn.addEventListener('click', () => {" in js
+    assert "sel.addEventListener('change', async () => {" in js
+    assert "removeBtn.addEventListener('click', () => {" in js
     assert "clearLoraRowSelection(row);" in js
     assert "Cleared preserved mismatch from LoRA ${id}." in js
     assert "collectLoraStack();" in js

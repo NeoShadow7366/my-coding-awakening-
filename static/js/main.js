@@ -3131,12 +3131,16 @@ function getPreservedHiddenIncompatibleSelectionCount() {
 	if (!loraStackContainer || !loraHideIncompatibleOptions) return 0;
 	const baseFamily = getActiveLoraCompatibilityFamily();
 	if (!baseFamily) return 0;
-	return [...loraStackContainer.querySelectorAll('.lora-row-select')].filter((sel) => {
+	return [...loraStackContainer.querySelectorAll('.lora-row')]
+		.filter((row) => !row.classList.contains('lora-disabled'))
+		.map((row) => row.querySelector('.lora-row-select'))
+		.filter((sel) => !!sel)
+		.filter((sel) => {
 		const currentValue = sel.value;
 		if (!currentValue) return false;
 		const currentFamily = inferCheckpointFamily(currentValue);
 		return Boolean(currentFamily && currentFamily !== baseFamily);
-	}).length;
+		}).length;
 }
 
 function getPreservedHiddenIncompatibleRows() {
@@ -3144,6 +3148,7 @@ function getPreservedHiddenIncompatibleRows() {
 	const baseFamily = getActiveLoraCompatibilityFamily();
 	if (!baseFamily) return [];
 	return [...loraStackContainer.querySelectorAll('.lora-row')].filter((row) => {
+		if (row.classList.contains('lora-disabled')) return false;
 		const sel = row.querySelector('.lora-row-select');
 		const currentValue = sel?.value || '';
 		if (!currentValue) return false;
@@ -3416,7 +3421,8 @@ function updateLoraRowCompatBadge(row) {
 	const loraFamily = inferCheckpointFamily(loraName);
 	applyFamilyChip(loraFamily || 'unknown');
 	const activeFamily = getActiveLoraCompatibilityFamily();
-	const preservedMismatch = Boolean(loraHideIncompatibleOptions && loraFamily && activeFamily && loraFamily !== activeFamily);
+	const rowEnabled = !row.classList.contains('lora-disabled');
+	const preservedMismatch = Boolean(rowEnabled && loraHideIncompatibleOptions && loraFamily && activeFamily && loraFamily !== activeFamily);
 	applyPreservedChip(preservedMismatch, loraFamily || '');
 	applyClearPreservedButton(preservedMismatch, loraFamily || '');
 	if (!loraFamily || !activeFamily || loraFamily === activeFamily) {
@@ -3593,9 +3599,7 @@ function addLoraRow() {
 		enableBtn.setAttribute('aria-pressed', String(enabled));
 		enableBtn.textContent = enabled ? 'On' : 'Off';
 		updateModelStackBadges();
-		updateLoraStackMismatchSummary();
-		updateDisableIncompatibleLoraButton();
-		updateLoraSubmitSkipHint();
+		updateAllLoraRowCompatBadges();
 	});
 
 	collapseBtn.addEventListener('click', () => {
@@ -3617,7 +3621,7 @@ function addLoraRow() {
 
 	sel.addEventListener('change', async () => {
 		updateModelStackBadges();
-		updateLoraRowCompatBadge(row);
+		updateAllLoraRowCompatBadges();
 		tagCloud.hidden = true;
 		tagHint.hidden = true;
 		tagCloud.innerHTML = '';
@@ -3654,9 +3658,7 @@ function addLoraRow() {
 	removeBtn.addEventListener('click', () => {
 		row.remove();
 		updateModelStackBadges();
-		updateLoraStackMismatchSummary();
-		updateDisableIncompatibleLoraButton();
-		updateLoraSubmitSkipHint();
+		updateAllLoraRowCompatBadges();
 	});
 
 	loraStackContainer.appendChild(row);
@@ -3667,8 +3669,7 @@ function addLoraRow() {
 		if (_strInput && _isFlux) _strInput.max = '1';
 	}
 	updateModelStackBadges();
-	updateDisableIncompatibleLoraButton();
-	updateLoraSubmitSkipHint();
+	updateAllLoraRowCompatBadges();
 }
 
 if (loraAddBtn) {
