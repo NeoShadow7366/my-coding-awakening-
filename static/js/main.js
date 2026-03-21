@@ -1338,7 +1338,9 @@ if (loraFamilyLegend) {
 }
 
 if (loraDisplayOptions) {
-	loraDisplayOptions.open = localStorage.getItem(LORA_DISPLAY_OPTIONS_EXPANDED_KEY) === '1';
+	const persistedDisplayOpenState = localStorage.getItem(LORA_DISPLAY_OPTIONS_EXPANDED_KEY);
+	const hasActiveDisplayPrefs = !loraShowRowHints || loraCompactPreservedIndicators || loraCompactRowClearButtons || loraCompactMismatchBadges;
+	loraDisplayOptions.open = persistedDisplayOpenState === '1' || (persistedDisplayOpenState !== '0' && hasActiveDisplayPrefs);
 	loraDisplayOptions.addEventListener('toggle', () => {
 		localStorage.setItem(LORA_DISPLAY_OPTIONS_EXPANDED_KEY, loraDisplayOptions.open ? '1' : '0');
 		updateLoraCompatUiResetButtonState();
@@ -3233,6 +3235,7 @@ function updateLoraDisplayOptionsSummary() {
 	const activeCount = Number(!loraShowRowHints) + Number(loraCompactPreservedIndicators) + Number(loraCompactRowClearButtons) + Number(loraCompactMismatchBadges);
 	loraDisplayOptionsToggle.textContent = activeCount > 0 ? `Display options (${activeCount} active)` : 'Display options';
 	loraDisplayOptionsToggle.dataset.active = activeCount > 0 ? '1' : '0';
+	loraDisplayOptionsToggle.setAttribute('aria-label', activeCount > 0 ? `Display options, ${activeCount} active` : 'Display options, defaults active');
 	loraDisplayOptionsToggle.title = activeCount > 0
 		? `${activeCount} non-default LoRA display option${activeCount === 1 ? '' : 's'} enabled.`
 		: 'All LoRA display options are using defaults.';

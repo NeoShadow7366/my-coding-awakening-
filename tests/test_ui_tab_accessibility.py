@@ -1709,7 +1709,9 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert "loraFamilyLegend.open = localStorage.getItem(LORA_FAMILY_LEGEND_EXPANDED_KEY) === '1';" in js
     assert "loraFamilyLegend.addEventListener('toggle', () => {" in js
     assert "localStorage.setItem(LORA_FAMILY_LEGEND_EXPANDED_KEY, loraFamilyLegend.open ? '1' : '0');" in js
-    assert "loraDisplayOptions.open = localStorage.getItem(LORA_DISPLAY_OPTIONS_EXPANDED_KEY) === '1';" in js
+    assert "const persistedDisplayOpenState = localStorage.getItem(LORA_DISPLAY_OPTIONS_EXPANDED_KEY);" in js
+    assert "const hasActiveDisplayPrefs = !loraShowRowHints || loraCompactPreservedIndicators || loraCompactRowClearButtons || loraCompactMismatchBadges;" in js
+    assert "loraDisplayOptions.open = persistedDisplayOpenState === '1' || (persistedDisplayOpenState !== '0' && hasActiveDisplayPrefs);" in js
     assert "loraDisplayOptions.addEventListener('toggle', () => {" in js
     assert "localStorage.setItem(LORA_DISPLAY_OPTIONS_EXPANDED_KEY, loraDisplayOptions.open ? '1' : '0');" in js
     assert "function getFilteredLoraModels(baseFamily)" in js
@@ -1737,6 +1739,7 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert "loraClearPreservedBtn.setAttribute('aria-label', loraClearPreservedBtn.title);" in js
     assert "loraDisplayOptionsToggle.textContent = activeCount > 0 ? `Display options (${activeCount} active)` : 'Display options';" in js
     assert "loraDisplayOptionsToggle.dataset.active = activeCount > 0 ? '1' : '0';" in js
+    assert "loraDisplayOptionsToggle.setAttribute('aria-label', activeCount > 0 ? `Display options, ${activeCount} active` : 'Display options, defaults active');" in js
     assert "non-default LoRA display option" in js
     assert "All LoRA display options are using defaults." in js
     assert "loraHideIncompatibleToggle.checked = loraHideIncompatibleOptions;" in js
