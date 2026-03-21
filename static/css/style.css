@@ -452,6 +452,26 @@ textarea {
   margin-bottom: 0.3rem;
 }
 
+.lora-compat-mode-hint.is-manual {
+  font-weight: 600;
+}
+
+.lora-compat-mode-hint.is-detected {
+  opacity: 0.82;
+}
+
+.lora-compat-mode-hint.is-generic {
+  font-style: italic;
+}
+
+.lora-compat-mode-hint.is-flux {
+  color: color-mix(in srgb, var(--clr-text) 84%, #ff934d);
+}
+
+.lora-compat-mode-hint.is-sd {
+  color: var(--clr-text-muted);
+}
+
 .model-stack-panel {
   border: none;
   border-radius: 0;
