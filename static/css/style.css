@@ -472,6 +472,19 @@ textarea {
   color: var(--clr-text-muted);
 }
 
+.lora-compat-mode-hint.detail-sdxl {
+  text-decoration: underline dotted;
+  text-underline-offset: 0.14rem;
+}
+
+.lora-compat-mode-hint.detail-sd15 {
+  letter-spacing: 0.015em;
+}
+
+.lora-compat-mode-hint.detail-unknown {
+  opacity: 0.62;
+}
+
 .model-stack-panel {
   border: none;
   border-radius: 0;

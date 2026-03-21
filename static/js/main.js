@@ -3141,13 +3141,14 @@ function updateLoraCompatibilityModeHint() {
 	if (!loraCompatModeHint) return;
 	const selectedModel = imageModelSelect?.value || '';
 	const requestedMode = imageModelFamilySelect?.value || imageModelFamilyMode || 'auto';
-	loraCompatModeHint.classList.remove('is-manual', 'is-detected', 'is-generic', 'is-flux', 'is-sd');
+	loraCompatModeHint.classList.remove('is-manual', 'is-detected', 'is-generic', 'is-flux', 'is-sd', 'detail-flux', 'detail-sd', 'detail-sdxl', 'detail-sd15', 'detail-unknown');
 	loraCompatModeHint.dataset.source = '';
 	loraCompatModeHint.dataset.family = '';
 	loraCompatModeHint.dataset.familyDetail = '';
 	const setHint = (text, classNames, source, family, familyDetail) => {
 		loraCompatModeHint.textContent = text;
 		classNames.forEach((className) => loraCompatModeHint.classList.add(className));
+		loraCompatModeHint.classList.add(`detail-${familyDetail}`);
 		loraCompatModeHint.title = text;
 		loraCompatModeHint.setAttribute('aria-label', text);
 		loraCompatModeHint.dataset.source = source;

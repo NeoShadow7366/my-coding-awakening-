@@ -1645,7 +1645,8 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert "LoRA grouping source: manual Flux mode." in js
     assert "LoRA grouping source: manual SD mode." in js
     assert "LoRA grouping source: generic list (family unknown)." in js
-    assert "loraCompatModeHint.classList.remove('is-manual', 'is-detected', 'is-generic', 'is-flux', 'is-sd');" in js
+    assert "loraCompatModeHint.classList.remove('is-manual', 'is-detected', 'is-generic', 'is-flux', 'is-sd', 'detail-flux', 'detail-sd', 'detail-sdxl', 'detail-sd15', 'detail-unknown');" in js
+    assert "loraCompatModeHint.classList.add(`detail-${familyDetail}`);" in js
     assert "loraCompatModeHint.setAttribute('aria-label', text);" in js
     assert "loraCompatModeHint.title = text;" in js
     assert "loraCompatModeHint.dataset.source = source;" in js
@@ -1686,6 +1687,9 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert ".lora-compat-mode-hint.is-generic" in css
     assert ".lora-compat-mode-hint.is-flux" in css
     assert ".lora-compat-mode-hint.is-sd" in css
+    assert ".lora-compat-mode-hint.detail-sdxl" in css
+    assert ".lora-compat-mode-hint.detail-sd15" in css
+    assert ".lora-compat-mode-hint.detail-unknown" in css
     assert "--clr-caution" in css
 
 
