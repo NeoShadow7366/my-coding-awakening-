@@ -231,26 +231,31 @@
           <input id="lora-hide-incompatible-toggle" type="checkbox" />
           Hide incompatible options
         </label>
-        <label class="hint lora-show-row-hints-toggle" for="lora-show-row-hints-toggle">
-          <input id="lora-show-row-hints-toggle" type="checkbox" />
-          Show row hints
-        </label>
-        <label class="hint lora-compact-preserved-toggle" for="lora-compact-preserved-toggle">
-          <input id="lora-compact-preserved-toggle" type="checkbox" />
-          Compact preserved indicators
-        </label>
-        <label class="hint lora-compact-row-clear-toggle" for="lora-compact-row-clear-toggle">
-          <input id="lora-compact-row-clear-toggle" type="checkbox" />
-          Compact row clear buttons
-        </label>
-        <label class="hint lora-compact-mismatch-toggle" for="lora-compact-mismatch-toggle">
-          <input id="lora-compact-mismatch-toggle" type="checkbox" />
-          Compact mismatch badges
-        </label>
         <span id="lora-hide-incompatible-status" class="hint lora-hide-incompatible-status" hidden aria-live="polite"></span>
         <button class="btn btn-ghost btn-xs" id="lora-clear-preserved-btn" type="button" hidden>Clear preserved</button>
         <button class="btn btn-ghost btn-xs" id="lora-compat-ui-reset" type="button">Reset LoRA UI</button>
       </div>
+      <details id="lora-display-options" class="lora-display-options">
+        <summary id="lora-display-options-toggle">Display options</summary>
+        <div class="lora-display-options-grid">
+          <label class="hint lora-show-row-hints-toggle" for="lora-show-row-hints-toggle">
+            <input id="lora-show-row-hints-toggle" type="checkbox" />
+            Show row hints
+          </label>
+          <label class="hint lora-compact-preserved-toggle" for="lora-compact-preserved-toggle">
+            <input id="lora-compact-preserved-toggle" type="checkbox" />
+            Compact preserved indicators
+          </label>
+          <label class="hint lora-compact-row-clear-toggle" for="lora-compact-row-clear-toggle">
+            <input id="lora-compact-row-clear-toggle" type="checkbox" />
+            Compact row clear buttons
+          </label>
+          <label class="hint lora-compact-mismatch-toggle" for="lora-compact-mismatch-toggle">
+            <input id="lora-compact-mismatch-toggle" type="checkbox" />
+            Compact mismatch badges
+          </label>
+        </div>
+      </details>
       <details id="lora-family-legend" class="lora-family-legend">
         <summary id="lora-family-legend-toggle">Family legend</summary>
         <p class="hint">Chip labels indicate inferred LoRA family (Flux, SDXL, SD1.5, Unknown). Amber mismatch badges mean the selected LoRA family does not match the active checkpoint family and may be skipped on submit.</p>

@@ -156,6 +156,7 @@ const loraCompactMismatchToggle = document.getElementById('lora-compact-mismatch
 const loraHideIncompatibleStatus = document.getElementById('lora-hide-incompatible-status');
 const loraClearPreservedBtn = document.getElementById('lora-clear-preserved-btn');
 const loraCompatUiResetBtn = document.getElementById('lora-compat-ui-reset');
+const loraDisplayOptions = document.getElementById('lora-display-options');
 const loraFamilyLegend = document.getElementById('lora-family-legend');
 const loraMismatchSummary = document.getElementById('lora-mismatch-summary');
 const loraDisableIncompatibleBtn = document.getElementById('lora-disable-incompatible-btn');
@@ -498,6 +499,7 @@ const IMAGE_SCHEDULER_FILTER_QUERY_KEY = 'imageSchedulerFilterQueryV1';
 const IMAGE_FLUX_AUTO_APPLY_RECOMMENDATION_KEY = 'imageFluxAutoApplyRecommendationV1';
 const IMAGE_FLUX_LOCK_RECOMMENDATION_KEY = 'imageFluxLockRecommendationV1';
 const LORA_FAMILY_LEGEND_EXPANDED_KEY = 'loraFamilyLegendExpandedV1';
+const LORA_DISPLAY_OPTIONS_EXPANDED_KEY = 'loraDisplayOptionsExpandedV1';
 const LORA_HIDE_INCOMPATIBLE_OPTIONS_KEY = 'loraHideIncompatibleOptionsV1';
 const LORA_SHOW_ROW_HINTS_KEY = 'loraShowRowHintsV1';
 const LORA_COMPACT_PRESERVED_KEY = 'loraCompactPreservedV1';
@@ -1330,6 +1332,14 @@ if (loraFamilyLegend) {
 	loraFamilyLegend.open = localStorage.getItem(LORA_FAMILY_LEGEND_EXPANDED_KEY) === '1';
 	loraFamilyLegend.addEventListener('toggle', () => {
 		localStorage.setItem(LORA_FAMILY_LEGEND_EXPANDED_KEY, loraFamilyLegend.open ? '1' : '0');
+		updateLoraCompatUiResetButtonState();
+	});
+}
+
+if (loraDisplayOptions) {
+	loraDisplayOptions.open = localStorage.getItem(LORA_DISPLAY_OPTIONS_EXPANDED_KEY) === '1';
+	loraDisplayOptions.addEventListener('toggle', () => {
+		localStorage.setItem(LORA_DISPLAY_OPTIONS_EXPANDED_KEY, loraDisplayOptions.open ? '1' : '0');
 		updateLoraCompatUiResetButtonState();
 	});
 }
@@ -3219,7 +3229,7 @@ function updateLoraClearPreservedButton() {
 
 function updateLoraCompatUiResetButtonState() {
 	if (!loraCompatUiResetBtn) return;
-	const hasCustomPrefs = Boolean(loraHideIncompatibleOptions || loraFamilyLegend?.open || !loraShowRowHints || loraCompactPreservedIndicators || loraCompactRowClearButtons || loraCompactMismatchBadges);
+	const hasCustomPrefs = Boolean(loraHideIncompatibleOptions || loraFamilyLegend?.open || loraDisplayOptions?.open || !loraShowRowHints || loraCompactPreservedIndicators || loraCompactRowClearButtons || loraCompactMismatchBadges);
 	loraCompatUiResetBtn.disabled = !hasCustomPrefs;
 	loraCompatUiResetBtn.title = hasCustomPrefs
 		? 'Reset LoRA compatibility UI preferences to defaults.'
@@ -3255,7 +3265,11 @@ function resetLoraCompatibilityUiPrefs() {
 	if (loraFamilyLegend) {
 		loraFamilyLegend.open = false;
 	}
+	if (loraDisplayOptions) {
+		loraDisplayOptions.open = false;
+	}
 	localStorage.removeItem(LORA_FAMILY_LEGEND_EXPANDED_KEY);
+	localStorage.removeItem(LORA_DISPLAY_OPTIONS_EXPANDED_KEY);
 	refreshLoraOptionsForCurrentFamily();
 	updateLoraCompatUiResetButtonState();
 	showToast('LoRA compatibility UI preferences reset.', 'pos');

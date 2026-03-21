@@ -1585,6 +1585,29 @@ textarea {
   text-align: right;
 }
 
+.lora-display-options {
+  margin: 0.15rem 0 0.4rem;
+}
+
+.lora-display-options > summary {
+  cursor: pointer;
+  font-size: 0.72rem;
+  color: var(--clr-text-muted);
+  user-select: none;
+}
+
+.lora-display-options[open] > summary {
+  color: var(--clr-text);
+}
+
+.lora-display-options-grid {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-xs);
+  margin-top: 0.15rem;
+}
+
 .lora-stack-container {
   display: flex;
   flex-direction: column;

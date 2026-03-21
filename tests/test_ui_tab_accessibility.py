@@ -1653,6 +1653,7 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert "const loraHideIncompatibleStatus = document.getElementById('lora-hide-incompatible-status');" in js
     assert "const loraClearPreservedBtn = document.getElementById('lora-clear-preserved-btn');" in js
     assert "const loraCompatUiResetBtn = document.getElementById('lora-compat-ui-reset');" in js
+    assert "const loraDisplayOptions = document.getElementById('lora-display-options');" in js
     assert "const loraFamilyLegend = document.getElementById('lora-family-legend');" in js
     assert "function resolveLoraCompatibilityHintState(selectedModel, requestedMode)" in js
     assert "function updateLoraCompatibilityModeHint()" in js
@@ -1693,6 +1694,7 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert "incompatible LoRA" in js
     assert "Skipped ${filteredLoraCount} incompatible LoRA" in js
     assert "const LORA_FAMILY_LEGEND_EXPANDED_KEY = 'loraFamilyLegendExpandedV1';" in js
+    assert "const LORA_DISPLAY_OPTIONS_EXPANDED_KEY = 'loraDisplayOptionsExpandedV1';" in js
     assert "const LORA_HIDE_INCOMPATIBLE_OPTIONS_KEY = 'loraHideIncompatibleOptionsV1';" in js
     assert "const LORA_SHOW_ROW_HINTS_KEY = 'loraShowRowHintsV1';" in js
     assert "const LORA_COMPACT_PRESERVED_KEY = 'loraCompactPreservedV1';" in js
@@ -1706,6 +1708,9 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert "loraFamilyLegend.open = localStorage.getItem(LORA_FAMILY_LEGEND_EXPANDED_KEY) === '1';" in js
     assert "loraFamilyLegend.addEventListener('toggle', () => {" in js
     assert "localStorage.setItem(LORA_FAMILY_LEGEND_EXPANDED_KEY, loraFamilyLegend.open ? '1' : '0');" in js
+    assert "loraDisplayOptions.open = localStorage.getItem(LORA_DISPLAY_OPTIONS_EXPANDED_KEY) === '1';" in js
+    assert "loraDisplayOptions.addEventListener('toggle', () => {" in js
+    assert "localStorage.setItem(LORA_DISPLAY_OPTIONS_EXPANDED_KEY, loraDisplayOptions.open ? '1' : '0');" in js
     assert "function getFilteredLoraModels(baseFamily)" in js
     assert "function getPreservedHiddenIncompatibleSelectionCount()" in js
     assert "function getPreservedHiddenIncompatibleRows()" in js
@@ -1744,6 +1749,7 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert "localStorage.setItem(LORA_COMPACT_MISMATCH_KEY, '1');" in js
     assert "localStorage.removeItem(LORA_COMPACT_MISMATCH_KEY);" in js
     assert "localStorage.removeItem(LORA_FAMILY_LEGEND_EXPANDED_KEY);" in js
+    assert "localStorage.removeItem(LORA_DISPLAY_OPTIONS_EXPANDED_KEY);" in js
     assert "loraCompatUiResetBtn.disabled = !hasCustomPrefs;" in js
     assert "updateLoraCompatUiResetButtonState();" in js
     assert "showToast('LoRA compatibility UI preferences reset.', 'pos');" in js
@@ -1758,6 +1764,10 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert 'id="lora-compact-preserved-toggle"' in tpl
     assert 'id="lora-compact-row-clear-toggle"' in tpl
     assert 'id="lora-compact-mismatch-toggle"' in tpl
+    assert 'id="lora-display-options" class="lora-display-options"' in tpl
+    assert 'id="lora-display-options-toggle"' in tpl
+    assert 'Display options' in tpl
+    assert 'class="lora-display-options-grid"' in tpl
     assert 'id="lora-hide-incompatible-status"' in tpl
     assert 'Hide incompatible options' in tpl
     assert 'Show row hints' in tpl
@@ -1847,6 +1857,9 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert ".lora-compact-preserved-toggle" in css
     assert ".lora-compact-row-clear-toggle" in css
     assert ".lora-compact-mismatch-toggle" in css
+    assert ".lora-display-options" in css
+    assert ".lora-display-options > summary" in css
+    assert ".lora-display-options-grid" in css
     assert ".lora-hide-incompatible-status" in css
     assert ".lora-family-legend > summary" in css
     assert ".lora-row-compat-badge" in css
