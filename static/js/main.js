@@ -151,6 +151,7 @@ const loraCompatModeHint = document.getElementById('lora-compat-mode-hint');
 const loraHideIncompatibleToggle = document.getElementById('lora-hide-incompatible-toggle');
 const loraShowRowHintsToggle = document.getElementById('lora-show-row-hints-toggle');
 const loraCompactPreservedToggle = document.getElementById('lora-compact-preserved-toggle');
+const loraCompactRowClearToggle = document.getElementById('lora-compact-row-clear-toggle');
 const loraHideIncompatibleStatus = document.getElementById('lora-hide-incompatible-status');
 const loraClearPreservedBtn = document.getElementById('lora-clear-preserved-btn');
 const loraCompatUiResetBtn = document.getElementById('lora-compat-ui-reset');
@@ -499,6 +500,7 @@ const LORA_FAMILY_LEGEND_EXPANDED_KEY = 'loraFamilyLegendExpandedV1';
 const LORA_HIDE_INCOMPATIBLE_OPTIONS_KEY = 'loraHideIncompatibleOptionsV1';
 const LORA_SHOW_ROW_HINTS_KEY = 'loraShowRowHintsV1';
 const LORA_COMPACT_PRESERVED_KEY = 'loraCompactPreservedV1';
+const LORA_COMPACT_ROW_CLEAR_KEY = 'loraCompactRowClearV1';
 const CONFIG_COMFY_NODES_INCLUDE_BUILTINS_KEY = 'configComfyNodesIncludeBuiltinsV1';
 const CONFIG_COMFY_DISABLE_PREVIEW_FILTER_KEY = 'configComfyDisablePreviewFilterV1';
 const CONFIG_COMFY_DISABLE_PREVIEW_SELECTED_ONLY_KEY = 'configComfyDisablePreviewSelectedOnlyV1';
@@ -531,6 +533,7 @@ if (!['auto', 'sd', 'flux'].includes(imageModelFamilyMode)) {
 let loraHideIncompatibleOptions = localStorage.getItem(LORA_HIDE_INCOMPATIBLE_OPTIONS_KEY) === '1';
 let loraShowRowHints = localStorage.getItem(LORA_SHOW_ROW_HINTS_KEY) !== '0';
 let loraCompactPreservedIndicators = localStorage.getItem(LORA_COMPACT_PRESERVED_KEY) === '1';
+let loraCompactRowClearButtons = localStorage.getItem(LORA_COMPACT_ROW_CLEAR_KEY) === '1';
 let imageFluxAutoApplyRecommendation = localStorage.getItem(IMAGE_FLUX_AUTO_APPLY_RECOMMENDATION_KEY) === '1';
 let imageFluxLockRecommendation = localStorage.getItem(IMAGE_FLUX_LOCK_RECOMMENDATION_KEY) === '1';
 let imageFluxLockBypassOnce = false;
@@ -3213,7 +3216,7 @@ function updateLoraClearPreservedButton() {
 
 function updateLoraCompatUiResetButtonState() {
 	if (!loraCompatUiResetBtn) return;
-	const hasCustomPrefs = Boolean(loraHideIncompatibleOptions || loraFamilyLegend?.open || !loraShowRowHints || loraCompactPreservedIndicators);
+	const hasCustomPrefs = Boolean(loraHideIncompatibleOptions || loraFamilyLegend?.open || !loraShowRowHints || loraCompactPreservedIndicators || loraCompactRowClearButtons);
 	loraCompatUiResetBtn.disabled = !hasCustomPrefs;
 	loraCompatUiResetBtn.title = hasCustomPrefs
 		? 'Reset LoRA compatibility UI preferences to defaults.'
@@ -3224,9 +3227,11 @@ function resetLoraCompatibilityUiPrefs() {
 	loraHideIncompatibleOptions = false;
 	loraShowRowHints = true;
 	loraCompactPreservedIndicators = false;
+	loraCompactRowClearButtons = false;
 	localStorage.removeItem(LORA_HIDE_INCOMPATIBLE_OPTIONS_KEY);
 	localStorage.removeItem(LORA_SHOW_ROW_HINTS_KEY);
 	localStorage.removeItem(LORA_COMPACT_PRESERVED_KEY);
+	localStorage.removeItem(LORA_COMPACT_ROW_CLEAR_KEY);
 	if (loraHideIncompatibleToggle) {
 		loraHideIncompatibleToggle.checked = false;
 	}
@@ -3235,6 +3240,9 @@ function resetLoraCompatibilityUiPrefs() {
 	}
 	if (loraCompactPreservedToggle) {
 		loraCompactPreservedToggle.checked = false;
+	}
+	if (loraCompactRowClearToggle) {
+		loraCompactRowClearToggle.checked = false;
 	}
 	if (loraFamilyLegend) {
 		loraFamilyLegend.open = false;
@@ -3435,7 +3443,7 @@ function updateLoraRowCompatBadge(row) {
 			? 'FLUX'
 			: (family === 'sdxl' ? 'SDXL' : (family === 'sd15' ? 'SD1.5' : family.toUpperCase()));
 		clearPreservedBtn.hidden = false;
-		clearPreservedBtn.textContent = `Clear ${label}`;
+		clearPreservedBtn.textContent = loraCompactRowClearButtons ? 'Clear' : `Clear ${label}`;
 		clearPreservedBtn.title = `Clear preserved ${label} mismatch from this row.`;
 		clearPreservedBtn.setAttribute('aria-label', clearPreservedBtn.title);
 	};
@@ -3741,6 +3749,20 @@ if (loraCompactPreservedToggle) {
 			localStorage.setItem(LORA_COMPACT_PRESERVED_KEY, '1');
 		} else {
 			localStorage.removeItem(LORA_COMPACT_PRESERVED_KEY);
+		}
+		updateAllLoraRowCompatBadges();
+		updateLoraCompatUiResetButtonState();
+	});
+}
+
+if (loraCompactRowClearToggle) {
+	loraCompactRowClearToggle.checked = loraCompactRowClearButtons;
+	loraCompactRowClearToggle.addEventListener('change', () => {
+		loraCompactRowClearButtons = loraCompactRowClearToggle.checked;
+		if (loraCompactRowClearButtons) {
+			localStorage.setItem(LORA_COMPACT_ROW_CLEAR_KEY, '1');
+		} else {
+			localStorage.removeItem(LORA_COMPACT_ROW_CLEAR_KEY);
 		}
 		updateAllLoraRowCompatBadges();
 		updateLoraCompatUiResetButtonState();
