@@ -148,6 +148,7 @@ const loraAddBtn = document.getElementById('lora-add-btn');
 const loraStackContainer = document.getElementById('lora-stack-container');
 const loraFluxHint = document.getElementById('lora-flux-hint');
 const loraCompatModeHint = document.getElementById('lora-compat-mode-hint');
+const loraMismatchSummary = document.getElementById('lora-mismatch-summary');
 // NOTE: loraModelSelect / loraStrength / loraStrengthVal replaced by multi-LoRA stack
 const controlnetModelSelect = document.getElementById('controlnet-model-select');
 const controlnetPreprocessorSelect = document.getElementById('controlnet-preprocessor-select');
@@ -1902,6 +1903,7 @@ function applyImageSettings(settings) {
 	syncImageControlLabels();
 	updateModelStackBadges();
 	updateModelStackCompatibilityHint();
+	updateAllLoraRowCompatBadges();
 }
 
 function renderImageProfileSelect(preferredName = '') {
@@ -3210,6 +3212,21 @@ function updateLoraRowCompatBadge(row) {
 function updateAllLoraRowCompatBadges() {
 	if (!loraStackContainer) return;
 	loraStackContainer.querySelectorAll('.lora-row').forEach(updateLoraRowCompatBadge);
+	updateLoraStackMismatchSummary();
+}
+
+function updateLoraStackMismatchSummary() {
+	if (!loraMismatchSummary || !loraStackContainer) return;
+	const count = loraStackContainer.querySelectorAll('.lora-row-compat-badge.is-mismatch:not([hidden])').length;
+	if (count === 0) {
+		loraMismatchSummary.hidden = true;
+		loraMismatchSummary.textContent = '';
+		return;
+	}
+	loraMismatchSummary.textContent = `${count} mismatch${count === 1 ? '' : 'es'}`;
+	loraMismatchSummary.title = `${count} LoRA${count === 1 ? '' : 's'} may be incompatible with the active checkpoint family.`;
+	loraMismatchSummary.setAttribute('aria-label', loraMismatchSummary.title);
+	loraMismatchSummary.hidden = false;
 }
 
 function addLoraRow() {

@@ -1706,6 +1706,17 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert "updateAllLoraRowCompatBadges();" in js
     assert ".lora-row-compat-badge" in css
     assert ".lora-row-compat-badge.is-mismatch" in css
+    # mismatch summary at stack header
+    assert "const loraMismatchSummary = document.getElementById('lora-mismatch-summary');" in js
+    assert "function updateLoraStackMismatchSummary()" in js
+    assert "updateLoraStackMismatchSummary();" in js
+    assert "loraMismatchSummary.hidden = true;" in js
+    assert "loraMismatchSummary.hidden = false;" in js
+    assert ".lora-row-compat-badge.is-mismatch:not([hidden])" in js
+    assert "mismatch${count === 1 ? '' : 'es'}" in js
+    assert "updateAllLoraRowCompatBadges();" in js
+    assert 'id="lora-mismatch-summary"' in tpl
+    assert ".lora-mismatch-summary" in css
 
 
 def test_profile_export_import_markup_and_wiring_present():
