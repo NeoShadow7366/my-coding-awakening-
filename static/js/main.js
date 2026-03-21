@@ -149,6 +149,7 @@ const loraStackContainer = document.getElementById('lora-stack-container');
 const loraFluxHint = document.getElementById('lora-flux-hint');
 const loraCompatModeHint = document.getElementById('lora-compat-mode-hint');
 const loraMismatchSummary = document.getElementById('lora-mismatch-summary');
+const loraDisableIncompatibleBtn = document.getElementById('lora-disable-incompatible-btn');
 // NOTE: loraModelSelect / loraStrength / loraStrengthVal replaced by multi-LoRA stack
 const controlnetModelSelect = document.getElementById('controlnet-model-select');
 const controlnetPreprocessorSelect = document.getElementById('controlnet-preprocessor-select');
@@ -3089,6 +3090,16 @@ function getIncompatibleEnabledLoraCount() {
 	return Math.max(0, enabledLoras.length - sanitizeLoraStackForCompatibilityFamily(enabledLoras, compatibilityFamily).length);
 }
 
+function getIncompatibleEnabledLoraRows() {
+	if (!loraStackContainer) return [];
+	return [...loraStackContainer.querySelectorAll('.lora-row')]
+		.filter((row) => !row.classList.contains('lora-disabled'))
+		.filter((row) => {
+			const badge = row.querySelector('.lora-row-compat-badge');
+			return Boolean(badge && !badge.hidden && badge.classList.contains('is-mismatch'));
+		});
+}
+
 function _buildLoraOptions() {
 	return '<option value="">None</option>' +
 		buildCompatGroupedOptions(_loraModelsCache, getActiveLoraCompatibilityFamily(), inferCheckpointFamily);
@@ -3236,6 +3247,7 @@ function updateAllLoraRowCompatBadges() {
 	if (!loraStackContainer) return;
 	loraStackContainer.querySelectorAll('.lora-row').forEach(updateLoraRowCompatBadge);
 	updateLoraStackMismatchSummary();
+	updateDisableIncompatibleLoraButton();
 	updateLoraSubmitSkipHint();
 }
 
@@ -3251,6 +3263,38 @@ function updateLoraStackMismatchSummary() {
 	loraMismatchSummary.title = `${count} LoRA${count === 1 ? '' : 's'} may be incompatible with the active checkpoint family.`;
 	loraMismatchSummary.setAttribute('aria-label', loraMismatchSummary.title);
 	loraMismatchSummary.hidden = false;
+}
+
+function updateDisableIncompatibleLoraButton() {
+	if (!loraDisableIncompatibleBtn) return;
+	const count = getIncompatibleEnabledLoraRows().length;
+	if (count === 0) {
+		loraDisableIncompatibleBtn.hidden = true;
+		loraDisableIncompatibleBtn.disabled = true;
+		loraDisableIncompatibleBtn.title = 'Disable incompatible LoRAs';
+		return;
+	}
+	loraDisableIncompatibleBtn.hidden = false;
+	loraDisableIncompatibleBtn.disabled = false;
+	loraDisableIncompatibleBtn.title = `Disable ${count} incompatible enabled LoRA${count === 1 ? '' : 's'}.`;
+}
+
+function disableIncompatibleLoraRows() {
+	const rows = getIncompatibleEnabledLoraRows();
+	if (!rows.length) return 0;
+	rows.forEach((row) => {
+		row.classList.add('lora-disabled');
+		const enableBtn = row.querySelector('.lora-row-enable');
+		if (enableBtn) {
+			enableBtn.setAttribute('aria-pressed', 'false');
+			enableBtn.textContent = 'Off';
+		}
+	});
+	updateModelStackBadges();
+	updateLoraStackMismatchSummary();
+	updateDisableIncompatibleLoraButton();
+	updateLoraSubmitSkipHint();
+	return rows.length;
 }
 
 function updateLoraSubmitSkipHint() {
@@ -3313,6 +3357,7 @@ function addLoraRow() {
 		enableBtn.textContent = enabled ? 'On' : 'Off';
 		updateModelStackBadges();
 		updateLoraStackMismatchSummary();
+		updateDisableIncompatibleLoraButton();
 		updateLoraSubmitSkipHint();
 	});
 
@@ -3364,6 +3409,7 @@ function addLoraRow() {
 		row.remove();
 		updateModelStackBadges();
 		updateLoraStackMismatchSummary();
+		updateDisableIncompatibleLoraButton();
 		updateLoraSubmitSkipHint();
 	});
 
@@ -3375,11 +3421,20 @@ function addLoraRow() {
 		if (_strInput && _isFlux) _strInput.max = '1';
 	}
 	updateModelStackBadges();
+	updateDisableIncompatibleLoraButton();
 	updateLoraSubmitSkipHint();
 }
 
 if (loraAddBtn) {
 	loraAddBtn.addEventListener('click', () => addLoraRow());
+}
+
+if (loraDisableIncompatibleBtn) {
+	loraDisableIncompatibleBtn.addEventListener('click', () => {
+		const disabledCount = disableIncompatibleLoraRows();
+		if (!disabledCount) return;
+		showToast(`Disabled ${disabledCount} incompatible LoRA${disabledCount === 1 ? '' : 's'}.`, '');
+	});
 }
 
 function collectLoraStack() {

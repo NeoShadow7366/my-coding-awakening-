@@ -1641,6 +1641,7 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert "function resolveLoraCompatibilityFamilyForModel(modelName = '')" in js
     assert "function sanitizeLoraStackForCompatibilityFamily(entries, compatibilityFamily)" in js
     assert "function getIncompatibleEnabledLoraCount()" in js
+    assert "function getIncompatibleEnabledLoraRows()" in js
     assert "function refreshLoraOptionsForCurrentFamily()" in js
     assert "const loraCompatModeHint = document.getElementById('lora-compat-mode-hint');" in js
     assert "function resolveLoraCompatibilityHintState(selectedModel, requestedMode)" in js
@@ -1704,6 +1705,8 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     # per-row compat badge
     assert "function updateLoraRowCompatBadge(row)" in js
     assert "function updateAllLoraRowCompatBadges()" in js
+    assert "function updateDisableIncompatibleLoraButton()" in js
+    assert "function disableIncompatibleLoraRows()" in js
     assert "function updateLoraSubmitSkipHint()" in js
     assert "'lora-row-compat-badge'" in js
     assert "badge.className = 'lora-row-compat-badge is-mismatch';" in js
@@ -1713,6 +1716,7 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert "'\u26a0 SD1.5\u2192SDXL'" in js
     assert "updateLoraRowCompatBadge(row);" in js
     assert "updateAllLoraRowCompatBadges();" in js
+    assert "updateDisableIncompatibleLoraButton();" in js
     assert "updateLoraSubmitSkipHint();" in js
     assert "collectLoraStack();" in js
     assert ".lora-row-compat-badge" in css
@@ -1727,7 +1731,10 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert "mismatch${count === 1 ? '' : 'es'}" in js
     assert "updateAllLoraRowCompatBadges();" in js
     assert 'id="lora-mismatch-summary"' in tpl
+    assert 'id="lora-disable-incompatible-btn"' in tpl
     assert ".lora-mismatch-summary" in css
+    assert "Disabled ${disabledCount} incompatible LoRA" in js
+    assert "#lora-disable-incompatible-btn[hidden]" in css
     assert 'id="lora-submit-skip-hint"' in tpl
     assert "will be skipped on submit." in js
     assert ".lora-submit-skip-hint" in css

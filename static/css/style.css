@@ -1517,6 +1517,7 @@ textarea {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: var(--sp-xs);
   margin-bottom: var(--sp-xs);
 }
 
@@ -1527,6 +1528,10 @@ textarea {
   font-weight: 600;
   color: var(--clr-caution);
   padding-right: var(--sp-xs);
+}
+
+#lora-disable-incompatible-btn[hidden] {
+  display: none;
 }
 
 .lora-stack-container {
