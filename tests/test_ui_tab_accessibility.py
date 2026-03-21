@@ -1649,6 +1649,7 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert "const loraShowRowHintsToggle = document.getElementById('lora-show-row-hints-toggle');" in js
     assert "const loraCompactPreservedToggle = document.getElementById('lora-compact-preserved-toggle');" in js
     assert "const loraCompactRowClearToggle = document.getElementById('lora-compact-row-clear-toggle');" in js
+    assert "const loraCompactMismatchToggle = document.getElementById('lora-compact-mismatch-toggle');" in js
     assert "const loraHideIncompatibleStatus = document.getElementById('lora-hide-incompatible-status');" in js
     assert "const loraClearPreservedBtn = document.getElementById('lora-clear-preserved-btn');" in js
     assert "const loraCompatUiResetBtn = document.getElementById('lora-compat-ui-reset');" in js
@@ -1696,10 +1697,12 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert "const LORA_SHOW_ROW_HINTS_KEY = 'loraShowRowHintsV1';" in js
     assert "const LORA_COMPACT_PRESERVED_KEY = 'loraCompactPreservedV1';" in js
     assert "const LORA_COMPACT_ROW_CLEAR_KEY = 'loraCompactRowClearV1';" in js
+    assert "const LORA_COMPACT_MISMATCH_KEY = 'loraCompactMismatchV1';" in js
     assert "let loraHideIncompatibleOptions = localStorage.getItem(LORA_HIDE_INCOMPATIBLE_OPTIONS_KEY) === '1';" in js
     assert "let loraShowRowHints = localStorage.getItem(LORA_SHOW_ROW_HINTS_KEY) !== '0';" in js
     assert "let loraCompactPreservedIndicators = localStorage.getItem(LORA_COMPACT_PRESERVED_KEY) === '1';" in js
     assert "let loraCompactRowClearButtons = localStorage.getItem(LORA_COMPACT_ROW_CLEAR_KEY) === '1';" in js
+    assert "let loraCompactMismatchBadges = localStorage.getItem(LORA_COMPACT_MISMATCH_KEY) === '1';" in js
     assert "loraFamilyLegend.open = localStorage.getItem(LORA_FAMILY_LEGEND_EXPANDED_KEY) === '1';" in js
     assert "loraFamilyLegend.addEventListener('toggle', () => {" in js
     assert "localStorage.setItem(LORA_FAMILY_LEGEND_EXPANDED_KEY, loraFamilyLegend.open ? '1' : '0');" in js
@@ -1729,6 +1732,7 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert "loraShowRowHintsToggle.checked = loraShowRowHints;" in js
     assert "loraCompactPreservedToggle.checked = loraCompactPreservedIndicators;" in js
     assert "loraCompactRowClearToggle.checked = loraCompactRowClearButtons;" in js
+    assert "loraCompactMismatchToggle.checked = loraCompactMismatchBadges;" in js
     assert "localStorage.setItem(LORA_HIDE_INCOMPATIBLE_OPTIONS_KEY, loraHideIncompatibleOptions ? '1' : '0');" in js
     assert "localStorage.removeItem(LORA_HIDE_INCOMPATIBLE_OPTIONS_KEY);" in js
     assert "localStorage.removeItem(LORA_SHOW_ROW_HINTS_KEY);" in js
@@ -1737,6 +1741,8 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert "localStorage.removeItem(LORA_COMPACT_PRESERVED_KEY);" in js
     assert "localStorage.setItem(LORA_COMPACT_ROW_CLEAR_KEY, '1');" in js
     assert "localStorage.removeItem(LORA_COMPACT_ROW_CLEAR_KEY);" in js
+    assert "localStorage.setItem(LORA_COMPACT_MISMATCH_KEY, '1');" in js
+    assert "localStorage.removeItem(LORA_COMPACT_MISMATCH_KEY);" in js
     assert "localStorage.removeItem(LORA_FAMILY_LEGEND_EXPANDED_KEY);" in js
     assert "loraCompatUiResetBtn.disabled = !hasCustomPrefs;" in js
     assert "updateLoraCompatUiResetButtonState();" in js
@@ -1751,11 +1757,13 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert 'id="lora-show-row-hints-toggle"' in tpl
     assert 'id="lora-compact-preserved-toggle"' in tpl
     assert 'id="lora-compact-row-clear-toggle"' in tpl
+    assert 'id="lora-compact-mismatch-toggle"' in tpl
     assert 'id="lora-hide-incompatible-status"' in tpl
     assert 'Hide incompatible options' in tpl
     assert 'Show row hints' in tpl
     assert 'Compact preserved indicators' in tpl
     assert 'Compact row clear buttons' in tpl
+    assert 'Compact mismatch badges' in tpl
     assert 'id="lora-clear-preserved-btn"' in tpl
     assert 'Clear preserved' in tpl
     assert 'id="lora-compat-ui-reset"' in tpl
@@ -1807,6 +1815,7 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert "clearPreservedBtn.textContent = 'Clear';" in js
     assert "clearPreservedBtn.textContent = loraCompactRowClearButtons ? 'Clear' : `Clear ${label}`;" in js
     assert "Clear preserved ${label} mismatch from this row." in js
+    assert "badge.textContent = loraCompactMismatchBadges ? '⚠' : badgeText;" in js
     assert "badge.className = 'lora-row-compat-badge is-mismatch';" in js
     assert "'\u26a0 Not Flux'" in js
     assert "'\u26a0 Flux LoRA'" in js
@@ -1837,6 +1846,7 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert ".lora-show-row-hints-toggle" in css
     assert ".lora-compact-preserved-toggle" in css
     assert ".lora-compact-row-clear-toggle" in css
+    assert ".lora-compact-mismatch-toggle" in css
     assert ".lora-hide-incompatible-status" in css
     assert ".lora-family-legend > summary" in css
     assert ".lora-row-compat-badge" in css

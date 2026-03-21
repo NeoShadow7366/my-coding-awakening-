@@ -152,6 +152,7 @@ const loraHideIncompatibleToggle = document.getElementById('lora-hide-incompatib
 const loraShowRowHintsToggle = document.getElementById('lora-show-row-hints-toggle');
 const loraCompactPreservedToggle = document.getElementById('lora-compact-preserved-toggle');
 const loraCompactRowClearToggle = document.getElementById('lora-compact-row-clear-toggle');
+const loraCompactMismatchToggle = document.getElementById('lora-compact-mismatch-toggle');
 const loraHideIncompatibleStatus = document.getElementById('lora-hide-incompatible-status');
 const loraClearPreservedBtn = document.getElementById('lora-clear-preserved-btn');
 const loraCompatUiResetBtn = document.getElementById('lora-compat-ui-reset');
@@ -501,6 +502,7 @@ const LORA_HIDE_INCOMPATIBLE_OPTIONS_KEY = 'loraHideIncompatibleOptionsV1';
 const LORA_SHOW_ROW_HINTS_KEY = 'loraShowRowHintsV1';
 const LORA_COMPACT_PRESERVED_KEY = 'loraCompactPreservedV1';
 const LORA_COMPACT_ROW_CLEAR_KEY = 'loraCompactRowClearV1';
+const LORA_COMPACT_MISMATCH_KEY = 'loraCompactMismatchV1';
 const CONFIG_COMFY_NODES_INCLUDE_BUILTINS_KEY = 'configComfyNodesIncludeBuiltinsV1';
 const CONFIG_COMFY_DISABLE_PREVIEW_FILTER_KEY = 'configComfyDisablePreviewFilterV1';
 const CONFIG_COMFY_DISABLE_PREVIEW_SELECTED_ONLY_KEY = 'configComfyDisablePreviewSelectedOnlyV1';
@@ -534,6 +536,7 @@ let loraHideIncompatibleOptions = localStorage.getItem(LORA_HIDE_INCOMPATIBLE_OP
 let loraShowRowHints = localStorage.getItem(LORA_SHOW_ROW_HINTS_KEY) !== '0';
 let loraCompactPreservedIndicators = localStorage.getItem(LORA_COMPACT_PRESERVED_KEY) === '1';
 let loraCompactRowClearButtons = localStorage.getItem(LORA_COMPACT_ROW_CLEAR_KEY) === '1';
+let loraCompactMismatchBadges = localStorage.getItem(LORA_COMPACT_MISMATCH_KEY) === '1';
 let imageFluxAutoApplyRecommendation = localStorage.getItem(IMAGE_FLUX_AUTO_APPLY_RECOMMENDATION_KEY) === '1';
 let imageFluxLockRecommendation = localStorage.getItem(IMAGE_FLUX_LOCK_RECOMMENDATION_KEY) === '1';
 let imageFluxLockBypassOnce = false;
@@ -3216,7 +3219,7 @@ function updateLoraClearPreservedButton() {
 
 function updateLoraCompatUiResetButtonState() {
 	if (!loraCompatUiResetBtn) return;
-	const hasCustomPrefs = Boolean(loraHideIncompatibleOptions || loraFamilyLegend?.open || !loraShowRowHints || loraCompactPreservedIndicators || loraCompactRowClearButtons);
+	const hasCustomPrefs = Boolean(loraHideIncompatibleOptions || loraFamilyLegend?.open || !loraShowRowHints || loraCompactPreservedIndicators || loraCompactRowClearButtons || loraCompactMismatchBadges);
 	loraCompatUiResetBtn.disabled = !hasCustomPrefs;
 	loraCompatUiResetBtn.title = hasCustomPrefs
 		? 'Reset LoRA compatibility UI preferences to defaults.'
@@ -3228,10 +3231,12 @@ function resetLoraCompatibilityUiPrefs() {
 	loraShowRowHints = true;
 	loraCompactPreservedIndicators = false;
 	loraCompactRowClearButtons = false;
+	loraCompactMismatchBadges = false;
 	localStorage.removeItem(LORA_HIDE_INCOMPATIBLE_OPTIONS_KEY);
 	localStorage.removeItem(LORA_SHOW_ROW_HINTS_KEY);
 	localStorage.removeItem(LORA_COMPACT_PRESERVED_KEY);
 	localStorage.removeItem(LORA_COMPACT_ROW_CLEAR_KEY);
+	localStorage.removeItem(LORA_COMPACT_MISMATCH_KEY);
 	if (loraHideIncompatibleToggle) {
 		loraHideIncompatibleToggle.checked = false;
 	}
@@ -3243,6 +3248,9 @@ function resetLoraCompatibilityUiPrefs() {
 	}
 	if (loraCompactRowClearToggle) {
 		loraCompactRowClearToggle.checked = false;
+	}
+	if (loraCompactMismatchToggle) {
+		loraCompactMismatchToggle.checked = false;
 	}
 	if (loraFamilyLegend) {
 		loraFamilyLegend.open = false;
@@ -3486,7 +3494,7 @@ function updateLoraRowCompatBadge(row) {
 		badgeText = '⚠ SD1.5→SDXL';
 		titleText = 'SD 1.5 LoRA selected but SDXL checkpoint is active.';
 	}
-	badge.textContent = badgeText;
+	badge.textContent = loraCompactMismatchBadges ? '⚠' : badgeText;
 	badge.title = titleText;
 	badge.setAttribute('aria-label', titleText);
 	badge.className = 'lora-row-compat-badge is-mismatch';
@@ -3763,6 +3771,20 @@ if (loraCompactRowClearToggle) {
 			localStorage.setItem(LORA_COMPACT_ROW_CLEAR_KEY, '1');
 		} else {
 			localStorage.removeItem(LORA_COMPACT_ROW_CLEAR_KEY);
+		}
+		updateAllLoraRowCompatBadges();
+		updateLoraCompatUiResetButtonState();
+	});
+}
+
+if (loraCompactMismatchToggle) {
+	loraCompactMismatchToggle.checked = loraCompactMismatchBadges;
+	loraCompactMismatchToggle.addEventListener('change', () => {
+		loraCompactMismatchBadges = loraCompactMismatchToggle.checked;
+		if (loraCompactMismatchBadges) {
+			localStorage.setItem(LORA_COMPACT_MISMATCH_KEY, '1');
+		} else {
+			localStorage.removeItem(LORA_COMPACT_MISMATCH_KEY);
 		}
 		updateAllLoraRowCompatBadges();
 		updateLoraCompatUiResetButtonState();
