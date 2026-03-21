@@ -3126,6 +3126,18 @@ function getFilteredLoraModels(baseFamily) {
 	});
 }
 
+function getPreservedHiddenIncompatibleSelectionCount() {
+	if (!loraStackContainer || !loraHideIncompatibleOptions) return 0;
+	const baseFamily = getActiveLoraCompatibilityFamily();
+	if (!baseFamily) return 0;
+	return [...loraStackContainer.querySelectorAll('.lora-row-select')].filter((sel) => {
+		const currentValue = sel.value;
+		if (!currentValue) return false;
+		const currentFamily = inferCheckpointFamily(currentValue);
+		return Boolean(currentFamily && currentFamily !== baseFamily);
+	}).length;
+}
+
 function updateLoraHideIncompatibleStatus() {
 	if (!loraHideIncompatibleStatus) return;
 	if (!loraHideIncompatibleOptions) {
@@ -3146,9 +3158,13 @@ function updateLoraHideIncompatibleStatus() {
 		const fam = inferCheckpointFamily(name);
 		return Boolean(fam && fam !== baseFamily);
 	}).length;
+	const preservedCount = getPreservedHiddenIncompatibleSelectionCount();
+	const preservedSuffix = preservedCount > 0
+		? ` Preserving ${preservedCount} selected mismatch${preservedCount === 1 ? '' : 'es'}.`
+		: '';
 	loraHideIncompatibleStatus.textContent = hiddenCount > 0
-		? `Hiding ${hiddenCount} incompatible option${hiddenCount === 1 ? '' : 's'} for ${baseFamilyLabel}.`
-		: `No incompatible options to hide for ${baseFamilyLabel}.`;
+		? `Hiding ${hiddenCount} incompatible option${hiddenCount === 1 ? '' : 's'} for ${baseFamilyLabel}.${preservedSuffix}`
+		: `No incompatible options to hide for ${baseFamilyLabel}.${preservedSuffix}`;
 	loraHideIncompatibleStatus.hidden = false;
 }
 
@@ -3203,7 +3219,6 @@ function refreshLoraOptionsForCurrentFamily() {
 			}
 		}
 	});
-	updateLoraHideIncompatibleStatus();
 	updateAllLoraRowCompatBadges();
 }
 
@@ -3365,6 +3380,7 @@ function updateAllLoraRowCompatBadges() {
 	updateLoraStackMismatchSummary();
 	updateDisableIncompatibleLoraButton();
 	updateLoraSubmitSkipHint();
+	updateLoraHideIncompatibleStatus();
 }
 
 function updateLoraStackMismatchSummary() {

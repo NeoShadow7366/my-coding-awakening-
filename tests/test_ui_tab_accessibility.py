@@ -1694,6 +1694,7 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert "loraFamilyLegend.addEventListener('toggle', () => {" in js
     assert "localStorage.setItem(LORA_FAMILY_LEGEND_EXPANDED_KEY, loraFamilyLegend.open ? '1' : '0');" in js
     assert "function getFilteredLoraModels(baseFamily)" in js
+    assert "function getPreservedHiddenIncompatibleSelectionCount()" in js
     assert "function updateLoraHideIncompatibleStatus()" in js
     assert "function updateLoraCompatUiResetButtonState()" in js
     assert "function resetLoraCompatibilityUiPrefs()" in js
@@ -1701,6 +1702,8 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert "const curFamilyLabel = curFamily === 'flux' ? 'FLUX'" in js
     assert "(hidden incompatible: ${curFamilyLabel})" in js
     assert "const baseFamilyLabel = baseFamily === 'flux'" in js
+    assert "const preservedCount = getPreservedHiddenIncompatibleSelectionCount();" in js
+    assert "Preserving ${preservedCount} selected mismatch${preservedCount === 1 ? '' : 'es'}." in js
     assert "Hiding ${hiddenCount} incompatible option${hiddenCount === 1 ? '' : 's'} for ${baseFamilyLabel}." in js
     assert "No incompatible options to hide for ${baseFamilyLabel}." in js
     assert "loraHideIncompatibleToggle.checked = loraHideIncompatibleOptions;" in js
@@ -1758,6 +1761,7 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert "updateAllLoraRowCompatBadges();" in js
     assert "updateDisableIncompatibleLoraButton();" in js
     assert "updateLoraSubmitSkipHint();" in js
+    assert "updateLoraHideIncompatibleStatus();" in js
     assert "collectLoraStack();" in js
     assert ".lora-row-family-chip" in css
     assert ".lora-row-family-chip.is-flux" in css
