@@ -2976,67 +2976,90 @@ def _run_comfyui_install_job(job_id: str) -> None:
             raise RuntimeError("git not found. Install Git and ensure it is on PATH before installing ComfyUI.")
         _append_install_log(job, f"git: {git_check.stdout.strip()}")
 
-        # 2. Clone or skip if already present
-        main_py = install_path / "main.py"
-        if main_py.exists():
-            _append_install_log(job, "\n>>> Clone (skip — main.py already present)")
+        # 2. Resolve the actual ComfyUI code root.
+        # Portable packages use: <configured_path>/ComfyUI/main.py
+        # Git-based installs use: <configured_path>/main.py
+        portable_sub = install_path / "ComfyUI"
+        if (portable_sub / "main.py").exists():
+            comfy_root = portable_sub
+            _append_install_log(job, "\n>>> Detected portable package layout")
+            _append_install_log(job, f"    ComfyUI root : {comfy_root}")
         else:
-            install_path.mkdir(parents=True, exist_ok=True)
+            comfy_root = install_path
+
+        # 3. Clone if ComfyUI is not already present
+        main_py = comfy_root / "main.py"
+        if main_py.exists():
+            _append_install_log(job, "\n>>> Clone (skip - ComfyUI already present at target)")
+        else:
+            comfy_root.parent.mkdir(parents=True, exist_ok=True)
             ok = _run_install_step(
                 job, "Clone ComfyUI",
-                ["git", "clone", COMFYUI_REPO_URL, str(install_path)],
+                ["git", "clone", COMFYUI_REPO_URL, str(comfy_root)],
                 timeout=300,
             )
             if not ok:
-                raise RuntimeError("git clone failed — check log for details")
+                raise RuntimeError("git clone failed - check log for details")
 
-        # 3. Create .venv (skip if it already exists)
-        venv_dir = install_path / ".venv"
-        if not venv_dir.exists():
-            ok = _run_install_step(
-                job, "Create Python virtual environment",
-                [sys.executable, "-m", "venv", str(venv_dir)],
-                cwd=install_path,
+        # 4. Determine the Python executable.
+        # Portable packages ship with python_embeded which already has torch;
+        # for git-based installs we create a .venv and install torch ourselves.
+        embedded_python = comfy_root.parent / "python_embeded" / "python.exe"
+        has_embedded_python = os.name == "nt" and embedded_python.exists()
+
+        if has_embedded_python:
+            venv_python = str(embedded_python)
+            _append_install_log(job, f"\n>>> Using existing python_embeded: {venv_python}")
+            _append_install_log(job, ">>> Create Python virtual environment (skip - portable package)")
+            _append_install_log(job, ">>> Install PyTorch (skip - portable package has pre-installed torch)")
+        else:
+            venv_dir = comfy_root / ".venv"
+            if not venv_dir.exists():
+                ok = _run_install_step(
+                    job, "Create Python virtual environment",
+                    [sys.executable, "-m", "venv", str(venv_dir)],
+                    cwd=comfy_root,
+                    timeout=120,
+                )
+                if not ok:
+                    raise RuntimeError("venv creation failed - check log for details")
+            else:
+                _append_install_log(job, "\n>>> Create Python virtual environment (skip - .venv already present)")
+
+            venv_python = _find_comfyui_python(comfy_root)
+
+            _run_install_step(
+                job, "Upgrade pip",
+                [venv_python, "-m", "pip", "install", "--upgrade", "pip"],
+                cwd=comfy_root,
                 timeout=120,
             )
+
+            torch_cmd = [venv_python, "-m", "pip", "install",
+                         "torch", "torchvision", "torchaudio"]
+            index_url = _TORCH_INDEX_URLS.get(gpu, "")
+            if index_url:
+                torch_cmd += ["--index-url", index_url]
+            ok = _run_install_step(job, f"Install PyTorch ({gpu})", torch_cmd,
+                                   cwd=comfy_root, timeout=600)
             if not ok:
-                raise RuntimeError("venv creation failed — check log for details")
-        else:
-            _append_install_log(job, "\n>>> Create Python virtual environment (skip — .venv already present)")
+                raise RuntimeError("torch install failed - check log for details")
 
-        # 4. Upgrade pip inside the venv
-        venv_python = _find_comfyui_python(install_path)
-        _run_install_step(
-            job, "Upgrade pip",
-            [venv_python, "-m", "pip", "install", "--upgrade", "pip"],
-            cwd=install_path,
-            timeout=120,
-        )
-
-        # 5. Install torch
-        torch_cmd = [venv_python, "-m", "pip", "install",
-                     "torch", "torchvision", "torchaudio"]
-        index_url = _TORCH_INDEX_URLS.get(gpu, "")
-        if index_url:
-            torch_cmd += ["--index-url", index_url]
-        ok = _run_install_step(job, f"Install PyTorch ({gpu})", torch_cmd,
-                               cwd=install_path, timeout=600)
-        if not ok:
-            raise RuntimeError("torch install failed — check log for details")
-
-        # 6. Install ComfyUI requirements
-        req_file = install_path / "requirements.txt"
+        # 5. Install / update ComfyUI requirements
+        req_file = comfy_root / "requirements.txt"
         if req_file.exists():
             ok = _run_install_step(
                 job, "Install ComfyUI requirements",
                 [venv_python, "-m", "pip", "install", "-r", str(req_file)],
-                cwd=install_path,
+                cwd=comfy_root,
                 timeout=600,
             )
             if not ok:
-                raise RuntimeError("requirements install failed — check log for details")
+                raise RuntimeError("requirements install failed - check log for details")
 
-        # 7. Persist as comfyui_path in service config
+        # 6. Persist as comfyui_path in service config.
+        # Always save install_path (the portable root or git clone target) so that
+        # _resolve_comfyui_launch can detect the layout correctly.
         config = _load_service_config()
         config["comfyui_path"] = str(install_path)
         _save_service_config(config)
