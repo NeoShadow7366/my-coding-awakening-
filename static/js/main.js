@@ -1353,7 +1353,7 @@ if (loraDisplayOptions) {
 	loraDisplayOptions.addEventListener('keydown', (event) => {
 		const hotkey = (event.key || '').toLowerCase();
 		const isEscape = event.key === 'Escape';
-		if (hotkey !== 'm' && hotkey !== 'o' && hotkey !== 'c' && hotkey !== 'w' && hotkey !== 'd' && hotkey !== 'r' && hotkey !== 'a' && hotkey !== 'h' && hotkey !== 't' && hotkey !== 's' && hotkey !== 'n' && hotkey !== 'p' && hotkey !== 'j' && hotkey !== 'x' && hotkey !== 'z' && hotkey !== 'b' && hotkey !== 'v' && hotkey !== 'i' && hotkey !== 'u' && hotkey !== 'l' && hotkey !== 'y' && hotkey !== 'k' && hotkey !== '?' && hotkey !== 'f' && hotkey !== 'end' && hotkey !== 'g' && hotkey !== 'home' && hotkey !== 'q' && hotkey !== '0' && hotkey !== 'backspace' && hotkey !== 'delete' && !isEscape) return;
+		if (hotkey !== 'm' && hotkey !== 'o' && hotkey !== 'c' && hotkey !== 'w' && hotkey !== 'd' && hotkey !== 'r' && hotkey !== 'a' && hotkey !== 'h' && hotkey !== 't' && hotkey !== 's' && hotkey !== 'n' && hotkey !== 'p' && hotkey !== 'j' && hotkey !== 'x' && hotkey !== 'z' && hotkey !== 'b' && hotkey !== 'v' && hotkey !== 'i' && hotkey !== 'u' && hotkey !== 'l' && hotkey !== 'y' && hotkey !== 'k' && hotkey !== '?' && hotkey !== 'f' && hotkey !== 'end' && hotkey !== 'g' && hotkey !== 'home' && hotkey !== 'q' && hotkey !== 'e' && hotkey !== '0' && hotkey !== 'backspace' && hotkey !== 'delete' && !isEscape) return;
 		if (event.repeat && !isEscape) return;
 		const targetTag = String(event.target?.tagName || '').toLowerCase();
 		if (targetTag === 'input' || targetTag === 'textarea' || targetTag === 'select' || event.target?.isContentEditable) return;
@@ -1364,7 +1364,7 @@ if (loraDisplayOptions) {
 			}
 			return;
 		}
-		if (hotkey === 'q') {
+		if (hotkey === 'q' || hotkey === 'e') {
 			if (loraDisplayOptions.open) {
 				loraDisplayOptions.open = false;
 			}
@@ -1415,7 +1415,7 @@ if (loraDisplayOptions) {
 			return;
 		}
 		if (hotkey === 'k' || hotkey === '?') {
-			showToast('Display shortcuts: M/O mode, Shift+M reset, C/W compact, S/N hints, P/J preserved, X/Z mismatch, B/V row clear, I/U hide incompatible, L/Y legend, K/? help, F/End focus mode chip, G/Home focus first option, D/R/A/0/Backspace/Delete default, H/T toggle panel, Q/Esc close.', 'pos');
+			showToast('Display shortcuts: M/O mode, Shift+M reset, C/W compact, S/N hints, P/J preserved, X/Z mismatch, B/V row clear, I/U hide incompatible, L/Y legend, K/? help, F/End focus mode chip, G/Home focus first option, D/R/A/0/Backspace/Delete default, H/T toggle panel, Q/E/Esc close.', 'pos');
 			return;
 		}
 		if (hotkey === 'o') {
@@ -3370,8 +3370,8 @@ function updateLoraDisplayOptionsSummary() {
 	}
 	if (loraDisplayOptionsChipHint) {
 		loraDisplayOptionsChipHint.textContent = displayMode === 'compact'
-			? 'Mode chip action: switch to default display options. Shortcuts: M/O toggles mode, Shift+M resets display options, C/W enables compact mode, S/N toggles row hints, P/J toggles preserved indicators, X/Z toggles compact mismatch badges, B/V toggles row clear buttons, I/U toggles hide incompatible, L/Y toggles the family legend, K/? shows shortcut help, F/End focuses mode chip, G/Home focuses first option, D/R/A/0/Backspace/Delete enable default mode, H/T toggles this panel, Q/Esc closes this panel.'
-			: 'Mode chip action: switch to compact display options. Shortcuts: M/O toggles mode, Shift+M resets display options, C/W enables compact mode, S/N toggles row hints, P/J toggles preserved indicators, X/Z toggles compact mismatch badges, B/V toggles row clear buttons, I/U toggles hide incompatible, L/Y toggles the family legend, K/? shows shortcut help, F/End focuses mode chip, G/Home focuses first option, D/R/A/0/Backspace/Delete enable default mode, H/T toggles this panel, Q/Esc closes this panel.';
+			? 'Mode chip action: switch to default display options. Shortcuts: M/O toggles mode, Shift+M resets display options, C/W enables compact mode, S/N toggles row hints, P/J toggles preserved indicators, X/Z toggles compact mismatch badges, B/V toggles row clear buttons, I/U toggles hide incompatible, L/Y toggles the family legend, K/? shows shortcut help, F/End focuses mode chip, G/Home focuses first option, D/R/A/0/Backspace/Delete enable default mode, H/T toggles this panel, Q/E/Esc closes this panel.'
+			: 'Mode chip action: switch to compact display options. Shortcuts: M/O toggles mode, Shift+M resets display options, C/W enables compact mode, S/N toggles row hints, P/J toggles preserved indicators, X/Z toggles compact mismatch badges, B/V toggles row clear buttons, I/U toggles hide incompatible, L/Y toggles the family legend, K/? shows shortcut help, F/End focuses mode chip, G/Home focuses first option, D/R/A/0/Backspace/Delete enable default mode, H/T toggles this panel, Q/E/Esc closes this panel.';
 	}
 	if (loraDisplayOptionsActiveHint) {
 		loraDisplayOptionsActiveHint.hidden = false;
