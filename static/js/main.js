@@ -6853,14 +6853,30 @@ function _clearQueueByStatus(status) {
 	return cleared;
 }
 
+function _countQueueByStatus(status) {
+	let count = 0;
+	for (const meta of queueJobMeta.values()) {
+		if (meta.status === status) count += 1;
+	}
+	return count;
+}
+
 async function clearFailedQueueItems() {
-	const cleared = _clearQueueByStatus('failed');
-	if (!cleared) {
+	const failedCount = _countQueueByStatus('failed');
+	if (!failedCount) {
 		setQueueLastAction('Clear failed skipped: no failed items.');
 		showToast('No failed items to clear.');
 		renderQueueStatus([], [], new Set());
 		return;
 	}
+	const confirmed = window.confirm(`Clear ${failedCount} failed queue item${failedCount === 1 ? '' : 's'}? This only removes local queue rows.`);
+	if (!confirmed) {
+		setQueueLastAction('Clear failed canceled.');
+		showToast('Clear failed canceled.', 'pos');
+		renderQueueStatus([], [], new Set());
+		return;
+	}
+	const cleared = _clearQueueByStatus('failed');
 	setQueueLastAction(`Cleared ${cleared} failed item${cleared === 1 ? '' : 's'}.`);
 	showToast(`Cleared ${cleared} failed item${cleared === 1 ? '' : 's'}.`, 'pos');
 	if (trackedPromptIds.size) {
@@ -6871,13 +6887,21 @@ async function clearFailedQueueItems() {
 }
 
 async function clearCompletedQueueItems() {
-	const cleared = _clearQueueByStatus('completed');
-	if (!cleared) {
+	const completedCount = _countQueueByStatus('completed');
+	if (!completedCount) {
 		setQueueLastAction('Clear done skipped: no completed items.');
 		showToast('No completed items to clear.');
 		renderQueueStatus([], [], new Set());
 		return;
 	}
+	const confirmed = window.confirm(`Clear ${completedCount} completed queue item${completedCount === 1 ? '' : 's'}? This only removes local queue rows.`);
+	if (!confirmed) {
+		setQueueLastAction('Clear done canceled.');
+		showToast('Clear done canceled.', 'pos');
+		renderQueueStatus([], [], new Set());
+		return;
+	}
+	const cleared = _clearQueueByStatus('completed');
 	setQueueLastAction(`Cleared ${cleared} completed item${cleared === 1 ? '' : 's'}.`);
 	showToast(`Cleared ${cleared} completed item${cleared === 1 ? '' : 's'}.`, 'pos');
 	if (trackedPromptIds.size) {

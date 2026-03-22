@@ -171,6 +171,13 @@ def test_queue_action_keyboard_handler_wiring_present_in_js_bundle():
     assert "localStorage.setItem(QUEUE_STATE_STORAGE_KEY" in content
     assert "setQueueLastAction(`Restored ${restoredCount} tracked queue item${restoredCount === 1 ? '' : 's'}.`);" in content
     assert "setQueueLastAction('Moved a job to the front of the queue.');" in content
+    assert "function _countQueueByStatus(status)" in content
+    assert "const confirmed = window.confirm(`Clear ${failedCount} failed queue item${failedCount === 1 ? '' : 's'}? This only removes local queue rows.`);" in content
+    assert "setQueueLastAction('Clear failed canceled.');" in content
+    assert "showToast('Clear failed canceled.', 'pos');" in content
+    assert "const confirmed = window.confirm(`Clear ${completedCount} completed queue item${completedCount === 1 ? '' : 's'}? This only removes local queue rows.`);" in content
+    assert "setQueueLastAction('Clear done canceled.');" in content
+    assert "showToast('Clear done canceled.', 'pos');" in content
     assert "if (action === 'prioritize') {" in content
     assert "queueList.addEventListener('keydown', onQueueActionKeydown);" in content
 
