@@ -2961,6 +2961,7 @@ def test_prompt_preset_v2_html_elements_present():
     assert 'id="prompt-preset-filter-shortcut-hint"' in html
     assert 'Recent chips: arrows move, P pins, Del removes.' in html
     assert 'id="prompt-preset-recent-pinned-only-toggle"' in html
+    assert 'aria-keyshortcuts="Space"' in html and 'prompt-preset-recent-pinned-only-toggle' in html.split('aria-keyshortcuts="Space"')[0].split('\n')[-1]
     assert 'id="prompt-preset-clear-filters"' in html
     assert 'aria-keyshortcuts="Control+Shift+K"' in html
     assert 'id="prompt-preset-recent-filters"' in html
@@ -3034,6 +3035,10 @@ def test_prompt_preset_v2_js_functions_present():
     assert "Unpinned recent filter." in js
     assert "Pinned-only recent filters on." in js
     assert "Pinned-only recent filters off." in js
+    # pinned recent toggle with keyboard support (Space/Enter)
+    assert "promptPresetRecentPinnedOnlyToggle.addEventListener('keydown'" in js
+    assert "event.key === ' ' || event.key === 'Enter'" in js
+    assert "event.preventDefault();" in js
     assert "function togglePinRecentPresetFilterCombo(index)" in js
     assert "function _getRenderableRecentPresetFilters()" in js
     assert "function moveRecentPresetFilterCombo(sourceFrom, sourceTo)" in js

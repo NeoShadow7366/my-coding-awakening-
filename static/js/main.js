@@ -14173,6 +14173,14 @@ if (promptPresetRecentPinnedOnlyToggle) {
 		renderRecentPresetFilterChips();
 		showToast(_getRecentPinnedOnlyFilter() ? 'Pinned-only recent filters on.' : 'Pinned-only recent filters off.', 'pos');
 	});
+	promptPresetRecentPinnedOnlyToggle.addEventListener('keydown', (event) => {
+		if (event.key === ' ' || event.key === 'Enter') {
+			event.preventDefault();
+			_setRecentPinnedOnlyFilter(!_getRecentPinnedOnlyFilter());
+			renderRecentPresetFilterChips();
+			showToast(_getRecentPinnedOnlyFilter() ? 'Pinned-only recent filters on.' : 'Pinned-only recent filters off.', 'pos');
+		}
+	});
 }
 if (promptEditPresetBtn) {
 	promptEditPresetBtn.addEventListener('click', () => {
