@@ -86,6 +86,8 @@ _migration_jobs_lock = threading.Lock()
 _migration_jobs: dict[str, dict] = {}
 _comfyui_update_jobs_lock = threading.Lock()
 _comfyui_update_jobs: dict[str, dict] = {}
+_comfyui_install_jobs_lock = threading.Lock()
+_comfyui_install_jobs: dict[str, dict] = {}
 _disable_op_log_lock = threading.Lock()
 _disable_op_log: list[dict] = []
 _disable_op_log_loaded = False
@@ -1168,19 +1170,41 @@ def _resolve_comfyui_launch(path_value: str) -> tuple[list[str], Path | None]:
     candidate = Path(path_value).expanduser()
     comfy_args = ["--enable-cors-header", "*"]
     if candidate.is_dir():
-        # Prefer ComfyUI's bundled launch scripts so it runs in the intended env.
+        # Windows portable package layout (e.g. ComfyUI_windows_portable):
+        #   <root>/python_embeded/python.exe  +  <root>/ComfyUI/main.py
+        # Use direct Python invocation — bat files spawn python then exit immediately,
+        # so the tracked cmd process exits with code 0 as a false "failed" signal.
+        portable_python = candidate / "python_embeded" / "python.exe"
+        portable_main = candidate / "ComfyUI" / "main.py"
+        if os.name == "nt" and portable_python.exists() and portable_main.exists():
+            return (
+                [str(portable_python), "-s", str(portable_main),
+                 "--windows-standalone-build", *comfy_args],
+                portable_main.parent,
+            )
+
+        # Git-based install: main.py at root, optional managed .venv.
+        main_py = candidate / "main.py"
+        if main_py.exists():
+            # Prefer managed venv created by the install system.
+            for venv_py in [
+                candidate / ".venv" / "Scripts" / "python.exe",  # Windows
+                candidate / ".venv" / "bin" / "python",           # Linux/macOS
+            ]:
+                if venv_py.exists():
+                    return [str(venv_py), str(main_py), *comfy_args], candidate
+            # Fallback: portable embedded Python one level up.
+            sibling_python = candidate.parent / "python_embeded" / "python.exe"
+            if os.name == "nt" and sibling_python.exists():
+                return [str(sibling_python), str(main_py), *comfy_args], candidate
+            return [sys.executable, str(main_py), *comfy_args], candidate
+
+        # Last resort: bat-based launch (only if no main.py found).
         bat_candidates = ["run_nvidia_gpu.bat", "run_cpu.bat", "run.bat"]
         for bat_name in bat_candidates:
             bat_path = candidate / bat_name
             if bat_path.exists():
                 return ["cmd", "/c", str(bat_path), *comfy_args], candidate
-
-        main_py = candidate / "main.py"
-        if main_py.exists():
-            portable_python = candidate.parent / "python_embeded" / "python.exe"
-            if os.name == "nt" and portable_python.exists():
-                return [str(portable_python), str(main_py), *comfy_args], candidate
-            return [sys.executable, str(main_py), *comfy_args], candidate
 
         raise ValueError("Configured ComfyUI directory must contain main.py or a run.bat script")
 
@@ -2762,13 +2786,28 @@ def _run_comfyui_update_job(job_id: str) -> None:
             cwd=comfyui_path,
             capture_output=True,
             text=True,
-            timeout=60
+            timeout=120
         )
-        
+
         output = result.stdout + (f"\nError: {result.stderr}" if result.stderr else "")
-        
+
         if result.returncode != 0:
             raise RuntimeError(f"git pull failed (exit code {result.returncode}): {result.stderr or result.stdout}")
+
+        # Update Python dependencies in the managed venv (if present) or system Python.
+        pip_python = _find_comfyui_python(comfyui_path)
+        req_file = comfyui_path / "requirements.txt"
+        if req_file.exists():
+            pip_result = subprocess.run(
+                [pip_python, "-m", "pip", "install", "-r", str(req_file), "--quiet"],
+                cwd=comfyui_path,
+                capture_output=True,
+                text=True,
+                timeout=300,
+            )
+            output += f"\n\npip install requirements:\n{pip_result.stdout}"
+            if pip_result.returncode != 0:
+                output += f"\nWarning: pip install requirements exited {pip_result.returncode}: {pip_result.stderr}"
         
         # After-update version
         after_version = _get_comfyui_version()
@@ -2810,6 +2849,246 @@ def _start_comfyui_update_job() -> dict:
     
     threading.Thread(target=_run_comfyui_update_job, args=(job_id,), daemon=True).start()
     return _comfyui_update_job_snapshot(job)
+
+
+# ---------------------------------------------------------------------------
+# ComfyUI self-contained install system
+# ---------------------------------------------------------------------------
+
+COMFYUI_REPO_URL = "https://github.com/comfyanonymous/ComfyUI.git"
+
+_TORCH_INDEX_URLS: dict[str, str] = {
+    "nvidia": "https://download.pytorch.org/whl/cu121",
+    "amd":    "https://download.pytorch.org/whl/rocm5.7",
+    "cpu":    "",
+}
+
+
+def _find_comfyui_python(comfyui_path: Path) -> str:
+    """Return the Python executable to use for a ComfyUI directory.
+
+    Preference order:
+    1. Managed .venv created by the install system (inside the ComfyUI dir).
+    2. Sibling python_embeded/python.exe (Windows portable package).
+    3. sys.executable as final fallback.
+    """
+    for venv_py in [
+        comfyui_path / ".venv" / "Scripts" / "python.exe",
+        comfyui_path / ".venv" / "bin" / "python",
+    ]:
+        if venv_py.exists():
+            return str(venv_py)
+    sibling_py = comfyui_path.parent / "python_embeded" / "python.exe"
+    if os.name == "nt" and sibling_py.exists():
+        return str(sibling_py)
+    return sys.executable
+
+
+def _check_comfyui_installed(path_value: str) -> dict:
+    """Return an install-state dict for the configured ComfyUI path."""
+    if not path_value:
+        return {"installed": False, "has_git": False, "has_venv": False,
+                "reason": "No path configured"}
+    try:
+        p = Path(path_value).expanduser().resolve()
+    except Exception as exc:
+        return {"installed": False, "has_git": False, "has_venv": False,
+                "reason": str(exc)}
+    if not p.exists():
+        return {"installed": False, "has_git": False, "has_venv": False,
+                "reason": f"Directory does not exist: {p}"}
+    # Portable package: ComfyUI sub-directory
+    actual = p / "ComfyUI" if (p / "ComfyUI" / "main.py").exists() else p
+    main_py = actual / "main.py"
+    has_git = (actual / ".git").is_dir()
+    has_venv = any([
+        (actual / ".venv" / "Scripts" / "python.exe").exists(),
+        (actual / ".venv" / "bin" / "python").exists(),
+    ])
+    return {
+        "installed": main_py.exists(),
+        "has_git": has_git,
+        "has_venv": has_venv,
+        "path": str(p),
+        "reason": "Installed" if main_py.exists() else "main.py not found — install ComfyUI first",
+    }
+
+
+def _append_install_log(job: dict, line: str) -> None:
+    """Thread-safe append to install job log."""
+    with _comfyui_install_jobs_lock:
+        job["log"] = job.get("log", "") + line + "\n"
+
+
+def _run_install_step(
+    job: dict,
+    label: str,
+    command: list[str],
+    cwd: Path | None = None,
+    timeout: int = 600,
+) -> bool:
+    """Run one install step, streaming output to the job log. Returns True on success."""
+    _append_install_log(job, f"\n>>> {label}")
+    _append_install_log(job, f"    $ {' '.join(str(c) for c in command)}")
+    try:
+        result = subprocess.run(
+            command,
+            cwd=str(cwd) if cwd else None,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+        if result.stdout.strip():
+            _append_install_log(job, result.stdout.rstrip())
+        if result.returncode != 0:
+            _append_install_log(job, f"[ERROR] exit code {result.returncode}")
+            if result.stderr.strip():
+                _append_install_log(job, result.stderr.rstrip())
+            return False
+        _append_install_log(job, f"    [OK]")
+        return True
+    except subprocess.TimeoutExpired:
+        _append_install_log(job, f"[ERROR] step timed out after {timeout}s")
+        return False
+    except Exception as exc:
+        _append_install_log(job, f"[ERROR] {exc}")
+        return False
+
+
+def _run_comfyui_install_job(job_id: str) -> None:
+    """Background thread: clone ComfyUI, create .venv, install torch + requirements."""
+    with _comfyui_install_jobs_lock:
+        job = _comfyui_install_jobs.get(job_id)
+    if not job:
+        return
+
+    install_path = Path(job["install_path"]).expanduser().resolve()
+    gpu = job.get("gpu", "nvidia")
+
+    try:
+        _append_install_log(job, f"=== ComfyUI Install ===")
+        _append_install_log(job, f"Target  : {install_path}")
+        _append_install_log(job, f"GPU type: {gpu}")
+
+        # 1. Check git is available
+        git_check = subprocess.run(["git", "--version"], capture_output=True, text=True, timeout=10)
+        if git_check.returncode != 0:
+            raise RuntimeError("git not found. Install Git and ensure it is on PATH before installing ComfyUI.")
+        _append_install_log(job, f"git: {git_check.stdout.strip()}")
+
+        # 2. Clone or skip if already present
+        main_py = install_path / "main.py"
+        if main_py.exists():
+            _append_install_log(job, "\n>>> Clone (skip — main.py already present)")
+        else:
+            install_path.mkdir(parents=True, exist_ok=True)
+            ok = _run_install_step(
+                job, "Clone ComfyUI",
+                ["git", "clone", COMFYUI_REPO_URL, str(install_path)],
+                timeout=300,
+            )
+            if not ok:
+                raise RuntimeError("git clone failed — check log for details")
+
+        # 3. Create .venv (skip if it already exists)
+        venv_dir = install_path / ".venv"
+        if not venv_dir.exists():
+            ok = _run_install_step(
+                job, "Create Python virtual environment",
+                [sys.executable, "-m", "venv", str(venv_dir)],
+                cwd=install_path,
+                timeout=120,
+            )
+            if not ok:
+                raise RuntimeError("venv creation failed — check log for details")
+        else:
+            _append_install_log(job, "\n>>> Create Python virtual environment (skip — .venv already present)")
+
+        # 4. Upgrade pip inside the venv
+        venv_python = _find_comfyui_python(install_path)
+        _run_install_step(
+            job, "Upgrade pip",
+            [venv_python, "-m", "pip", "install", "--upgrade", "pip"],
+            cwd=install_path,
+            timeout=120,
+        )
+
+        # 5. Install torch
+        torch_cmd = [venv_python, "-m", "pip", "install",
+                     "torch", "torchvision", "torchaudio"]
+        index_url = _TORCH_INDEX_URLS.get(gpu, "")
+        if index_url:
+            torch_cmd += ["--index-url", index_url]
+        ok = _run_install_step(job, f"Install PyTorch ({gpu})", torch_cmd,
+                               cwd=install_path, timeout=600)
+        if not ok:
+            raise RuntimeError("torch install failed — check log for details")
+
+        # 6. Install ComfyUI requirements
+        req_file = install_path / "requirements.txt"
+        if req_file.exists():
+            ok = _run_install_step(
+                job, "Install ComfyUI requirements",
+                [venv_python, "-m", "pip", "install", "-r", str(req_file)],
+                cwd=install_path,
+                timeout=600,
+            )
+            if not ok:
+                raise RuntimeError("requirements install failed — check log for details")
+
+        # 7. Persist as comfyui_path in service config
+        config = _load_service_config()
+        config["comfyui_path"] = str(install_path)
+        _save_service_config(config)
+        _append_install_log(job, f"\n>>> Saved comfyui_path = {install_path}")
+
+        _append_install_log(job, "\n=== Install complete! ===")
+        with _comfyui_install_jobs_lock:
+            j = _comfyui_install_jobs.get(job_id)
+            if j:
+                j["status"] = "done"
+                j["finished_at"] = datetime.now(timezone.utc).isoformat()
+
+    except Exception as exc:
+        _append_install_log(job, f"\n[FATAL] {exc}")
+        with _comfyui_install_jobs_lock:
+            j = _comfyui_install_jobs.get(job_id)
+            if j:
+                j["status"] = "error"
+                j["error"] = str(exc)
+                j["finished_at"] = datetime.now(timezone.utc).isoformat()
+
+
+def _start_comfyui_install_job(install_path: str, gpu: str) -> dict:
+    """Create and start a background ComfyUI install job."""
+    job_id = f"install-{int(time.time() * 1000)}"
+    job: dict = {
+        "id": job_id,
+        "status": "running",
+        "install_path": install_path,
+        "gpu": gpu,
+        "log": "",
+        "error": "",
+        "started_at": datetime.now(timezone.utc).isoformat(),
+        "finished_at": "",
+    }
+    with _comfyui_install_jobs_lock:
+        _comfyui_install_jobs[job_id] = job
+    threading.Thread(target=_run_comfyui_install_job, args=(job_id,), daemon=True).start()
+    return _comfyui_install_job_snapshot(job)
+
+
+def _comfyui_install_job_snapshot(job: dict) -> dict:
+    return {
+        "id": job.get("id"),
+        "status": job.get("status"),
+        "install_path": job.get("install_path"),
+        "gpu": job.get("gpu"),
+        "log": job.get("log", ""),
+        "error": job.get("error", ""),
+        "started_at": job.get("started_at"),
+        "finished_at": job.get("finished_at"),
+    }
 
 
 def _normalize_image_ref(body: dict) -> dict:
@@ -4879,11 +5158,45 @@ def api_comfyui_update_status(job_id: str):
     """Get status of a running ComfyUI update job."""
     with _comfyui_update_jobs_lock:
         job = _comfyui_update_jobs.get(job_id)
-    
+
     if not job:
         return jsonify({"error": f"Job {job_id} not found"}), 404
-    
+
     return jsonify(_comfyui_update_job_snapshot(job))
+
+
+@app.route("/api/service/comfyui/install-check", methods=["GET"])
+def api_comfyui_install_check():
+    """Check whether ComfyUI is installed at the configured path."""
+    config = _load_service_config()
+    path_value = str(config.get("comfyui_path") or "").strip()
+    state = _check_comfyui_installed(path_value)
+    return jsonify(state)
+
+
+@app.route("/api/service/comfyui/install", methods=["POST"])
+def api_comfyui_install():
+    """Start a self-contained ComfyUI install into the configured (or provided) path."""
+    body = request.get_json(silent=True) or {}
+    config = _load_service_config()
+    install_path = str(body.get("install_path") or config.get("comfyui_path") or "").strip()
+    if not install_path:
+        return jsonify({"error": "Provide install_path or configure comfyui_path first"}), 400
+    gpu = str(body.get("gpu") or "nvidia").strip().lower()
+    if gpu not in _TORCH_INDEX_URLS:
+        return jsonify({"error": f"gpu must be one of: {', '.join(_TORCH_INDEX_URLS)}"}), 400
+    job = _start_comfyui_install_job(install_path, gpu)
+    return jsonify({"ok": True, "job": job}), 202
+
+
+@app.route("/api/service/comfyui/install-status/<job_id>", methods=["GET"])
+def api_comfyui_install_status(job_id: str):
+    """Poll the status of a running ComfyUI install job."""
+    with _comfyui_install_jobs_lock:
+        job = _comfyui_install_jobs.get(job_id)
+    if not job:
+        return jsonify({"error": f"Job {job_id} not found"}), 404
+    return jsonify(_comfyui_install_job_snapshot(job))
 
 
 @app.route("/api/app/restart", methods=["POST"])

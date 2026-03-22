@@ -995,6 +995,26 @@
       </div>
       <p id="config-comfy-version-info" class="hint">Version info: checking...</p>
       <p id="config-comfy-status" class="hint">Awaiting action.</p>
+
+      <details id="comfyui-install-section" class="install-section">
+        <summary class="install-section-summary">Install / Repair ComfyUI</summary>
+        <div class="install-section-body">
+          <p id="comfyui-install-status-line" class="hint" aria-live="polite">Checking install status…</p>
+          <div class="install-controls-row">
+            <label for="comfyui-install-gpu" class="field-label-inline">GPU type:</label>
+            <div class="select-wrapper select-wrapper-inline">
+              <select id="comfyui-install-gpu" aria-label="GPU type for PyTorch install">
+                <option value="nvidia">NVIDIA (CUDA 12.1)</option>
+                <option value="amd">AMD (ROCm 5.7)</option>
+                <option value="cpu">CPU only</option>
+              </select>
+            </div>
+            <button class="btn btn-primary btn-sm" id="comfyui-install-btn" type="button">Install</button>
+          </div>
+          <p class="hint">Clones ComfyUI from GitHub, creates a <code>.venv</code>, and installs PyTorch + requirements into the configured path. Safe to re-run to repair a broken install.</p>
+          <pre id="comfyui-install-log" class="install-log" aria-live="polite" aria-label="Install log output" hidden></pre>
+        </div>
+      </details>
     </section>
 
     <section class="config-card" aria-label="ComfyUI custom nodes browser">

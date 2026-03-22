@@ -336,6 +336,11 @@ const configComfyStopBtn = document.getElementById('config-comfy-stop');
 const configComfyCheckUpdatesBtn = document.getElementById('config-comfy-check-updates');
 const configComfyUpdateBtn = document.getElementById('config-comfy-update');
 const configComfyVersionInfo = document.getElementById('config-comfy-version-info');
+const comfyuiInstallSection = document.getElementById('comfyui-install-section');
+const comfyuiInstallStatusLine = document.getElementById('comfyui-install-status-line');
+const comfyuiInstallGpu = document.getElementById('comfyui-install-gpu');
+const comfyuiInstallBtn = document.getElementById('comfyui-install-btn');
+const comfyuiInstallLog = document.getElementById('comfyui-install-log');
 const configComfyNodesSearchInput = document.getElementById('config-comfy-nodes-search');
 const configComfyNodesIncludeBuiltinsToggle = document.getElementById('config-comfy-nodes-include-builtins');
 const configComfyNodesRefreshBtn = document.getElementById('config-comfy-nodes-refresh');
@@ -2619,6 +2624,8 @@ async function saveServiceConfig(options = {}) {
 		if (configDefaultNegPrompt) {
 			localStorage.setItem('defaultNegativePrompt', configDefaultNegPrompt.value);
 		}
+		// Refresh install status when path is saved
+		checkComfyInstallStatus();
 		if (!silentSuccess) {
 			showToast('Configuration saved.', 'pos');
 		}
@@ -4665,6 +4672,85 @@ if (configComfyStopBtn) {
 	configComfyStopBtn.addEventListener('keydown', onConfigServiceControlsKeydown);
 }
 
+// ComfyUI install / repair handlers
+async function checkComfyInstallStatus() {
+	if (!comfyuiInstallStatusLine) return;
+	try {
+		const resp = await fetch('/api/service/comfyui/install-check');
+		const data = await resp.json();
+		if (data.installed) {
+			const extras = [data.has_git && 'git', data.has_venv && 'venv'].filter(Boolean).join(', ');
+			comfyuiInstallStatusLine.textContent = `Installed at: ${data.path}${extras ? ` (${extras})` : ''}`;
+			if (comfyuiInstallBtn) comfyuiInstallBtn.textContent = 'Repair / Reinstall';
+		} else {
+			comfyuiInstallStatusLine.textContent = data.reason || 'Not installed.';
+			if (comfyuiInstallBtn) comfyuiInstallBtn.textContent = 'Install';
+		}
+	} catch (err) {
+		if (comfyuiInstallStatusLine) comfyuiInstallStatusLine.textContent = `Status check failed: ${err.message}`;
+	}
+}
+
+async function pollComfyInstallStatus(jobId) {
+	const maxAttempts = 600;  // 10 min at 1s intervals
+	for (let i = 0; i < maxAttempts; i++) {
+		await new Promise(r => setTimeout(r, 1000));
+		try {
+			const resp = await fetch(`/api/service/comfyui/install-status/${jobId}`);
+			const data = await resp.json();
+			if (comfyuiInstallLog) {
+				comfyuiInstallLog.textContent = data.log || '';
+				comfyuiInstallLog.scrollTop = comfyuiInstallLog.scrollHeight;
+				comfyuiInstallLog.hidden = false;
+			}
+			if (data.status === 'done') {
+				if (comfyuiInstallStatusLine) comfyuiInstallStatusLine.textContent = 'Install complete!';
+				if (comfyuiInstallBtn) { comfyuiInstallBtn.disabled = false; comfyuiInstallBtn.textContent = 'Repair / Reinstall'; }
+				showToast('ComfyUI installed successfully.', 'pos');
+				await checkComfyInstallStatus();
+				return;
+			}
+			if (data.status === 'error') {
+				if (comfyuiInstallStatusLine) comfyuiInstallStatusLine.textContent = `Install failed: ${data.error}`;
+				if (comfyuiInstallBtn) { comfyuiInstallBtn.disabled = false; comfyuiInstallBtn.textContent = 'Retry Install'; }
+				showToast(`ComfyUI install failed: ${data.error}`, 'neg');
+				return;
+			}
+			if (comfyuiInstallStatusLine) comfyuiInstallStatusLine.textContent = `Installing… (${i + 1}s)`;
+		} catch (err) {
+			if (comfyuiInstallStatusLine) comfyuiInstallStatusLine.textContent = `Polling error: ${err.message}`;
+		}
+	}
+	if (comfyuiInstallStatusLine) comfyuiInstallStatusLine.textContent = 'Install timed out waiting for completion.';
+	if (comfyuiInstallBtn) comfyuiInstallBtn.disabled = false;
+}
+
+if (comfyuiInstallBtn) {
+	comfyuiInstallBtn.addEventListener('click', async () => {
+		const gpu = comfyuiInstallGpu?.value || 'nvidia';
+		comfyuiInstallBtn.disabled = true;
+		if (comfyuiInstallStatusLine) comfyuiInstallStatusLine.textContent = 'Starting install…';
+		if (comfyuiInstallLog) { comfyuiInstallLog.textContent = ''; comfyuiInstallLog.hidden = false; }
+		try {
+			const resp = await fetch('/api/service/comfyui/install', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ gpu }),
+			});
+			const data = await resp.json();
+			if (!resp.ok) {
+				if (comfyuiInstallStatusLine) comfyuiInstallStatusLine.textContent = `Install failed: ${data.error}`;
+				comfyuiInstallBtn.disabled = false;
+				return;
+			}
+			await pollComfyInstallStatus(data.job.id);
+		} catch (err) {
+			if (comfyuiInstallStatusLine) comfyuiInstallStatusLine.textContent = `Install error: ${err.message}`;
+			comfyuiInstallBtn.disabled = false;
+		}
+	});
+}
+
 // ComfyUI update handlers
 if (configComfyCheckUpdatesBtn) {
 	configComfyCheckUpdatesBtn.addEventListener('click', async () => {
@@ -5276,8 +5362,9 @@ async function loadComfyCustomNodes() {
 	await loadComfyCustomNodePackages();
 }
 
-// Load version info on page load
+// Load version info and install status on page load
 loadComfyuiVersionInfo();
+checkComfyInstallStatus();
 
 if (configComfyNodesIncludeBuiltinsToggle) {
 	configComfyNodesIncludeBuiltinsToggle.checked = comfyCustomNodeIncludeBuiltins;
