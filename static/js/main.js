@@ -8773,6 +8773,24 @@ document.addEventListener('keydown', (event) => {
 	}
 });
 
+// Escape-to-close support for Image panel collapsible details elements
+document.addEventListener('keydown', (event) => {
+	if (event.key !== 'Escape') return;
+	
+	// Find closest open details element (ControlNet, LoRA display, LoRA legend, HiresFix)
+	const openDetails = event.target.closest('details[open]');
+	if (!openDetails) return;
+	
+	// Only handle details in the Image panel
+	const imagePanel = panelImage;
+	if (!imagePanel || imagePanel.hidden) return;
+	if (!imagePanel.contains(openDetails)) return;
+	
+	event.preventDefault();
+	event.stopPropagation();
+	openDetails.open = false;
+});
+
 // Preset quick-apply with number keys 1-3 (Fast, Quality, Creative)
 document.addEventListener('keydown', (event) => {
 	const key = event.key;

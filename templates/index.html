@@ -237,7 +237,7 @@
         <button class="btn btn-ghost btn-xs" id="lora-compat-ui-reset" type="button">Reset LoRA UI</button>
       </div>
       <details id="lora-display-options" class="lora-display-options">
-        <summary id="lora-display-options-toggle">Display options</summary>
+        <summary id="lora-display-options-toggle" aria-keyshortcuts="Escape">Display options</summary>
         <div class="lora-display-options-grid">
           <label class="hint lora-show-row-hints-toggle" for="lora-show-row-hints-toggle">
             <input id="lora-show-row-hints-toggle" type="checkbox" />
@@ -265,7 +265,7 @@
         <p id="lora-display-options-active-hint" class="hint lora-display-options-active-hint" hidden aria-live="polite"></p>
       </details>
       <details id="lora-family-legend" class="lora-family-legend">
-        <summary id="lora-family-legend-toggle">Family legend</summary>
+        <summary id="lora-family-legend-toggle" aria-keyshortcuts="Escape">Family legend</summary>
         <p class="hint">Chip labels indicate inferred LoRA family (Flux, SDXL, SD1.5, Unknown). Amber mismatch badges mean the selected LoRA family does not match the active checkpoint family and may be skipped on submit.</p>
       </details>
       <div id="lora-stack-container" class="lora-stack-container" aria-label="LoRA network stack">
@@ -321,7 +321,7 @@
     </div>
 
     <details class="sidebar-section cn-panel" id="controlnet-panel" data-image-ui-level="advanced">
-      <summary class="field-label">ControlNet (optional)</summary>
+      <summary class="field-label" aria-keyshortcuts="Escape">ControlNet (optional)</summary>
       <div class="form-field cn-controls">
         <label for="controlnet-model-select" class="field-label">ControlNet Model</label>
         <div class="select-wrapper">
@@ -638,7 +638,7 @@
         <p class="hint flux-no-neg-hint" id="flux-no-neg-hint" hidden>Flux models do not use negative prompts — this field is hidden in FLUX mode.</p>
 
         <details class="form-field hiresfix-panel" id="hiresfix-panel" data-image-ui-level="advanced">
-          <summary class="hiresfix-summary">
+          <summary class="hiresfix-summary" aria-keyshortcuts="Escape">
             <span class="field-label">Hi-Res Fix / Upscaler</span>
             <label class="toggle-label hiresfix-enable-label" onclick="event.stopPropagation()">
               <input id="hiresfix-enable" type="checkbox" />

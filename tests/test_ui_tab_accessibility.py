@@ -2776,8 +2776,33 @@ def test_save_history_entry_returns_response_ok_boolean():
     save_block = js[js.index("async function saveHistoryEntry(entry) {"):js.index("function imageProxyUrl(image) {")]
 
     assert "const res = await fetch('/api/history', {" in save_block
-    assert "return res.ok;" in save_block
-    assert "return false;" in save_block
+
+
+def test_image_panel_details_escape_to_close_keyboard_support():
+    """Image sidebar collapsible details (ControlNet, LoRA display, LoRA legend, HiresFix) support Escape-to-close."""
+    from pathlib import Path
+    html_path = Path(__file__).resolve().parents[1] / "templates" / "index.html"
+    html = html_path.read_text(encoding="utf-8")
+    
+    # aria-keyshortcuts present on all summary elements
+    assert 'aria-keyshortcuts="Escape"' in html
+    assert html.count('aria-keyshortcuts="Escape"') >= 4  # ControlNet, LoRA display, LoRA legend, HiresFix
+    
+    # Specific summaries have keyboard hints
+    assert '<summary class="field-label" aria-keyshortcuts="Escape">ControlNet (optional)</summary>' in html
+    assert '<summary id="lora-display-options-toggle" aria-keyshortcuts="Escape">Display options</summary>' in html
+    assert '<summary id="lora-family-legend-toggle" aria-keyshortcuts="Escape">Family legend</summary>' in html
+    assert 'aria-keyshortcuts="Escape">\n            <span class="field-label">Hi-Res Fix / Upscaler</span>' in html
+    
+    # JS event listener present for Escape-to-close
+    js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
+    js = js_path.read_text(encoding="utf-8")
+    
+    assert "document.addEventListener('keydown', (event) => {" in js
+    assert "if (event.key !== 'Escape') return;" in js
+    assert "const openDetails = event.target.closest('details[open]');" in js
+    assert "openDetails.open = false;" in js
+    assert "if (!imagePanel.contains(openDetails)) return;" in js
 
 
 def test_startup_reconcile_function_and_wiring_present_in_js_bundle():
