@@ -1004,12 +1004,15 @@ def test_preview_websocket_retry_backoff_is_respected_between_attempts():
     assert "let comfyWsBlockedUntil = 0;" in content
     assert "let comfyWsQuickCloseCount = 0;" in content
     assert "const COMFY_WS_BLOCKED_COOLDOWN_MS = 5 * 60 * 1000;" in content
-    assert "const COMFY_WS_QUICK_CLOSE_THRESHOLD = 3;" in content
+    assert "const COMFY_WS_QUICK_CLOSE_MS = 4000;" in content
+    assert "const COMFY_WS_QUICK_CLOSE_THRESHOLD = 2;" in content
     assert "function _isComfyWsBlockedActive() {" in content
     assert "if (comfyWsNextRetryAt > Date.now()) {" in content
     assert "ComfyUI WebSocket retry scheduled in ${secsLeft}s. HTTP polling fallback is active." in content
     assert "ComfyUI WebSocket appears blocked (${secsLeft}s left). HTTP polling fallback is active." in content
-    assert "const likelyBlocked = Boolean(event?.code === 1006 && comfyWsQuickCloseCount >= COMFY_WS_QUICK_CLOSE_THRESHOLD);" in content
+    assert "const likelyBlockedByQuickCloses = Boolean(event?.code === 1006 && comfyWsQuickCloseCount >= COMFY_WS_QUICK_CLOSE_THRESHOLD);" in content
+    assert "const likelyBlockedByRepeatedHandshakeFailures = Boolean(event?.code === 1006 && comfyWsFailCount >= 2);" in content
+    assert "const likelyBlocked = likelyBlockedByQuickCloses || likelyBlockedByRepeatedHandshakeFailures;" in content
     assert "ComfyUI WebSocket appears blocked (likely 403/forbidden). HTTP polling fallback is active." in content
     assert "comfyWsNextRetryAt = Date.now() + delay;" in content
     assert "comfyWsNextRetryAt = 0;" in content

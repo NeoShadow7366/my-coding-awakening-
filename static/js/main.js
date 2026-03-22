@@ -9116,8 +9116,8 @@ const COMFY_WS_MAX_RETRIES = 4;
 const COMFY_WS_COOLDOWN_KEY = 'comfyWsCooldownUntil';
 const COMFY_WS_COOLDOWN_MS = 30 * 60 * 1000;
 const COMFY_WS_BLOCKED_COOLDOWN_MS = 5 * 60 * 1000;
-const COMFY_WS_QUICK_CLOSE_MS = 1500;
-const COMFY_WS_QUICK_CLOSE_THRESHOLD = 3;
+const COMFY_WS_QUICK_CLOSE_MS = 4000;
+const COMFY_WS_QUICK_CLOSE_THRESHOLD = 2;
 const comfyWsProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
 const comfyWsHost = window.location.hostname || 'localhost';
 const COMFY_WS_URL = `${comfyWsProtocol}://${comfyWsHost}:8188/ws?clientId=${tabInstanceId}`;
@@ -9325,7 +9325,9 @@ function connectComfyWebSocket() {
 			} else {
 				comfyWsQuickCloseCount = 0;
 			}
-			const likelyBlocked = Boolean(event?.code === 1006 && comfyWsQuickCloseCount >= COMFY_WS_QUICK_CLOSE_THRESHOLD);
+			const likelyBlockedByQuickCloses = Boolean(event?.code === 1006 && comfyWsQuickCloseCount >= COMFY_WS_QUICK_CLOSE_THRESHOLD);
+			const likelyBlockedByRepeatedHandshakeFailures = Boolean(event?.code === 1006 && comfyWsFailCount >= 2);
+			const likelyBlocked = likelyBlockedByQuickCloses || likelyBlockedByRepeatedHandshakeFailures;
 			if (likelyBlocked) {
 				comfyWsBlockedUntil = Date.now() + COMFY_WS_BLOCKED_COOLDOWN_MS;
 				comfyWsNextRetryAt = 0;
