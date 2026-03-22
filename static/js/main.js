@@ -6050,6 +6050,18 @@ function syncImageReadiness() {
 	imageReadinessText.textContent = `Readiness: ready to generate using ${modelName}.`;
 }
 
+function ensureSidebarSectionExpandedForControl(controlEl) {
+	if (!controlEl || typeof controlEl.closest !== 'function') return;
+	const section = controlEl.closest('#panel-image .sidebar .sidebar-section');
+	if (!section || !section.classList.contains('is-collapsed')) return;
+	const toggleBtn = section.querySelector(':scope > .sidebar-section-head .sidebar-section-toggle');
+	if (toggleBtn) {
+		toggleBtn.click();
+		return;
+	}
+	section.classList.remove('is-collapsed');
+}
+
 function syncImageQuickState() {
 	if (!imageQuickState) return;
 	const baseModel = String(imageModelSelect?.value || '').trim();
@@ -6075,6 +6087,16 @@ function syncImageQuickState() {
 
 function focusImageControl(controlEl) {
 	if (!controlEl || typeof controlEl.scrollIntoView !== 'function') return;
+	if (panelImage?.dataset?.imageUiMode === 'simple' && controlEl.closest?.('[data-image-ui-level="advanced"]')) {
+		setImageUiMode('advanced');
+	}
+	const imagePanelRoot = controlEl.closest('#panel-image');
+	const allDetails = imagePanelRoot ? [...imagePanelRoot.querySelectorAll('details')] : [];
+	const detailsAncestors = allDetails.filter((detailsEl) => detailsEl.contains(controlEl));
+	for (const detailsEl of detailsAncestors) {
+		detailsEl.open = true;
+	}
+	ensureSidebarSectionExpandedForControl(controlEl);
 	controlEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
 	if (typeof controlEl.focus === 'function') {
 		controlEl.focus({ preventScroll: true });

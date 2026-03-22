@@ -2485,11 +2485,15 @@ def test_image_quick_workflow_bar_and_sticky_actions_present():
     assert "function syncImageQuickState() {" in js
     assert "function setImageUiMode(mode, options = {}) {" in js
     assert "function syncImageReadiness() {" in js
+    assert "function ensureSidebarSectionExpandedForControl(controlEl) {" in js
     assert "function focusImageControl(controlEl) {" in js
     assert "syncImageQuickState();" in js
     assert "syncImageReadiness();" in js
     assert "const IMAGE_UI_MODE_KEY = 'imageUiModeV1';" in js
     assert "panelImage.dataset.imageUiMode = nextMode;" in js
+    assert "setImageUiMode('advanced');" in js
+    assert "ensureSidebarSectionExpandedForControl(controlEl);" in js
+    assert "detailsEl.open = true;" in js
     assert "Readiness: ready to generate" in js
     assert "Queue ${queueLabel}" in js
 
