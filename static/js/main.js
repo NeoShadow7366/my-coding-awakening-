@@ -1296,11 +1296,15 @@ function restoreTrackedQueueState() {
 	try {
 		parsed = JSON.parse(localStorage.getItem(QUEUE_STATE_STORAGE_KEY) || '{}');
 	} catch {
+		renderQueueRestoreHint();
 		return;
 	}
 
 	const entries = Array.isArray(parsed?.entries) ? parsed.entries : [];
-	if (!entries.length) return;
+	if (!entries.length) {
+		renderQueueRestoreHint();
+		return;
+	}
 
 	let restoredCount = 0;
 	for (const entry of entries) {
@@ -14445,6 +14449,7 @@ syncImageReadiness();
 syncImageRuntimeEstimate();
 
 restoreTrackedQueueState();
+renderQueueRestoreHint();
 loadGallery();
 loadLivePreview();
 loadServiceConfig();

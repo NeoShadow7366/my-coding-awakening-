@@ -158,6 +158,9 @@ def test_queue_action_keyboard_handler_wiring_present_in_js_bundle():
     assert "renderQueueLastAction();" in content
     assert "Restored ${count} active queue item" in content
     assert "restoreTrackedQueueState();" in content
+    assert "if (!entries.length) {" in content
+    assert "renderQueueRestoreHint();" in content
+    assert "restoreTrackedQueueState();\nrenderQueueRestoreHint();" in content
     assert "localStorage.setItem(QUEUE_STATE_STORAGE_KEY" in content
     assert "setQueueLastAction(`Restored ${restoredCount} tracked queue item${restoredCount === 1 ? '' : 's'}.`);" in content
     assert "setQueueLastAction('Moved a job to the front of the queue.');" in content
