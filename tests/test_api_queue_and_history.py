@@ -48,7 +48,7 @@ def test_image_queue_returns_done_for_prompt_ids(client, monkeypatch):
 
     def fake_get(url, timeout=0, **kwargs):
         assert url.endswith("/queue")
-        assert timeout == 10
+        assert timeout == 5  # queue endpoint uses short timeout to avoid Flask thread exhaustion
         return DummyResponse(
             payload={
                 "queue_running": [[1, "pid-run"]],
@@ -56,13 +56,19 @@ def test_image_queue_returns_done_for_prompt_ids(client, monkeypatch):
             }
         )
 
-    def fake_parse_prompt_images(prompt_id):
-        if prompt_id == "pid-done":
-            return [{"filename": "img.png", "subfolder": "", "type": "output"}]
-        return []
-
     monkeypatch.setattr(app_module.requests, "get", fake_get)
-    monkeypatch.setattr(app_module, "_parse_prompt_images", fake_parse_prompt_images)
+
+    def fake_comfy_history(prompt_id, timeout=20):
+        if prompt_id == "pid-done":
+            return {
+                "pid-done": {
+                    "outputs": {"node1": {"images": [{"filename": "img.png", "subfolder": "", "type": "output"}]}},
+                    "status": {"status_str": "success"},
+                }
+            }
+        return {}
+
+    monkeypatch.setattr(app_module, "_comfy_history", fake_comfy_history)
 
     resp = client.get("/api/image/queue?prompt_ids=pid-done,pid-empty")
 
@@ -70,12 +76,12 @@ def test_image_queue_returns_done_for_prompt_ids(client, monkeypatch):
     data = resp.get_json()
     assert data["running"] == [[1, "pid-run"]]
     assert data["pending"] == [[2, "pid-pend"]]
-    assert data["done"] == [
-        {
-            "prompt_id": "pid-done",
-            "images": [{"filename": "img.png", "subfolder": "", "type": "output"}],
-        }
-    ]
+    assert len(data["done"]) == 1
+    done_item = data["done"][0]
+    assert done_item["prompt_id"] == "pid-done"
+    assert done_item["images"] == [{"filename": "img.png", "subfolder": "", "type": "output"}]
+    assert done_item["comfy_status"] == "success"
+    assert done_item["error"] is False
 
 
 def test_image_queue_transient_parse_error_is_skipped_per_prompt(client, monkeypatch):
@@ -83,18 +89,24 @@ def test_image_queue_transient_parse_error_is_skipped_per_prompt(client, monkeyp
 
     def fake_get(url, timeout=0, **kwargs):
         assert url.endswith("/queue")
-        assert timeout == 10
+        assert timeout == 5  # queue endpoint uses short timeout to avoid Flask thread exhaustion
         return DummyResponse(payload={"queue_running": [], "queue_pending": []})
 
-    def fake_parse_prompt_images(prompt_id):
-        if prompt_id == "pid-error":
-            raise app_module.requests.RequestException("temporary parse failure")
-        if prompt_id == "pid-done":
-            return [{"filename": "ok.png", "subfolder": "", "type": "output"}]
-        return []
-
     monkeypatch.setattr(app_module.requests, "get", fake_get)
-    monkeypatch.setattr(app_module, "_parse_prompt_images", fake_parse_prompt_images)
+
+    def fake_comfy_history(prompt_id, timeout=20):
+        if prompt_id == "pid-error":
+            raise app_module.requests.RequestException("temporary history failure")
+        if prompt_id == "pid-done":
+            return {
+                "pid-done": {
+                    "outputs": {"node1": {"images": [{"filename": "ok.png", "subfolder": "", "type": "output"}]}},
+                    "status": {"status_str": "success"},
+                }
+            }
+        return {}
+
+    monkeypatch.setattr(app_module, "_comfy_history", fake_comfy_history)
 
     resp = client.get("/api/image/queue?prompt_ids=pid-error,pid-done")
 
@@ -102,33 +114,38 @@ def test_image_queue_transient_parse_error_is_skipped_per_prompt(client, monkeyp
     data = resp.get_json()
     assert data["running"] == []
     assert data["pending"] == []
-    assert data["done"] == [
-        {
-            "prompt_id": "pid-done",
-            "images": [{"filename": "ok.png", "subfolder": "", "type": "output"}],
-        }
-    ]
+    assert len(data["done"]) == 1
+    done_item = data["done"][0]
+    assert done_item["prompt_id"] == "pid-done"
+    assert done_item["images"] == [{"filename": "ok.png", "subfolder": "", "type": "output"}]
+    assert done_item["error"] is False
 
 
 def test_image_queue_retry_returns_done_after_transient_parse_failure(client, monkeypatch):
     monkeypatch.setattr(app_module, "_comfy_available", lambda: True)
-    parse_calls = {"pid-retry": 0}
+    history_calls = {"pid-retry": 0}
 
     def fake_get(url, timeout=0, **kwargs):
         assert url.endswith("/queue")
-        assert timeout == 10
+        assert timeout == 5  # queue endpoint uses short timeout to avoid Flask thread exhaustion
         return DummyResponse(payload={"queue_running": [], "queue_pending": []})
 
-    def fake_parse_prompt_images(prompt_id):
-        if prompt_id != "pid-retry":
-            return []
-        parse_calls["pid-retry"] += 1
-        if parse_calls["pid-retry"] == 1:
-            raise app_module.requests.RequestException("history not ready")
-        return [{"filename": "retry.png", "subfolder": "", "type": "output"}]
-
     monkeypatch.setattr(app_module.requests, "get", fake_get)
-    monkeypatch.setattr(app_module, "_parse_prompt_images", fake_parse_prompt_images)
+
+    def fake_comfy_history(prompt_id, timeout=20):
+        if prompt_id != "pid-retry":
+            return {}
+        history_calls["pid-retry"] += 1
+        if history_calls["pid-retry"] == 1:
+            raise app_module.requests.RequestException("history not ready")
+        return {
+            "pid-retry": {
+                "outputs": {"node1": {"images": [{"filename": "retry.png", "subfolder": "", "type": "output"}]}},
+                "status": {"status_str": "success"},
+            }
+        }
+
+    monkeypatch.setattr(app_module, "_comfy_history", fake_comfy_history)
 
     first = client.get("/api/image/queue?prompt_ids=pid-retry")
     second = client.get("/api/image/queue?prompt_ids=pid-retry")
@@ -137,12 +154,11 @@ def test_image_queue_retry_returns_done_after_transient_parse_failure(client, mo
     assert first.get_json()["done"] == []
 
     assert second.status_code == 200
-    assert second.get_json()["done"] == [
-        {
-            "prompt_id": "pid-retry",
-            "images": [{"filename": "retry.png", "subfolder": "", "type": "output"}],
-        }
-    ]
+    retry_done = second.get_json()["done"]
+    assert len(retry_done) == 1
+    assert retry_done[0]["prompt_id"] == "pid-retry"
+    assert retry_done[0]["images"] == [{"filename": "retry.png", "subfolder": "", "type": "output"}]
+    assert retry_done[0]["error"] is False
 
 
 def test_image_cancel_requires_prompt_id(client, monkeypatch):
@@ -584,7 +600,7 @@ def test_live_preview_returns_first_available_prompt_image(client, monkeypatch):
 
     def fake_get(url, timeout=0, **kwargs):
         assert url.endswith("/queue")
-        assert timeout == 10
+        assert timeout == 5  # queue endpoint uses short timeout to avoid Flask thread exhaustion
         return DummyResponse(
             payload={
                 "queue_running": [[1, "pid-run"]],
@@ -703,6 +719,8 @@ def test_clamp_float_clamps_to_bounds():
 def test_image_generate_clamps_out_of_range_workflow_params(client, monkeypatch):
     """Values outside allowed ranges are clamped before the workflow is built."""
     monkeypatch.setattr(app_module, "_comfy_available", lambda: True)
+    monkeypatch.setattr(app_module, "_image_models", lambda: ["clamp_test.safetensors"])
+    monkeypatch.setattr(app_module, "_flux_clip_vae_components", lambda: {"t5": None, "clip_l": None, "vae": None})
 
     captured_meta = {}
 
@@ -1185,6 +1203,17 @@ def test_queue_endpoint_auto_reconciles_done_jobs(client, monkeypatch):
         return DummyResponse(payload={"queue_running": [], "queue_pending": []})
 
     monkeypatch.setattr(app_module.requests, "get", fake_get_queue)
+    monkeypatch.setattr(
+        app_module,
+        "_comfy_history",
+        lambda pid, timeout=20: {
+            pid: {
+                "outputs": {"node1": {"images": done_images}},
+                "status": {"status_str": "success"},
+            }
+        } if pid == "pid-auto-recon" else {},
+    )
+    # _reconcile_pending_history still uses _parse_prompt_images internally
     monkeypatch.setattr(
         app_module,
         "_parse_prompt_images",

@@ -297,6 +297,7 @@ const imageReadinessText = document.getElementById('image-readiness-text');
 const imageReadinessActionBtn = document.getElementById('image-readiness-action');
 const imageEstimateBadge = document.getElementById('image-estimate-badge');
 const imageGenerateBtn = document.getElementById('image-generate-btn');
+const imageCancelSubmissionBtn = document.getElementById('image-cancel-submission-btn');
 const queueTelemetry = document.getElementById('queue-telemetry');
 const queueTelemetryResetBtn = document.getElementById('queue-telemetry-reset');
 const queueHelpDetails = document.getElementById('queue-help-details');
@@ -1280,6 +1281,17 @@ if (queueLastActionPinBtn) {
 	});
 }
 
+if (imageCancelSubmissionBtn) {
+	imageCancelSubmissionBtn.addEventListener('click', () => {
+		resetImageSubmissionTimeout();
+		imageGenerateBtn.disabled = false;
+		imageGenerateBtn.textContent = 'Generate Image';
+		queueSummary.textContent = 'Submission cancelled.';
+		showToast('Generation submission cancelled.', '');
+		syncImageReadiness();
+	});
+}
+
 function persistTrackedQueueState() {
 	const entries = Array.from(trackedPromptIds)
 		.map((promptId) => {
@@ -1517,6 +1529,65 @@ if (queueTelemetryResetBtn) {
 const imageState = {
 	currentPromptId: '',
 };
+
+// Submission timeout tracking (for Flux and other stuck submissions)
+let imageSubmissionAbortController = null;
+let imageSubmissionTimeoutId = null;
+const IMAGE_SUBMISSION_TIMEOUT_MS = 120000; // 120 seconds (model loading can take 30-90s)
+const IMAGE_SUBMISSION_LOADING_HINT_MS = 8000; // Show "loading model..." hint after 8s
+let imageSubmissionLoadingHintId = null;
+
+function resetImageSubmissionTimeout() {
+	if (imageSubmissionTimeoutId) {
+		clearTimeout(imageSubmissionTimeoutId);
+		imageSubmissionTimeoutId = null;
+	}
+	if (imageSubmissionLoadingHintId) {
+		clearTimeout(imageSubmissionLoadingHintId);
+		imageSubmissionLoadingHintId = null;
+	}
+	if (imageSubmissionAbortController) {
+		try {
+			imageSubmissionAbortController.abort();
+		} catch (e) {
+			// Ignore abort errors
+		}
+		imageSubmissionAbortController = null;
+	}
+	if (imageCancelSubmissionBtn) {
+		imageCancelSubmissionBtn.hidden = true;
+	}
+}
+
+function setupImageSubmissionTimeout() {
+	resetImageSubmissionTimeout();
+	imageSubmissionAbortController = new AbortController();
+	
+	imageSubmissionTimeoutId = setTimeout(() => {
+		if (imageSubmissionAbortController && !imageSubmissionAbortController.signal.aborted) {
+			imageSubmissionAbortController.abort();
+		}
+		// Show error without resetting button yet (error handler will do it)
+		queueSummary.textContent = 'Error: Generation request timed out after 2 minutes. ComfyUI may be unresponsive.';
+		showToast('Generation request timed out. Check ComfyUI and try again.', 'neg');
+		imageSubmissionTimeoutId = null;
+	}, IMAGE_SUBMISSION_TIMEOUT_MS);
+	
+	// Show "loading model..." status hint after 8s (model loading can take 30-90s)
+	imageSubmissionLoadingHintId = setTimeout(() => {
+		if (imageSubmissionAbortController && !imageSubmissionAbortController.signal.aborted) {
+			if (queueSummary && queueSummary.textContent.includes('submitting')) {
+				queueSummary.textContent = 'Loading model into ComfyUI — this may take up to 2 minutes for first load…';
+			}
+		}
+		imageSubmissionLoadingHintId = null;
+	}, IMAGE_SUBMISSION_LOADING_HINT_MS);
+	
+	// Show cancel button
+	if (imageCancelSubmissionBtn) {
+		imageCancelSubmissionBtn.hidden = false;
+	}
+}
 
 /* --------------------------------------------------------------------------
 	 Toast notifications
@@ -9684,6 +9755,21 @@ async function pollQueue() {
 				const meta = queueJobMeta.get(promptId) || {};
 				const snapshot = pendingImageJobs.get(promptId) || meta.snapshot || {};
 
+				if (done.error || (images.length === 0 && done.comfy_status !== 'success')) {
+					// ComfyUI reported an error or finished with no images.
+					const reason = done.comfy_status === 'error'
+						? 'ComfyUI reported an execution error. Check ComfyUI logs for details.'
+						: 'ComfyUI job completed but produced no images. The model or workflow may be misconfigured.';
+					meta.status = 'failed';
+					meta.failReason = reason;
+					meta.updatedAt = Date.now();
+					queueJobMeta.set(promptId, meta);
+					trackedPromptIds.delete(promptId);
+					pendingImageJobs.delete(promptId);
+					incrementQueueTelemetry('failed');
+					continue;
+				}
+
 				if (images.length) {
 					updateLivePreviewFromDoneItem(done, snapshot, meta);
 					const saved = await saveHistoryEntry({
@@ -14630,6 +14716,9 @@ imageForm.addEventListener('submit', async (e) => {
 	imageGenerateBtn.textContent = 'Submitting...';
 	syncImageQuickState();
 	syncImageReadiness();
+	
+	// Set up submission timeout (30 seconds max wait)
+	setupImageSubmissionTimeout();
 
 	try {
 		const controlnetModel = controlnetModelSelect?.value || '';
@@ -14639,6 +14728,7 @@ imageForm.addEventListener('submit', async (e) => {
 			imageGenerateBtn.disabled = false;
 			imageGenerateBtn.textContent = 'Generate Image';
 			syncImageReadiness();
+			resetImageSubmissionTimeout();
 			return;
 		}
 		if (!controlnetModel && hasControlnetImage) {
@@ -14646,6 +14736,7 @@ imageForm.addEventListener('submit', async (e) => {
 			imageGenerateBtn.disabled = false;
 			imageGenerateBtn.textContent = 'Generate Image';
 			syncImageReadiness();
+			resetImageSubmissionTimeout();
 			return;
 		}
 
@@ -14718,23 +14809,28 @@ imageForm.addEventListener('submit', async (e) => {
 			res = await fetch('/api/image/img2img', {
 				method: 'POST',
 				body: formData,
+				signal: imageSubmissionAbortController?.signal,
 			});
 		} else {
 			res = await fetch('/api/image/generate', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify(normalizedCommon),
+				signal: imageSubmissionAbortController?.signal,
 			});
 		}
 
 		const data = await res.json();
 		if (!res.ok) {
+			resetImageSubmissionTimeout();
 			queueSummary.textContent = `Error: ${data.error || 'Image request failed'}`;
 			imageGenerateBtn.disabled = false;
 			imageGenerateBtn.textContent = 'Generate Image';
 			syncImageReadiness();
 			return;
 		}
+
+		resetImageSubmissionTimeout();
 
 		if (data && data.meta && data.meta.seed !== undefined && data.meta.seed !== null) {
 			setLastGeneratedSeed(data.meta.seed);
@@ -14798,11 +14894,18 @@ imageForm.addEventListener('submit', async (e) => {
 				if (data.meta && data.meta.seed !== undefined) setLastGeneratedSeed(data.meta.seed);
 		await pollQueue();
 	} catch (err) {
-		queueSummary.textContent = `Error: ${err.message}`;
+		resetImageSubmissionTimeout();
+		const errorMsg = err.name === 'AbortError' 
+			? 'Generation request timed out after 2 minutes. If this is a new model, ComfyUI may need more time to load it.'
+			: err.message || 'Generation request failed';
+		queueSummary.textContent = `Error: ${errorMsg}`;
 		imageGenerateBtn.disabled = false;
 		imageGenerateBtn.textContent = 'Generate Image';
 		syncImageQuickState();
 		syncImageReadiness();
+		if (err.name !== 'AbortError') {
+			showToast(`Generation error: ${errorMsg}`, 'neg');
+		}
 	}
 });
 

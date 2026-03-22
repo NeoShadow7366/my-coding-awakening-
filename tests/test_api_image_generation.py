@@ -707,6 +707,121 @@ def test_build_img2img_workflow_flux_model_family_uses_flux_guidance_node(monkey
     assert ks_nodes[0]["inputs"]["cfg"] == 1.0
 
 
+
+def test_build_txt2img_workflow_flux_unet_only_uses_dual_clip_loader(monkeypatch):
+    """Flux txt2img workflow must add DualCLIPLoader + VAELoader when components are available."""
+    monkeypatch.setattr(app_module, "_image_models", lambda: ["flux_dev.safetensors"])
+    monkeypatch.setattr(
+        app_module,
+        "_flux_clip_vae_components",
+        lambda: {"t5": "t5xxl_fp8_e4m3fn.safetensors", "clip_l": "clip_l.safetensors", "vae": "ae.safetensors"},
+    )
+
+    workflow, meta = app_module._build_txt2img_workflow(
+        {
+            "prompt": "a neon city",
+            "model": "flux_dev.safetensors",
+            "model_family": "flux",
+            "sampler": "euler",
+            "scheduler": "normal",
+            "cfg": 3.5,
+            "steps": 20,
+        }
+    )
+
+    dc_nodes = [v for v in workflow.values() if v.get("class_type") == "DualCLIPLoader"]
+    assert len(dc_nodes) == 1, "Expected exactly one DualCLIPLoader node for Flux UNET workflow"
+    assert dc_nodes[0]["inputs"]["clip_name1"] == "t5xxl_fp8_e4m3fn.safetensors"
+    assert dc_nodes[0]["inputs"]["clip_name2"] == "clip_l.safetensors"
+    assert dc_nodes[0]["inputs"]["type"] == "flux"
+
+    vae_nodes = [v for v in workflow.values() if v.get("class_type") == "VAELoader"]
+    assert len(vae_nodes) == 1, "Expected exactly one VAELoader node for Flux UNET workflow"
+    assert vae_nodes[0]["inputs"]["vae_name"] == "ae.safetensors"
+
+
+def test_build_txt2img_workflow_flux_no_split_when_components_unavailable(monkeypatch):
+    """Flux workflow falls back to CheckpointLoaderSimple CLIP/VAE when no components found."""
+    monkeypatch.setattr(app_module, "_image_models", lambda: ["flux_dev.safetensors"])
+    monkeypatch.setattr(
+        app_module,
+        "_flux_clip_vae_components",
+        lambda: {"t5": None, "clip_l": None, "vae": None},
+    )
+
+    workflow, meta = app_module._build_txt2img_workflow(
+        {
+            "prompt": "a neon city",
+            "model": "flux_dev.safetensors",
+            "model_family": "flux",
+            "sampler": "euler",
+            "cfg": 3.5,
+            "steps": 20,
+        }
+    )
+
+    dc_nodes = [v for v in workflow.values() if v.get("class_type") == "DualCLIPLoader"]
+    assert len(dc_nodes) == 0, "No DualCLIPLoader expected when components unavailable"
+
+
+def test_build_txt2img_workflow_flux_custom_vae_not_overridden_by_split(monkeypatch):
+    """When user specifies a custom VAE, the Flux split must not override it."""
+    monkeypatch.setattr(app_module, "_image_models", lambda: ["flux_dev.safetensors"])
+    monkeypatch.setattr(
+        app_module,
+        "_flux_clip_vae_components",
+        lambda: {"t5": "t5xxl_fp8_e4m3fn.safetensors", "clip_l": "clip_l.safetensors", "vae": "ae.safetensors"},
+    )
+
+    workflow, meta = app_module._build_txt2img_workflow(
+        {
+            "prompt": "a neon city",
+            "model": "flux_dev.safetensors",
+            "model_family": "flux",
+            "sampler": "euler",
+            "cfg": 3.5,
+            "steps": 20,
+            "vae": "my_custom_vae.safetensors",
+        }
+    )
+
+    vae_nodes = [v for v in workflow.values() if v.get("class_type") == "VAELoader"]
+    assert len(vae_nodes) == 1, "Only one VAELoader (the user's custom VAE)"
+    assert vae_nodes[0]["inputs"]["vae_name"] == "my_custom_vae.safetensors"
+
+
+def test_build_img2img_workflow_flux_unet_only_uses_dual_clip_loader(monkeypatch):
+    """Flux img2img workflow must add DualCLIPLoader + VAELoader when components available."""
+    monkeypatch.setattr(app_module, "_image_models", lambda: ["flux_dev.safetensors"])
+    monkeypatch.setattr(
+        app_module,
+        "_flux_clip_vae_components",
+        lambda: {"t5": "t5xxl_fp8_e4m3fn.safetensors", "clip_l": "clip_l.safetensors", "vae": "ae.safetensors"},
+    )
+
+    workflow, meta = app_module._build_img2img_workflow(
+        {
+            "prompt": "futuristic robot",
+            "model": "flux_dev.safetensors",
+            "model_family": "flux",
+            "sampler": "euler",
+            "scheduler": "simple",
+            "cfg": 3.0,
+            "steps": 20,
+            "denoise": 0.7,
+        },
+        "source.png",
+    )
+
+    dc_nodes = [v for v in workflow.values() if v.get("class_type") == "DualCLIPLoader"]
+    assert len(dc_nodes) == 1
+    assert dc_nodes[0]["inputs"]["type"] == "flux"
+
+    vae_nodes = [v for v in workflow.values() if v.get("class_type") == "VAELoader"]
+    assert len(vae_nodes) == 1
+    assert vae_nodes[0]["inputs"]["vae_name"] == "ae.safetensors"
+
+
 def test_build_img2img_workflow_includes_batch_size(monkeypatch):
     """img2img workflow metadata must include batch_size parameter."""
     monkeypatch.setattr(app_module, "_image_models", lambda: ["base.safetensors"])

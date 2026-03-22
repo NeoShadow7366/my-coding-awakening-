@@ -2694,7 +2694,9 @@ def test_queue_poll_done_items_clear_tracking_without_images():
     assert "const images = done.images || [];" in poll_queue_block
     assert "if (images.length) {" in poll_queue_block
     assert "trackedPromptIds.delete(promptId);" in poll_queue_block
-    assert poll_queue_block.index("if (images.length) {") < poll_queue_block.index("trackedPromptIds.delete(promptId);")
+    # Early-exit error paths may also call trackedPromptIds.delete before the images block;
+    # verify the LAST cleanup (success path) still appears after if (images.length).
+    assert poll_queue_block.index("if (images.length) {") < poll_queue_block.rindex("trackedPromptIds.delete(promptId);")
 
 
 def test_queue_done_items_update_live_preview_immediately_before_history_sync():
@@ -2742,7 +2744,7 @@ def test_queue_poll_retries_done_history_persistence_until_post_ok():
     assert "meta.status = 'processing';" in poll_queue_block
     assert "meta.failReason = HISTORY_PERSIST_PENDING_REASON;" in poll_queue_block
     assert "continue;" in poll_queue_block
-    assert poll_queue_block.index("if (!saved) {") < poll_queue_block.index("trackedPromptIds.delete(promptId);")
+    assert poll_queue_block.index("if (!saved) {") < poll_queue_block.rindex("trackedPromptIds.delete(promptId);")
 
 
 def test_queue_summary_and_badge_include_history_persisting_state():

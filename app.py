@@ -769,13 +769,12 @@ def _image_schedulers() -> list[str]:
 
 
 def _image_models() -> list[str]:
-    """Return available checkpoint names from ComfyUI."""
+    """Return available checkpoint names from ComfyUI, excluding loose component files."""
     data = _comfy_get_object_info("CheckpointLoaderSimple")
     required = data.get("CheckpointLoaderSimple", {}).get("input", {}).get("required", {})
     names = required.get("ckpt_name", [[]])
-    if names and isinstance(names[0], list):
-        return names[0]
-    return []
+    raw = names[0] if names and isinstance(names[0], list) else []
+    return [m for m in raw if not _is_flux_component_file(m)]
 
 
 def _preflight_validate_image_model(model_name: str, available_models: list[str] | None = None) -> None:
@@ -809,6 +808,15 @@ def _preflight_validate_image_model(model_name: str, available_models: list[str]
         )
 
 
+def _is_flux_component_file(model_name: str) -> bool:
+    """Return True if the file looks like a Flux component (encoder/VAE), not a full checkpoint."""
+    if _infer_image_model_family(model_name) != "flux":
+        return False
+    lowered = model_name.lower()
+    component_tokens = ("encoder", "text_encoder", "text-encoder", "clip", "t5", "_vae", ".vae")
+    return any(token in lowered for token in component_tokens)
+
+
 def _infer_image_model_family(model_name: str) -> str:
     """Infer broad model family from checkpoint file naming conventions."""
     value = str(model_name or "").strip().lower()
@@ -833,6 +841,49 @@ def _infer_flux_variant(model_name: str) -> str:
     if "dev" in value or "flux.1-d" in value or "flux1-d" in value or "flux_1_d" in value:
         return "dev"
     return "dev"
+
+
+def _flux_clip_vae_components() -> dict:
+    """Auto-detect best available Flux T5/CLIP-L/VAE component files from ComfyUI.
+
+    Returns a dict with keys 't5', 'clip_l', 'vae'; each is a filename string or None.
+    Used to build the split Flux workflow (DualCLIPLoader + VAELoader) for UNET-only
+    Flux checkpoints that lack embedded text encoders and VAE.
+    """
+    result: dict = {"t5": None, "clip_l": None, "vae": None}
+    try:
+        data = _comfy_get_object_info("DualCLIPLoader")
+        required = data.get("DualCLIPLoader", {}).get("input", {}).get("required", {})
+        clip_files: list = list(required.get("clip_name1", [[]])[0]) if required.get("clip_name1") else []
+        # T5 priority order
+        for pref in ("t5xxl_fp8_e4m3fn.safetensors", "t5xxl_fp16.safetensors", "t5xxl_enconly.safetensors"):
+            if pref in clip_files:
+                result["t5"] = pref
+                break
+        if not result["t5"]:
+            t5_candidates = [f for f in clip_files if "t5" in f.lower()]
+            result["t5"] = t5_candidates[0] if t5_candidates else None
+        # CLIP-L priority
+        if "clip_l.safetensors" in clip_files:
+            result["clip_l"] = "clip_l.safetensors"
+        else:
+            clip_l_candidates = [f for f in clip_files if "clip_l" in f.lower()]
+            result["clip_l"] = clip_l_candidates[0] if clip_l_candidates else None
+    except Exception:
+        pass
+    try:
+        data = _comfy_get_object_info("VAELoader")
+        required = data.get("VAELoader", {}).get("input", {}).get("required", {})
+        vae_files: list = list(required.get("vae_name", [[]])[0]) if required.get("vae_name") else []
+        # Flux VAE (ae.safetensors is the canonical name)
+        if "ae.safetensors" in vae_files:
+            result["vae"] = "ae.safetensors"
+        else:
+            ae_candidates = [f for f in vae_files if f.lower().startswith("ae.") or "flux" in f.lower()]
+            result["vae"] = ae_candidates[0] if ae_candidates else None
+    except Exception:
+        pass
+    return result
 
 
 def _image_model_capabilities(model_name: str) -> dict:
@@ -2388,9 +2439,9 @@ def _comfy_submit_prompt(workflow: dict, *, front: bool = False) -> dict:
     return resp.json()
 
 
-def _comfy_history(prompt_id: str) -> dict:
+def _comfy_history(prompt_id: str, timeout: int = 20) -> dict:
     """Fetch prompt history payload from ComfyUI."""
-    resp = requests.get(f"{COMFYUI_BASE_URL}/history/{prompt_id}", timeout=20)
+    resp = requests.get(f"{COMFYUI_BASE_URL}/history/{prompt_id}", timeout=timeout)
     resp.raise_for_status()
     return resp.json() or {}
 
@@ -2963,6 +3014,31 @@ def _build_txt2img_workflow(body: dict) -> tuple[dict, dict]:
         workflow[vae_node] = {"class_type": "VAELoader", "inputs": {"vae_name": custom_vae}}
         vae_ref = [vae_node, 0]
 
+    # Flux split workflow: UNET-only Flux checkpoints lack embedded CLIP/VAE.
+    # Override clip_ref and vae_ref with DualCLIPLoader + VAELoader so both
+    # complete Flux checkpoints and UNET-only files work correctly.
+    _early_family = body.get("model_family") or _infer_image_model_family(model)
+    if _early_family == "flux":
+        flux_comps = _flux_clip_vae_components()
+        if flux_comps.get("t5") and flux_comps.get("clip_l"):
+            dc_node = _nid()
+            workflow[dc_node] = {
+                "class_type": "DualCLIPLoader",
+                "inputs": {
+                    "clip_name1": flux_comps["t5"],
+                    "clip_name2": flux_comps["clip_l"],
+                    "type": "flux",
+                },
+            }
+            clip_ref = [dc_node, 0]
+        if not custom_vae and flux_comps.get("vae"):
+            fvae_node = _nid()
+            workflow[fvae_node] = {
+                "class_type": "VAELoader",
+                "inputs": {"vae_name": flux_comps["vae"]},
+            }
+            vae_ref = [fvae_node, 0]
+
     # LoRA chain
     for lora_entry in loras:
         lora_node = _nid()
@@ -3254,6 +3330,31 @@ def _build_img2img_workflow(body: dict, uploaded_name: str) -> tuple[dict, dict]
         vae_node = _nid()
         workflow[vae_node] = {"class_type": "VAELoader", "inputs": {"vae_name": custom_vae}}
         vae_ref = [vae_node, 0]
+
+    # Flux split workflow: UNET-only Flux checkpoints lack embedded CLIP/VAE.
+    # Override clip_ref and vae_ref with DualCLIPLoader + VAELoader so both
+    # complete Flux checkpoints and UNET-only files work correctly.
+    _early_family = body.get("model_family") or _infer_image_model_family(model)
+    if _early_family == "flux":
+        flux_comps = _flux_clip_vae_components()
+        if flux_comps.get("t5") and flux_comps.get("clip_l"):
+            dc_node = _nid()
+            workflow[dc_node] = {
+                "class_type": "DualCLIPLoader",
+                "inputs": {
+                    "clip_name1": flux_comps["t5"],
+                    "clip_name2": flux_comps["clip_l"],
+                    "type": "flux",
+                },
+            }
+            clip_ref = [dc_node, 0]
+        if not custom_vae and flux_comps.get("vae"):
+            fvae_node = _nid()
+            workflow[fvae_node] = {
+                "class_type": "VAELoader",
+                "inputs": {"vae_name": flux_comps["vae"]},
+            }
+            vae_ref = [fvae_node, 0]
 
     for lora_entry in loras:
         lora_node = _nid()
@@ -5416,13 +5517,24 @@ def api_image_generate():
     try:
         workflow, meta = _build_txt2img_workflow(body)
     except (TypeError, ValueError) as exc:
+        logger.warning("txt2img workflow validation failed: %s", exc)
         return jsonify({"error": f"Invalid parameters: {exc}"}), 400
+    except Exception as exc:
+        logger.error("txt2img workflow building failed: %s", exc, exc_info=True)
+        return jsonify({"error": f"Failed to build generation workflow: {exc}"}), 400
 
     try:
         result = _comfy_submit_prompt(workflow, front=queue_front)
+        if not result or not isinstance(result, dict):
+            logger.error("ComfyUI txt2img returned invalid result: %s", result)
+            return jsonify({"error": "ComfyUI returned invalid response. Check ComfyUI logs."}), 502
+        
         prompt_id = result.get("prompt_id") or ""
-        if prompt_id:
-            _write_pending_history_entry(prompt_id, meta, mode="txt2img")
+        if not prompt_id:
+            logger.error("ComfyUI txt2img did not return prompt_id: %s", result)
+            return jsonify({"error": "ComfyUI queue submission failed (no prompt ID). Check ComfyUI logs."}), 502
+        
+        _write_pending_history_entry(prompt_id, meta, mode="txt2img")
         return jsonify(
             {
                 "ok": True,
@@ -5432,8 +5544,11 @@ def api_image_generate():
             }
         )
     except requests.RequestException as exc:
-        logger.error("ComfyUI txt2img submit failed: %s", exc)
-        return jsonify({"error": str(exc)}), 502
+        logger.error("ComfyUI txt2img network error: %s", exc, exc_info=True)
+        return jsonify({"error": f"Failed to submit to ComfyUI: {str(exc)}"}), 502
+    except Exception as exc:
+        logger.error("Unexpected error during txt2img submission: %s", exc, exc_info=True)
+        return jsonify({"error": f"Unexpected error: {str(exc)}"}), 500
 
 
 @app.route("/api/image/img2img", methods=["POST"])
@@ -5473,12 +5588,22 @@ def api_image_img2img():
     try:
         uploaded_name = _upload_image_to_comfy(image)
         if not uploaded_name:
+            logger.error("img2img image upload to ComfyUI failed")
             return jsonify({"error": "Failed to upload image to ComfyUI"}), 502
+        
         workflow, meta = _build_img2img_workflow(body, uploaded_name)
         result = _comfy_submit_prompt(workflow, front=queue_front)
+        
+        if not result or not isinstance(result, dict):
+            logger.error("ComfyUI img2img returned invalid result: %s", result)
+            return jsonify({"error": "ComfyUI returned invalid response. Check ComfyUI logs."}), 502
+        
         prompt_id = result.get("prompt_id") or ""
-        if prompt_id:
-            _write_pending_history_entry(prompt_id, meta, mode="img2img")
+        if not prompt_id:
+            logger.error("ComfyUI img2img did not return prompt_id: %s", result)
+            return jsonify({"error": "ComfyUI queue submission failed (no prompt ID). Check ComfyUI logs."}), 502
+        
+        _write_pending_history_entry(prompt_id, meta, mode="img2img")
         return jsonify(
             {
                 "ok": True,
@@ -5488,10 +5613,14 @@ def api_image_img2img():
             }
         )
     except (TypeError, ValueError) as exc:
+        logger.warning("img2img workflow validation failed: %s", exc)
         return jsonify({"error": f"Invalid parameters: {exc}"}), 400
     except requests.RequestException as exc:
-        logger.error("ComfyUI img2img submit failed: %s", exc)
-        return jsonify({"error": str(exc)}), 502
+        logger.error("ComfyUI img2img network error: %s", exc, exc_info=True)
+        return jsonify({"error": f"Failed to submit to ComfyUI: {str(exc)}"}), 502
+    except Exception as exc:
+        logger.error("Unexpected error during img2img submission: %s", exc, exc_info=True)
+        return jsonify({"error": f"Unexpected error: {str(exc)}"}), 500
 
 
 @app.route("/api/image/img2img-requeue", methods=["POST"])
@@ -5553,7 +5682,8 @@ def api_image_queue():
         prompt_ids = [single_prompt_id]
 
     try:
-        queue_resp = requests.get(f"{COMFYUI_BASE_URL}/queue", timeout=10)
+        # Short timeouts: this endpoint is polled every ~1s by the frontend.
+        queue_resp = requests.get(f"{COMFYUI_BASE_URL}/queue", timeout=5)
         queue_resp.raise_for_status()
         queue_data = queue_resp.json() or {}
 
@@ -5561,9 +5691,25 @@ def api_image_queue():
         done_prompt_ids: list[str] = []
         for prompt_id in prompt_ids:
             try:
-                done_images = _parse_prompt_images(prompt_id)
-                if done_images:
-                    done.append({"prompt_id": prompt_id, "images": done_images})
+                # Use a short timeout here: queue is polled every ~1s so a slow
+                # response (ComfyUI loading models) must not exhaust Flask threads.
+                history_data = _comfy_history(prompt_id, timeout=5)
+                if prompt_id in history_data:
+                    # Job reached a terminal state in ComfyUI (success or error).
+                    done_images = []
+                    outputs = history_data[prompt_id].get("outputs", {})
+                    for output in outputs.values():
+                        for img in output.get("images", []):
+                            if img.get("filename"):
+                                done_images.append(img)
+                    status_info = history_data[prompt_id].get("status", {})
+                    comfy_status = status_info.get("status_str", "")
+                    done.append({
+                        "prompt_id": prompt_id,
+                        "images": done_images,
+                        "comfy_status": comfy_status,
+                        "error": comfy_status == "error" or (not done_images and comfy_status != "success"),
+                    })
                     done_prompt_ids.append(prompt_id)
             except requests.RequestException:
                 continue
@@ -5711,7 +5857,7 @@ def api_image_live_preview():
 
     status_by_prompt_id: dict[str, str] = {}
     try:
-        queue_resp = requests.get(f"{COMFYUI_BASE_URL}/queue", timeout=10)
+        queue_resp = requests.get(f"{COMFYUI_BASE_URL}/queue", timeout=5)
         queue_resp.raise_for_status()
         queue_data = queue_resp.json() or {}
         for row in queue_data.get("queue_running", []):
