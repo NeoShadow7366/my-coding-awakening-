@@ -1353,7 +1353,7 @@ if (loraDisplayOptions) {
 	loraDisplayOptions.addEventListener('keydown', (event) => {
 		const hotkey = (event.key || '').toLowerCase();
 		const isEscape = event.key === 'Escape';
-		if (hotkey !== 'm' && hotkey !== 'o' && hotkey !== 'c' && hotkey !== 'w' && hotkey !== 'd' && hotkey !== 'r' && hotkey !== 'h' && hotkey !== 't' && hotkey !== 's' && hotkey !== 'p' && hotkey !== 'x' && hotkey !== 'z' && hotkey !== 'b' && hotkey !== 'i' && hotkey !== 'l' && hotkey !== 'k' && hotkey !== '?' && hotkey !== 'f' && hotkey !== 'end' && hotkey !== 'g' && hotkey !== 'home' && hotkey !== '0' && hotkey !== 'backspace' && !isEscape) return;
+		if (hotkey !== 'm' && hotkey !== 'o' && hotkey !== 'c' && hotkey !== 'w' && hotkey !== 'd' && hotkey !== 'r' && hotkey !== 'h' && hotkey !== 't' && hotkey !== 's' && hotkey !== 'n' && hotkey !== 'p' && hotkey !== 'x' && hotkey !== 'z' && hotkey !== 'b' && hotkey !== 'i' && hotkey !== 'l' && hotkey !== 'k' && hotkey !== '?' && hotkey !== 'f' && hotkey !== 'end' && hotkey !== 'g' && hotkey !== 'home' && hotkey !== '0' && hotkey !== 'backspace' && !isEscape) return;
 		if (event.repeat && !isEscape) return;
 		const targetTag = String(event.target?.tagName || '').toLowerCase();
 		if (targetTag === 'input' || targetTag === 'textarea' || targetTag === 'select' || event.target?.isContentEditable) return;
@@ -1372,7 +1372,7 @@ if (loraDisplayOptions) {
 			applyLoraDisplayOptionsCompactPreset();
 			return;
 		}
-		if (hotkey === 's') {
+		if (hotkey === 's' || hotkey === 'n') {
 			if (loraShowRowHintsToggle) {
 				loraShowRowHintsToggle.click();
 			}
@@ -1409,7 +1409,7 @@ if (loraDisplayOptions) {
 			return;
 		}
 		if (hotkey === 'k' || hotkey === '?') {
-			showToast('Display shortcuts: M/O mode, Shift+M reset, C/W compact, S hints, P preserved, X/Z mismatch, B row clear, I hide incompatible, L legend, K/? help, F/End focus mode chip, G/Home focus first option, D/R/0/Backspace default, H/T toggle panel, Esc close.', 'pos');
+			showToast('Display shortcuts: M/O mode, Shift+M reset, C/W compact, S/N hints, P preserved, X/Z mismatch, B row clear, I hide incompatible, L legend, K/? help, F/End focus mode chip, G/Home focus first option, D/R/0/Backspace default, H/T toggle panel, Esc close.', 'pos');
 			return;
 		}
 		if (hotkey === 'o') {
@@ -3364,8 +3364,8 @@ function updateLoraDisplayOptionsSummary() {
 	}
 	if (loraDisplayOptionsChipHint) {
 		loraDisplayOptionsChipHint.textContent = displayMode === 'compact'
-			? 'Mode chip action: switch to default display options. Shortcuts: M/O toggles mode, Shift+M resets display options, C/W enables compact mode, S toggles row hints, P toggles preserved indicators, X/Z toggles compact mismatch badges, B toggles row clear buttons, I toggles hide incompatible, L toggles the family legend, K/? shows shortcut help, F/End focuses mode chip, G/Home focuses first option, D/R/0/Backspace enable default mode, H/T toggles this panel, Esc closes this panel.'
-			: 'Mode chip action: switch to compact display options. Shortcuts: M/O toggles mode, Shift+M resets display options, C/W enables compact mode, S toggles row hints, P toggles preserved indicators, X/Z toggles compact mismatch badges, B toggles row clear buttons, I toggles hide incompatible, L toggles the family legend, K/? shows shortcut help, F/End focuses mode chip, G/Home focuses first option, D/R/0/Backspace enable default mode, H/T toggles this panel, Esc closes this panel.';
+			? 'Mode chip action: switch to default display options. Shortcuts: M/O toggles mode, Shift+M resets display options, C/W enables compact mode, S/N toggles row hints, P toggles preserved indicators, X/Z toggles compact mismatch badges, B toggles row clear buttons, I toggles hide incompatible, L toggles the family legend, K/? shows shortcut help, F/End focuses mode chip, G/Home focuses first option, D/R/0/Backspace enable default mode, H/T toggles this panel, Esc closes this panel.'
+			: 'Mode chip action: switch to compact display options. Shortcuts: M/O toggles mode, Shift+M resets display options, C/W enables compact mode, S/N toggles row hints, P toggles preserved indicators, X/Z toggles compact mismatch badges, B toggles row clear buttons, I toggles hide incompatible, L toggles the family legend, K/? shows shortcut help, F/End focuses mode chip, G/Home focuses first option, D/R/0/Backspace enable default mode, H/T toggles this panel, Esc closes this panel.';
 	}
 	if (loraDisplayOptionsActiveHint) {
 		loraDisplayOptionsActiveHint.hidden = false;
