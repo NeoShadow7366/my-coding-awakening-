@@ -176,6 +176,7 @@
           <option value="">- loading checkpoints -</option>
         </select>
       </div>
+      <div data-image-ui-level="advanced">
       <label for="image-model-family-select" class="field-label">Model Family Mode</label>
       <div class="select-wrapper">
         <select id="image-model-family-select" aria-label="Image model family mode">
@@ -316,9 +317,10 @@
           <li>Higher guidance = stronger prompt adherence; lower = more creative variation.</li>
         </ul>
       </div>
+      </div>
     </div>
 
-    <details class="sidebar-section cn-panel" id="controlnet-panel">
+    <details class="sidebar-section cn-panel" id="controlnet-panel" data-image-ui-level="advanced">
       <summary class="field-label">ControlNet (optional)</summary>
       <div class="form-field cn-controls">
         <label for="controlnet-model-select" class="field-label">ControlNet Model</label>
@@ -360,7 +362,7 @@
       </div>
     </details>
 
-    <div class="sidebar-section">
+    <div class="sidebar-section" data-image-ui-level="advanced">
       <p class="field-label">Seed and Presets</p>
       <div class="inline-field-row">
         <label for="image-seed" class="inline-label">Seed</label>
@@ -380,7 +382,7 @@
       <p id="image-preset-summary" class="hint preset-summary" hidden></p>
     </div>
 
-    <div class="sidebar-section" id="image-basic-slider-section">
+    <div class="sidebar-section" id="image-basic-slider-section" data-image-ui-level="advanced">
       <div class="slider-group">
         <label for="image-steps" class="inline-label">Steps <span id="image-steps-val">30</span></label>
         <input id="image-steps" type="range" min="1" max="150" step="1" value="30" />
@@ -433,6 +435,24 @@
   <div class="image-container">
     <section class="image-form-wrap" aria-label="Image generation form">
       <form id="image-form">
+        <div class="image-workflow-bar" role="region" aria-label="Image workflow quick actions">
+          <p id="image-quick-state" class="hint image-quick-state" aria-live="polite">Preparing image controls...</p>
+          <div class="image-workflow-actions" role="group" aria-label="Quick focus actions">
+            <div class="image-ui-mode-switch" role="group" aria-label="Image UI mode">
+              <button class="btn btn-ghost btn-xs" id="image-ui-mode-simple" type="button" aria-pressed="false">Simple</button>
+              <button class="btn btn-ghost btn-xs" id="image-ui-mode-advanced" type="button" aria-pressed="true">Advanced</button>
+            </div>
+            <button class="btn btn-ghost btn-xs" id="image-quick-focus-prompt" type="button">Prompt</button>
+            <button class="btn btn-ghost btn-xs" id="image-quick-focus-negative" type="button">Negative</button>
+            <button class="btn btn-ghost btn-xs" id="image-quick-focus-size" type="button">Size</button>
+            <button class="btn btn-ghost btn-xs" id="image-quick-focus-source" type="button">Img2img</button>
+          </div>
+        </div>
+        <div class="image-readiness-bar" id="image-readiness-bar" role="status" aria-live="polite">
+          <p id="image-readiness-text" class="hint image-readiness-text">Readiness: checking...</p>
+          <button class="btn btn-ghost btn-xs" id="image-readiness-action" type="button" hidden>Fix</button>
+        </div>
+
         <div class="field-label-row">
           <label for="enhanced-prompt-toggle" class="toggle-label">
             <input id="enhanced-prompt-toggle" type="checkbox" />
@@ -441,7 +461,7 @@
         </div>
         <p id="prompt-mode-hint" class="hint prompt-mode-hint" aria-live="polite"></p>
 
-        <section id="enhanced-prompt-fields" class="enhanced-prompt-fields" hidden aria-label="Enhanced prompt breakdown fields">
+        <section id="enhanced-prompt-fields" class="enhanced-prompt-fields" hidden aria-label="Enhanced prompt breakdown fields" data-image-ui-level="advanced">
           <p class="hint">Fill out the details and generate offline Ollama prompt suggestions.</p>
 
           <div class="form-field">
@@ -592,7 +612,7 @@
           </div>
         </div>
 
-        <div class="form-field" id="image-negative-prompt-section">
+        <div class="form-field" id="image-negative-prompt-section" data-image-ui-level="advanced">
           <div class="neg-prompt-label-row">
             <label for="image-negative-prompt" class="field-label">Negative prompt</label>
             <button class="btn btn-ghost btn-xs" id="negative-prompt-default-btn" type="button" title="Load default negative prompt from Configurations">Default</button>
@@ -606,7 +626,7 @@
         </div>
         <p class="hint flux-no-neg-hint" id="flux-no-neg-hint" hidden>Flux models do not use negative prompts — this field is hidden in FLUX mode.</p>
 
-        <details class="form-field hiresfix-panel" id="hiresfix-panel">
+        <details class="form-field hiresfix-panel" id="hiresfix-panel" data-image-ui-level="advanced">
           <summary class="hiresfix-summary">
             <span class="field-label">Hi-Res Fix / Upscaler</span>
             <label class="toggle-label hiresfix-enable-label" onclick="event.stopPropagation()">
@@ -640,7 +660,7 @@
           </div>
         </details>
 
-        <div class="inline-grid two-up">
+        <div class="inline-grid two-up" data-image-ui-level="advanced">
           <div class="form-field">
             <label for="image-width" class="field-label">Width</label>
             <input id="image-width" type="number" min="256" max="2048" step="64" value="1024" />
@@ -673,7 +693,8 @@
 
         <div class="image-actions">
           <p id="lora-submit-skip-hint" class="hint lora-submit-skip-hint" hidden aria-live="polite"></p>
-            <button class="btn btn-primary" id="image-generate-btn" type="submit" title="Generate Image (Ctrl+Enter)">Generate Image</button>
+          <p class="hint image-actions-shortcut-hint">Shortcut: Ctrl+Enter</p>
+          <button class="btn btn-primary" id="image-generate-btn" type="submit" title="Generate Image (Ctrl+Enter)">Generate Image</button>
         </div>
       </form>
     </section>

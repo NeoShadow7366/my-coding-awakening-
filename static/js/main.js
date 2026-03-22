@@ -278,6 +278,16 @@ const imageHeight = document.getElementById('image-height');
 const imageBatchSize = document.getElementById('image-batch-size');
 const imageUpload = document.getElementById('image-upload');
 const loraSubmitSkipHint = document.getElementById('lora-submit-skip-hint');
+const imageQuickState = document.getElementById('image-quick-state');
+const imageQuickFocusPromptBtn = document.getElementById('image-quick-focus-prompt');
+const imageQuickFocusNegativeBtn = document.getElementById('image-quick-focus-negative');
+const imageQuickFocusSizeBtn = document.getElementById('image-quick-focus-size');
+const imageQuickFocusSourceBtn = document.getElementById('image-quick-focus-source');
+const imageUiModeSimpleBtn = document.getElementById('image-ui-mode-simple');
+const imageUiModeAdvancedBtn = document.getElementById('image-ui-mode-advanced');
+const imageReadinessBar = document.getElementById('image-readiness-bar');
+const imageReadinessText = document.getElementById('image-readiness-text');
+const imageReadinessActionBtn = document.getElementById('image-readiness-action');
 const imageGenerateBtn = document.getElementById('image-generate-btn');
 const queueTelemetry = document.getElementById('queue-telemetry');
 const queueTelemetryResetBtn = document.getElementById('queue-telemetry-reset');
@@ -504,6 +514,7 @@ const IMAGE_SAMPLER_FILTER_QUERY_KEY = 'imageSamplerFilterQueryV1';
 const IMAGE_SCHEDULER_FILTER_QUERY_KEY = 'imageSchedulerFilterQueryV1';
 const IMAGE_FLUX_AUTO_APPLY_RECOMMENDATION_KEY = 'imageFluxAutoApplyRecommendationV1';
 const IMAGE_FLUX_LOCK_RECOMMENDATION_KEY = 'imageFluxLockRecommendationV1';
+const IMAGE_UI_MODE_KEY = 'imageUiModeV1';
 const LORA_FAMILY_LEGEND_EXPANDED_KEY = 'loraFamilyLegendExpandedV1';
 const LORA_DISPLAY_OPTIONS_EXPANDED_KEY = 'loraDisplayOptionsExpandedV1';
 const LORA_HIDE_INCOMPATIBLE_OPTIONS_KEY = 'loraHideIncompatibleOptionsV1';
@@ -547,6 +558,8 @@ let loraCompactRowClearButtons = localStorage.getItem(LORA_COMPACT_ROW_CLEAR_KEY
 let loraCompactMismatchBadges = localStorage.getItem(LORA_COMPACT_MISMATCH_KEY) === '1';
 let imageFluxAutoApplyRecommendation = localStorage.getItem(IMAGE_FLUX_AUTO_APPLY_RECOMMENDATION_KEY) === '1';
 let imageFluxLockRecommendation = localStorage.getItem(IMAGE_FLUX_LOCK_RECOMMENDATION_KEY) === '1';
+let imageUiMode = localStorage.getItem(IMAGE_UI_MODE_KEY) === 'simple' ? 'simple' : 'advanced';
+let imageReadinessActionTarget = null;
 let imageFluxLockBypassOnce = false;
 let lastAutoRecommendationModelKey = '';
 let activeImagePreset = '';
@@ -5913,6 +5926,159 @@ function syncImageControlLabels() {
 	if (controlnetWeightVal && controlnetWeight) controlnetWeightVal.textContent = Number(controlnetWeight.value).toFixed(2);
 	if (controlnetStartVal && controlnetStart) controlnetStartVal.textContent = Number(controlnetStart.value).toFixed(2);
 	if (controlnetEndVal && controlnetEnd) controlnetEndVal.textContent = Number(controlnetEnd.value).toFixed(2);
+	syncImageQuickState();
+	syncImageReadiness();
+}
+
+function setImageUiMode(mode, options = {}) {
+	const nextMode = mode === 'simple' ? 'simple' : 'advanced';
+	imageUiMode = nextMode;
+	if (panelImage) {
+		panelImage.dataset.imageUiMode = nextMode;
+	}
+	if (imageUiModeSimpleBtn) {
+		imageUiModeSimpleBtn.setAttribute('aria-pressed', nextMode === 'simple' ? 'true' : 'false');
+	}
+	if (imageUiModeAdvancedBtn) {
+		imageUiModeAdvancedBtn.setAttribute('aria-pressed', nextMode === 'advanced' ? 'true' : 'false');
+	}
+	if (imageQuickFocusNegativeBtn) {
+		imageQuickFocusNegativeBtn.hidden = nextMode === 'simple';
+	}
+	if (imageQuickFocusSourceBtn) {
+		imageQuickFocusSourceBtn.hidden = nextMode === 'simple';
+	}
+	localStorage.setItem(IMAGE_UI_MODE_KEY, nextMode);
+	syncImageReadiness();
+	if (options.announce) {
+		showToast(`Image UI mode: ${nextMode}.`, 'pos');
+	}
+}
+
+function getCurrentImageInputsForValidation() {
+	return {
+		prompt: resolvePromptForSubmission(),
+		model: imageModelSelect?.value || '',
+		model_family: resolveActiveImageFamily(imageModelSelect?.value || ''),
+		controlnet_model: controlnetModelSelect?.value || '',
+		controlnet_weight: Number(controlnetWeight?.value || 1),
+		controlnet_start: Number(controlnetStart?.value || 0),
+		controlnet_end: Number(controlnetEnd?.value || 1),
+		width: Number(imageWidth?.value || 0),
+		height: Number(imageHeight?.value || 0),
+		batch_size: Number(imageBatchSize?.value || 1),
+		steps: Number(imageSteps?.value || 30),
+		cfg: Number(imageCfg?.value || 7),
+		denoise: Number(imageDenoise?.value || 0.75),
+	};
+}
+
+function resolveReadinessFocusTarget(validationMessage, common) {
+	if (!validationMessage) return null;
+	if (validationMessage.includes('checkpoint model')) return imageModelSelect;
+	if (validationMessage.includes('Width and height') || validationMessage.includes('multiples of 64')) return imageWidth;
+	if (validationMessage.includes('Batch size')) return imageBatchSize;
+	if (validationMessage.includes('Steps')) return imageSteps;
+	if (validationMessage.includes('CFG')) return imageCfg;
+	if (validationMessage.includes('Denoise')) return imageDenoise;
+	if (validationMessage.includes('ControlNet')) return common.controlnet_model ? controlnetImageUpload : controlnetModelSelect;
+	return imageModelSelect;
+}
+
+function syncImageReadiness() {
+	if (!imageReadinessText || !imageReadinessBar) return;
+	imageReadinessBar.classList.remove('is-ready', 'is-warning');
+	imageReadinessActionTarget = null;
+	if (imageReadinessActionBtn) {
+		imageReadinessActionBtn.hidden = true;
+		imageReadinessActionBtn.textContent = 'Fix';
+	}
+
+	if (imageGenerateBtn?.disabled && imageGenerateBtn.textContent === 'Submitting...') {
+		imageReadinessText.textContent = 'Readiness: submitting your request...';
+		return;
+	}
+
+	const common = getCurrentImageInputsForValidation();
+	if (!common.prompt) {
+		imageReadinessBar.classList.add('is-warning');
+		imageReadinessText.textContent = 'Readiness: add a prompt before generating.';
+		imageReadinessActionTarget = enhancedPromptToggle?.checked ? enhancedPromptSuggestBtn : imagePrompt;
+		if (imageReadinessActionBtn) {
+			imageReadinessActionBtn.hidden = false;
+			imageReadinessActionBtn.textContent = enhancedPromptToggle?.checked ? 'Suggest prompt' : 'Focus prompt';
+		}
+		return;
+	}
+
+	const hasControlnetImage = Boolean(controlnetImageUpload?.files && controlnetImageUpload.files[0]);
+	if (common.controlnet_model && !hasControlnetImage) {
+		imageReadinessBar.classList.add('is-warning');
+		imageReadinessText.textContent = 'Readiness: ControlNet model selected, but no control image is attached.';
+		imageReadinessActionTarget = controlnetImageUpload;
+		if (imageReadinessActionBtn) {
+			imageReadinessActionBtn.hidden = false;
+			imageReadinessActionBtn.textContent = 'Attach image';
+		}
+		return;
+	}
+	if (!common.controlnet_model && hasControlnetImage) {
+		imageReadinessBar.classList.add('is-warning');
+		imageReadinessText.textContent = 'Readiness: control image attached without a ControlNet model.';
+		imageReadinessActionTarget = controlnetModelSelect;
+		if (imageReadinessActionBtn) {
+			imageReadinessActionBtn.hidden = false;
+			imageReadinessActionBtn.textContent = 'Pick model';
+		}
+		return;
+	}
+
+	const validationError = validateImageInputs(common);
+	if (validationError) {
+		imageReadinessBar.classList.add('is-warning');
+		imageReadinessText.textContent = `Readiness: ${validationError}`;
+		imageReadinessActionTarget = resolveReadinessFocusTarget(validationError, common);
+		if (imageReadinessActionBtn && imageReadinessActionTarget) {
+			imageReadinessActionBtn.hidden = false;
+			imageReadinessActionBtn.textContent = 'Review field';
+		}
+		return;
+	}
+
+	const modelName = String(common.model || '').split('/').pop().split('\\').pop() || 'selected model';
+	imageReadinessBar.classList.add('is-ready');
+	imageReadinessText.textContent = `Readiness: ready to generate using ${modelName}.`;
+}
+
+function syncImageQuickState() {
+	if (!imageQuickState) return;
+	const baseModel = String(imageModelSelect?.value || '').trim();
+	const modelLabel = baseModel ? baseModel.split('/').pop().split('\\').pop() : 'none';
+	const width = Number(imageWidth?.value || 0) || 0;
+	const height = Number(imageHeight?.value || 0) || 0;
+	const steps = Number(imageSteps?.value || 0) || 0;
+	const cfg = Number(imageCfg?.value || 0) || 0;
+	const denoise = Number(imageDenoise?.value || 0) || 0;
+	const mode = imageUpload?.files && imageUpload.files[0] ? 'img2img' : 'txt2img';
+	const running = Array.from(queueJobMeta.entries()).filter(([promptId, meta]) => trackedPromptIds.has(promptId) && meta.status === 'running').length;
+	const queued = Array.from(queueJobMeta.entries()).filter(([promptId, meta]) => trackedPromptIds.has(promptId) && meta.status === 'queued').length;
+	const processing = Array.from(queueJobMeta.entries()).filter(([promptId, meta]) => trackedPromptIds.has(promptId) && meta.status === 'processing').length;
+	const queueLabel = running > 0
+		? `${running} running`
+		: queued > 0
+			? `${queued} queued`
+			: processing > 0
+				? `${processing} saving`
+				: 'idle';
+	imageQuickState.textContent = `Model ${modelLabel} | ${width}x${height} | ${steps} steps, CFG ${cfg.toFixed(1)}, denoise ${denoise.toFixed(2)} | ${mode} | Queue ${queueLabel}`;
+}
+
+function focusImageControl(controlEl) {
+	if (!controlEl || typeof controlEl.scrollIntoView !== 'function') return;
+	controlEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+	if (typeof controlEl.focus === 'function') {
+		controlEl.focus({ preventScroll: true });
+	}
 }
 
 function updateControlnetImagePreview() {
@@ -5948,6 +6114,7 @@ if (imageModelSelect) {
 		updateModelStackBadges();
 		refreshCompatibilityGroupings();
 		applyImageFamilyModeUi();
+		syncImageQuickState();
 	});
 }
 if (imageModelFamilySelect) {
@@ -5957,6 +6124,7 @@ if (imageModelFamilySelect) {
 		imageModelFamilyMode = ['auto', 'sd', 'flux'].includes(mode) ? mode : 'auto';
 		localStorage.setItem(IMAGE_MODEL_FAMILY_MODE_KEY, imageModelFamilyMode);
 		applyImageFamilyModeUi();
+		syncImageReadiness();
 	});
 }
 if (imageModelFilter) {
@@ -5998,6 +6166,18 @@ if (imageRecommendationInfoBtn) {
 		showToast(detailText, '');
 	});
 }
+if (imageUiModeSimpleBtn) {
+	imageUiModeSimpleBtn.addEventListener('click', () => setImageUiMode('simple', { announce: true }));
+}
+if (imageUiModeAdvancedBtn) {
+	imageUiModeAdvancedBtn.addEventListener('click', () => setImageUiMode('advanced', { announce: true }));
+}
+if (imageReadinessActionBtn) {
+	imageReadinessActionBtn.addEventListener('click', () => {
+		focusImageControl(imageReadinessActionTarget);
+	});
+}
+setImageUiMode(imageUiMode);
 if (imageAutoApplyRecommendationToggle) {
 	imageAutoApplyRecommendationToggle.checked = imageFluxAutoApplyRecommendation;
 	imageAutoApplyRecommendationToggle.addEventListener('change', () => {
@@ -6455,6 +6635,7 @@ function renderQueueStatus(running, pending, donePromptIds = new Set()) {
 	queueList.innerHTML = rows.length ? rows.join('') : '<li class="history-item"><span class="history-text">No queue items match this filter.</span></li>';
 	persistTrackedQueueState();
 	restoreQueueActionFocus(focusedQueueAction);
+	syncImageQuickState();
 }
 
 function _clearQueueByStatus(status) {
@@ -13720,11 +13901,14 @@ imageForm.addEventListener('submit', async (e) => {
 		} else {
 			imagePrompt.focus();
 		}
+		syncImageReadiness();
 		return;
 	}
 
 	imageGenerateBtn.disabled = true;
 	imageGenerateBtn.textContent = 'Submitting...';
+	syncImageQuickState();
+	syncImageReadiness();
 
 	try {
 		const controlnetModel = controlnetModelSelect?.value || '';
@@ -13733,12 +13917,14 @@ imageForm.addEventListener('submit', async (e) => {
 			queueSummary.textContent = 'Error: Choose a ControlNet image when a ControlNet model is selected.';
 			imageGenerateBtn.disabled = false;
 			imageGenerateBtn.textContent = 'Generate Image';
+			syncImageReadiness();
 			return;
 		}
 		if (!controlnetModel && hasControlnetImage) {
 			queueSummary.textContent = 'Error: Choose a ControlNet model when a ControlNet image is uploaded.';
 			imageGenerateBtn.disabled = false;
 			imageGenerateBtn.textContent = 'Generate Image';
+			syncImageReadiness();
 			return;
 		}
 
@@ -13782,6 +13968,7 @@ imageForm.addEventListener('submit', async (e) => {
 			queueSummary.textContent = `Error: ${validationError}`;
 			imageGenerateBtn.disabled = false;
 			imageGenerateBtn.textContent = 'Generate Image';
+			syncImageReadiness();
 			return;
 		}
 
@@ -13824,6 +14011,7 @@ imageForm.addEventListener('submit', async (e) => {
 			queueSummary.textContent = `Error: ${data.error || 'Image request failed'}`;
 			imageGenerateBtn.disabled = false;
 			imageGenerateBtn.textContent = 'Generate Image';
+			syncImageReadiness();
 			return;
 		}
 
@@ -13883,14 +14071,51 @@ imageForm.addEventListener('submit', async (e) => {
 			}
 		}
 		imageGenerateBtn.textContent = 'Queued';
+		syncImageQuickState();
+		syncImageReadiness();
 				if (data.meta && data.meta.seed !== undefined) setLastGeneratedSeed(data.meta.seed);
 		await pollQueue();
 	} catch (err) {
 		queueSummary.textContent = `Error: ${err.message}`;
 		imageGenerateBtn.disabled = false;
 		imageGenerateBtn.textContent = 'Generate Image';
+		syncImageQuickState();
+		syncImageReadiness();
 	}
 });
+
+if (imageQuickFocusPromptBtn) {
+	imageQuickFocusPromptBtn.addEventListener('click', () => focusImageControl(imagePrompt));
+}
+
+if (imageQuickFocusNegativeBtn) {
+	imageQuickFocusNegativeBtn.addEventListener('click', () => focusImageControl(imageNegativePrompt));
+}
+
+if (imageQuickFocusSizeBtn) {
+	imageQuickFocusSizeBtn.addEventListener('click', () => focusImageControl(imageWidth));
+}
+
+if (imageQuickFocusSourceBtn) {
+	imageQuickFocusSourceBtn.addEventListener('click', () => focusImageControl(imageUpload));
+}
+
+[imageWidth, imageHeight, imageSteps, imageCfg, imageDenoise, imageModelSelect, imageUpload].forEach((el) => {
+	if (!el) return;
+	el.addEventListener('input', syncImageQuickState);
+	el.addEventListener('change', syncImageQuickState);
+	el.addEventListener('input', syncImageReadiness);
+	el.addEventListener('change', syncImageReadiness);
+});
+
+[imagePrompt, imageNegativePrompt, imageBatchSize, controlnetModelSelect, controlnetImageUpload, enhancedPromptToggle].forEach((el) => {
+	if (!el) return;
+	el.addEventListener('input', syncImageReadiness);
+	el.addEventListener('change', syncImageReadiness);
+});
+
+syncImageQuickState();
+syncImageReadiness();
 
 restoreTrackedQueueState();
 loadGallery();

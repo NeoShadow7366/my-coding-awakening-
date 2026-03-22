@@ -2459,6 +2459,49 @@ def test_image_prompt_ctrl_enter_shortcut():
     assert js.count("imageForm.addEventListener('submit', async (e) => {") == 1
 
 
+def test_image_quick_workflow_bar_and_sticky_actions_present():
+    app_module.app.config["TESTING"] = True
+    client = app_module.app.test_client()
+    html = client.get("/").get_data(as_text=True)
+
+    js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
+    js = js_path.read_text(encoding="utf-8")
+    css_path = Path(__file__).resolve().parents[1] / "static" / "css" / "style.css"
+    css = css_path.read_text(encoding="utf-8")
+
+    assert 'id="image-quick-state"' in html
+    assert 'id="image-quick-focus-prompt"' in html
+    assert 'id="image-quick-focus-negative"' in html
+    assert 'id="image-quick-focus-size"' in html
+    assert 'id="image-quick-focus-source"' in html
+    assert 'id="image-ui-mode-simple"' in html
+    assert 'id="image-ui-mode-advanced"' in html
+    assert 'id="image-readiness-bar"' in html
+    assert 'id="image-readiness-text"' in html
+    assert 'id="image-readiness-action"' in html
+    assert 'data-image-ui-level="advanced"' in html
+    assert 'class="hint image-actions-shortcut-hint"' in html
+
+    assert "function syncImageQuickState() {" in js
+    assert "function setImageUiMode(mode, options = {}) {" in js
+    assert "function syncImageReadiness() {" in js
+    assert "function focusImageControl(controlEl) {" in js
+    assert "syncImageQuickState();" in js
+    assert "syncImageReadiness();" in js
+    assert "const IMAGE_UI_MODE_KEY = 'imageUiModeV1';" in js
+    assert "panelImage.dataset.imageUiMode = nextMode;" in js
+    assert "Readiness: ready to generate" in js
+    assert "Queue ${queueLabel}" in js
+
+    assert ".image-workflow-bar {" in css
+    assert ".image-workflow-actions {" in css
+    assert ".image-ui-mode-switch {" in css
+    assert ".image-readiness-bar {" in css
+    assert "#panel-image[data-image-ui-mode='simple'] [data-image-ui-level='advanced']" in css
+    assert ".image-actions-shortcut-hint {" in css
+    assert "position: sticky;" in css
+
+
 def test_queue_poll_done_items_clear_tracking_without_images():
     js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
     js = js_path.read_text(encoding="utf-8")
