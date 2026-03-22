@@ -1584,7 +1584,7 @@ def test_gallery_lightbox_compare_markup_and_wiring_present():
     assert "const isImg2Img = snapshot.mode === 'img2img' && (snapshot.image || snapshot.image_name);" in js
     assert "image: snapshot.image || snapshot.image_name || ''," in js
     assert "if (isGalleryLightboxInteractiveTarget(event.target)) return;" in js
-    assert "if (key !== 'Escape' && key !== 'ArrowLeft' && key !== 'ArrowRight' && key !== 'c' && key !== 'C') return;" in js
+    assert "if (key !== 'Escape' && key !== 'ArrowLeft' && key !== 'ArrowRight' && key !== 'c' && key !== 'C' && key !== 'r' && key !== 'R') return;" in js
     assert "if (key === 'c' || key === 'C') {" in js
     assert "toggleGalleryLightboxCompare();" in js
     assert "galleryLightboxPrev.addEventListener('keydown', onGalleryLightboxControlsKeydown);" in js
@@ -1617,6 +1617,8 @@ def test_gallery_lightbox_meta_panel_markup_and_wiring_present():
     assert 'id="gallery-lightbox-meta"' in html
     assert 'id="gallery-lightbox-meta-chips"' in html
     assert 'id="gallery-lightbox-reuse"' in html
+    assert 'aria-keyshortcuts="R"' in html
+    assert 'R re-use' in html or 'R re-use' in html
 
     js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
     js = js_path.read_text(encoding="utf-8")
@@ -1627,13 +1629,16 @@ def test_gallery_lightbox_meta_panel_markup_and_wiring_present():
     assert "let galleryLightboxLastFocus = null;" in js
     assert "let lightboxMetaOpen = false;" in js
     assert "function updateLightboxMeta(entry)" in js
+    assert "function applySettingsFromCurrentLightboxEntry()" in js
     assert "galleryLightboxMetaToggle.addEventListener('click'" in js
     assert "galleryLightboxMetaToggle.addEventListener('keydown', onGalleryLightboxControlsKeydown);" in js
-    assert "galleryLightboxReuseBtn.addEventListener('click'" in js
+    assert "galleryLightboxReuseBtn.addEventListener('click', applySettingsFromCurrentLightboxEntry);" in js
     assert "galleryLightboxReuseBtn.addEventListener('keydown', onGalleryLightboxControlsKeydown);" in js
     assert "galleryLightboxCloseBtn.addEventListener('keydown', onGalleryLightboxControlsKeydown);" in js
+    assert "if (key === 'r' || key === 'R')" in js
     assert "applyImageSettings(settings);" in js
     assert "showPanel('image');" in js
+    assert "closeGalleryLightbox();" in js
     assert "galleryLightboxLastFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;" in js
     assert "if (galleryLightboxLastFocus && document.contains(galleryLightboxLastFocus)) {" in js
     assert "galleryLightboxMetaToggle.hidden = !hasParams;" in js

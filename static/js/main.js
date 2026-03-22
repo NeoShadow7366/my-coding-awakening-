@@ -8644,7 +8644,7 @@ function onGalleryLightboxControlsKeydown(event) {
 
 document.addEventListener('keydown', (event) => {
 	const key = event.key;
-	if (key !== 'Escape' && key !== 'ArrowLeft' && key !== 'ArrowRight' && key !== 'c' && key !== 'C') return;
+	if (key !== 'Escape' && key !== 'ArrowLeft' && key !== 'ArrowRight' && key !== 'c' && key !== 'C' && key !== 'r' && key !== 'R') return;
 
 	if (key === 'Escape') {
 		if (galleryContextMenu && !galleryContextMenu.hidden) {
@@ -8667,6 +8667,15 @@ document.addEventListener('keydown', (event) => {
 		if (!galleryLightboxCompareToggle || galleryLightboxCompareToggle.hidden || galleryLightboxCompareToggle.disabled) return;
 		event.preventDefault();
 		toggleGalleryLightboxCompare();
+		return;
+	}
+
+	if (key === 'r' || key === 'R') {
+		const target = event.target;
+		if (target instanceof HTMLElement && target.closest('#gallery-lightbox input, #gallery-lightbox select, #gallery-lightbox textarea')) return;
+		if (!galleryLightboxReuseBtn || galleryLightboxReuseBtn.hidden || galleryLightboxReuseBtn.disabled) return;
+		event.preventDefault();
+		applySettingsFromCurrentLightboxEntry();
 		return;
 	}
 
@@ -8982,6 +8991,42 @@ function toggleGalleryLightboxCompare() {
 	updateLightboxMedia(entry, galleryLightboxImage?.src || '', 'Generated image', entry?.prompt || 'Untitled generation');
 }
 
+function applySettingsFromCurrentLightboxEntry() {
+	const entry = currentGalleryImages[lightboxCurrentIndex];
+	if (!entry) return;
+	const settings = {
+		model: entry.model || '',
+		sampler: entry.params?.sampler || '',
+		negative_prompt: entry.negative_prompt || '',
+		seed: entry.params?.seed !== undefined ? entry.params.seed : '',
+		steps: Number(entry.params?.steps || 0),
+		cfg: Number(entry.params?.cfg || 0),
+		denoise: Number(entry.params?.denoise || 0),
+		width: Number(entry.params?.width || 0),
+		height: Number(entry.params?.height || 0),
+		batch_size: Number(entry.params?.batch_size || 1),
+		loras: Array.isArray(entry.params?.loras) ? entry.params.loras : [],
+		vae: entry.params?.vae || '',
+		refiner_model: entry.params?.refiner_model || '',
+		hiresfix_enable: Boolean(entry.params?.hiresfix_enable),
+		hiresfix_upscaler: entry.params?.hiresfix_upscaler || '',
+		hiresfix_scale: Number(entry.params?.hiresfix_scale || 2),
+		hiresfix_steps: Number(entry.params?.hiresfix_steps || 20),
+		hiresfix_denoise: Number(entry.params?.hiresfix_denoise || 0.4),
+		controlnet_model: entry.params?.controlnet_model || '',
+		controlnet_weight: Number(entry.params?.controlnet_weight ?? 1),
+		controlnet_start: Number(entry.params?.controlnet_start ?? 0),
+		controlnet_end: Number(entry.params?.controlnet_end ?? 1),
+	};
+	if (typeof entry.prompt === 'string') {
+		imagePrompt.value = entry.prompt;
+	}
+	applyImageSettings(settings);
+	closeGalleryLightbox();
+	showPanel('image');
+	showToast('Settings loaded from gallery entry.', 'pos');
+}
+
 if (galleryLightboxCompareToggle) {
 	galleryLightboxCompareToggle.addEventListener('keydown', onGalleryLightboxControlsKeydown);
 	galleryLightboxCompareToggle.addEventListener('click', () => {
@@ -9031,41 +9076,7 @@ if (galleryLightboxMetaToggle) {
 
 if (galleryLightboxReuseBtn) {
 	galleryLightboxReuseBtn.addEventListener('keydown', onGalleryLightboxControlsKeydown);
-	galleryLightboxReuseBtn.addEventListener('click', () => {
-		const entry = currentGalleryImages[lightboxCurrentIndex];
-		if (!entry) return;
-		const settings = {
-			model: entry.model || '',
-			sampler: entry.params?.sampler || '',
-			negative_prompt: entry.negative_prompt || '',
-			seed: entry.params?.seed !== undefined ? entry.params.seed : '',
-			steps: Number(entry.params?.steps || 0),
-			cfg: Number(entry.params?.cfg || 0),
-			denoise: Number(entry.params?.denoise || 0),
-			width: Number(entry.params?.width || 0),
-			height: Number(entry.params?.height || 0),
-			batch_size: Number(entry.params?.batch_size || 1),
-			loras: Array.isArray(entry.params?.loras) ? entry.params.loras : [],
-			vae: entry.params?.vae || '',
-			refiner_model: entry.params?.refiner_model || '',
-			hiresfix_enable: Boolean(entry.params?.hiresfix_enable),
-			hiresfix_upscaler: entry.params?.hiresfix_upscaler || '',
-			hiresfix_scale: Number(entry.params?.hiresfix_scale || 2),
-			hiresfix_steps: Number(entry.params?.hiresfix_steps || 20),
-			hiresfix_denoise: Number(entry.params?.hiresfix_denoise || 0.4),
-			controlnet_model: entry.params?.controlnet_model || '',
-			controlnet_weight: Number(entry.params?.controlnet_weight ?? 1),
-			controlnet_start: Number(entry.params?.controlnet_start ?? 0),
-			controlnet_end: Number(entry.params?.controlnet_end ?? 1),
-		};
-		if (typeof entry.prompt === 'string') {
-			imagePrompt.value = entry.prompt;
-		}
-		applyImageSettings(settings);
-		closeGalleryLightbox();
-		showPanel('image');
-		showToast('Settings loaded from gallery entry.', 'pos');
-	});
+	galleryLightboxReuseBtn.addEventListener('click', applySettingsFromCurrentLightboxEntry);
 }
 
 function updateLivePreviewFromActiveJob(payload) {
