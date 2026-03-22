@@ -1352,7 +1352,7 @@ if (loraDisplayOptions) {
 	});
 	loraDisplayOptions.addEventListener('keydown', (event) => {
 		const hotkey = (event.key || '').toLowerCase();
-		if (hotkey !== 'm' && hotkey !== 'c' && hotkey !== 'd') return;
+		if (hotkey !== 'm' && hotkey !== 'c' && hotkey !== 'd' && hotkey !== 'r') return;
 		if (event.repeat) return;
 		const targetTag = String(event.target?.tagName || '').toLowerCase();
 		if (targetTag === 'input' || targetTag === 'textarea' || targetTag === 'select' || event.target?.isContentEditable) return;
@@ -1361,7 +1361,7 @@ if (loraDisplayOptions) {
 			applyLoraDisplayOptionsCompactPreset();
 			return;
 		}
-		if (hotkey === 'd') {
+		if (hotkey === 'd' || hotkey === 'r') {
 			resetLoraDisplayOptionsPrefs();
 			return;
 		}
@@ -3295,8 +3295,8 @@ function updateLoraDisplayOptionsSummary() {
 	}
 	if (loraDisplayOptionsChipHint) {
 		loraDisplayOptionsChipHint.textContent = displayMode === 'compact'
-			? 'Mode chip action: switch to default display options. Shortcuts: M toggles mode, Shift+M resets display options, C enables compact mode, D enables default mode.'
-			: 'Mode chip action: switch to compact display options. Shortcuts: M toggles mode, Shift+M resets display options, C enables compact mode, D enables default mode.';
+			? 'Mode chip action: switch to default display options. Shortcuts: M toggles mode, Shift+M resets display options, C enables compact mode, D/R enable default mode.'
+			: 'Mode chip action: switch to compact display options. Shortcuts: M toggles mode, Shift+M resets display options, C enables compact mode, D/R enable default mode.';
 	}
 	if (loraDisplayOptionsActiveHint) {
 		loraDisplayOptionsActiveHint.hidden = false;
