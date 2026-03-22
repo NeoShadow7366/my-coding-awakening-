@@ -1767,11 +1767,11 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert "Display mode custom with ${activeCount} active options. Activate to switch to compact display options." in js
     assert "Display mode default with 0 active options. Activate to switch to compact display options." in js
     assert "loraDisplayOptionsChipHint.textContent = displayMode === 'compact'" in js
-    assert "Mode chip action: switch to default display options. Shortcuts: M/O toggles mode, Shift+M resets display options, C/W enables compact mode, S/N toggles row hints, P/J toggles preserved indicators, X/Z toggles compact mismatch badges, B/V toggles row clear buttons, I toggles hide incompatible, L toggles the family legend, K/? shows shortcut help, F/End focuses mode chip, G/Home focuses first option, D/R/0/Backspace enable default mode, H/T toggles this panel, Esc closes this panel." in js
-    assert "Mode chip action: switch to compact display options. Shortcuts: M/O toggles mode, Shift+M resets display options, C/W enables compact mode, S/N toggles row hints, P/J toggles preserved indicators, X/Z toggles compact mismatch badges, B/V toggles row clear buttons, I toggles hide incompatible, L toggles the family legend, K/? shows shortcut help, F/End focuses mode chip, G/Home focuses first option, D/R/0/Backspace enable default mode, H/T toggles this panel, Esc closes this panel." in js
+    assert "Mode chip action: switch to default display options. Shortcuts: M/O toggles mode, Shift+M resets display options, C/W enables compact mode, S/N toggles row hints, P/J toggles preserved indicators, X/Z toggles compact mismatch badges, B/V toggles row clear buttons, I/U toggles hide incompatible, L toggles the family legend, K/? shows shortcut help, F/End focuses mode chip, G/Home focuses first option, D/R/0/Backspace enable default mode, H/T toggles this panel, Esc closes this panel." in js
+    assert "Mode chip action: switch to compact display options. Shortcuts: M/O toggles mode, Shift+M resets display options, C/W enables compact mode, S/N toggles row hints, P/J toggles preserved indicators, X/Z toggles compact mismatch badges, B/V toggles row clear buttons, I/U toggles hide incompatible, L toggles the family legend, K/? shows shortcut help, F/End focuses mode chip, G/Home focuses first option, D/R/0/Backspace enable default mode, H/T toggles this panel, Esc closes this panel." in js
     assert "const hotkey = (event.key || '').toLowerCase();" in js
     assert "const isEscape = event.key === 'Escape';" in js
-    assert "if (hotkey !== 'm' && hotkey !== 'o' && hotkey !== 'c' && hotkey !== 'w' && hotkey !== 'd' && hotkey !== 'r' && hotkey !== 'h' && hotkey !== 't' && hotkey !== 's' && hotkey !== 'n' && hotkey !== 'p' && hotkey !== 'j' && hotkey !== 'x' && hotkey !== 'z' && hotkey !== 'b' && hotkey !== 'v' && hotkey !== 'i' && hotkey !== 'l' && hotkey !== 'k' && hotkey !== '?' && hotkey !== 'f' && hotkey !== 'end' && hotkey !== 'g' && hotkey !== 'home' && hotkey !== '0' && hotkey !== 'backspace' && !isEscape) return;" in js
+    assert "if (hotkey !== 'm' && hotkey !== 'o' && hotkey !== 'c' && hotkey !== 'w' && hotkey !== 'd' && hotkey !== 'r' && hotkey !== 'h' && hotkey !== 't' && hotkey !== 's' && hotkey !== 'n' && hotkey !== 'p' && hotkey !== 'j' && hotkey !== 'x' && hotkey !== 'z' && hotkey !== 'b' && hotkey !== 'v' && hotkey !== 'i' && hotkey !== 'u' && hotkey !== 'l' && hotkey !== 'k' && hotkey !== '?' && hotkey !== 'f' && hotkey !== 'end' && hotkey !== 'g' && hotkey !== 'home' && hotkey !== '0' && hotkey !== 'backspace' && !isEscape) return;" in js
     assert "if (event.repeat && !isEscape) return;" in js
     assert "if (targetTag === 'input' || targetTag === 'textarea' || targetTag === 'select' || event.target?.isContentEditable) return;" in js
     assert "if (isEscape) {" in js
@@ -1793,14 +1793,14 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert "if (hotkey === 'b' || hotkey === 'v') {" in js
     assert "if (loraCompactRowClearToggle) {" in js
     assert "loraCompactRowClearToggle.click();" in js
-    assert "if (hotkey === 'i') {" in js
+    assert "if (hotkey === 'i' || hotkey === 'u') {" in js
     assert "if (loraHideIncompatibleToggle) {" in js
     assert "loraHideIncompatibleToggle.click();" in js
     assert "if (hotkey === 'l') {" in js
     assert "if (loraFamilyLegend) {" in js
     assert "loraFamilyLegend.open = !loraFamilyLegend.open;" in js
     assert "if (hotkey === 'k' || hotkey === '?') {" in js
-    assert "showToast('Display shortcuts: M/O mode, Shift+M reset, C/W compact, S/N hints, P/J preserved, X/Z mismatch, B/V row clear, I hide incompatible, L legend, K/? help, F/End focus mode chip, G/Home focus first option, D/R/0/Backspace default, H/T toggle panel, Esc close.', 'pos');" in js
+    assert "showToast('Display shortcuts: M/O mode, Shift+M reset, C/W compact, S/N hints, P/J preserved, X/Z mismatch, B/V row clear, I/U hide incompatible, L legend, K/? help, F/End focus mode chip, G/Home focus first option, D/R/0/Backspace default, H/T toggle panel, Esc close.', 'pos');" in js
     assert "if (hotkey === 'o') {" in js
     assert "loraDisplayOptionsModeChip.click();" in js
     assert "if (hotkey === 'f' || hotkey === 'end') {" in js
