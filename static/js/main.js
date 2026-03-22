@@ -1353,7 +1353,7 @@ if (loraDisplayOptions) {
 	loraDisplayOptions.addEventListener('keydown', (event) => {
 		const hotkey = (event.key || '').toLowerCase();
 		const isEscape = event.key === 'Escape';
-		if (hotkey !== 'm' && hotkey !== 'c' && hotkey !== 'd' && hotkey !== 'r' && hotkey !== 'h' && hotkey !== 's' && hotkey !== 'p' && !isEscape) return;
+		if (hotkey !== 'm' && hotkey !== 'c' && hotkey !== 'd' && hotkey !== 'r' && hotkey !== 'h' && hotkey !== 's' && hotkey !== 'p' && hotkey !== 'x' && !isEscape) return;
 		if (event.repeat && !isEscape) return;
 		const targetTag = String(event.target?.tagName || '').toLowerCase();
 		if (targetTag === 'input' || targetTag === 'textarea' || targetTag === 'select' || event.target?.isContentEditable) return;
@@ -1381,6 +1381,12 @@ if (loraDisplayOptions) {
 		if (hotkey === 'p') {
 			if (loraCompactPreservedToggle) {
 				loraCompactPreservedToggle.click();
+			}
+			return;
+		}
+		if (hotkey === 'x') {
+			if (loraCompactMismatchToggle) {
+				loraCompactMismatchToggle.click();
 			}
 			return;
 		}
@@ -3318,8 +3324,8 @@ function updateLoraDisplayOptionsSummary() {
 	}
 	if (loraDisplayOptionsChipHint) {
 		loraDisplayOptionsChipHint.textContent = displayMode === 'compact'
-			? 'Mode chip action: switch to default display options. Shortcuts: M toggles mode, Shift+M resets display options, C enables compact mode, S toggles row hints, P toggles preserved indicators, D/R enable default mode, H toggles this panel, Esc closes this panel.'
-			: 'Mode chip action: switch to compact display options. Shortcuts: M toggles mode, Shift+M resets display options, C enables compact mode, S toggles row hints, P toggles preserved indicators, D/R enable default mode, H toggles this panel, Esc closes this panel.';
+			? 'Mode chip action: switch to default display options. Shortcuts: M toggles mode, Shift+M resets display options, C enables compact mode, S toggles row hints, P toggles preserved indicators, X toggles compact mismatch badges, D/R enable default mode, H toggles this panel, Esc closes this panel.'
+			: 'Mode chip action: switch to compact display options. Shortcuts: M toggles mode, Shift+M resets display options, C enables compact mode, S toggles row hints, P toggles preserved indicators, X toggles compact mismatch badges, D/R enable default mode, H toggles this panel, Esc closes this panel.';
 	}
 	if (loraDisplayOptionsActiveHint) {
 		loraDisplayOptionsActiveHint.hidden = false;
