@@ -64,7 +64,7 @@ def test_index_image_preset_buttons_expose_toggle_semantics():
     assert 'aria-keyshortcuts="2"' in html and 'data-image-preset="quality"' in html.split('aria-keyshortcuts="2"')[0].split('\n')[-1]
     assert 'aria-keyshortcuts="3"' in html and 'data-image-preset="creative"' in html.split('aria-keyshortcuts="3"')[0].split('\n')[-1]
     assert 'class="hint preset-shortcut-hint"' in html
-    assert 'Shortcuts: 1 Fast, 2 Quality, 3 Creative' in html
+    assert 'Shortcuts: 1/2/3 Fast/Quality/Creative (top row or numpad)' in html
     assert 'id="image-preset-family-badge" class="hint preset-family-badge" aria-live="polite"' in html
 
 
@@ -1707,10 +1707,12 @@ def test_fast_preset_applies_speed_focused_settings():
     assert 'id="image-preset-summary" class="hint preset-summary" hidden' in tpl
     assert ".preset-summary" in css
     assert "if (hiresfixEnable) hiresfixEnable.checked = false;" in js
-    # Preset number-key shortcuts (1-3)
+    # Preset number-key shortcuts (top row + numpad)
     assert "// Preset quick-apply with number keys 1-3" in js
-    assert "const presetMap = { '1': 'fast', '2': 'quality', '3': 'creative' };" in js
-    assert "!['1', '2', '3'].includes(key)" in js
+    assert "const presetMapByKey = { '1': 'fast', '2': 'quality', '3': 'creative' };" in js
+    assert "const presetMapByCode = { Numpad1: 'fast', Numpad2: 'quality', Numpad3: 'creative' };" in js
+    assert "const preset = presetMapByKey[key] || presetMapByCode[code];" in js
+    assert "if (event.ctrlKey || event.metaKey || event.altKey) return;" in js
     assert "applyImagePreset(preset);" in js
     assert "setActiveImagePresetButton(preset);" in js
     assert "showToast(`Applied preset: ${IMAGE_PRESET_BASE_LABELS[preset] || preset}`" in js
