@@ -1353,7 +1353,7 @@ if (loraDisplayOptions) {
 	loraDisplayOptions.addEventListener('keydown', (event) => {
 		const hotkey = (event.key || '').toLowerCase();
 		const isEscape = event.key === 'Escape';
-		if (hotkey !== 'm' && hotkey !== 'c' && hotkey !== 'd' && hotkey !== 'r' && hotkey !== 'h' && hotkey !== 's' && hotkey !== 'p' && hotkey !== 'x' && hotkey !== 'b' && hotkey !== 'i' && hotkey !== '0' && !isEscape) return;
+		if (hotkey !== 'm' && hotkey !== 'c' && hotkey !== 'd' && hotkey !== 'r' && hotkey !== 'h' && hotkey !== 's' && hotkey !== 'p' && hotkey !== 'x' && hotkey !== 'b' && hotkey !== 'i' && hotkey !== 'l' && hotkey !== '0' && !isEscape) return;
 		if (event.repeat && !isEscape) return;
 		const targetTag = String(event.target?.tagName || '').toLowerCase();
 		if (targetTag === 'input' || targetTag === 'textarea' || targetTag === 'select' || event.target?.isContentEditable) return;
@@ -1399,6 +1399,12 @@ if (loraDisplayOptions) {
 		if (hotkey === 'i') {
 			if (loraHideIncompatibleToggle) {
 				loraHideIncompatibleToggle.click();
+			}
+			return;
+		}
+		if (hotkey === 'l') {
+			if (loraFamilyLegend) {
+				loraFamilyLegend.open = !loraFamilyLegend.open;
 			}
 			return;
 		}
@@ -3336,8 +3342,8 @@ function updateLoraDisplayOptionsSummary() {
 	}
 	if (loraDisplayOptionsChipHint) {
 		loraDisplayOptionsChipHint.textContent = displayMode === 'compact'
-			? 'Mode chip action: switch to default display options. Shortcuts: M toggles mode, Shift+M resets display options, C enables compact mode, S toggles row hints, P toggles preserved indicators, X toggles compact mismatch badges, B toggles row clear buttons, I toggles hide incompatible, D/R/0 enable default mode, H toggles this panel, Esc closes this panel.'
-			: 'Mode chip action: switch to compact display options. Shortcuts: M toggles mode, Shift+M resets display options, C enables compact mode, S toggles row hints, P toggles preserved indicators, X toggles compact mismatch badges, B toggles row clear buttons, I toggles hide incompatible, D/R/0 enable default mode, H toggles this panel, Esc closes this panel.';
+			? 'Mode chip action: switch to default display options. Shortcuts: M toggles mode, Shift+M resets display options, C enables compact mode, S toggles row hints, P toggles preserved indicators, X toggles compact mismatch badges, B toggles row clear buttons, I toggles hide incompatible, L toggles the family legend, D/R/0 enable default mode, H toggles this panel, Esc closes this panel.'
+			: 'Mode chip action: switch to compact display options. Shortcuts: M toggles mode, Shift+M resets display options, C enables compact mode, S toggles row hints, P toggles preserved indicators, X toggles compact mismatch badges, B toggles row clear buttons, I toggles hide incompatible, L toggles the family legend, D/R/0 enable default mode, H toggles this panel, Esc closes this panel.';
 	}
 	if (loraDisplayOptionsActiveHint) {
 		loraDisplayOptionsActiveHint.hidden = false;
