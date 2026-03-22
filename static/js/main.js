@@ -14450,6 +14450,9 @@ syncImageRuntimeEstimate();
 
 restoreTrackedQueueState();
 renderQueueRestoreHint();
+if (!trackedPromptIds.size) {
+	renderQueueStatus([], [], new Set());
+}
 loadGallery();
 loadLivePreview();
 loadServiceConfig();
