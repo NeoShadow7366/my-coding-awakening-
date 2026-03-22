@@ -877,12 +877,15 @@ def test_model_search_aborts_previous_requests_and_ignores_stale_results():
     assert "let mbSearchInFlight = false;" in content
     assert "let mbSearchCancelRequested = false;" in content
     assert "const MB_SEARCH_TIMEOUT_MS = 25000;" in content
+    assert "let mbSearchFailSafeTimer = null;" in content
+    assert "const MB_SEARCH_UI_FAILSAFE_MS = MB_SEARCH_TIMEOUT_MS + 5000;" in content
     assert "const requestId = ++mbSearchRequestSeq;" in content
     assert "mbSearchAbortController.abort();" in content
     assert "const controller = new AbortController();" in content
     assert "const { signal } = controller;" in content
     assert "timeoutHandle = setTimeout(() => {" in content
     assert "mbSearchInFlight = true;" in content
+    assert "armModelSearchFailsafe(requestId);" in content
     assert "mbSearchInFlight = false;" in content
     assert "await fetch(endpoint + params.toString(), { signal });" in content
     assert "if (requestId !== mbSearchRequestSeq) return;" in content
@@ -891,6 +894,27 @@ def test_model_search_aborts_previous_requests_and_ignores_stale_results():
     assert "setModelSearchStatus('Search cancelled.', true);" in content
     assert "if (searchTimedOut) {" in content
     assert "clearTimeout(timeoutHandle);" in content
+    assert "clearModelSearchFailsafeTimer();" in content
+
+
+def test_model_search_failsafe_recovers_controls_if_request_pipeline_stalls():
+    js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
+    content = js_path.read_text(encoding="utf-8")
+
+    assert "function clearModelSearchFailsafeTimer()" in content
+    assert "function armModelSearchFailsafe(requestId)" in content
+    assert "mbSearchFailSafeTimer = setTimeout(() => {" in content
+    assert "if (requestId !== mbSearchRequestSeq) return;" in content
+    assert "if (!mbSearchInFlight) return;" in content
+    assert "if (mbSearchAbortController) {" in content
+    assert "mbSearchAbortController.abort();" in content
+    assert "mbSearchInFlight = false;" in content
+    assert "mbSearchCancelRequested = false;" in content
+    assert "mbSearchAbortController = null;" in content
+    assert "updateModelSearchControls();" in content
+    assert "updatePagination();" in content
+    assert "setModelSearchStatus('Search timed out. Please try again.', true);" in content
+    assert "}, MB_SEARCH_UI_FAILSAFE_MS);" in content
 
 
 def test_model_search_timeout_message_is_exposed_for_stalled_requests():

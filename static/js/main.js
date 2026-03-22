@@ -10421,12 +10421,40 @@ let mbSearchRequestSeq = 0;
 let mbSearchInFlight = false;
 let mbSearchCancelRequested = false;
 let mbSearchStatusTimer = null;
+let mbSearchFailSafeTimer = null;
 const MB_SEARCH_TIMEOUT_MS = 25000;
 const MB_CANCEL_STATUS_CLEAR_MS = 2500;
+const MB_SEARCH_UI_FAILSAFE_MS = MB_SEARCH_TIMEOUT_MS + 5000;
 
 function updateModelSearchControls() {
 	if (mbSearchBtn) mbSearchBtn.disabled = mbSearchInFlight;
 	if (mbCancelSearchBtn) mbCancelSearchBtn.disabled = !mbSearchInFlight;
+}
+
+function clearModelSearchFailsafeTimer() {
+	if (!mbSearchFailSafeTimer) return;
+	clearTimeout(mbSearchFailSafeTimer);
+	mbSearchFailSafeTimer = null;
+}
+
+function armModelSearchFailsafe(requestId) {
+	clearModelSearchFailsafeTimer();
+	mbSearchFailSafeTimer = setTimeout(() => {
+		if (requestId !== mbSearchRequestSeq) return;
+		if (!mbSearchInFlight) return;
+		if (mbSearchAbortController) {
+			mbSearchAbortController.abort();
+		}
+		mbSearchInFlight = false;
+		mbSearchCancelRequested = false;
+		mbSearchAbortController = null;
+		mbHasNextPage = false;
+		updateModelSearchControls();
+		updatePagination();
+		if (mbSearchStatus && /^Searching /.test(String(mbSearchStatus.textContent || ''))) {
+			setModelSearchStatus('Search timed out. Please try again.', true);
+		}
+	}, MB_SEARCH_UI_FAILSAFE_MS);
 }
 
 function cancelModelSearch() {
@@ -12077,6 +12105,7 @@ async function runCivitaiSearch(page) {
 	mbSearchCancelRequested = false;
 	mbSearchInFlight = true;
 	updateModelSearchControls();
+	armModelSearchFailsafe(requestId);
 	const provider = mbProvider ? String(mbProvider.value || 'civitai') : 'civitai';
 	const query = mbSearchQuery ? mbSearchQuery.value.trim() : '';
 	const type  = mbSearchType  ? mbSearchType.value : '';
@@ -12161,6 +12190,7 @@ async function runCivitaiSearch(page) {
 			clearTimeout(timeoutHandle);
 		}
 		if (requestId === mbSearchRequestSeq) {
+			clearModelSearchFailsafeTimer();
 			mbSearchInFlight = false;
 			mbSearchCancelRequested = false;
 			mbSearchAbortController = null;
