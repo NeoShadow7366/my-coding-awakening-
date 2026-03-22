@@ -374,12 +374,13 @@
         <button class="btn btn-ghost btn-xs" id="image-lock-seed" type="button" aria-pressed="false" title="Keep seed fixed between generations">Lock</button>
       </div>
       <div class="preset-row" role="group" aria-label="Image presets">
-        <button class="btn btn-ghost btn-xs" type="button" data-image-preset="fast" aria-pressed="false">Fast</button>
-        <button class="btn btn-ghost btn-xs" type="button" data-image-preset="quality" aria-pressed="false">Quality</button>
-        <button class="btn btn-ghost btn-xs" type="button" data-image-preset="creative" aria-pressed="false">Creative</button>
+        <button class="btn btn-ghost btn-xs" type="button" data-image-preset="fast" aria-pressed="false" aria-keyshortcuts="1" title="Apply Fast preset (1)">Fast</button>
+        <button class="btn btn-ghost btn-xs" type="button" data-image-preset="quality" aria-pressed="false" aria-keyshortcuts="2" title="Apply Quality preset (2)">Quality</button>
+        <button class="btn btn-ghost btn-xs" type="button" data-image-preset="creative" aria-pressed="false" aria-keyshortcuts="3" title="Apply Creative preset (3)">Creative</button>
       </div>
       <p id="image-preset-family-badge" class="hint preset-family-badge" aria-live="polite">Preset profile: SD</p>
       <p id="image-preset-summary" class="hint preset-summary" hidden></p>
+      <p class="hint preset-shortcut-hint">Shortcuts: 1 Fast, 2 Quality, 3 Creative</p>
     </div>
 
     <div class="sidebar-section" id="image-basic-slider-section" data-image-ui-level="advanced">

@@ -8742,6 +8742,32 @@ document.addEventListener('keydown', (event) => {
 	}
 });
 
+// Preset quick-apply with number keys 1-3 (Fast, Quality, Creative)
+document.addEventListener('keydown', (event) => {
+	const key = event.key;
+	// Only check for '1', '2', '3' keys (top row numeric keys)
+	if (!['1', '2', '3'].includes(key)) return;
+
+	// Only trigger when Image panel is active
+	const panelImage = document.getElementById('panel-image');
+	if (!panelImage || panelImage.hidden) return;
+
+	// Don't trigger if user is typing in an input field
+	const target = event.target;
+	if (target instanceof HTMLElement && target.closest('#panel-image input, #panel-image select, #panel-image textarea, #panel-image [contenteditable]')) return;
+
+	event.preventDefault();
+
+	// Map number keys to presets: 1=fast, 2=quality, 3=creative
+	const presetMap = { '1': 'fast', '2': 'quality', '3': 'creative' };
+	const preset = presetMap[key];
+	if (!preset) return;
+
+	applyImagePreset(preset);
+	setActiveImagePresetButton(preset);
+	showToast(`Applied preset: ${IMAGE_PRESET_BASE_LABELS[preset] || preset}`, 'pos');
+});
+
 if (gallerySortSelect) {
 	gallerySortSelect.value = gallerySortOrder;
 	gallerySortSelect.addEventListener('change', () => {

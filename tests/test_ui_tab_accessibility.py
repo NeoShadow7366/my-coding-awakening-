@@ -59,6 +59,12 @@ def test_index_image_preset_buttons_expose_toggle_semantics():
     assert 'data-image-preset="fast" aria-pressed="false"' in html
     assert 'data-image-preset="quality" aria-pressed="false"' in html
     assert 'data-image-preset="creative" aria-pressed="false"' in html
+    # Preset keyboard shortcuts
+    assert 'aria-keyshortcuts="1"' in html and 'data-image-preset="fast"' in html.split('aria-keyshortcuts="1"')[0].split('\n')[-1]
+    assert 'aria-keyshortcuts="2"' in html and 'data-image-preset="quality"' in html.split('aria-keyshortcuts="2"')[0].split('\n')[-1]
+    assert 'aria-keyshortcuts="3"' in html and 'data-image-preset="creative"' in html.split('aria-keyshortcuts="3"')[0].split('\n')[-1]
+    assert 'class="hint preset-shortcut-hint"' in html
+    assert 'Shortcuts: 1 Fast, 2 Quality, 3 Creative' in html
     assert 'id="image-preset-family-badge" class="hint preset-family-badge" aria-live="polite"' in html
 
 
@@ -1701,6 +1707,13 @@ def test_fast_preset_applies_speed_focused_settings():
     assert 'id="image-preset-summary" class="hint preset-summary" hidden' in tpl
     assert ".preset-summary" in css
     assert "if (hiresfixEnable) hiresfixEnable.checked = false;" in js
+    # Preset number-key shortcuts (1-3)
+    assert "// Preset quick-apply with number keys 1-3" in js
+    assert "const presetMap = { '1': 'fast', '2': 'quality', '3': 'creative' };" in js
+    assert "!['1', '2', '3'].includes(key)" in js
+    assert "applyImagePreset(preset);" in js
+    assert "setActiveImagePresetButton(preset);" in js
+    assert "showToast(`Applied preset: ${IMAGE_PRESET_BASE_LABELS[preset] || preset}`" in js
 
 
 def test_flux_lora_hint_and_strength_clamp_wiring():
