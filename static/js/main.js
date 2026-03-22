@@ -1202,6 +1202,10 @@ function setQueueLastAction(message) {
 function renderQueueRestoreHint() {
 	if (!queueRestoreHint || !queueRestoreWrap || !queueRestoreShowBtn) return;
 	if (!restoredQueueStateInfo || !trackedPromptIds.size) {
+		if (restoredQueueStateInfo && !trackedPromptIds.size) {
+			restoredQueueStateInfo = null;
+			localStorage.removeItem(QUEUE_STATE_STORAGE_KEY);
+		}
 		queueRestoreWrap.hidden = true;
 		queueRestoreShowBtn.hidden = true;
 		queueRestoreHint.textContent = '';

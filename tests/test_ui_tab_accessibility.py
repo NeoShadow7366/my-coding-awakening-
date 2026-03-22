@@ -105,6 +105,9 @@ def test_queue_action_keyboard_handler_wiring_present_in_js_bundle():
     assert "function persistTrackedQueueState()" in content
     assert "function restoreTrackedQueueState()" in content
     assert "function renderQueueRestoreHint()" in content
+    assert "if (restoredQueueStateInfo && !trackedPromptIds.size) {" in content
+    assert "restoredQueueStateInfo = null;" in content
+    assert "localStorage.removeItem(QUEUE_STATE_STORAGE_KEY);" in content
     assert "function stopQueueRestoreHintTicker()" in content
     assert "function ensureQueueRestoreHintTicker()" in content
     assert "queueRestoreHintTimer = window.setInterval(() => {" in content
