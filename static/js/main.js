@@ -8584,6 +8584,14 @@ if (galleryLightbox) {
 	});
 
 	galleryLightbox.addEventListener('keydown', (event) => {
+		// Escape-to-close for keyboard accessibility
+		if (event.key === 'Escape' && !galleryLightbox.hidden) {
+			event.preventDefault();
+			event.stopPropagation();
+			closeGalleryLightbox();
+			return;
+		}
+		
 		if (event.key !== 'Tab' || galleryLightbox.hidden) return;
 		const tabStops = getGalleryLightboxTabStops();
 		if (!tabStops.length) return;

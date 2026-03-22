@@ -2805,6 +2805,28 @@ def test_image_panel_details_escape_to_close_keyboard_support():
     assert "if (!imagePanel.contains(openDetails)) return;" in js
 
 
+def test_gallery_lightbox_escape_to_close_keyboard_support():
+    """Gallery lightbox dialog supports Escape-to-close keyboard shortcut."""
+    from pathlib import Path
+    html_path = Path(__file__).resolve().parents[1] / "templates" / "index.html"
+    html = html_path.read_text(encoding="utf-8")
+    
+    # Close button has Escape keyboard shortcut hint
+    assert 'aria-keyshortcuts="Escape"' in html
+    assert '<button id="gallery-lightbox-close" class="btn btn-ghost btn-xs gallery-lightbox-close" type="button" aria-label="Close image viewer" aria-keyshortcuts="Escape">Close</button>' in html
+    
+    # Escape handler in lightbox keydown listener
+    js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
+    js = js_path.read_text(encoding="utf-8")
+    
+    # Find the lightbox keydown listener section
+    assert "galleryLightbox.addEventListener('keydown', (event) => {" in js
+    # Check for Escape handling before Tab handling
+    assert "if (event.key === 'Escape' && !galleryLightbox.hidden) {" in js
+    assert "closeGalleryLightbox();" in js
+    assert "if (event.key !== 'Tab' || galleryLightbox.hidden) return;" in js
+
+
 def test_startup_reconcile_function_and_wiring_present_in_js_bundle():
     """runStartupHistoryReconcile must exist and be called once when imageOk first becomes true."""
     js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
