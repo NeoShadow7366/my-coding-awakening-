@@ -2924,6 +2924,29 @@ def test_text_panel_chat_input_escape_to_clear_keyboard_support():
     assert "chatInput.focus();" in js
 
 
+def test_text_panel_negative_prompt_escape_to_clear_keyboard_support():
+    """Text panel negative prompt supports Escape-to-clear keyboard shortcut."""
+    from pathlib import Path
+    html_path = Path(__file__).resolve().parents[1] / "templates" / "index.html"
+    html = html_path.read_text(encoding="utf-8")
+    
+    # Negative prompt has Escape keyboard shortcut hint
+    assert '<textarea\n        id="text-negative-prompt"' in html
+    assert 'aria-keyshortcuts="Escape"' in html
+    
+    # JS event listener handles Escape for clear
+    js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
+    js = js_path.read_text(encoding="utf-8")
+    
+    # Escape-to-clear handler for text negative prompt
+    assert "if (textNegativePrompt) {" in js
+    assert "textNegativePrompt.addEventListener('keydown', (e) => {" in js
+    assert "if (e.key !== 'Escape') return;" in js
+    assert "if (!textNegativePrompt.value) return;" in js
+    assert "textNegativePrompt.value = '';" in js
+    assert "textNegativePrompt.focus();" in js
+
+
 def test_startup_reconcile_function_and_wiring_present_in_js_bundle():
     """runStartupHistoryReconcile must exist and be called once when imageOk first becomes true."""
     js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"

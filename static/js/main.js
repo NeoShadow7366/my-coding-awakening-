@@ -5862,6 +5862,17 @@ chatInput.addEventListener('keydown', (e) => {
 	}
 });
 
+// Text panel negative prompt Escape-to-clear
+if (textNegativePrompt) {
+	textNegativePrompt.addEventListener('keydown', (e) => {
+		if (e.key !== 'Escape') return;
+		if (!textNegativePrompt.value) return; // skip if empty
+		e.stopPropagation();
+		textNegativePrompt.value = '';
+		textNegativePrompt.focus();
+	});
+}
+
 chatForm.addEventListener('submit', async (e) => {
 	e.preventDefault();
 	if (isGenerating) return;
