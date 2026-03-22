@@ -1351,10 +1351,15 @@ if (loraDisplayOptions) {
 		updateLoraCompatUiResetButtonState();
 	});
 	loraDisplayOptions.addEventListener('keydown', (event) => {
-		if ((event.key || '').toLowerCase() !== 'm') return;
+		const hotkey = (event.key || '').toLowerCase();
+		if (hotkey !== 'm' && hotkey !== 'c') return;
 		const targetTag = String(event.target?.tagName || '').toLowerCase();
 		if (targetTag === 'input' || targetTag === 'textarea' || targetTag === 'select' || event.target?.isContentEditable) return;
 		event.preventDefault();
+		if (hotkey === 'c') {
+			applyLoraDisplayOptionsCompactPreset();
+			return;
+		}
 		if (event.shiftKey) {
 			resetLoraDisplayOptionsPrefs();
 			return;
@@ -3285,8 +3290,8 @@ function updateLoraDisplayOptionsSummary() {
 	}
 	if (loraDisplayOptionsChipHint) {
 		loraDisplayOptionsChipHint.textContent = displayMode === 'compact'
-			? 'Mode chip action: switch to default display options. Shortcuts: M toggles mode, Shift+M resets display options.'
-			: 'Mode chip action: switch to compact display options. Shortcuts: M toggles mode, Shift+M resets display options.';
+			? 'Mode chip action: switch to default display options. Shortcuts: M toggles mode, Shift+M resets display options, C enables compact mode.'
+			: 'Mode chip action: switch to compact display options. Shortcuts: M toggles mode, Shift+M resets display options, C enables compact mode.';
 	}
 	if (loraDisplayOptionsActiveHint) {
 		loraDisplayOptionsActiveHint.hidden = false;

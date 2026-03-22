@@ -1767,10 +1767,13 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert "Display mode custom with ${activeCount} active options. Activate to switch to compact display options." in js
     assert "Display mode default with 0 active options. Activate to switch to compact display options." in js
     assert "loraDisplayOptionsChipHint.textContent = displayMode === 'compact'" in js
-    assert "Mode chip action: switch to default display options. Shortcuts: M toggles mode, Shift+M resets display options." in js
-    assert "Mode chip action: switch to compact display options. Shortcuts: M toggles mode, Shift+M resets display options." in js
-    assert "if ((event.key || '').toLowerCase() !== 'm') return;" in js
+    assert "Mode chip action: switch to default display options. Shortcuts: M toggles mode, Shift+M resets display options, C enables compact mode." in js
+    assert "Mode chip action: switch to compact display options. Shortcuts: M toggles mode, Shift+M resets display options, C enables compact mode." in js
+    assert "const hotkey = (event.key || '').toLowerCase();" in js
+    assert "if (hotkey !== 'm' && hotkey !== 'c') return;" in js
     assert "if (targetTag === 'input' || targetTag === 'textarea' || targetTag === 'select' || event.target?.isContentEditable) return;" in js
+    assert "if (hotkey === 'c') {" in js
+    assert "applyLoraDisplayOptionsCompactPreset();" in js
     assert "if (event.shiftKey) {" in js
     assert "resetLoraDisplayOptionsPrefs();" in js
     assert "loraDisplayOptionsModeChip.click();" in js
