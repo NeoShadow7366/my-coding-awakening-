@@ -9030,6 +9030,26 @@ function updateLivePreview(entry) {
 	previewUpdated.textContent = formatPreviewTime(entry.created_at);
 }
 
+function updateLivePreviewFromDoneItem(doneItem, snapshot = {}, meta = {}) {
+	const images = Array.isArray(doneItem?.images) ? doneItem.images : [];
+	if (!images.length) return;
+	updateLivePreview({
+		prompt: snapshot.prompt || 'Image generation',
+		model: snapshot.model || '',
+		params: {
+			sampler: snapshot.sampler || '',
+			steps: snapshot.steps || 0,
+			cfg: snapshot.cfg || 0,
+			denoise: snapshot.denoise || 0,
+			width: snapshot.width || 0,
+			height: snapshot.height || 0,
+			...(Number.isFinite(Number(meta.generationTimeMs)) ? { generation_time_ms: meta.generationTimeMs } : {}),
+		},
+		images,
+		created_at: doneItem?.created_at || Math.floor(Date.now() / 1000),
+	});
+}
+
 async function loadLivePreview() {
 	const activePromptIds = Array.from(trackedPromptIds);
 	if (activePromptIds.length) {
@@ -9398,6 +9418,7 @@ async function pollQueue() {
 				const meta = queueJobMeta.get(promptId) || {};
 
 				if (images.length) {
+					updateLivePreviewFromDoneItem(done, snapshot, meta);
 					const saved = await saveHistoryEntry({
 						type: 'image',
 						prompt: snapshot.prompt || 'Image generation',

@@ -2534,6 +2534,17 @@ def test_queue_poll_done_items_clear_tracking_without_images():
     assert poll_queue_block.index("if (images.length) {") < poll_queue_block.index("trackedPromptIds.delete(promptId);")
 
 
+def test_queue_done_items_update_live_preview_immediately_before_history_sync():
+    js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
+    js = js_path.read_text(encoding="utf-8")
+    poll_queue_block = js[js.index("async function pollQueue() {"):js.index("function ensureQueuePolling() {")]
+
+    assert "function updateLivePreviewFromDoneItem(doneItem, snapshot = {}, meta = {}) {" in js
+    assert "updateLivePreviewFromDoneItem(done, snapshot, meta);" in poll_queue_block
+    assert "const saved = await saveHistoryEntry({" in poll_queue_block
+    assert poll_queue_block.index("updateLivePreviewFromDoneItem(done, snapshot, meta);") < poll_queue_block.index("const saved = await saveHistoryEntry({")
+
+
 def test_queue_poll_retries_done_history_persistence_until_post_ok():
     js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
     js = js_path.read_text(encoding="utf-8")
