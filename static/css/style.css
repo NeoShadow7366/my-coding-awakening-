@@ -2416,6 +2416,10 @@ textarea {
   gap: 0.45rem;
 }
 
+.queue-restore-wrap[hidden] {
+  display: none !important;
+}
+
 .queue-restore-hint {
   margin-top: 0;
   margin-bottom: 0;
@@ -2424,6 +2428,10 @@ textarea {
 
 .queue-restore-show {
   margin-top: 0.1rem;
+}
+
+.queue-restore-show[hidden] {
+  display: none !important;
 }
 
 .queue-last-action-row {

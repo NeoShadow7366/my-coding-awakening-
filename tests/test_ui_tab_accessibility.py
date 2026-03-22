@@ -195,6 +195,8 @@ def test_queue_action_keyboard_handler_wiring_present_in_js_bundle():
     assert ".queue-restore-wrap" in css
     assert ".queue-restore-hint" in css
     assert ".queue-restore-show" in css
+    assert ".queue-restore-wrap[hidden]" in css
+    assert ".queue-restore-show[hidden]" in css
     assert ".queue-last-action-row" in css
     assert ".queue-last-action" in css
     assert ".queue-last-action-pin" in css
