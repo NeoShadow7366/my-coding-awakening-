@@ -10422,9 +10422,15 @@ let mbSearchInFlight = false;
 let mbSearchCancelRequested = false;
 let mbSearchStatusTimer = null;
 let mbSearchFailSafeTimer = null;
+let mbLibraryLoadAbortController = null;
+let mbLibraryLoadRequestSeq = 0;
+let mbLibraryLoadInFlight = false;
+let mbLibraryLoadFailSafeTimer = null;
 const MB_SEARCH_TIMEOUT_MS = 25000;
 const MB_CANCEL_STATUS_CLEAR_MS = 2500;
 const MB_SEARCH_UI_FAILSAFE_MS = MB_SEARCH_TIMEOUT_MS + 5000;
+const MB_LIBRARY_LOAD_TIMEOUT_MS = 30000;
+const MB_LIBRARY_LOAD_FAILSAFE_MS = MB_LIBRARY_LOAD_TIMEOUT_MS + 5000;
 
 function updateModelSearchControls() {
 	if (mbSearchBtn) mbSearchBtn.disabled = mbSearchInFlight;
@@ -10455,6 +10461,29 @@ function armModelSearchFailsafe(requestId) {
 			setModelSearchStatus('Search timed out. Please try again.', true);
 		}
 	}, MB_SEARCH_UI_FAILSAFE_MS);
+}
+
+function clearModelLibraryLoadFailsafeTimer() {
+	if (!mbLibraryLoadFailSafeTimer) return;
+	clearTimeout(mbLibraryLoadFailSafeTimer);
+	mbLibraryLoadFailSafeTimer = null;
+}
+
+function armModelLibraryLoadFailsafe(requestId) {
+	clearModelLibraryLoadFailsafeTimer();
+	mbLibraryLoadFailSafeTimer = setTimeout(() => {
+		if (requestId !== mbLibraryLoadRequestSeq) return;
+		if (!mbLibraryLoadInFlight) return;
+		if (mbLibraryLoadAbortController) {
+			mbLibraryLoadAbortController.abort();
+		}
+		mbLibraryLoadInFlight = false;
+		mbLibraryLoadAbortController = null;
+		if (mbLibraryStatus && /^Scanning local models/i.test(String(mbLibraryStatus.textContent || ''))) {
+			mbLibraryStatus.textContent = 'Local model scan timed out. Please refresh and try again.';
+			setElementHiddenState(mbLibraryStatus, false);
+		}
+	}, MB_LIBRARY_LOAD_FAILSAFE_MS);
 }
 
 function cancelModelSearch() {
@@ -11476,17 +11505,53 @@ function mbOnTabActivate() {
 
 async function loadModelLibrary() {
 	if (!mbLibraryGrid) return;
+	const requestId = ++mbLibraryLoadRequestSeq;
+	if (mbLibraryLoadAbortController) {
+		mbLibraryLoadAbortController.abort();
+	}
+	const controller = new AbortController();
+	mbLibraryLoadAbortController = controller;
+	const { signal } = controller;
+	let timeoutHandle = null;
+	let loadTimedOut = false;
+	mbLibraryLoadInFlight = true;
+	armModelLibraryLoadFailsafe(requestId);
 	if (mbLibraryStatus) { mbLibraryStatus.textContent = 'Scanning local models…'; setElementHiddenState(mbLibraryStatus, false); }
 	mbLibraryGrid.innerHTML = '';
 	try {
-		const resp = await fetch('/api/models/library');
+		timeoutHandle = setTimeout(() => {
+			if (requestId !== mbLibraryLoadRequestSeq) return;
+			loadTimedOut = true;
+			controller.abort();
+		}, MB_LIBRARY_LOAD_TIMEOUT_MS);
+		const resp = await fetch('/api/models/library', { signal });
 		const data = await resp.json();
+		if (requestId !== mbLibraryLoadRequestSeq) return;
 		if (!resp.ok) throw new Error(data.error || resp.statusText);
 		mbLibraryAllModels = Array.isArray(data.models) ? data.models : [];
 		mbLibraryRoot = String(data.models_root || '');
 		renderLocalLibraryFromState();
 	} catch (err) {
+		if (requestId !== mbLibraryLoadRequestSeq) return;
+		if (err && err.name === 'AbortError') {
+			if (loadTimedOut) {
+				if (mbLibraryStatus) {
+					mbLibraryStatus.textContent = `Local model scan timed out after ${Math.round(MB_LIBRARY_LOAD_TIMEOUT_MS / 1000)}s. Please try again.`;
+					setElementHiddenState(mbLibraryStatus, false);
+				}
+			}
+			return;
+		}
 		if (mbLibraryStatus) { mbLibraryStatus.textContent = 'Could not load local models: ' + err.message; setElementHiddenState(mbLibraryStatus, false); }
+	} finally {
+		if (timeoutHandle) {
+			clearTimeout(timeoutHandle);
+		}
+		if (requestId === mbLibraryLoadRequestSeq) {
+			clearModelLibraryLoadFailsafeTimer();
+			mbLibraryLoadInFlight = false;
+			mbLibraryLoadAbortController = null;
+		}
 	}
 }
 

@@ -966,6 +966,36 @@ def test_model_search_cancel_status_is_auto_cleared_after_delay():
     assert "setModelSearchStatus('', false);" in content
 
 
+def test_local_library_load_has_timeout_abort_and_failsafe_recovery_guards():
+    js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
+    content = js_path.read_text(encoding="utf-8")
+
+    assert "let mbLibraryLoadAbortController = null;" in content
+    assert "let mbLibraryLoadRequestSeq = 0;" in content
+    assert "let mbLibraryLoadInFlight = false;" in content
+    assert "let mbLibraryLoadFailSafeTimer = null;" in content
+    assert "const MB_LIBRARY_LOAD_TIMEOUT_MS = 30000;" in content
+    assert "const MB_LIBRARY_LOAD_FAILSAFE_MS = MB_LIBRARY_LOAD_TIMEOUT_MS + 5000;" in content
+    assert "function clearModelLibraryLoadFailsafeTimer()" in content
+    assert "function armModelLibraryLoadFailsafe(requestId)" in content
+    assert "const requestId = ++mbLibraryLoadRequestSeq;" in content
+    assert "if (mbLibraryLoadAbortController) {" in content
+    assert "mbLibraryLoadAbortController.abort();" in content
+    assert "const controller = new AbortController();" in content
+    assert "const { signal } = controller;" in content
+    assert "mbLibraryLoadInFlight = true;" in content
+    assert "armModelLibraryLoadFailsafe(requestId);" in content
+    assert "const resp = await fetch('/api/models/library', { signal });" in content
+    assert "if (requestId !== mbLibraryLoadRequestSeq) return;" in content
+    assert "if (err && err.name === 'AbortError') {" in content
+    assert "if (loadTimedOut) {" in content
+    assert "Local model scan timed out after ${Math.round(MB_LIBRARY_LOAD_TIMEOUT_MS / 1000)}s. Please try again." in content
+    assert "clearModelLibraryLoadFailsafeTimer();" in content
+    assert "mbLibraryLoadInFlight = false;" in content
+    assert "mbLibraryLoadAbortController = null;" in content
+    assert "Local model scan timed out. Please refresh and try again." in content
+
+
 def test_preview_websocket_retry_backoff_is_respected_between_attempts():
     js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
     content = js_path.read_text(encoding="utf-8")
