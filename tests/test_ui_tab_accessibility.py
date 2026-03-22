@@ -2854,6 +2854,27 @@ def test_prompt_input_escape_to_clear_keyboard_support():
     assert "imageNegativePrompt.value = '';" in js
 
 
+def test_model_browser_modal_escape_to_close_keyboard_support():
+    """Model browser modal supports Escape-to-close keyboard shortcut."""
+    from pathlib import Path
+    html_path = Path(__file__).resolve().parents[1] / "templates" / "index.html"
+    html = html_path.read_text(encoding="utf-8")
+    
+    # Close button has Escape keyboard shortcut hint
+    assert '<button id="mb-model-modal-close" class="btn btn-ghost btn-xs" type="button" aria-label="Close model details" aria-keyshortcuts="Escape">Close</button>' in html
+    
+    # Escape handler in modal keydown listener
+    js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
+    js = js_path.read_text(encoding="utf-8")
+    
+    # Find the model modal keydown listener section
+    assert "mbModelModal.addEventListener('keydown', (event) => {" in js
+    # Check for Escape handling before Tab handling
+    assert "if (event.key === 'Escape' && !mbModelModal.hidden) {" in js
+    assert "setModelModalOpen(false);" in js
+    assert "if (event.key !== 'Tab' || mbModelModal.hidden) return;" in js
+
+
 def test_startup_reconcile_function_and_wiring_present_in_js_bundle():
     """runStartupHistoryReconcile must exist and be called once when imageOk first becomes true."""
     js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"

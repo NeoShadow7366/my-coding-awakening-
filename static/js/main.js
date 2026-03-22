@@ -13117,6 +13117,13 @@ if (mbModelModal) {
 	});
 
 	mbModelModal.addEventListener('keydown', (event) => {
+		// Escape-to-close support
+		if (event.key === 'Escape' && !mbModelModal.hidden) {
+			event.preventDefault();
+			setModelModalOpen(false);
+			return;
+		}
+		
 		if (event.key !== 'Tab' || mbModelModal.hidden) return;
 		const tabStops = getModelModalTabStops();
 		if (!tabStops.length) return;
