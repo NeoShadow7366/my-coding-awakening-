@@ -2623,6 +2623,8 @@ def test_queue_poll_defensive_reconciliation_clears_terminal_stale_tracked_ids()
     js = js_path.read_text(encoding="utf-8")
     poll_queue_block = js[js.index("async function pollQueue() {"):js.index("function ensureQueuePolling() {")]
 
+    assert "function reconcileTerminalTrackedQueueState() {" in js
+    assert "if (!['completed', 'failed', 'canceled'].includes(meta.status || '')) continue;" in js
     assert "const runningPromptIds = new Set(running.map((item) => item[1]).filter(Boolean));" in poll_queue_block
     assert "const pendingPromptIds = new Set(pending.map((item) => item[1]).filter(Boolean));" in poll_queue_block
     assert "for (const promptId of Array.from(trackedPromptIds)) {" in poll_queue_block
@@ -2630,6 +2632,13 @@ def test_queue_poll_defensive_reconciliation_clears_terminal_stale_tracked_ids()
     assert "if (donePromptIds.has(promptId) || ['completed', 'failed', 'canceled'].includes(meta.status || '')) {" in poll_queue_block
     assert "trackedPromptIds.delete(promptId);" in poll_queue_block
     assert "pendingImageJobs.delete(promptId);" in poll_queue_block
+    assert "const clearedTerminal = reconcileTerminalTrackedQueueState();" in poll_queue_block
+    assert "if (clearedTerminal > 0) {" in poll_queue_block
+    assert "persistTrackedQueueState();" in poll_queue_block
+    assert "renderQueueStatus([], [], new Set());" in poll_queue_block
+    assert "if (!trackedPromptIds.size) {" in poll_queue_block
+    assert "imageGenerateBtn.textContent = 'Generate Image';" in poll_queue_block
+    assert "stopQueuePolling();" in poll_queue_block
 
 
 def test_queue_poll_retries_done_history_persistence_until_post_ok():

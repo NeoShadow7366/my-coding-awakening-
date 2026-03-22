@@ -9422,6 +9422,18 @@ async function loadGallery() {
 
 refreshGalleryBtn.addEventListener('click', loadGallery);
 
+function reconcileTerminalTrackedQueueState() {
+	let cleared = 0;
+	for (const promptId of Array.from(trackedPromptIds)) {
+		const meta = queueJobMeta.get(promptId) || {};
+		if (!['completed', 'failed', 'canceled'].includes(meta.status || '')) continue;
+		trackedPromptIds.delete(promptId);
+		pendingImageJobs.delete(promptId);
+		cleared += 1;
+	}
+	return cleared;
+}
+
 async function pollQueue() {
 	const ids = Array.from(trackedPromptIds);
 	if (!ids.length) {
@@ -9518,7 +9530,18 @@ async function pollQueue() {
 
 		await processAutoRetries();
 	} catch {
-		// non-fatal poll failures
+		// Non-fatal poll failures can still leave terminal items tracked if the
+		// exception happened before normal reconciliation; clear those defensively.
+		const clearedTerminal = reconcileTerminalTrackedQueueState();
+		if (clearedTerminal > 0) {
+			persistTrackedQueueState();
+			renderQueueStatus([], [], new Set());
+		}
+		if (!trackedPromptIds.size) {
+			imageGenerateBtn.disabled = false;
+			imageGenerateBtn.textContent = 'Generate Image';
+			stopQueuePolling();
+		}
 	}
 }
 
