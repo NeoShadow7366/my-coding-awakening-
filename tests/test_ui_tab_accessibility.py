@@ -2297,6 +2297,7 @@ def test_prompt_recent_chips_markup_and_wiring_present():
     assert "promptRecentClearBtn.addEventListener('keydown', onPromptRecentControlsKeydown);" in js
     assert "promptRecentChips.innerHTML = '<span class=\"hint\">No recent prompts yet.</span>';" in js
     assert "promptRecentChips.querySelectorAll('.prompt-recent-chip').forEach((btn) => {" in js
+    assert "window.confirm('Clear recent prompt history?');" in js
     assert "localStorage.removeItem(PROMPT_RECENT_KEY);" in js
     assert "renderPromptRecentChips();" in js
     assert "setSelectValueIfOptionExists(loraModelSelect, payload.lora);" not in js
@@ -3015,6 +3016,11 @@ def test_prompt_preset_v2_js_functions_present():
     assert "function togglePresetFavorite(name)" in js
     assert "function _updateFavToggleBtn(name, isFav)" in js
     assert "function deleteNamedPromptPreset(name)" in js
+    assert "if (!n) return false;" in js
+    assert "window.confirm(`Delete prompt preset \"${n}\"? This cannot be undone.`);" in js
+    assert "showToast('Delete preset canceled.', 'pos');" in js
+    assert "return false;" in js
+    assert "return true;" in js
     # v2 structure written on save
     assert "text: t, tags, favorite, created_at" in js
     # migration writes object from string
@@ -3054,6 +3060,8 @@ def test_prompt_preset_v2_js_functions_present():
     assert "promptPresetRecentPinnedOnlyToggle.addEventListener('keydown'" in js
     assert "event.key === ' ' || event.key === 'Enter'" in js
     assert "event.preventDefault();" in js
+    assert "window.confirm(`Delete image profile \"${name}\"? This cannot be undone.`);" in js
+    assert "window.confirm('Clear current conversation messages?');" in js
     assert "function togglePinRecentPresetFilterCombo(index)" in js
     assert "function _getRenderableRecentPresetFilters()" in js
     assert "function moveRecentPresetFilterCombo(sourceFrom, sourceTo)" in js

@@ -2179,6 +2179,11 @@ function deleteSelectedImageProfile() {
 		showToast('No profile selected.', 'neg');
 		return;
 	}
+	const confirmed = window.confirm(`Delete image profile "${name}"? This cannot be undone.`);
+	if (!confirmed) {
+		showToast('Profile delete canceled.', 'pos');
+		return;
+	}
 	const profiles = getImageProfileState();
 	if (!profiles[name]) {
 		renderImageProfileSelect('');
@@ -5829,6 +5834,8 @@ textRandomSeed.addEventListener('click', () => {
 });
 
 clearChat.addEventListener('click', () => {
+	const confirmed = window.confirm('Clear current conversation messages?');
+	if (!confirmed) return;
 	chatMessages.innerHTML = '';
 	appendSystemMessage('Conversation cleared.');
 });
@@ -13554,13 +13561,19 @@ function _updateFavToggleBtn(name, isFav) {
 }
 function deleteNamedPromptPreset(name) {
 	const n = String(name || '').trim();
-	if (!n) return;
+	if (!n) return false;
+	const confirmed = window.confirm(`Delete prompt preset "${n}"? This cannot be undone.`);
+	if (!confirmed) {
+		showToast('Delete preset canceled.', 'pos');
+		return false;
+	}
 	const presets = loadPromptSavedPresets();
 	delete presets[n];
 	localStorage.setItem(PROMPT_SAVED_KEY, JSON.stringify(presets));
 	refreshPromptTagFilterOptions();
 	renderPromptSavedSelect();
 	showToast(`Deleted prompt preset "${n}".`, 'pos');
+	return true;
 }
 
 // --- Preset Edit Modal ---
@@ -14243,8 +14256,8 @@ if (presetEditDelete) {
 	presetEditDelete.addEventListener('click', () => {
 		const name = _presetEditOriginalName;
 		if (!name) return;
-		closePresetEditModal();
-		deleteNamedPromptPreset(name);
+		const deleted = deleteNamedPromptPreset(name);
+		if (deleted) closePresetEditModal();
 	});
 }
 if (presetEditModal) {
@@ -14272,6 +14285,8 @@ document.addEventListener('keydown', (e) => {
 });
 if (promptRecentClearBtn) {
 	promptRecentClearBtn.addEventListener('click', () => {
+		const confirmed = window.confirm('Clear recent prompt history?');
+		if (!confirmed) return;
 		localStorage.removeItem(PROMPT_RECENT_KEY);
 		renderPromptRecentDropdown();
 		renderPromptRecentChips();
