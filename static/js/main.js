@@ -8769,6 +8769,29 @@ if (gallerySearch) {
 	});
 }
 
+// Escape-to-clear support for prompt input fields
+// Image generation prompt
+if (imagePrompt) {
+	imagePrompt.addEventListener('keydown', (e) => {
+		if (e.key !== 'Escape') return;
+		if (!imagePrompt.value) return; // skip if empty
+		e.stopPropagation();
+		imagePrompt.value = '';
+		imagePrompt.focus();
+	});
+}
+
+// Image generation negative prompt
+if (imageNegativePrompt) {
+	imageNegativePrompt.addEventListener('keydown', (e) => {
+		if (e.key !== 'Escape') return;
+		if (!imageNegativePrompt.value) return; // skip if empty
+		e.stopPropagation();
+		imageNegativePrompt.value = '';
+		imageNegativePrompt.focus();
+	});
+}
+
 // Global Ctrl+F shortcut for gallery search focus (when Image panel is active)
 document.addEventListener('keydown', (event) => {
 	if (event.ctrlKey && event.key === 'f' || event.metaKey && event.key === 'f') {

@@ -2827,6 +2827,33 @@ def test_gallery_lightbox_escape_to_close_keyboard_support():
     assert "if (event.key !== 'Tab' || galleryLightbox.hidden) return;" in js
 
 
+def test_prompt_input_escape_to_clear_keyboard_support():
+    """Prompt input fields (image prompt, negative prompt) support Escape-to-clear keyboard shortcut."""
+    from pathlib import Path
+    html_path = Path(__file__).resolve().parents[1] / "templates" / "index.html"
+    html = html_path.read_text(encoding="utf-8")
+    
+    # aria-keyshortcuts present on prompt fields
+    assert '<textarea id="image-prompt" rows="4" placeholder="A cinematic forest temple, volumetric light, detailed illustration" aria-keyshortcuts="Escape"></textarea>' in html
+    assert '<textarea id="image-negative-prompt" rows="3" placeholder="blurry, low quality, watermark, text" aria-keyshortcuts="Escape"></textarea>' in html
+    
+    # JS event listeners for Escape-to-clear
+    js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
+    js = js_path.read_text(encoding="utf-8")
+    
+    # Escape-to-clear handlers for prompt fields
+    assert "if (imagePrompt) {" in js
+    assert "imagePrompt.addEventListener('keydown', (e) => {" in js
+    assert "if (e.key !== 'Escape') return;" in js
+    assert "if (!imagePrompt.value) return;" in js
+    assert "imagePrompt.value = '';" in js
+    
+    assert "if (imageNegativePrompt) {" in js
+    assert "imageNegativePrompt.addEventListener('keydown', (e) => {" in js
+    assert "if (!imageNegativePrompt.value) return;" in js
+    assert "imageNegativePrompt.value = '';" in js
+
+
 def test_startup_reconcile_function_and_wiring_present_in_js_bundle():
     """runStartupHistoryReconcile must exist and be called once when imageOk first becomes true."""
     js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
