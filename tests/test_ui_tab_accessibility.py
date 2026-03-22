@@ -1800,7 +1800,7 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert "if (loraFamilyLegend) {" in js
     assert "loraFamilyLegend.open = !loraFamilyLegend.open;" in js
     assert "if (hotkey === 'k' || hotkey === '?') {" in js
-    assert "showToast('Display shortcuts: M mode, Shift+M reset, C compact, S hints, P preserved, X mismatch, B row clear, I hide incompatible, L legend, D/R/0 default, H toggle panel, Esc close.', 'pos');" in js
+    assert "showToast('Display shortcuts: M mode, Shift+M reset, C compact, S hints, P preserved, X mismatch, B row clear, I hide incompatible, L legend, K/? help, F focus mode chip, D/R/0/Backspace default, H toggle panel, Esc close.', 'pos');" in js
     assert "if (hotkey === 'f') {" in js
     assert "if (loraDisplayOptionsModeChip) {" in js
     assert "loraDisplayOptionsModeChip.focus();" in js

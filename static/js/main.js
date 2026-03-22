@@ -1409,7 +1409,7 @@ if (loraDisplayOptions) {
 			return;
 		}
 		if (hotkey === 'k' || hotkey === '?') {
-			showToast('Display shortcuts: M mode, Shift+M reset, C compact, S hints, P preserved, X mismatch, B row clear, I hide incompatible, L legend, D/R/0 default, H toggle panel, Esc close.', 'pos');
+			showToast('Display shortcuts: M mode, Shift+M reset, C compact, S hints, P preserved, X mismatch, B row clear, I hide incompatible, L legend, K/? help, F focus mode chip, D/R/0/Backspace default, H toggle panel, Esc close.', 'pos');
 			return;
 		}
 		if (hotkey === 'f') {
