@@ -8730,6 +8730,18 @@ if (gallerySearch) {
 	});
 }
 
+// Global Ctrl+F shortcut for gallery search focus (when Image panel is active)
+document.addEventListener('keydown', (event) => {
+	if (event.ctrlKey && event.key === 'f' || event.metaKey && event.key === 'f') {
+		if (!panelImage || panelImage.hidden) return;
+		if (!gallerySearch) return;
+		event.preventDefault();
+		gallerySearch.focus();
+		gallerySearch.select();
+		showToast('Focus on gallery search.', 'pos');
+	}
+});
+
 if (gallerySortSelect) {
 	gallerySortSelect.value = gallerySortOrder;
 	gallerySortSelect.addEventListener('change', () => {

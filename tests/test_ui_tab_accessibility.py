@@ -2203,6 +2203,34 @@ def test_gallery_lightbox_tag_editor_markup_present():
     assert 'id="gallery-lightbox-tags" class="gallery-lightbox-tags" aria-live="polite"' in html
 
 
+def test_gallery_search_markup_and_keyboard_shortcut_present():
+    app_module.app.config["TESTING"] = True
+    client = app_module.app.test_client()
+
+    html = client.get("/").get_data(as_text=True)
+    assert 'id="gallery-search"' in html
+    assert 'type="search"' in html
+    assert 'placeholder="Filter by prompt…"' in html
+
+    js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
+    js = js_path.read_text(encoding="utf-8")
+    assert "const gallerySearch = document.getElementById('gallery-search');" in js
+    assert "GALLERY_SEARCH_QUERY_KEY" in js
+    assert "gallerySearch.addEventListener('input'" in js
+    assert "gallerySearch.addEventListener('keydown'" in js
+    assert "if (e.key !== 'Escape') return;" in js
+    assert "gallerySearchQuery = gallerySearch.value || '';" in js
+    assert "localStorage.setItem(GALLERY_SEARCH_QUERY_KEY, gallerySearchQuery);" in js
+    assert "localStorage.removeItem(GALLERY_SEARCH_QUERY_KEY);" in js
+    assert "renderGallery(currentFullHistory);" in js
+    # Ctrl+F shortcut for gallery search focus
+    assert "if (event.ctrlKey && event.key === 'f' || event.metaKey && event.key === 'f')" in js
+    assert "panelImage.hidden" in js
+    assert "gallerySearch.focus();" in js
+    assert "gallerySearch.select();" in js
+    assert "'Focus on gallery search.'" in js
+
+
 def test_gallery_favorites_markup_and_wiring_present():
     app_module.app.config["TESTING"] = True
     client = app_module.app.test_client()
