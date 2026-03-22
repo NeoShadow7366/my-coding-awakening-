@@ -778,6 +778,37 @@ def _image_models() -> list[str]:
     return []
 
 
+def _preflight_validate_image_model(model_name: str, available_models: list[str] | None = None) -> None:
+    """Reject obviously invalid model selections before queue submission."""
+    model = str(model_name or "").strip()
+    if not model:
+        raise ValueError("No checkpoint model is available. Add checkpoints in ComfyUI first.")
+
+    available = available_models if isinstance(available_models, list) else _image_models()
+    if available and model not in available:
+        raise ValueError(f"Selected checkpoint is not available in ComfyUI: {model}")
+
+    family = _infer_image_model_family(model)
+    if family != "flux":
+        return
+
+    lowered = model.lower()
+    component_tokens = (
+        "encoder",
+        "text_encoder",
+        "text-encoder",
+        "clip",
+        "t5",
+        "_vae",
+        ".vae",
+    )
+    if any(token in lowered for token in component_tokens):
+        raise ValueError(
+            "Selected Flux file looks like a component (encoder/clip/vae), not a full checkpoint. "
+            "Choose a full Flux checkpoint model for generation."
+        )
+
+
 def _infer_image_model_family(model_name: str) -> str:
     """Infer broad model family from checkpoint file naming conventions."""
     value = str(model_name or "").strip().lower()
@@ -2160,6 +2191,42 @@ def _merge_preferred_history_entry(existing: dict, candidate: dict) -> dict:
     }
 
 
+def _merge_history_by_prompt_id(existing: dict, candidate: dict) -> dict:
+    """Merge two history entries that share the same prompt_id.
+
+    Uses score-based preference for top-level fields but merges params additively
+    (no keys lost from either side) and always propagates non-empty images from
+    whichever entry has them, handling the pending-to-completed state transition.
+    """
+    if _history_entry_score(candidate) > _history_entry_score(existing):
+        merged: dict = {
+            **existing,
+            **candidate,
+            "id": existing.get("id") or candidate.get("id"),
+            "created_at": existing.get("created_at") or candidate.get("created_at"),
+        }
+    else:
+        merged = dict(existing)
+
+    # Merge params additively: existing keys win over zero/empty placeholders.
+    merged_params: dict = {}
+    for source in (existing.get("params") or {}, candidate.get("params") or {}):
+        for k, v in source.items():
+            if k not in merged_params or merged_params[k] in (None, "", 0):
+                merged_params[k] = v
+    merged["params"] = merged_params
+
+    # Always propagate images (handles pending entry gaining images on completion).
+    existing_images = existing.get("images") or []
+    candidate_images = candidate.get("images") or []
+    if not existing_images and candidate_images:
+        merged["images"] = candidate_images
+    elif existing_images and not candidate_images:
+        merged["images"] = existing_images
+
+    return merged
+
+
 def _dedupe_history_entries(entries: list[dict]) -> list[dict]:
     """Remove duplicate image-history rows while preserving the best metadata."""
     deduped: list[dict] = []
@@ -2185,6 +2252,21 @@ def _dedupe_history_entries(entries: list[dict]) -> list[dict]:
 def _append_history(item: dict) -> dict:
     entries = _load_history()
 
+    # Upgrade-by-prompt_id: find any existing entry with the same prompt_id and
+    # merge (handles pending-skeleton -> completed-with-images transition).
+    param_prompt_id = str((item.get("params") or {}).get("prompt_id") or "").strip()
+    if param_prompt_id:
+        for index, existing in enumerate(entries):
+            existing_pid = str((existing.get("params") or {}).get("prompt_id") or "").strip()
+            if existing_pid != param_prompt_id:
+                continue
+            merged = _merge_history_by_prompt_id(existing, item)
+            if merged != existing:
+                entries[index] = merged
+                _save_history(entries[:300])
+            return merged
+
+    # Standard image-key dedup (same prompt_id + same image references).
     duplicate_key = _history_image_key(item)
     if duplicate_key:
         for index, existing in enumerate(entries):
@@ -2204,6 +2286,92 @@ def _append_history(item: dict) -> dict:
     entries.insert(0, entry)
     _save_history(entries[:300])
     return entry
+
+
+def _write_pending_history_entry(prompt_id: str, meta: dict, mode: str = "txt2img") -> None:
+    """Persist a skeleton history entry immediately after a job is submitted to ComfyUI.
+
+    Gives the history/gallery visibility for jobs that complete without an active
+    browser listener.  The entry is upgraded to a full record when images arrive
+    either via POST /api/history from the frontend or a future reconciliation call.
+    """
+    try:
+        _append_history(
+            {
+                "type": "image",
+                "prompt": (meta.get("prompt") or "").strip(),
+                "negative_prompt": (meta.get("negative_prompt") or "").strip(),
+                "engine": "comfyui",
+                "model": (meta.get("model") or "").strip(),
+                "params": {
+                    "prompt_id": prompt_id,
+                    "sampler": meta.get("sampler") or "",
+                    "scheduler": meta.get("scheduler") or "",
+                    "seed": meta.get("seed"),
+                    "steps": meta.get("steps") or 0,
+                    "cfg": meta.get("cfg") or 0,
+                    "denoise": meta.get("denoise") or 0,
+                    "width": meta.get("width") or 0,
+                    "height": meta.get("height") or 0,
+                    "batch_size": meta.get("batch_size") or 1,
+                    "mode": mode,
+                },
+                "images": [],
+            }
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Could not write pending history entry for %s: %s", prompt_id, exc)
+
+
+def _reconcile_pending_history(prompt_ids: list[str] | None = None) -> dict:
+    """Upgrade pending (images=[]) history entries by fetching completed images from ComfyUI.
+
+    If *prompt_ids* is provided, only those entries are reconciled.  Otherwise
+    every image history entry with an empty images list is checked (capped at
+    50 requests to avoid stalling on large history files).
+
+    Returns a summary dict: {checked, upgraded, not_ready, errors}.
+    """
+    entries = _load_history()
+    counts = {"checked": 0, "upgraded": 0, "not_ready": 0, "errors": 0}
+
+    pending_entries: list[tuple[int, dict]] = []
+    for idx, entry in enumerate(entries):
+        if entry.get("type") != "image":
+            continue
+        if entry.get("images"):
+            continue
+        pid = str((entry.get("params") or {}).get("prompt_id") or "").strip()
+        if not pid:
+            continue
+        if prompt_ids is not None and pid not in prompt_ids:
+            continue
+        pending_entries.append((idx, entry))
+
+    pending_entries = pending_entries[:50]  # cap ComfyUI requests per call
+
+    for idx, entry in pending_entries:
+        pid = str((entry.get("params") or {}).get("prompt_id") or "").strip()
+        counts["checked"] += 1
+        try:
+            images = _parse_prompt_images(pid)
+        except requests.RequestException:
+            counts["errors"] += 1
+            continue
+
+        if not images:
+            counts["not_ready"] += 1
+            continue
+
+        merged = _merge_history_by_prompt_id(entry, {**entry, "images": images})
+        if merged != entry:
+            entries[idx] = merged
+            counts["upgraded"] += 1
+
+    if counts["upgraded"]:
+        _save_history(entries[:300])
+
+    return counts
 
 
 def _comfy_submit_prompt(workflow: dict, *, front: bool = False) -> dict:
@@ -2740,9 +2908,10 @@ def _build_txt2img_workflow(body: dict) -> tuple[dict, dict]:
     if controlnet_start > controlnet_end:
         controlnet_start, controlnet_end = controlnet_end, controlnet_start
 
+    models = _image_models()
     if not model:
-        models = _image_models()
         model = models[0] if models else ""
+    _preflight_validate_image_model(model, models)
 
     meta = {
         "prompt": prompt,
@@ -3040,9 +3209,10 @@ def _build_img2img_workflow(body: dict, uploaded_name: str) -> tuple[dict, dict]
     if controlnet_start > controlnet_end:
         controlnet_start, controlnet_end = controlnet_end, controlnet_start
 
+    models = _image_models()
     if not model:
-        models = _image_models()
         model = models[0] if models else ""
+    _preflight_validate_image_model(model, models)
 
     meta = {
         "prompt": prompt,
@@ -5250,10 +5420,13 @@ def api_image_generate():
 
     try:
         result = _comfy_submit_prompt(workflow, front=queue_front)
+        prompt_id = result.get("prompt_id") or ""
+        if prompt_id:
+            _write_pending_history_entry(prompt_id, meta, mode="txt2img")
         return jsonify(
             {
                 "ok": True,
-                "prompt_id": result.get("prompt_id"),
+                "prompt_id": prompt_id,
                 "number": result.get("number"),
                 "meta": meta,
             }
@@ -5303,10 +5476,13 @@ def api_image_img2img():
             return jsonify({"error": "Failed to upload image to ComfyUI"}), 502
         workflow, meta = _build_img2img_workflow(body, uploaded_name)
         result = _comfy_submit_prompt(workflow, front=queue_front)
+        prompt_id = result.get("prompt_id") or ""
+        if prompt_id:
+            _write_pending_history_entry(prompt_id, meta, mode="img2img")
         return jsonify(
             {
                 "ok": True,
-                "prompt_id": result.get("prompt_id"),
+                "prompt_id": prompt_id,
                 "number": result.get("number"),
                 "meta": meta,
             }
@@ -5343,10 +5519,13 @@ def api_image_img2img_requeue():
     try:
         workflow, meta = _build_img2img_workflow(body, image_name)
         result = _comfy_submit_prompt(workflow, front=queue_front)
+        prompt_id = result.get("prompt_id") or ""
+        if prompt_id:
+            _write_pending_history_entry(prompt_id, meta, mode="img2img")
         return jsonify(
             {
                 "ok": True,
-                "prompt_id": result.get("prompt_id"),
+                "prompt_id": prompt_id,
                 "number": result.get("number"),
                 "meta": meta,
             }
@@ -5379,13 +5558,23 @@ def api_image_queue():
         queue_data = queue_resp.json() or {}
 
         done = []
+        done_prompt_ids: list[str] = []
         for prompt_id in prompt_ids:
             try:
                 done_images = _parse_prompt_images(prompt_id)
                 if done_images:
                     done.append({"prompt_id": prompt_id, "images": done_images})
+                    done_prompt_ids.append(prompt_id)
             except requests.RequestException:
                 continue
+
+        # Auto-reconcile: upgrade any pending history skeleton for done jobs so
+        # the history record is complete even if the frontend doesn't post back.
+        if done_prompt_ids:
+            try:
+                _reconcile_pending_history(done_prompt_ids)
+            except Exception:  # noqa: BLE001
+                pass  # reconcile is best-effort; never block the queue response
 
         return jsonify(
             {
@@ -5730,6 +5919,30 @@ def api_gallery_bulk_export():
         as_attachment=True,
         download_name=filename,
     )
+
+
+@app.route("/api/history/reconcile-pending", methods=["GET", "POST"])
+def api_history_reconcile_pending():
+    """Sweep pending image history entries and fill in images from ComfyUI.
+
+    Useful to call once on startup or on demand (e.g., after a session where the
+    browser was closed before jobs finished).  Accepts an optional JSON body
+    ``{"prompt_ids": ["pid-1", "pid-2"]}`` to limit the scope to specific jobs.
+    """
+    if not _comfy_available():
+        return jsonify({"error": "ComfyUI is not running"}), 503
+
+    prompt_ids: list[str] | None = None
+    body = request.get_json(silent=True) or {}
+    if body.get("prompt_ids"):
+        prompt_ids = [str(p).strip() for p in body["prompt_ids"] if str(p).strip()]
+
+    try:
+        result = _reconcile_pending_history(prompt_ids)
+        return jsonify({"ok": True, **result})
+    except Exception as exc:  # noqa: BLE001
+        logger.error("Reconcile pending history failed: %s", exc)
+        return jsonify({"error": str(exc)}), 500
 
 
 @app.route("/api/history", methods=["GET", "POST"])

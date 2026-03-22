@@ -482,6 +482,47 @@ def test_build_txt2img_workflow_no_preprocessor_node_when_none(monkeypatch):
     assert meta["controlnet_preprocessor"] == "none"
 
 
+def test_preflight_validate_image_model_rejects_flux_component(monkeypatch):
+    monkeypatch.setattr(
+        app_module,
+        "_image_models",
+        lambda: ["flux_dev.safetensors", "flux2_vae.safetensors"],
+    )
+
+    with pytest.raises(ValueError, match="component"):
+        app_module._preflight_validate_image_model("flux2_vae.safetensors")
+
+
+def test_image_generate_rejects_unavailable_selected_checkpoint(client, monkeypatch):
+    monkeypatch.setattr(app_module, "_comfy_available", lambda: True)
+    monkeypatch.setattr(app_module, "_image_models", lambda: ["base.safetensors"])
+
+    resp = client.post(
+        "/api/image/generate",
+        json={"prompt": "castle", "model": "missing.safetensors"},
+    )
+
+    assert resp.status_code == 400
+    assert "Selected checkpoint is not available" in resp.get_json()["error"]
+
+
+def test_img2img_requeue_rejects_flux_component_model(client, monkeypatch):
+    monkeypatch.setattr(app_module, "_comfy_available", lambda: True)
+    monkeypatch.setattr(app_module, "_image_models", lambda: ["flux2_encoderFP8.safetensors"])
+
+    resp = client.post(
+        "/api/image/img2img-requeue",
+        json={
+            "prompt": "forest",
+            "image_name": "uploaded.png",
+            "model": "flux2_encoderFP8.safetensors",
+        },
+    )
+
+    assert resp.status_code == 400
+    assert "looks like a component" in resp.get_json()["error"]
+
+
 def test_image_prompt_suggestions_requires_all_fields(client, monkeypatch):
     monkeypatch.setattr(app_module, "_ollama_available", lambda: True)
 

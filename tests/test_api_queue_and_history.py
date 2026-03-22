@@ -905,3 +905,351 @@ def test_resolve_comfy_root_dir_uses_parent_for_script_path_and_detects_nested_c
 
     resolved = app_module._resolve_comfy_root_dir()
     assert resolved == nested_comfy
+
+
+# ---------------------------------------------------------------------------
+# Backend-owned pending history entries (Item 2 – history persistence)
+# ---------------------------------------------------------------------------
+
+def test_image_generate_writes_pending_history_entry(client, monkeypatch):
+    """Submitting a txt2img job should immediately write a pending history entry."""
+    monkeypatch.setattr(app_module, "_comfy_available", lambda: True)
+    monkeypatch.setattr(app_module, "_image_models", lambda: ["model.safetensors"])
+    monkeypatch.setattr(
+        app_module,
+        "_comfy_submit_prompt",
+        lambda workflow, front=False: {"prompt_id": "pid-pending-txt2img", "number": 1},
+    )
+
+    resp = client.post(
+        "/api/image/generate",
+        json={"prompt": "a scenic mountain", "model": "model.safetensors", "steps": 20, "cfg": 7.0},
+    )
+    assert resp.status_code == 200
+
+    history = client.get("/api/history?type=image").get_json()["history"]
+    assert len(history) == 1
+    entry = history[0]
+    assert entry["prompt"] == "a scenic mountain"
+    assert entry["model"] == "model.safetensors"
+    assert entry["params"]["prompt_id"] == "pid-pending-txt2img"
+    assert entry["params"]["mode"] == "txt2img"
+    assert entry["images"] == []
+
+
+def test_img2img_requeue_writes_pending_history_entry(client, monkeypatch):
+    """Submitting an img2img-requeue job should immediately write a pending history entry."""
+    monkeypatch.setattr(app_module, "_comfy_available", lambda: True)
+    monkeypatch.setattr(app_module, "_image_models", lambda: ["model.safetensors"])
+    monkeypatch.setattr(
+        app_module,
+        "_comfy_submit_prompt",
+        lambda workflow, front=False: {"prompt_id": "pid-pending-img2img", "number": 2},
+    )
+
+    resp = client.post(
+        "/api/image/img2img-requeue",
+        json={
+            "prompt": "oil painting style",
+            "image_name": "source.png",
+            "model": "model.safetensors",
+            "steps": 25,
+        },
+    )
+    assert resp.status_code == 200
+
+    history = client.get("/api/history?type=image").get_json()["history"]
+    assert len(history) == 1
+    entry = history[0]
+    assert entry["prompt"] == "oil painting style"
+    assert entry["params"]["prompt_id"] == "pid-pending-img2img"
+    assert entry["params"]["mode"] == "img2img"
+    assert entry["images"] == []
+
+
+def test_pending_entry_upgraded_when_completed_entry_arrives(client, monkeypatch):
+    """POST /api/history with matching prompt_id upgrades the pending entry."""
+    monkeypatch.setattr(app_module, "_comfy_available", lambda: True)
+    monkeypatch.setattr(app_module, "_image_models", lambda: ["m.safetensors"])
+    monkeypatch.setattr(
+        app_module,
+        "_comfy_submit_prompt",
+        lambda workflow, front=False: {"prompt_id": "pid-upgrade-test", "number": 3},
+    )
+
+    # Submit a job — writes pending entry
+    client.post(
+        "/api/image/generate",
+        json={"prompt": "fantasy castle", "model": "m.safetensors", "steps": 30, "cfg": 7.5},
+    )
+
+    # Simulate the frontend completing the job and posting history
+    completed = {
+        "type": "image",
+        "prompt": "fantasy castle",
+        "negative_prompt": "blurry",
+        "engine": "comfyui",
+        "model": "m.safetensors",
+        "params": {
+            "prompt_id": "pid-upgrade-test",
+            "sampler": "euler",
+            "steps": 30,
+            "cfg": 7.5,
+            "mode": "txt2img",
+        },
+        "images": [{"filename": "out-castle.png", "subfolder": "", "type": "output"}],
+    }
+    r = client.post("/api/history", json=completed)
+    assert r.status_code == 201
+
+    # Should still be exactly one entry (pending upgraded in-place, not duplicated)
+    history = client.get("/api/history?type=image").get_json()["history"]
+    assert len(history) == 1
+    entry = history[0]
+    assert entry["params"]["prompt_id"] == "pid-upgrade-test"
+    assert entry["images"] == [{"filename": "out-castle.png", "subfolder": "", "type": "output"}]
+    assert entry["params"]["steps"] == 30
+
+
+def test_merge_history_by_prompt_id_preserves_backend_params_not_in_frontend():
+    """Params present in the backend entry but absent from the frontend entry are kept."""
+    pending = {
+        "type": "image",
+        "prompt": "sunset over water",
+        "negative_prompt": "",
+        "engine": "comfyui",
+        "model": "m.safetensors",
+        "params": {
+            "prompt_id": "pid-params-merge",
+            "sampler": "euler",
+            "scheduler": "karras",
+            "steps": 25,
+            "cfg": 7.0,
+            "denoise": 0,
+            "width": 512,
+            "height": 512,
+            "batch_size": 1,
+            "mode": "txt2img",
+        },
+        "images": [],
+    }
+    completed = {
+        "type": "image",
+        "prompt": "sunset over water",
+        "negative_prompt": "",
+        "engine": "comfyui",
+        "model": "m.safetensors",
+        "params": {
+            "prompt_id": "pid-params-merge",
+            "sampler": "euler",
+            "steps": 25,
+            "cfg": 7.0,
+            "mode": "txt2img",
+            # no scheduler, no width/height — smaller frontend payload
+        },
+        "images": [{"filename": "out.png", "subfolder": "", "type": "output"}],
+    }
+
+    merged = app_module._merge_history_by_prompt_id(pending, completed)
+
+    # Images from completed applied
+    assert merged["images"] == [{"filename": "out.png", "subfolder": "", "type": "output"}]
+    # Backend-only params preserved
+    assert merged["params"]["scheduler"] == "karras"
+    assert merged["params"]["width"] == 512
+    assert merged["params"]["height"] == 512
+
+
+# ---------------------------------------------------------------------------
+# Pending history reconciliation (Sprint 31)
+# ---------------------------------------------------------------------------
+
+def test_reconcile_pending_history_upgrades_empty_image_entry(client, monkeypatch):
+    """_reconcile_pending_history fills in images for a pending entry."""
+    # Seed a pending entry (images=[])
+    monkeypatch.setattr(app_module, "_comfy_available", lambda: True)
+    monkeypatch.setattr(app_module, "_image_models", lambda: ["m.safetensors"])
+    monkeypatch.setattr(
+        app_module,
+        "_comfy_submit_prompt",
+        lambda workflow, front=False: {"prompt_id": "pid-recon-1", "number": 1},
+    )
+    client.post(
+        "/api/image/generate",
+        json={"prompt": "forest path", "model": "m.safetensors", "steps": 20},
+    )
+
+    history = client.get("/api/history?type=image").get_json()["history"]
+    assert len(history) == 1
+    assert history[0]["images"] == []
+
+    # Simulate ComfyUI completing the job
+    done_images = [{"filename": "forest.png", "subfolder": "", "type": "output"}]
+    monkeypatch.setattr(
+        app_module,
+        "_parse_prompt_images",
+        lambda pid: done_images if pid == "pid-recon-1" else [],
+    )
+
+    counts = app_module._reconcile_pending_history()
+    assert counts["checked"] == 1
+    assert counts["upgraded"] == 1
+    assert counts["not_ready"] == 0
+
+    history = client.get("/api/history?type=image").get_json()["history"]
+    assert history[0]["images"] == done_images
+
+
+def test_reconcile_pending_history_skips_entries_already_having_images(client, monkeypatch):
+    """Entries that already have images are not re-checked."""
+    client.post("/api/history", json={
+        "type": "image",
+        "prompt": "done job",
+        "negative_prompt": "",
+        "engine": "comfyui",
+        "model": "m.safetensors",
+        "params": {"prompt_id": "pid-already-done"},
+        "images": [{"filename": "done.png", "subfolder": "", "type": "output"}],
+    })
+
+    parse_calls = []
+    monkeypatch.setattr(
+        app_module, "_parse_prompt_images", lambda pid: parse_calls.append(pid) or []
+    )
+
+    counts = app_module._reconcile_pending_history()
+    assert counts["checked"] == 0
+    assert parse_calls == []
+
+
+def test_reconcile_pending_history_counts_not_ready_when_comfy_returns_empty(client, monkeypatch):
+    """Entries whose jobs are not yet done in ComfyUI are counted as not_ready."""
+    monkeypatch.setattr(app_module, "_comfy_available", lambda: True)
+    monkeypatch.setattr(app_module, "_image_models", lambda: ["m.safetensors"])
+    monkeypatch.setattr(
+        app_module,
+        "_comfy_submit_prompt",
+        lambda workflow, front=False: {"prompt_id": "pid-not-ready", "number": 2},
+    )
+    client.post("/api/image/generate", json={"prompt": "sky", "model": "m.safetensors"})
+
+    monkeypatch.setattr(app_module, "_parse_prompt_images", lambda pid: [])
+
+    counts = app_module._reconcile_pending_history()
+    assert counts["not_ready"] == 1
+    assert counts["upgraded"] == 0
+
+
+def test_reconcile_pending_history_limited_to_prompt_ids_when_specified(client, monkeypatch):
+    """When prompt_ids is given, only those entries are checked."""
+    monkeypatch.setattr(app_module, "_comfy_available", lambda: True)
+    monkeypatch.setattr(app_module, "_image_models", lambda: ["m.safetensors"])
+
+    call_sequence = [0]
+    def fake_submit(*args, **kwargs):
+        call_sequence[0] += 1
+        return {"prompt_id": f"pid-scope-{call_sequence[0]}", "number": call_sequence[0]}
+
+    monkeypatch.setattr(app_module, "_comfy_submit_prompt", fake_submit)
+
+    # Submit two jobs
+    client.post("/api/image/generate", json={"prompt": "one", "model": "m.safetensors"})
+    client.post("/api/image/generate", json={"prompt": "two", "model": "m.safetensors"})
+
+    checked = []
+    monkeypatch.setattr(app_module, "_parse_prompt_images", lambda pid: checked.append(pid) or [])
+
+    # Only reconcile the first
+    app_module._reconcile_pending_history(["pid-scope-1"])
+    assert checked == ["pid-scope-1"]
+
+
+def test_queue_endpoint_auto_reconciles_done_jobs(client, monkeypatch):
+    """api_image_queue auto-upgrades pending history entries for done prompt IDs."""
+    monkeypatch.setattr(app_module, "_comfy_available", lambda: True)
+    monkeypatch.setattr(app_module, "_image_models", lambda: ["m.safetensors"])
+    monkeypatch.setattr(
+        app_module,
+        "_comfy_submit_prompt",
+        lambda workflow, front=False: {"prompt_id": "pid-auto-recon", "number": 3},
+    )
+    client.post("/api/image/generate", json={"prompt": "volcano", "model": "m.safetensors"})
+
+    # Confirm pending
+    history = client.get("/api/history?type=image").get_json()["history"]
+    assert history[0]["images"] == []
+
+    done_images = [{"filename": "volcano.png", "subfolder": "", "type": "output"}]
+
+    def fake_get_queue(url, timeout=0, **kwargs):
+        return DummyResponse(payload={"queue_running": [], "queue_pending": []})
+
+    monkeypatch.setattr(app_module.requests, "get", fake_get_queue)
+    monkeypatch.setattr(
+        app_module,
+        "_parse_prompt_images",
+        lambda pid: done_images if pid == "pid-auto-recon" else [],
+    )
+
+    resp = client.get("/api/image/queue?prompt_ids=pid-auto-recon")
+    assert resp.status_code == 200
+    assert resp.get_json()["done"][0]["images"] == done_images
+
+    # History should now be upgraded
+    history = client.get("/api/history?type=image").get_json()["history"]
+    assert history[0]["images"] == done_images
+
+
+def test_api_reconcile_pending_endpoint_returns_counts(client, monkeypatch):
+    """GET /api/history/reconcile-pending returns reconciliation counts."""
+    monkeypatch.setattr(app_module, "_comfy_available", lambda: True)
+    monkeypatch.setattr(app_module, "_image_models", lambda: ["m.safetensors"])
+    monkeypatch.setattr(
+        app_module,
+        "_comfy_submit_prompt",
+        lambda workflow, front=False: {"prompt_id": "pid-endpoint-recon", "number": 4},
+    )
+    client.post("/api/image/generate", json={"prompt": "clouds", "model": "m.safetensors"})
+
+    done_images = [{"filename": "clouds.png", "subfolder": "", "type": "output"}]
+    monkeypatch.setattr(
+        app_module,
+        "_parse_prompt_images",
+        lambda pid: done_images if pid == "pid-endpoint-recon" else [],
+    )
+
+    resp = client.get("/api/history/reconcile-pending")
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["ok"] is True
+    assert data["checked"] == 1
+    assert data["upgraded"] == 1
+
+
+def test_api_reconcile_pending_endpoint_returns_503_when_comfy_unavailable(client, monkeypatch):
+    monkeypatch.setattr(app_module, "_comfy_available", lambda: False)
+    resp = client.get("/api/history/reconcile-pending")
+    assert resp.status_code == 503
+
+
+def test_api_reconcile_pending_endpoint_accepts_post_with_prompt_ids(client, monkeypatch):
+    """POST /api/history/reconcile-pending with prompt_ids limits scope."""
+    monkeypatch.setattr(app_module, "_comfy_available", lambda: True)
+    monkeypatch.setattr(app_module, "_image_models", lambda: ["m.safetensors"])
+
+    call_count = [0]
+    def fake_submit(*args, **kwargs):
+        call_count[0] += 1
+        return {"prompt_id": f"pid-post-{call_count[0]}", "number": call_count[0]}
+
+    monkeypatch.setattr(app_module, "_comfy_submit_prompt", fake_submit)
+    client.post("/api/image/generate", json={"prompt": "a", "model": "m.safetensors"})
+    client.post("/api/image/generate", json={"prompt": "b", "model": "m.safetensors"})
+
+    checked = []
+    monkeypatch.setattr(app_module, "_parse_prompt_images", lambda pid: checked.append(pid) or [])
+
+    resp = client.post("/api/history/reconcile-pending", json={"prompt_ids": ["pid-post-1"]})
+    assert resp.status_code == 200
+    assert "pid-post-1" in checked
+    assert "pid-post-2" not in checked

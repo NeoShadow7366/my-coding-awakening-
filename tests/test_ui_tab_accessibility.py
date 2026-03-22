@@ -2158,9 +2158,34 @@ def test_gallery_sort_and_mode_filter_markup_and_wiring_present():
     css = css_path.read_text(encoding="utf-8")
     assert ".gallery-sort-wrap," in css
     assert ".gallery-mode-filter-wrap," in css
-    assert ".gallery-tag-filter-wrap {" in css
+    assert ".gallery-tag-filter-wrap," in css
     assert ".gallery-lightbox-tag-input" in css
     assert ".gallery-lightbox-tags" in css
+
+
+def test_gallery_model_filter_markup_and_wiring_present():
+    app_module.app.config["TESTING"] = True
+    client = app_module.app.test_client()
+
+    html = client.get("/").get_data(as_text=True)
+    assert 'id="gallery-model-filter"' in html
+    assert '<option value="all">All models</option>' in html
+    assert 'class="select-wrapper gallery-model-filter-wrap"' in html
+
+    js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
+    js = js_path.read_text(encoding="utf-8")
+    assert "const galleryModelFilterSelect = document.getElementById('gallery-model-filter');" in js
+    assert "GALLERY_MODEL_FILTER_KEY" in js
+    assert "let galleryModelFilter = " in js
+    assert "function syncGalleryModelFilterOptions" in js
+    assert "galleryModelFilter === 'all'" in js
+    assert "e.model || ''" in js
+    assert "galleryModelFilterSelect.addEventListener('change'" in js
+
+    css_path = Path(__file__).resolve().parents[1] / "static" / "css" / "style.css"
+    css = css_path.read_text(encoding="utf-8")
+    assert ".gallery-model-filter-wrap {" in css
+    assert ".gallery-model-filter-wrap select {" in css
 
 
 def test_gallery_lightbox_tag_editor_markup_present():
@@ -2699,7 +2724,36 @@ def test_save_history_entry_returns_response_ok_boolean():
     assert "return false;" in save_block
 
 
-def test_flux_negative_prompt_section_present_in_html():
+def test_startup_reconcile_function_and_wiring_present_in_js_bundle():
+    """runStartupHistoryReconcile must exist and be called once when imageOk first becomes true."""
+    js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
+    js = js_path.read_text(encoding="utf-8")
+
+    # Function is declared
+    assert "async function runStartupHistoryReconcile()" in js
+
+    # Calls reconcile-pending endpoint
+    assert "'/api/history/reconcile-pending'" in js
+
+    # Shows toast if entries were upgraded
+    assert "data.upgraded > 0" in js
+    assert "gallery refreshed" in js
+
+    # Refreshes gallery after upgrade
+    recon_block = js[
+        js.index("async function runStartupHistoryReconcile()"):
+        js.index("function imageProxyUrl(image) {")
+    ]
+    assert "await loadGallery();" in recon_block
+
+    # Guarded by startupReconcileDone flag
+    assert "let startupReconcileDone = false;" in js
+    assert "if (!startupReconcileDone)" in js
+    assert "startupReconcileDone = true;" in js
+    assert "runStartupHistoryReconcile();" in js
+
+
+
     """Negative prompt section must have an id so JS can hide it in Flux mode."""
     app_module.app.config["TESTING"] = True
     client = app_module.app.test_client()
@@ -2872,6 +2926,7 @@ def test_prompt_preset_v2_html_elements_present():
     assert 'id="prompt-tag-filter"' in html
     assert 'id="prompt-preset-filter-status"' in html
     assert 'id="prompt-preset-filter-shortcut-hint"' in html
+    assert 'Recent chips: arrows move, P pins, Del removes.' in html
     assert 'id="prompt-preset-recent-pinned-only-toggle"' in html
     assert 'id="prompt-preset-clear-filters"' in html
     assert 'aria-keyshortcuts="Control+Shift+K"' in html
@@ -2941,11 +2996,27 @@ def test_prompt_preset_v2_js_functions_present():
     assert "data-recent-filter-index" in js
     assert "data-recent-filter-pin" in js
     assert "data-recent-filter-remove" in js
+    assert "draggable=\"true\"" in js
     assert "Pinned recent filter." in js
     assert "Unpinned recent filter." in js
     assert "Pinned-only recent filters on." in js
     assert "Pinned-only recent filters off." in js
     assert "function togglePinRecentPresetFilterCombo(index)" in js
+    assert "function _getRenderableRecentPresetFilters()" in js
+    assert "function moveRecentPresetFilterCombo(sourceFrom, sourceTo)" in js
+    assert "function _getRecentPresetFilterWraps()" in js
+    assert "function _focusRecentPresetFilterChip(renderIndex)" in js
+    assert "promptPresetRecentFilters.addEventListener('dragstart'" in js
+    assert "promptPresetRecentFilters.addEventListener('dragover'" in js
+    assert "promptPresetRecentFilters.addEventListener('drop'" in js
+    assert "promptPresetRecentFilters.addEventListener('keydown'" in js
+    assert "['ArrowLeft', 'ArrowUp', 'ArrowRight', 'ArrowDown', 'Home', 'End'].includes(key)" in js
+    assert "key.toLowerCase() === 'p'" in js
+    assert "['Delete', 'Backspace'].includes(key)" in js
+    assert "aria-keyshortcuts=\"ArrowLeft ArrowRight ArrowUp ArrowDown Home End Enter Space\"" in js
+    assert "aria-keyshortcuts=\"P\"" in js
+    assert "aria-keyshortcuts=\"Delete Backspace\"" in js
+    assert "Reordered recent filters." in js
     assert "Removed recent filter." in js
     # fav toggle wired
     assert "promptFavToggle.addEventListener('click'" in js
@@ -2984,6 +3055,8 @@ def test_prompt_preset_v2_css_present():
     assert ".prompt-preset-recent-filters" in css
     assert ".prompt-preset-recent-filter-chip-wrap" in css
     assert ".prompt-preset-recent-filter-chip-wrap.is-pinned" in css
+    assert ".prompt-preset-recent-filter-chip-wrap.is-dragging" in css
+    assert ".prompt-preset-recent-filter-chip-wrap.is-drop-target" in css
     assert ".prompt-preset-recent-filter-chip" in css
     assert ".prompt-preset-recent-filter-pin" in css
     assert ".prompt-preset-recent-filter-remove" in css

@@ -443,6 +443,7 @@ const gallerySearch = document.getElementById('gallery-search');
 const gallerySortSelect = document.getElementById('gallery-sort');
 const galleryModeFilterSelect = document.getElementById('gallery-mode-filter');
 const galleryTagFilterSelect = document.getElementById('gallery-tag-filter');
+const galleryModelFilterSelect = document.getElementById('gallery-model-filter');
 const galleryLightboxStarBtn = document.getElementById('gallery-lightbox-star');
 const galleryViewToggle = document.getElementById('gallery-view-toggle');
 const gallerySelectModeBtn = document.getElementById('gallery-select-mode-btn');
@@ -495,6 +496,7 @@ const QUEUE_LAST_ACTION_MAX_AGE_MS = 120000;
 const DIAG_DRAWER_COLLAPSED_KEY = 'diagDrawerCollapsedV1';
 const DIAG_COMMAND_HISTORY_KEY = 'diagCommandHistoryV1';
 const DIAG_REPAIR_STATUS_KEY = 'diagRepairStatusV1';
+let startupReconcileDone = false;
 const SIDEBAR_SECTION_COLLAPSE_KEY = 'imageSidebarSectionCollapseV1';
 const diagDrawerCollapsedStored = localStorage.getItem(DIAG_DRAWER_COLLAPSED_KEY);
 const diagRepairStatusStored = localStorage.getItem(DIAG_REPAIR_STATUS_KEY) || '';
@@ -645,6 +647,8 @@ let gallerySearchQuery = localStorage.getItem(GALLERY_SEARCH_QUERY_KEY) || '';
 let gallerySortOrder = localStorage.getItem('gallerySortOrder') || 'newest';
 let galleryModeFilter = localStorage.getItem('galleryModeFilter') || 'all';
 let galleryTagFilter = localStorage.getItem(GALLERY_TAG_FILTER_KEY) || 'all';
+const GALLERY_MODEL_FILTER_KEY = 'galleryModelFilterV1';
+let galleryModelFilter = localStorage.getItem(GALLERY_MODEL_FILTER_KEY) || 'all';
 const VALID_GALLERY_SORT_ORDERS = new Set(['newest', 'oldest', 'favorites-first']);
 if (!VALID_GALLERY_SORT_ORDERS.has(gallerySortOrder)) {
 	gallerySortOrder = 'newest';
@@ -715,6 +719,23 @@ function syncGalleryTagFilterOptions(images) {
 		localStorage.removeItem(GALLERY_TAG_FILTER_KEY);
 	}
 	galleryTagFilterSelect.value = galleryTagFilter;
+}
+function syncGalleryModelFilterOptions(images) {
+	if (!galleryModelFilterSelect) return;
+	const models = [...new Set(
+		images.map((e) => (e.model || '').trim()).filter(Boolean)
+	)].sort((a, b) => a.localeCompare(b));
+	let html = '<option value="all">All models</option>';
+	models.forEach((m) => {
+		const displayName = m.split('/').pop() || m;
+		html += `<option value="${escHtml(m)}" title="${escHtml(m)}">${escHtml(displayName)}</option>`;
+	});
+	galleryModelFilterSelect.innerHTML = html;
+	if (galleryModelFilter !== 'all' && !models.includes(galleryModelFilter)) {
+		galleryModelFilter = 'all';
+		localStorage.removeItem(GALLERY_MODEL_FILTER_KEY);
+	}
+	galleryModelFilterSelect.value = galleryModelFilter;
 }
 let gallerySelectMode = false;
 const gallerySelectedIds = new Set();
@@ -4253,6 +4274,10 @@ async function checkStatus() {
 			await loadControlnetPreprocessors();
 			await loadHiresfixUpscalers();
 			connectComfyWebSocket();
+			if (!startupReconcileDone) {
+				startupReconcileDone = true;
+				runStartupHistoryReconcile();
+			}
 		} else {
 			imageEngineStatus.textContent = 'ComfyUI offline - start server at localhost:8188';
 			imageEngineStatus.style.color = 'var(--clr-accent-neg)';
@@ -7220,6 +7245,25 @@ async function saveHistoryEntry(entry) {
 	}
 }
 
+async function runStartupHistoryReconcile() {
+	// Silently sweep any pending (images=[]) history entries from previous
+	// sessions where the browser was closed before jobs finished.
+	try {
+		const res = await fetch('/api/history/reconcile-pending');
+		if (!res.ok) return;
+		const data = await res.json();
+		if (data.upgraded > 0) {
+			showToast(
+				`Gallery: ${data.upgraded} image job${data.upgraded === 1 ? '' : 's'} completed since last visit — gallery refreshed.`,
+				'pos',
+			);
+			await loadGallery();
+		}
+	} catch {
+		// best-effort — silently ignore network errors on startup
+	}
+}
+
 function imageProxyUrl(image) {
 	const params = new URLSearchParams({
 		filename: image.filename,
@@ -7471,6 +7515,7 @@ function updateGalleryFilterHint(matching, total) {
 	const parts = [];
 	if (gallerySearchQuery) parts.push(`prompt "${gallerySearchQuery}"`);
 	if (galleryTagFilter && galleryTagFilter !== 'all') parts.push(`#${galleryTagFilter}`);
+	if (galleryModelFilter && galleryModelFilter !== 'all') parts.push(`model "${galleryModelFilter.split('/').pop() || galleryModelFilter}"`);
 	if (!parts.length || !total) {
 		galleryFilterHint.hidden = true;
 		galleryFilterHint.textContent = '';
@@ -8135,12 +8180,17 @@ function renderGallery(history) {
 		? modeFiltered
 		: modeFiltered.filter((e) => getGalleryTags(e).includes(galleryTagFilter));
 
+	syncGalleryModelFilterOptions(images);
+	const modelFiltered = galleryModelFilter === 'all'
+		? tagFiltered
+		: tagFiltered.filter((e) => (e.model || '').trim() === galleryModelFilter);
+
 	const query = gallerySearchQuery.toLowerCase().trim();
 	const filteredImages = query
-		? tagFiltered.filter((e) => (e.prompt || '').toLowerCase().includes(query))
-		: tagFiltered;
+		? modelFiltered.filter((e) => (e.prompt || '').toLowerCase().includes(query))
+		: modelFiltered;
 
-	updateGalleryFilterHint(filteredImages.length, tagFiltered.length);
+	updateGalleryFilterHint(filteredImages.length, modelFiltered.length);
 
 	if (!filteredImages.length) {
 		galleryVirtualState = null;
@@ -8700,6 +8750,18 @@ if (galleryTagFilterSelect) {
 			localStorage.removeItem(GALLERY_TAG_FILTER_KEY);
 		} else {
 			localStorage.setItem(GALLERY_TAG_FILTER_KEY, galleryTagFilter);
+		}
+		renderGallery(currentFullHistory);
+	});
+}
+
+if (galleryModelFilterSelect) {
+	galleryModelFilterSelect.addEventListener('change', () => {
+		galleryModelFilter = galleryModelFilterSelect.value || 'all';
+		if (galleryModelFilter === 'all') {
+			localStorage.removeItem(GALLERY_MODEL_FILTER_KEY);
+		} else {
+			localStorage.setItem(GALLERY_MODEL_FILTER_KEY, galleryModelFilter);
 		}
 		renderGallery(currentFullHistory);
 	});
@@ -12982,7 +13044,10 @@ const PROMPT_SAVED_TAG_FILTER_KEY = 'promptSavedTagFilterV1';
 const PROMPT_SAVED_RECENT_FILTERS_KEY = 'promptSavedRecentFiltersV1';
 const PROMPT_SAVED_RECENT_FILTERS_PINNED_ONLY_KEY = 'promptSavedRecentFiltersPinnedOnlyV1';
 const PROMPT_SAVED_RECENT_FILTERS_MAX = 6;
+const PROMPT_SAVED_RECENT_FILTERS_DRAG_SUPPRESS_MS = 250;
 const PROMPT_RECENT_CHIPS_MAX = 8;
+let _recentPresetDragSourceIndex = -1;
+let _recentPresetClickSuppressedUntil = 0;
 
 function loadPromptRecentHistory() {
 	try { return JSON.parse(localStorage.getItem(PROMPT_RECENT_KEY) || '[]'); }
@@ -13216,6 +13281,31 @@ function _trimRecentPresetFilters(list) {
 	const roomForUnpinned = Math.max(0, PROMPT_SAVED_RECENT_FILTERS_MAX - keepPinned.length);
 	return keepPinned.concat(unpinned.slice(0, roomForUnpinned));
 }
+function _getRenderableRecentPresetFilters() {
+	const pinnedOnly = _getRecentPinnedOnlyFilter();
+	const items = _loadRecentPresetFilters();
+	const renderable = [];
+	items.forEach((item, sourceIndex) => {
+		if (pinnedOnly && !Boolean(item?.pinned)) return;
+		renderable.push({ item, sourceIndex });
+	});
+	return renderable;
+}
+function moveRecentPresetFilterCombo(sourceFrom, sourceTo) {
+	const from = Number(sourceFrom);
+	const to = Number(sourceTo);
+	if (!Number.isFinite(from) || !Number.isFinite(to)) return false;
+	if (from < 0 || to < 0 || from === to) return false;
+	const items = _loadRecentPresetFilters();
+	if (from >= items.length || to >= items.length) return false;
+	const [moved] = items.splice(from, 1);
+	if (!moved) return false;
+	const insertIndex = from < to ? to - 1 : to;
+	items.splice(insertIndex, 0, moved);
+	_saveRecentPresetFilters(items);
+	renderRecentPresetFilterChips();
+	return true;
+}
 function removeRecentPresetFilterCombo(index) {
 	const idx = Number(index);
 	if (!Number.isFinite(idx) || idx < 0) return;
@@ -13261,17 +13351,14 @@ function applyPresetFilterCombo(combo) {
 function renderRecentPresetFilterChips() {
 	if (!promptPresetRecentFilters) return;
 	const pinnedOnly = _getRecentPinnedOnlyFilter();
-	let items = _loadRecentPresetFilters();
-	if (pinnedOnly) {
-		items = items.filter((it) => Boolean(it.pinned));
-	}
-	if (!items.length) {
+	const renderable = _getRenderableRecentPresetFilters();
+	if (!renderable.length) {
 		promptPresetRecentFilters.innerHTML = pinnedOnly
 			? '<span class="hint">No pinned recent filters yet.</span>'
 			: '';
 		return;
 	}
-	promptPresetRecentFilters.innerHTML = items.map((it, idx) => {
+	promptPresetRecentFilters.innerHTML = renderable.map(({ item: it, sourceIndex }) => {
 		const parts = [];
 		if (it.favoritesOnly) parts.push('favorites');
 		if (it.tag) parts.push(`tag:${it.tag}`);
@@ -13280,9 +13367,25 @@ function renderRecentPresetFilterChips() {
 		const pinTitle = isPinned ? 'Unpin this recent filter' : 'Pin this recent filter';
 		const pinLabel = isPinned ? 'Unpin recent filter' : 'Pin recent filter';
 		const pinText = isPinned ? 'Unpin' : 'Pin';
-		return `<span class="prompt-preset-recent-filter-chip-wrap${isPinned ? ' is-pinned' : ''}" data-recent-filter-index="${idx}"><button class="btn btn-ghost btn-xs prompt-preset-recent-filter-chip" type="button" title="Apply filter ${escHtml(label)}">${escHtml(label)}</button><button class="btn btn-ghost btn-xs prompt-preset-recent-filter-pin" type="button" data-recent-filter-pin="1" title="${pinTitle}" aria-label="${pinLabel}" aria-pressed="${isPinned ? 'true' : 'false'}">${pinText}</button><button class="btn btn-ghost btn-xs prompt-preset-recent-filter-remove" type="button" data-recent-filter-remove="1" title="Remove this recent filter" aria-label="Remove recent filter ${escHtml(label)}">x</button></span>`;
+		return `<span class="prompt-preset-recent-filter-chip-wrap${isPinned ? ' is-pinned' : ''}" data-recent-filter-index="${sourceIndex}" draggable="true" title="Drag to reorder recent filters"><button class="btn btn-ghost btn-xs prompt-preset-recent-filter-chip" type="button" title="Apply filter ${escHtml(label)}" aria-keyshortcuts="ArrowLeft ArrowRight ArrowUp ArrowDown Home End Enter Space">${escHtml(label)}</button><button class="btn btn-ghost btn-xs prompt-preset-recent-filter-pin" type="button" data-recent-filter-pin="1" title="${pinTitle}" aria-label="${pinLabel}" aria-pressed="${isPinned ? 'true' : 'false'}" aria-keyshortcuts="P">${pinText}</button><button class="btn btn-ghost btn-xs prompt-preset-recent-filter-remove" type="button" data-recent-filter-remove="1" title="Remove this recent filter" aria-label="Remove recent filter ${escHtml(label)}" aria-keyshortcuts="Delete Backspace">x</button></span>`;
 	}).join('');
 }
+
+function _getRecentPresetFilterWraps() {
+	if (!promptPresetRecentFilters) return [];
+	return [...promptPresetRecentFilters.querySelectorAll('[data-recent-filter-index]')];
+}
+
+function _focusRecentPresetFilterChip(renderIndex) {
+	const wraps = _getRecentPresetFilterWraps();
+	if (!wraps.length) return false;
+	const index = Math.max(0, Math.min(renderIndex, wraps.length - 1));
+	const target = wraps[index]?.querySelector('.prompt-preset-recent-filter-chip');
+	if (!target) return false;
+	target.focus();
+	return true;
+}
+
 function clearPromptPresetFilters(showToastOnClear = true) {
 	if (promptTagFilter) promptTagFilter.value = '';
 	_setStoredTagFilter('');
@@ -13918,7 +14021,100 @@ if (promptPresetTagChips) {
 	});
 }
 if (promptPresetRecentFilters) {
+	promptPresetRecentFilters.addEventListener('dragstart', (e) => {
+		const wrap = e.target.closest('[data-recent-filter-index]');
+		if (!wrap) return;
+		const sourceIndex = Number(wrap.dataset.recentFilterIndex);
+		if (!Number.isFinite(sourceIndex) || sourceIndex < 0) return;
+		_recentPresetDragSourceIndex = sourceIndex;
+		wrap.classList.add('is-dragging');
+		if (e.dataTransfer) {
+			e.dataTransfer.effectAllowed = 'move';
+			e.dataTransfer.setData('text/plain', String(sourceIndex));
+		}
+	});
+	promptPresetRecentFilters.addEventListener('dragover', (e) => {
+		const wrap = e.target.closest('[data-recent-filter-index]');
+		if (!wrap) return;
+		e.preventDefault();
+		if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+		promptPresetRecentFilters
+			.querySelectorAll('.prompt-preset-recent-filter-chip-wrap.is-drop-target')
+			.forEach((el) => el.classList.remove('is-drop-target'));
+		wrap.classList.add('is-drop-target');
+	});
+	promptPresetRecentFilters.addEventListener('dragleave', (e) => {
+		const wrap = e.target.closest('[data-recent-filter-index]');
+		if (!wrap) return;
+		wrap.classList.remove('is-drop-target');
+	});
+	promptPresetRecentFilters.addEventListener('drop', (e) => {
+		const wrap = e.target.closest('[data-recent-filter-index]');
+		if (!wrap) return;
+		e.preventDefault();
+		const targetIndex = Number(wrap.dataset.recentFilterIndex);
+		const moved = moveRecentPresetFilterCombo(_recentPresetDragSourceIndex, targetIndex);
+		_recentPresetClickSuppressedUntil = Date.now() + PROMPT_SAVED_RECENT_FILTERS_DRAG_SUPPRESS_MS;
+		_recentPresetDragSourceIndex = -1;
+		promptPresetRecentFilters
+			.querySelectorAll('.prompt-preset-recent-filter-chip-wrap')
+			.forEach((el) => el.classList.remove('is-dragging', 'is-drop-target'));
+		if (moved) showToast('Reordered recent filters.', 'pos');
+	});
+	promptPresetRecentFilters.addEventListener('dragend', () => {
+		_recentPresetDragSourceIndex = -1;
+		promptPresetRecentFilters
+			.querySelectorAll('.prompt-preset-recent-filter-chip-wrap')
+			.forEach((el) => el.classList.remove('is-dragging', 'is-drop-target'));
+	});
+	promptPresetRecentFilters.addEventListener('keydown', (e) => {
+		const wrap = e.target.closest('[data-recent-filter-index]');
+		if (!wrap) return;
+		const wraps = _getRecentPresetFilterWraps();
+		const renderIndex = wraps.indexOf(wrap);
+		if (renderIndex < 0) return;
+		const key = String(e.key || '');
+		if (['ArrowLeft', 'ArrowUp', 'ArrowRight', 'ArrowDown', 'Home', 'End'].includes(key)) {
+			e.preventDefault();
+			if (key === 'Home') {
+				_focusRecentPresetFilterChip(0);
+				return;
+			}
+			if (key === 'End') {
+				_focusRecentPresetFilterChip(wraps.length - 1);
+				return;
+			}
+			const delta = (key === 'ArrowLeft' || key === 'ArrowUp') ? -1 : 1;
+			_focusRecentPresetFilterChip(renderIndex + delta);
+			return;
+		}
+		if (key.toLowerCase() === 'p') {
+			e.preventDefault();
+			const sourceIndex = Number(wrap.dataset.recentFilterIndex);
+			if (!Number.isFinite(sourceIndex) || sourceIndex < 0) return;
+			const pinned = togglePinRecentPresetFilterCombo(sourceIndex);
+			showToast(pinned ? 'Pinned recent filter.' : 'Unpinned recent filter.', 'pos');
+			window.requestAnimationFrame(() => {
+				if (_focusRecentPresetFilterChip(renderIndex)) return;
+				if (_focusRecentPresetFilterChip(renderIndex - 1)) return;
+				promptPresetRecentPinnedOnlyToggle?.focus();
+			});
+			return;
+		}
+		if (!['Delete', 'Backspace'].includes(key)) return;
+		e.preventDefault();
+		const sourceIndex = Number(wrap.dataset.recentFilterIndex);
+		if (!Number.isFinite(sourceIndex) || sourceIndex < 0) return;
+		removeRecentPresetFilterCombo(sourceIndex);
+		showToast('Removed recent filter.', 'pos');
+		window.requestAnimationFrame(() => {
+			if (_focusRecentPresetFilterChip(renderIndex)) return;
+			if (_focusRecentPresetFilterChip(renderIndex - 1)) return;
+			promptPresetRecentPinnedOnlyToggle?.focus();
+		});
+	});
 	promptPresetRecentFilters.addEventListener('click', (e) => {
+		if (Date.now() < _recentPresetClickSuppressedUntil) return;
 		const pinBtn = e.target.closest('[data-recent-filter-pin]');
 		if (pinBtn) {
 			const wrap = pinBtn.closest('[data-recent-filter-index]');

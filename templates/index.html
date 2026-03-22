@@ -611,7 +611,7 @@
             <div class="prompt-preset-filter-row">
               <p id="prompt-preset-filter-status" class="hint prompt-preset-filter-status" aria-live="polite">No filters active.</p>
               <div class="prompt-preset-filter-actions">
-                <span id="prompt-preset-filter-shortcut-hint" class="hint prompt-preset-filter-shortcut-hint">Shortcut: Ctrl+Shift+K</span>
+                <span id="prompt-preset-filter-shortcut-hint" class="hint prompt-preset-filter-shortcut-hint">Shortcut: Ctrl+Shift+K. Recent chips: arrows move, P pins, Del removes.</span>
                 <button class="btn btn-ghost btn-xs prompt-preset-recent-pinned-only-toggle" id="prompt-preset-recent-pinned-only-toggle" type="button" aria-pressed="false" title="Show pinned recent filters only">Pinned recent</button>
                 <button class="btn btn-ghost btn-xs" id="prompt-preset-clear-filters" type="button" aria-keyshortcuts="Control+Shift+K">Clear filters</button>
               </div>
@@ -807,6 +807,11 @@
           <div class="select-wrapper gallery-tag-filter-wrap">
             <select id="gallery-tag-filter" aria-label="Filter by tag">
               <option value="all">All tags</option>
+            </select>
+          </div>
+          <div class="select-wrapper gallery-model-filter-wrap">
+            <select id="gallery-model-filter" aria-label="Filter by model">
+              <option value="all">All models</option>
             </select>
           </div>
           <button class="btn btn-ghost btn-xs" id="gallery-view-toggle" type="button" aria-pressed="false">Grid</button>
