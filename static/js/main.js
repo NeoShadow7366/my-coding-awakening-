@@ -1353,6 +1353,7 @@ if (loraDisplayOptions) {
 	loraDisplayOptions.addEventListener('keydown', (event) => {
 		const hotkey = (event.key || '').toLowerCase();
 		if (hotkey !== 'm' && hotkey !== 'c' && hotkey !== 'd') return;
+		if (event.repeat) return;
 		const targetTag = String(event.target?.tagName || '').toLowerCase();
 		if (targetTag === 'input' || targetTag === 'textarea' || targetTag === 'select' || event.target?.isContentEditable) return;
 		event.preventDefault();
