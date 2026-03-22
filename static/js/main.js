@@ -9408,6 +9408,8 @@ async function pollQueue() {
 		const pending = data.pending || [];
 		const doneItems = data.done || [];
 		const donePromptIds = new Set(doneItems.map((d) => d.prompt_id).filter(Boolean));
+		const runningPromptIds = new Set(running.map((item) => item[1]).filter(Boolean));
+		const pendingPromptIds = new Set(pending.map((item) => item[1]).filter(Boolean));
 		renderQueueStatus(running, pending, donePromptIds);
 		await loadActiveLivePreview(ids);
 		if (doneItems.length) {
@@ -9462,6 +9464,18 @@ async function pollQueue() {
 			await loadGallery();
 			await loadLivePreview();
 		}
+
+		// Defensive reconciliation: if a tracked id is no longer active in ComfyUI,
+		// clear it from tracking when we already know it reached a terminal state.
+		for (const promptId of Array.from(trackedPromptIds)) {
+			if (runningPromptIds.has(promptId) || pendingPromptIds.has(promptId)) continue;
+			const meta = queueJobMeta.get(promptId) || {};
+			if (donePromptIds.has(promptId) || ['completed', 'failed', 'canceled'].includes(meta.status || '')) {
+				trackedPromptIds.delete(promptId);
+				pendingImageJobs.delete(promptId);
+			}
+		}
+		persistTrackedQueueState();
 
 		if (!trackedPromptIds.size) {
 			imageGenerateBtn.disabled = false;

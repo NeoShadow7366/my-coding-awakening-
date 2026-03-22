@@ -2545,6 +2545,20 @@ def test_queue_done_items_update_live_preview_immediately_before_history_sync():
     assert poll_queue_block.index("updateLivePreviewFromDoneItem(done, snapshot, meta);") < poll_queue_block.index("const saved = await saveHistoryEntry({")
 
 
+def test_queue_poll_defensive_reconciliation_clears_terminal_stale_tracked_ids():
+    js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
+    js = js_path.read_text(encoding="utf-8")
+    poll_queue_block = js[js.index("async function pollQueue() {"):js.index("function ensureQueuePolling() {")]
+
+    assert "const runningPromptIds = new Set(running.map((item) => item[1]).filter(Boolean));" in poll_queue_block
+    assert "const pendingPromptIds = new Set(pending.map((item) => item[1]).filter(Boolean));" in poll_queue_block
+    assert "for (const promptId of Array.from(trackedPromptIds)) {" in poll_queue_block
+    assert "if (runningPromptIds.has(promptId) || pendingPromptIds.has(promptId)) continue;" in poll_queue_block
+    assert "if (donePromptIds.has(promptId) || ['completed', 'failed', 'canceled'].includes(meta.status || '')) {" in poll_queue_block
+    assert "trackedPromptIds.delete(promptId);" in poll_queue_block
+    assert "pendingImageJobs.delete(promptId);" in poll_queue_block
+
+
 def test_queue_poll_retries_done_history_persistence_until_post_ok():
     js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
     js = js_path.read_text(encoding="utf-8")
