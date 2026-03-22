@@ -5846,12 +5846,26 @@ chatForm.addEventListener('submit', async (e) => {
 		top_k: Number(textTopK.value || 40),
 		num_predict: Number(textNumPredict.value || 512),
 	};
+	let streamIdleTimer = null;
 
 	try {
+		const controller = new AbortController();
+		const TEXT_STREAM_IDLE_TIMEOUT_MS = 45000;
+		const resetStreamIdleTimer = () => {
+			if (streamIdleTimer) {
+				window.clearTimeout(streamIdleTimer);
+			}
+			streamIdleTimer = window.setTimeout(() => {
+				try { controller.abort('text-stream-idle-timeout'); } catch { /* no-op */ }
+			}, TEXT_STREAM_IDLE_TIMEOUT_MS);
+		};
+		resetStreamIdleTimer();
+
 		const res = await fetch('/api/generate', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify(payload),
+			signal: controller.signal,
 		});
 
 		if (!res.ok) {
@@ -5866,10 +5880,12 @@ chatForm.addEventListener('submit', async (e) => {
 		let buffer = '';
 		let fullText = '';
 		let finalMeta = null;
+		let streamDone = false;
 
 		while (true) {
 			const { value, done } = await reader.read();
 			if (done) break;
+			resetStreamIdleTimer();
 
 			buffer += decoder.decode(value, { stream: true });
 			const lines = buffer.split('\n');
@@ -5879,7 +5895,10 @@ chatForm.addEventListener('submit', async (e) => {
 				const trimmed = line.trim();
 				if (!trimmed.startsWith('data:')) continue;
 				const raw = trimmed.slice(5).trim();
-				if (raw === '[DONE]') break;
+				if (raw === '[DONE]') {
+					streamDone = true;
+					break;
+				}
 
 				try {
 					const chunk = JSON.parse(raw);
@@ -5900,6 +5919,11 @@ chatForm.addEventListener('submit', async (e) => {
 					// ignore malformed chunks
 				}
 			}
+			if (streamDone) break;
+		}
+		if (streamIdleTimer) {
+			window.clearTimeout(streamIdleTimer);
+			streamIdleTimer = null;
 		}
 
 		await saveHistoryEntry({
@@ -5919,8 +5943,16 @@ chatForm.addEventListener('submit', async (e) => {
 			response: fullText,
 		});
 	} catch (err) {
+		if (err?.name === 'AbortError') {
+			aiBubble.textContent = 'Error: Text generation timed out waiting for new tokens.';
+		} else {
 		aiBubble.textContent = `Error: ${err.message}`;
+		}
 	} finally {
+		if (streamIdleTimer) {
+			window.clearTimeout(streamIdleTimer);
+			streamIdleTimer = null;
+		}
 		aiBubble.classList.remove('streaming');
 		isGenerating = false;
 		sendBtn.disabled = false;

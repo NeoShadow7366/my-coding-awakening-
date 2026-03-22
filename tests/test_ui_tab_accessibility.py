@@ -2459,6 +2459,22 @@ def test_image_prompt_ctrl_enter_shortcut():
     assert js.count("imageForm.addEventListener('submit', async (e) => {") == 1
 
 
+def test_text_stream_done_and_idle_timeout_guards_present():
+    js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
+    js = js_path.read_text(encoding="utf-8")
+
+    chat_block = js[js.index("chatForm.addEventListener('submit', async (e) => {"):js.index("/* --------------------------------------------------------------------------\n\t Image controls, presets, queue, gallery")]
+
+    assert "const TEXT_STREAM_IDLE_TIMEOUT_MS = 45000;" in chat_block
+    assert "controller.abort('text-stream-idle-timeout');" in chat_block
+    assert "let streamDone = false;" in chat_block
+    assert "if (raw === '[DONE]') {" in chat_block
+    assert "streamDone = true;" in chat_block
+    assert "if (streamDone) break;" in chat_block
+    assert "if (err?.name === 'AbortError') {" in chat_block
+    assert "Text generation timed out waiting for new tokens." in chat_block
+
+
 def test_image_quick_workflow_bar_and_sticky_actions_present():
     app_module.app.config["TESTING"] = True
     client = app_module.app.test_client()
