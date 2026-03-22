@@ -2459,6 +2459,11 @@ def test_image_scheduler_select_present_in_html():
     assert 'id="image-recommendation-status"' in html
     assert 'id="image-recommendation-drift-hint"' in html
     assert 'id="image-recommendation-source-tag"' in html
+    assert 'id="flux-components-status"' in html
+    assert 'id="flux-comp-t5-pill"' in html
+    assert 'id="flux-comp-clip-pill"' in html
+    assert 'id="flux-comp-vae-pill"' in html
+    assert 'id="flux-comp-ready-msg"' in html
 
 
 def test_image_scheduler_js_wiring_present_in_bundle():
@@ -3000,6 +3005,12 @@ def test_flux_negative_prompt_js_wiring_present_in_bundle():
     assert "const imageNegativePromptSection = document.getElementById('image-negative-prompt-section');" in js
     assert "const fluxNoNegHint = document.getElementById('flux-no-neg-hint');" in js
     assert "const fluxSamplerHint = document.getElementById('flux-sampler-hint');" in js
+    assert "const fluxComponentsStatus = document.getElementById('flux-components-status');" in js
+    assert "const fluxCompT5Pill = document.getElementById('flux-comp-t5-pill');" in js
+    assert "const fluxCompClipPill = document.getElementById('flux-comp-clip-pill');" in js
+    assert "const fluxCompVaePill = document.getElementById('flux-comp-vae-pill');" in js
+    assert "const fluxCompReadyMsg = document.getElementById('flux-comp-ready-msg');" in js
+    assert "async function loadFluxComponentStatus()" in js
 
     # Verify toggle logic is inside applyImageFamilyModeUi
     fn_start = js.index("function applyImageFamilyModeUi()")
@@ -3035,6 +3046,10 @@ def test_flux_variant_chip_color_classes_present_in_css():
     assert ".flux-variant-chip.is-auto" in css
     assert "#image-auto-apply-recommendation-label" in css
     assert ".recommendation-drift-hint.is-warning" in css
+    assert ".flux-components-status" in css
+    assert ".flux-comp-pill" in css
+    assert ".flux-comp-pill.is-found" in css
+    assert ".flux-comp-pill.is-missing" in css
 
 
 def test_flux_cfg_guidance_label_rename_in_html_and_js():

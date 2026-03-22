@@ -853,6 +853,57 @@ def test_image_schedulers_fallback_when_comfy_returns_empty(client, monkeypatch)
 
 
 # ---------------------------------------------------------------------------
+# /api/image/flux-components
+# ---------------------------------------------------------------------------
+
+def test_flux_components_returns_all_when_available(client, monkeypatch):
+    monkeypatch.setattr(app_module, "_comfy_available", lambda: True)
+    monkeypatch.setattr(
+        app_module,
+        "_flux_clip_vae_components",
+        lambda: {"t5": "t5xxl_fp8_e4m3fn.safetensors", "clip_l": "clip_l.safetensors", "vae": "ae.safetensors"},
+    )
+
+    resp = client.get("/api/image/flux-components")
+
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["ok"] is True
+    assert data["t5"] == "t5xxl_fp8_e4m3fn.safetensors"
+    assert data["clip_l"] == "clip_l.safetensors"
+    assert data["vae"] == "ae.safetensors"
+    assert data["ready"] is True
+
+
+def test_flux_components_returns_503_when_comfy_unavailable(client, monkeypatch):
+    monkeypatch.setattr(app_module, "_comfy_available", lambda: False)
+
+    resp = client.get("/api/image/flux-components")
+
+    assert resp.status_code == 503
+    data = resp.get_json()
+    assert data["ok"] is False
+    assert "error" in data
+
+
+def test_flux_components_ready_false_when_t5_missing(client, monkeypatch):
+    monkeypatch.setattr(app_module, "_comfy_available", lambda: True)
+    monkeypatch.setattr(
+        app_module,
+        "_flux_clip_vae_components",
+        lambda: {"t5": None, "clip_l": "clip_l.safetensors", "vae": "ae.safetensors"},
+    )
+
+    resp = client.get("/api/image/flux-components")
+
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["ok"] is True
+    assert data["t5"] is None
+    assert data["ready"] is False
+
+
+# ---------------------------------------------------------------------------
 # /api/image/view — happy path (proxied image bytes)
 # ---------------------------------------------------------------------------
 

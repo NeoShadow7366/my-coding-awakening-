@@ -5411,6 +5411,25 @@ def api_image_samplers():
     return jsonify({"samplers": _image_samplers()})
 
 
+@app.route("/api/image/flux-components")
+def api_image_flux_components():
+    """Report which Flux component files (T5, CLIP-L, VAE) are available in ComfyUI.
+
+    These components are required for UNET-only Flux checkpoints that lack embedded
+    text encoders and VAE (e.g. flux_dev.safetensors, FluxAnime*.ckpt).
+    """
+    if not _comfy_available():
+        return jsonify({"ok": False, "error": "ComfyUI unavailable"}), 503
+    comps = _flux_clip_vae_components()
+    return jsonify({
+        "ok": True,
+        "t5": comps["t5"],
+        "clip_l": comps["clip_l"],
+        "vae": comps["vae"],
+        "ready": bool(comps["t5"] and comps["clip_l"] and comps["vae"]),
+    })
+
+
 @app.route("/api/image/schedulers")
 def api_image_schedulers():
     """List ComfyUI scheduler names."""

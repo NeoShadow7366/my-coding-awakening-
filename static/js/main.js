@@ -264,6 +264,11 @@ const imageNegativePrompt = document.getElementById('image-negative-prompt');
 const imageNegativePromptSection = document.getElementById('image-negative-prompt-section');
 const fluxNoNegHint = document.getElementById('flux-no-neg-hint');
 const fluxSamplerHint = document.getElementById('flux-sampler-hint');
+const fluxComponentsStatus = document.getElementById('flux-components-status');
+const fluxCompT5Pill = document.getElementById('flux-comp-t5-pill');
+const fluxCompClipPill = document.getElementById('flux-comp-clip-pill');
+const fluxCompVaePill = document.getElementById('flux-comp-vae-pill');
+const fluxCompReadyMsg = document.getElementById('flux-comp-ready-msg');
 const hiresfixEnable = document.getElementById('hiresfix-enable');
 const hiresfixPanel = document.getElementById('hiresfix-panel');
 const hiresfixUpscalerSelect = document.getElementById('hiresfix-upscaler-select');
@@ -10062,6 +10067,53 @@ function updateFluxRecommendationDriftHint() {
 	updateFluxRecommendationSourceTag();
 }
 
+let fluxComponentsStatusAbortController = null;
+
+async function loadFluxComponentStatus() {
+	if (!fluxComponentsStatus) return;
+	for (const pill of [fluxCompT5Pill, fluxCompClipPill, fluxCompVaePill]) {
+		if (pill) { pill.classList.remove('is-found', 'is-missing'); pill.classList.add('is-loading'); }
+	}
+	if (fluxCompReadyMsg) fluxCompReadyMsg.textContent = 'Checking…';
+	if (fluxComponentsStatusAbortController) fluxComponentsStatusAbortController.abort();
+	fluxComponentsStatusAbortController = new AbortController();
+	try {
+		const resp = await fetch('/api/image/flux-components', { signal: fluxComponentsStatusAbortController.signal });
+		if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+		const data = await resp.json();
+		const setPill = (el, filename) => {
+			if (!el) return;
+			el.classList.remove('is-loading');
+			if (filename) {
+				el.classList.add('is-found');
+				el.classList.remove('is-missing');
+				el.title = filename;
+			} else {
+				el.classList.add('is-missing');
+				el.classList.remove('is-found');
+				el.title = 'Not found — download to ComfyUI models/clip/ folder';
+			}
+		};
+		setPill(fluxCompT5Pill, data.t5);
+		setPill(fluxCompClipPill, data.clip_l);
+		setPill(fluxCompVaePill, data.vae);
+		if (fluxCompReadyMsg) {
+			if (data.ready) {
+				fluxCompReadyMsg.textContent = 'All components found.';
+			} else {
+				const missing = [!data.t5 && 'T5', !data.clip_l && 'CLIP-L', !data.vae && 'VAE'].filter(Boolean);
+				fluxCompReadyMsg.textContent = `Missing: ${missing.join(', ')} — add to ComfyUI models/clip/ (T5, CLIP-L) or models/vae/ (VAE).`;
+			}
+		}
+	} catch (err) {
+		if (err.name === 'AbortError') return;
+		for (const pill of [fluxCompT5Pill, fluxCompClipPill, fluxCompVaePill]) {
+			if (pill) { pill.classList.remove('is-loading', 'is-found', 'is-missing'); }
+		}
+		if (fluxCompReadyMsg) fluxCompReadyMsg.textContent = 'ComfyUI unavailable — component check skipped.';
+	}
+}
+
 function resolveActiveImageFamily(modelName = '') {
 	const requestedMode = imageModelFamilySelect?.value || imageModelFamilyMode || 'auto';
 	if (requestedMode === 'flux') return 'flux';
@@ -10206,6 +10258,15 @@ function applyImageFamilyModeUi() {
 			}
 			fluxVariantChip.textContent = `Flux Variant: ${variantLabel}`;
 			fluxVariantChip.hidden = false;
+		}
+	}
+
+	if (fluxComponentsStatus) {
+		if (!isFluxActive) {
+			fluxComponentsStatus.hidden = true;
+		} else {
+			fluxComponentsStatus.hidden = false;
+			loadFluxComponentStatus();
 		}
 	}
 

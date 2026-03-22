@@ -311,6 +311,13 @@
       <p id="image-recommendation-drift-hint" class="hint recommendation-drift-hint" aria-live="polite" hidden></p>
       <span id="image-recommendation-source-tag" class="hint recommendation-source-tag" hidden></span>
       <p class="hint flux-sampler-hint" id="flux-sampler-hint" hidden>FLUX tip: <code>euler</code> sampler with <code>simple</code> or <code>normal</code> scheduler is recommended for best results.</p>
+      <div id="flux-components-status" class="flux-components-status" hidden aria-live="polite">
+        <span class="flux-comp-label">Components:</span>
+        <span id="flux-comp-t5-pill" class="flux-comp-pill" title="T5-XXL text encoder (t5xxl_fp8_e4m3fn.safetensors or similar)">T5</span>
+        <span id="flux-comp-clip-pill" class="flux-comp-pill" title="CLIP-L text encoder (clip_l.safetensors)">CLIP-L</span>
+        <span id="flux-comp-vae-pill" class="flux-comp-pill" title="Flux VAE (ae.safetensors)">VAE</span>
+        <span id="flux-comp-ready-msg" class="hint flux-comp-message"></span>
+      </div>
       <div id="flux-prompt-tips" class="hint flux-prompt-tips-block" hidden aria-live="polite">
         <strong>Flux Prompt Tips:</strong>
         <ul class="flux-tips-list">

@@ -543,6 +543,59 @@ textarea {
   background: color-mix(in srgb, var(--clr-surface) 84%, var(--clr-primary));
 }
 
+/* Flux component readiness pills */
+.flux-components-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem;
+  margin-top: 0.4rem;
+  font-size: 0.78rem;
+}
+
+.flux-comp-label {
+  color: var(--clr-text-muted);
+  font-size: 0.75rem;
+  margin-right: 0.1rem;
+}
+
+.flux-comp-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.1rem 0.45rem;
+  border-radius: 0.9rem;
+  border: 1px solid var(--clr-border);
+  background: var(--clr-surface);
+  color: var(--clr-text-muted);
+  font-size: 0.73rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  cursor: default;
+  transition: background 0.2s, border-color 0.2s, color 0.2s;
+}
+
+.flux-comp-pill.is-found {
+  color: color-mix(in srgb, var(--clr-text) 84%, #4caf50);
+  border-color: color-mix(in srgb, var(--clr-border) 35%, #4caf50);
+  background: color-mix(in srgb, var(--clr-surface) 68%, #4caf50);
+}
+
+.flux-comp-pill.is-missing {
+  color: color-mix(in srgb, var(--clr-text) 84%, #e05252);
+  border-color: color-mix(in srgb, var(--clr-border) 35%, #e05252);
+  background: color-mix(in srgb, var(--clr-surface) 68%, #e05252);
+}
+
+.flux-comp-pill.is-loading {
+  opacity: 0.6;
+}
+
+.flux-comp-message {
+  margin: 0;
+  font-size: 0.73rem;
+}
+
 .model-recent-wrap {
   display: flex;
   flex-direction: column;
