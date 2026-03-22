@@ -13349,7 +13349,7 @@ function moveRecentPresetFilterCombo(sourceFrom, sourceTo) {
 	if (from >= items.length || to >= items.length) return false;
 	const [moved] = items.splice(from, 1);
 	if (!moved) return false;
-	const insertIndex = from < to ? to - 1 : to;
+	const insertIndex = to;
 	items.splice(insertIndex, 0, moved);
 	_saveRecentPresetFilters(items);
 	renderRecentPresetFilterChips();
@@ -13416,7 +13416,7 @@ function renderRecentPresetFilterChips() {
 		const pinTitle = isPinned ? 'Unpin this recent filter' : 'Pin this recent filter';
 		const pinLabel = isPinned ? 'Unpin recent filter' : 'Pin recent filter';
 		const pinText = isPinned ? 'Unpin' : 'Pin';
-		return `<span class="prompt-preset-recent-filter-chip-wrap${isPinned ? ' is-pinned' : ''}" data-recent-filter-index="${sourceIndex}" draggable="true" title="Drag to reorder recent filters"><button class="btn btn-ghost btn-xs prompt-preset-recent-filter-chip" type="button" title="Apply filter ${escHtml(label)}" aria-keyshortcuts="ArrowLeft ArrowRight ArrowUp ArrowDown Home End Enter Space">${escHtml(label)}</button><button class="btn btn-ghost btn-xs prompt-preset-recent-filter-pin" type="button" data-recent-filter-pin="1" title="${pinTitle}" aria-label="${pinLabel}" aria-pressed="${isPinned ? 'true' : 'false'}" aria-keyshortcuts="P">${pinText}</button><button class="btn btn-ghost btn-xs prompt-preset-recent-filter-remove" type="button" data-recent-filter-remove="1" title="Remove this recent filter" aria-label="Remove recent filter ${escHtml(label)}" aria-keyshortcuts="Delete Backspace">x</button></span>`;
+		return `<span class="prompt-preset-recent-filter-chip-wrap${isPinned ? ' is-pinned' : ''}" data-recent-filter-index="${sourceIndex}" draggable="true" title="Drag to reorder recent filters"><button class="btn btn-ghost btn-xs prompt-preset-recent-filter-chip" type="button" title="Apply filter ${escHtml(label)}" aria-keyshortcuts="ArrowLeft ArrowRight ArrowUp ArrowDown Shift+ArrowLeft Shift+ArrowRight Shift+ArrowUp Shift+ArrowDown Home End Enter Space">${escHtml(label)}</button><button class="btn btn-ghost btn-xs prompt-preset-recent-filter-pin" type="button" data-recent-filter-pin="1" title="${pinTitle}" aria-label="${pinLabel}" aria-pressed="${isPinned ? 'true' : 'false'}" aria-keyshortcuts="P">${pinText}</button><button class="btn btn-ghost btn-xs prompt-preset-recent-filter-remove" type="button" data-recent-filter-remove="1" title="Remove this recent filter" aria-label="Remove recent filter ${escHtml(label)}" aria-keyshortcuts="Delete Backspace">x</button></span>`;
 	}).join('');
 }
 
@@ -14123,6 +14123,23 @@ if (promptPresetRecentFilters) {
 		const renderIndex = wraps.indexOf(wrap);
 		if (renderIndex < 0) return;
 		const key = String(e.key || '');
+		if (e.shiftKey && ['ArrowLeft', 'ArrowUp', 'ArrowRight', 'ArrowDown'].includes(key)) {
+			e.preventDefault();
+			const delta = (key === 'ArrowLeft' || key === 'ArrowUp') ? -1 : 1;
+			const targetWrap = wraps[renderIndex + delta];
+			if (!targetWrap) return;
+			const sourceIndex = Number(wrap.dataset.recentFilterIndex);
+			const targetIndex = Number(targetWrap.dataset.recentFilterIndex);
+			if (!Number.isFinite(sourceIndex) || sourceIndex < 0) return;
+			if (!Number.isFinite(targetIndex) || targetIndex < 0) return;
+			const moved = moveRecentPresetFilterCombo(sourceIndex, targetIndex);
+			if (!moved) return;
+			showToast('Reordered recent filters.', 'pos');
+			window.requestAnimationFrame(() => {
+				_focusRecentPresetFilterChip(renderIndex + delta);
+			});
+			return;
+		}
 		if (['ArrowLeft', 'ArrowUp', 'ArrowRight', 'ArrowDown', 'Home', 'End'].includes(key)) {
 			e.preventDefault();
 			if (key === 'Home') {

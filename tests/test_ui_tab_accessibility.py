@@ -2972,7 +2972,7 @@ def test_prompt_preset_v2_html_elements_present():
     assert 'id="prompt-tag-filter"' in html
     assert 'id="prompt-preset-filter-status"' in html
     assert 'id="prompt-preset-filter-shortcut-hint"' in html
-    assert 'Recent chips: arrows move, P pins, Del removes.' in html
+    assert 'Recent chips: arrows move, Shift+arrows reorder, P pins, Del removes.' in html
     assert 'id="prompt-preset-recent-pinned-only-toggle"' in html
     assert 'aria-keyshortcuts="Space"' in html and 'prompt-preset-recent-pinned-only-toggle' in html.split('aria-keyshortcuts="Space"')[0].split('\n')[-1]
     assert 'id="prompt-preset-clear-filters"' in html
@@ -3061,10 +3061,14 @@ def test_prompt_preset_v2_js_functions_present():
     assert "promptPresetRecentFilters.addEventListener('dragover'" in js
     assert "promptPresetRecentFilters.addEventListener('drop'" in js
     assert "promptPresetRecentFilters.addEventListener('keydown'" in js
+    assert "if (e.shiftKey && ['ArrowLeft', 'ArrowUp', 'ArrowRight', 'ArrowDown'].includes(key))" in js
+    assert "const moved = moveRecentPresetFilterCombo(sourceIndex, targetIndex);" in js
+    assert "window.requestAnimationFrame(() => {" in js
+    assert "_focusRecentPresetFilterChip(renderIndex + delta);" in js
     assert "['ArrowLeft', 'ArrowUp', 'ArrowRight', 'ArrowDown', 'Home', 'End'].includes(key)" in js
     assert "key.toLowerCase() === 'p'" in js
     assert "['Delete', 'Backspace'].includes(key)" in js
-    assert "aria-keyshortcuts=\"ArrowLeft ArrowRight ArrowUp ArrowDown Home End Enter Space\"" in js
+    assert "aria-keyshortcuts=\"ArrowLeft ArrowRight ArrowUp ArrowDown Shift+ArrowLeft Shift+ArrowRight Shift+ArrowUp Shift+ArrowDown Home End Enter Space\"" in js
     assert "aria-keyshortcuts=\"P\"" in js
     assert "aria-keyshortcuts=\"Delete Backspace\"" in js
     assert "Reordered recent filters." in js
