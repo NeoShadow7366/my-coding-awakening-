@@ -12883,7 +12883,22 @@ if (mbSearchQuery) {
 		localStorage.setItem('mbSearchQuery', mbSearchQuery.value || '');
 	});
 	mbSearchQuery.addEventListener('keydown', (e) => {
-		if (e.key === 'Escape') return onModelSearchControlKeydown(e);
+		if (e.key === 'Escape') {
+			// Clear search query if running, or close the modal if idle
+			if (mbSearchInFlight) {
+				e.preventDefault();
+				cancelModelSearch();
+				return;
+			}
+			// If not running but has query, clear it
+			if (mbSearchQuery.value) {
+				e.stopPropagation();
+				mbSearchQuery.value = '';
+				localStorage.setItem('mbSearchQuery', '');
+				mbSearchQuery.focus();
+				return;
+			}
+		}
 		if (e.key === 'Enter') runCivitaiSearch(1);
 	});
 }

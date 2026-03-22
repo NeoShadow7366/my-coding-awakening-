@@ -2875,6 +2875,29 @@ def test_model_browser_modal_escape_to_close_keyboard_support():
     assert "if (event.key !== 'Tab' || mbModelModal.hidden) return;" in js
 
 
+def test_model_browser_search_escape_keyboard_support():
+    """Model browser search query field supports Escape for cancel-search or clear."""
+    from pathlib import Path
+    html_path = Path(__file__).resolve().parents[1] / "templates" / "index.html"
+    html = html_path.read_text(encoding="utf-8")
+    
+    # Search query field has Escape keyboard shortcut hint
+    assert '<input id="mb-search-query" type="text" placeholder="e.g. realistic, anime, xl…" aria-keyshortcuts="Escape" />' in html
+    
+    # JS event listener handles Escape for both cancel and clear
+    js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
+    js = js_path.read_text(encoding="utf-8")
+    
+    # Escape handler in mbSearchQuery listener
+    assert "mbSearchQuery.addEventListener('keydown', (e) => {" in js
+    # Check for dual behavior: cancel search or clear query
+    assert "if (mbSearchInFlight) {" in js
+    assert "cancelModelSearch();" in js
+    assert "if (mbSearchQuery.value) {" in js
+    assert "mbSearchQuery.value = '';" in js
+    assert "localStorage.setItem('mbSearchQuery', '');" in js
+
+
 def test_startup_reconcile_function_and_wiring_present_in_js_bundle():
     """runStartupHistoryReconcile must exist and be called once when imageOk first becomes true."""
     js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
