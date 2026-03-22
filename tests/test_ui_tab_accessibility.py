@@ -2479,16 +2479,29 @@ def test_image_quick_workflow_bar_and_sticky_actions_present():
     assert 'id="image-readiness-bar"' in html
     assert 'id="image-readiness-text"' in html
     assert 'id="image-readiness-action"' in html
+    assert 'id="image-quickstart-strip"' in html
+    assert 'id="image-quickstart-fast"' in html
+    assert 'id="image-quickstart-balanced"' in html
+    assert 'id="image-quickstart-detailed"' in html
+    assert 'id="image-quickstart-hide"' in html
+    assert 'id="image-quickstart-show"' in html
+    assert 'id="image-estimate-badge"' in html
     assert 'data-image-ui-level="advanced"' in html
     assert 'class="hint image-actions-shortcut-hint"' in html
 
     assert "function syncImageQuickState() {" in js
     assert "function setImageUiMode(mode, options = {}) {" in js
     assert "function syncImageReadiness() {" in js
+    assert "function syncImageRuntimeEstimate() {" in js
+    assert "function markImageQuickstartCompleted() {" in js
+    assert "const IMAGE_QUICKSTART_DISMISSED_KEY = 'imageQuickstartDismissedV1';" in js
+    assert "const IMAGE_QUICKSTART_COMPLETED_KEY = 'imageQuickstartCompletedV1';" in js
     assert "function ensureSidebarSectionExpandedForControl(controlEl) {" in js
     assert "function focusImageControl(controlEl) {" in js
     assert "syncImageQuickState();" in js
     assert "syncImageReadiness();" in js
+    assert "syncImageRuntimeEstimate();" in js
+    assert "markImageQuickstartCompleted();" in js
     assert "const IMAGE_UI_MODE_KEY = 'imageUiModeV1';" in js
     assert "panelImage.dataset.imageUiMode = nextMode;" in js
     assert "setImageUiMode('advanced');" in js
@@ -2501,6 +2514,9 @@ def test_image_quick_workflow_bar_and_sticky_actions_present():
     assert ".image-workflow-actions {" in css
     assert ".image-ui-mode-switch {" in css
     assert ".image-readiness-bar {" in css
+    assert ".image-quickstart-strip {" in css
+    assert ".image-estimate-badge {" in css
+    assert ".image-estimate-badge.is-heavy {" in css
     assert "#panel-image[data-image-ui-mode='simple'] [data-image-ui-level='advanced']" in css
     assert ".image-actions-shortcut-hint {" in css
     assert "position: sticky;" in css

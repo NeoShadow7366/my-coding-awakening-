@@ -442,10 +442,20 @@
               <button class="btn btn-ghost btn-xs" id="image-ui-mode-simple" type="button" aria-pressed="false">Simple</button>
               <button class="btn btn-ghost btn-xs" id="image-ui-mode-advanced" type="button" aria-pressed="true">Advanced</button>
             </div>
+            <button class="btn btn-ghost btn-xs" id="image-quickstart-show" type="button" hidden>Show quick start</button>
             <button class="btn btn-ghost btn-xs" id="image-quick-focus-prompt" type="button">Prompt</button>
             <button class="btn btn-ghost btn-xs" id="image-quick-focus-negative" type="button">Negative</button>
             <button class="btn btn-ghost btn-xs" id="image-quick-focus-size" type="button">Size</button>
             <button class="btn btn-ghost btn-xs" id="image-quick-focus-source" type="button">Img2img</button>
+          </div>
+        </div>
+        <div class="image-quickstart-strip" id="image-quickstart-strip" role="region" aria-label="Image quick start">
+          <p id="image-quickstart-status" class="hint image-quickstart-status" aria-live="polite">Quick start: choose a profile to begin faster.</p>
+          <div class="image-quickstart-actions" role="group" aria-label="Quick start presets">
+            <button class="btn btn-ghost btn-xs" id="image-quickstart-fast" type="button" data-image-quickstart="fast">Fast Draft</button>
+            <button class="btn btn-ghost btn-xs" id="image-quickstart-balanced" type="button" data-image-quickstart="quality">Balanced</button>
+            <button class="btn btn-ghost btn-xs" id="image-quickstart-detailed" type="button" data-image-quickstart="creative">Detailed</button>
+            <button class="btn btn-ghost btn-xs" id="image-quickstart-hide" type="button">Hide</button>
           </div>
         </div>
         <div class="image-readiness-bar" id="image-readiness-bar" role="status" aria-live="polite">
@@ -693,6 +703,7 @@
 
         <div class="image-actions">
           <p id="lora-submit-skip-hint" class="hint lora-submit-skip-hint" hidden aria-live="polite"></p>
+          <span id="image-estimate-badge" class="history-badge image-estimate-badge" title="Estimated generation effort">Estimate: --</span>
           <p class="hint image-actions-shortcut-hint">Shortcut: Ctrl+Enter</p>
           <button class="btn btn-primary" id="image-generate-btn" type="submit" title="Generate Image (Ctrl+Enter)">Generate Image</button>
         </div>

@@ -285,9 +285,17 @@ const imageQuickFocusSizeBtn = document.getElementById('image-quick-focus-size')
 const imageQuickFocusSourceBtn = document.getElementById('image-quick-focus-source');
 const imageUiModeSimpleBtn = document.getElementById('image-ui-mode-simple');
 const imageUiModeAdvancedBtn = document.getElementById('image-ui-mode-advanced');
+const imageQuickstartStrip = document.getElementById('image-quickstart-strip');
+const imageQuickstartStatus = document.getElementById('image-quickstart-status');
+const imageQuickstartFastBtn = document.getElementById('image-quickstart-fast');
+const imageQuickstartBalancedBtn = document.getElementById('image-quickstart-balanced');
+const imageQuickstartDetailedBtn = document.getElementById('image-quickstart-detailed');
+const imageQuickstartHideBtn = document.getElementById('image-quickstart-hide');
+const imageQuickstartShowBtn = document.getElementById('image-quickstart-show');
 const imageReadinessBar = document.getElementById('image-readiness-bar');
 const imageReadinessText = document.getElementById('image-readiness-text');
 const imageReadinessActionBtn = document.getElementById('image-readiness-action');
+const imageEstimateBadge = document.getElementById('image-estimate-badge');
 const imageGenerateBtn = document.getElementById('image-generate-btn');
 const queueTelemetry = document.getElementById('queue-telemetry');
 const queueTelemetryResetBtn = document.getElementById('queue-telemetry-reset');
@@ -515,6 +523,8 @@ const IMAGE_SCHEDULER_FILTER_QUERY_KEY = 'imageSchedulerFilterQueryV1';
 const IMAGE_FLUX_AUTO_APPLY_RECOMMENDATION_KEY = 'imageFluxAutoApplyRecommendationV1';
 const IMAGE_FLUX_LOCK_RECOMMENDATION_KEY = 'imageFluxLockRecommendationV1';
 const IMAGE_UI_MODE_KEY = 'imageUiModeV1';
+const IMAGE_QUICKSTART_DISMISSED_KEY = 'imageQuickstartDismissedV1';
+const IMAGE_QUICKSTART_COMPLETED_KEY = 'imageQuickstartCompletedV1';
 const LORA_FAMILY_LEGEND_EXPANDED_KEY = 'loraFamilyLegendExpandedV1';
 const LORA_DISPLAY_OPTIONS_EXPANDED_KEY = 'loraDisplayOptionsExpandedV1';
 const LORA_HIDE_INCOMPATIBLE_OPTIONS_KEY = 'loraHideIncompatibleOptionsV1';
@@ -560,6 +570,8 @@ let imageFluxAutoApplyRecommendation = localStorage.getItem(IMAGE_FLUX_AUTO_APPL
 let imageFluxLockRecommendation = localStorage.getItem(IMAGE_FLUX_LOCK_RECOMMENDATION_KEY) === '1';
 let imageUiMode = localStorage.getItem(IMAGE_UI_MODE_KEY) === 'simple' ? 'simple' : 'advanced';
 let imageReadinessActionTarget = null;
+let imageQuickstartDismissed = localStorage.getItem(IMAGE_QUICKSTART_DISMISSED_KEY) === '1';
+let imageQuickstartCompleted = localStorage.getItem(IMAGE_QUICKSTART_COMPLETED_KEY) === '1';
 let imageFluxLockBypassOnce = false;
 let lastAutoRecommendationModelKey = '';
 let activeImagePreset = '';
@@ -5928,6 +5940,65 @@ function syncImageControlLabels() {
 	if (controlnetEndVal && controlnetEnd) controlnetEndVal.textContent = Number(controlnetEnd.value).toFixed(2);
 	syncImageQuickState();
 	syncImageReadiness();
+	syncImageRuntimeEstimate();
+}
+
+function setImageQuickstartVisible(isVisible) {
+	if (imageQuickstartStrip) {
+		imageQuickstartStrip.hidden = !isVisible;
+	}
+	if (imageQuickstartShowBtn) {
+		imageQuickstartShowBtn.hidden = isVisible || imageQuickstartCompleted;
+	}
+}
+
+function syncImageQuickstartVisibility() {
+	setImageQuickstartVisible(!imageQuickstartDismissed && !imageQuickstartCompleted);
+}
+
+function markImageQuickstartCompleted() {
+	if (imageQuickstartCompleted) return;
+	imageQuickstartCompleted = true;
+	localStorage.setItem(IMAGE_QUICKSTART_COMPLETED_KEY, '1');
+	setImageQuickstartVisible(false);
+}
+
+function setImageQuickstartDismissed(isDismissed) {
+	imageQuickstartDismissed = !!isDismissed;
+	if (imageQuickstartDismissed) {
+		localStorage.setItem(IMAGE_QUICKSTART_DISMISSED_KEY, '1');
+	} else {
+		localStorage.removeItem(IMAGE_QUICKSTART_DISMISSED_KEY);
+	}
+	syncImageQuickstartVisibility();
+}
+
+function syncImageRuntimeEstimate() {
+	if (!imageEstimateBadge) return;
+	const family = resolveActiveImageFamily(imageModelSelect?.value || '');
+	const width = Number(imageWidth?.value || 1024) || 1024;
+	const height = Number(imageHeight?.value || 1024) || 1024;
+	const steps = Number(imageSteps?.value || 30) || 30;
+	const batch = Number(imageBatchSize?.value || 1) || 1;
+	const hiresEnabled = !!hiresfixEnable?.checked;
+	const mode = imageUpload?.files && imageUpload.files[0] ? 'img2img' : 'txt2img';
+	const pixelFactor = (width * height) / (1024 * 1024);
+	const familyFactor = family === 'flux' ? 1.15 : 1;
+	const hiresFactor = hiresEnabled ? 1.7 : 1;
+	const modeFactor = mode === 'img2img' ? 0.9 : 1;
+	const score = pixelFactor * steps * batch * familyFactor * hiresFactor * modeFactor;
+	const estimatedSec = Math.max(4, Math.round(score * 0.45));
+	let tier = 'fast';
+	if (score >= 60) {
+		tier = 'heavy';
+	} else if (score >= 28) {
+		tier = 'medium';
+	}
+	imageEstimateBadge.classList.remove('is-fast', 'is-medium', 'is-heavy');
+	imageEstimateBadge.classList.add(`is-${tier}`);
+	const label = tier === 'fast' ? 'Fast' : tier === 'medium' ? 'Medium' : 'Heavy';
+	imageEstimateBadge.textContent = `Estimate: ${label} (~${estimatedSec}s)`;
+	imageEstimateBadge.title = `Estimated effort from size, steps, batch, model family, and Hi-Res mode.`;
 }
 
 function setImageUiMode(mode, options = {}) {
@@ -6200,6 +6271,39 @@ if (imageReadinessActionBtn) {
 	});
 }
 setImageUiMode(imageUiMode);
+syncImageQuickstartVisibility();
+
+const imageQuickstartButtons = [imageQuickstartFastBtn, imageQuickstartBalancedBtn, imageQuickstartDetailedBtn].filter(Boolean);
+imageQuickstartButtons.forEach((btn) => {
+	btn.addEventListener('click', () => {
+		const preset = String(btn.dataset.imageQuickstart || '').trim();
+		if (!preset) return;
+		applyImagePreset(preset);
+		setActiveImagePresetButton(preset);
+		if (imageQuickstartStatus) {
+			imageQuickstartStatus.textContent = `Quick start applied: ${btn.textContent}.`;
+		}
+		setImageUiMode('simple');
+		setImageQuickstartDismissed(true);
+		showToast(`Applied ${btn.textContent} quick start.`, 'pos');
+	});
+});
+
+if (imageQuickstartHideBtn) {
+	imageQuickstartHideBtn.addEventListener('click', () => {
+		setImageQuickstartDismissed(true);
+		showToast('Quick start hidden.', 'pos');
+	});
+}
+
+if (imageQuickstartShowBtn) {
+	imageQuickstartShowBtn.addEventListener('click', () => {
+		setImageQuickstartDismissed(false);
+		if (imageQuickstartStatus) {
+			imageQuickstartStatus.textContent = 'Quick start: choose a profile to begin faster.';
+		}
+	});
+}
 if (imageAutoApplyRecommendationToggle) {
 	imageAutoApplyRecommendationToggle.checked = imageFluxAutoApplyRecommendation;
 	imageAutoApplyRecommendationToggle.addEventListener('change', () => {
@@ -14081,6 +14185,7 @@ imageForm.addEventListener('submit', async (e) => {
 		queueSummary.textContent = filteredLoraCount > 0
 			? `Submitted: ${promptId} (${filteredLoraCount} incompatible LoRA${filteredLoraCount === 1 ? '' : 's'} skipped)`
 			: `Submitted: ${promptId}`;
+		markImageQuickstartCompleted();
 		if (filteredLoraCount > 0) {
 			showToast(`Skipped ${filteredLoraCount} incompatible LoRA${filteredLoraCount === 1 ? '' : 's'} for this run.`, '');
 		}
@@ -14128,16 +14233,25 @@ if (imageQuickFocusSourceBtn) {
 	el.addEventListener('change', syncImageQuickState);
 	el.addEventListener('input', syncImageReadiness);
 	el.addEventListener('change', syncImageReadiness);
+	el.addEventListener('input', syncImageRuntimeEstimate);
+	el.addEventListener('change', syncImageRuntimeEstimate);
 });
 
 [imagePrompt, imageNegativePrompt, imageBatchSize, controlnetModelSelect, controlnetImageUpload, enhancedPromptToggle].forEach((el) => {
 	if (!el) return;
 	el.addEventListener('input', syncImageReadiness);
 	el.addEventListener('change', syncImageReadiness);
+	el.addEventListener('input', syncImageRuntimeEstimate);
+	el.addEventListener('change', syncImageRuntimeEstimate);
 });
+
+if (hiresfixEnable) {
+	hiresfixEnable.addEventListener('change', syncImageRuntimeEstimate);
+}
 
 syncImageQuickState();
 syncImageReadiness();
+syncImageRuntimeEstimate();
 
 restoreTrackedQueueState();
 loadGallery();
