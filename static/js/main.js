@@ -9462,8 +9462,8 @@ async function pollQueue() {
 			for (const done of doneItems) {
 				const promptId = done.prompt_id;
 				const images = done.images || [];
-				const snapshot = pendingImageJobs.get(promptId) || {};
 				const meta = queueJobMeta.get(promptId) || {};
+				const snapshot = pendingImageJobs.get(promptId) || meta.snapshot || {};
 
 				if (images.length) {
 					updateLivePreviewFromDoneItem(done, snapshot, meta);

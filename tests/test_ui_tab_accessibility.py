@@ -2613,6 +2613,7 @@ def test_queue_done_items_update_live_preview_immediately_before_history_sync():
     poll_queue_block = js[js.index("async function pollQueue() {"):js.index("function ensureQueuePolling() {")]
 
     assert "function updateLivePreviewFromDoneItem(doneItem, snapshot = {}, meta = {}) {" in js
+    assert "const snapshot = pendingImageJobs.get(promptId) || meta.snapshot || {};" in poll_queue_block
     assert "updateLivePreviewFromDoneItem(done, snapshot, meta);" in poll_queue_block
     assert "const saved = await saveHistoryEntry({" in poll_queue_block
     assert poll_queue_block.index("updateLivePreviewFromDoneItem(done, snapshot, meta);") < poll_queue_block.index("const saved = await saveHistoryEntry({")
