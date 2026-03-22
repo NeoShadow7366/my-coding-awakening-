@@ -2898,6 +2898,32 @@ def test_model_browser_search_escape_keyboard_support():
     assert "localStorage.setItem('mbSearchQuery', '');" in js
 
 
+def test_text_panel_chat_input_escape_to_clear_keyboard_support():
+    """Text panel chat input supports Escape-to-clear keyboard shortcut."""
+    from pathlib import Path
+    html_path = Path(__file__).resolve().parents[1] / "templates" / "index.html"
+    html = html_path.read_text(encoding="utf-8")
+    
+    # Chat input has Escape keyboard shortcut hint
+    assert 'aria-keyshortcuts="Escape"' in html
+    # Verify it's on the chat-input specifically
+    assert 'id="chat-input"' in html
+    assert 'aria-label="Message input"' in html
+    assert 'aria-keyshortcuts="Escape"' in html
+    
+    # JS event listener handles Escape for clear
+    js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
+    js = js_path.read_text(encoding="utf-8")
+    
+    # Escape handler in chatInput listener
+    assert "chatInput.addEventListener('keydown', (e) => {" in js
+    assert "if (e.key === 'Escape') {" in js
+    assert "if (!chatInput.value) return;" in js
+    assert "chatInput.value = '';" in js
+    assert "chatInput.style.height = 'auto';" in js
+    assert "chatInput.focus();" in js
+
+
 def test_startup_reconcile_function_and_wiring_present_in_js_bundle():
     """runStartupHistoryReconcile must exist and be called once when imageOk first becomes true."""
     js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"

@@ -5846,6 +5846,16 @@ chatInput.addEventListener('input', () => {
 });
 
 chatInput.addEventListener('keydown', (e) => {
+	// Escape-to-clear support
+	if (e.key === 'Escape') {
+		if (!chatInput.value) return; // skip if empty
+		e.stopPropagation();
+		chatInput.value = '';
+		chatInput.style.height = 'auto';
+		chatInput.focus();
+		return;
+	}
+	
 	if (e.key === 'Enter' && !e.shiftKey) {
 		e.preventDefault();
 		chatForm.requestSubmit();
