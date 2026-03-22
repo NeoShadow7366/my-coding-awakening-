@@ -1767,11 +1767,11 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert "Display mode custom with ${activeCount} active options. Activate to switch to compact display options." in js
     assert "Display mode default with 0 active options. Activate to switch to compact display options." in js
     assert "loraDisplayOptionsChipHint.textContent = displayMode === 'compact'" in js
-    assert "Mode chip action: switch to default display options. Shortcuts: M toggles mode, Shift+M resets display options, C enables compact mode, S toggles row hints, P toggles preserved indicators, X toggles compact mismatch badges, B toggles row clear buttons, D/R enable default mode, H toggles this panel, Esc closes this panel." in js
-    assert "Mode chip action: switch to compact display options. Shortcuts: M toggles mode, Shift+M resets display options, C enables compact mode, S toggles row hints, P toggles preserved indicators, X toggles compact mismatch badges, B toggles row clear buttons, D/R enable default mode, H toggles this panel, Esc closes this panel." in js
+    assert "Mode chip action: switch to default display options. Shortcuts: M toggles mode, Shift+M resets display options, C enables compact mode, S toggles row hints, P toggles preserved indicators, X toggles compact mismatch badges, B toggles row clear buttons, I toggles hide incompatible, D/R enable default mode, H toggles this panel, Esc closes this panel." in js
+    assert "Mode chip action: switch to compact display options. Shortcuts: M toggles mode, Shift+M resets display options, C enables compact mode, S toggles row hints, P toggles preserved indicators, X toggles compact mismatch badges, B toggles row clear buttons, I toggles hide incompatible, D/R enable default mode, H toggles this panel, Esc closes this panel." in js
     assert "const hotkey = (event.key || '').toLowerCase();" in js
     assert "const isEscape = event.key === 'Escape';" in js
-    assert "if (hotkey !== 'm' && hotkey !== 'c' && hotkey !== 'd' && hotkey !== 'r' && hotkey !== 'h' && hotkey !== 's' && hotkey !== 'p' && hotkey !== 'x' && hotkey !== 'b' && !isEscape) return;" in js
+    assert "if (hotkey !== 'm' && hotkey !== 'c' && hotkey !== 'd' && hotkey !== 'r' && hotkey !== 'h' && hotkey !== 's' && hotkey !== 'p' && hotkey !== 'x' && hotkey !== 'b' && hotkey !== 'i' && !isEscape) return;" in js
     assert "if (event.repeat && !isEscape) return;" in js
     assert "if (targetTag === 'input' || targetTag === 'textarea' || targetTag === 'select' || event.target?.isContentEditable) return;" in js
     assert "if (isEscape) {" in js
@@ -1793,6 +1793,9 @@ def test_flux_lora_hint_and_strength_clamp_wiring():
     assert "if (hotkey === 'b') {" in js
     assert "if (loraCompactRowClearToggle) {" in js
     assert "loraCompactRowClearToggle.click();" in js
+    assert "if (hotkey === 'i') {" in js
+    assert "if (loraHideIncompatibleToggle) {" in js
+    assert "loraHideIncompatibleToggle.click();" in js
     assert "if (hotkey === 'd' || hotkey === 'r') {" in js
     assert "if (event.shiftKey) {" in js
     assert "resetLoraDisplayOptionsPrefs();" in js
