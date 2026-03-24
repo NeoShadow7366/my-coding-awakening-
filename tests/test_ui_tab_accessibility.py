@@ -2922,6 +2922,12 @@ def test_image_panel_details_escape_to_close_keyboard_support():
     assert "const targetEl = event.target instanceof Element ? event.target : document.activeElement;" in js
     assert "const openDetails = targetEl.closest('details[open]');" in js
     assert "openDetails.open = false;" in js
+    assert "const panelOpenDetails = [...imagePanel.querySelectorAll('details[open]')];" in js
+    assert "const fallbackOpenDetails = panelOpenDetails[panelOpenDetails.length - 1];" in js
+    assert "fallbackOpenDetails.open = false;" in js
+    assert "const fallbackSummary = fallbackOpenDetails.querySelector(':scope > summary');" in js
+    assert "if (fallbackSummary instanceof HTMLElement) {" in js
+    assert "fallbackSummary.focus();" in js
     assert "function collapseSidebarSectionForControl(controlEl) {" in js
     assert "const section = controlEl.closest('#panel-image .sidebar .sidebar-section');" in js
     assert "syncSidebarSectionCollapsedState(section, toggleBtn, true);" in js

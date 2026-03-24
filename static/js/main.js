@@ -9736,6 +9736,20 @@ document.addEventListener('keydown', (event) => {
 		return;
 	}
 
+	// If focus is elsewhere in Image panel, still close the most recently open details panel first.
+	const panelOpenDetails = [...imagePanel.querySelectorAll('details[open]')];
+	if (panelOpenDetails.length) {
+		event.preventDefault();
+		event.stopPropagation();
+		const fallbackOpenDetails = panelOpenDetails[panelOpenDetails.length - 1];
+		fallbackOpenDetails.open = false;
+		const fallbackSummary = fallbackOpenDetails.querySelector(':scope > summary');
+		if (fallbackSummary instanceof HTMLElement) {
+			fallbackSummary.focus();
+		}
+		return;
+	}
+
 	if (!collapseSidebarSectionForControl(targetEl)) return;
 	event.preventDefault();
 	event.stopPropagation();
