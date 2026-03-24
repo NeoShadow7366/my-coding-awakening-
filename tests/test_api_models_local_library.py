@@ -764,3 +764,56 @@ def test_find_huggingface_match_prefers_exact_filename_candidate(monkeypatch):
     assert match["provider"] == "huggingface"
     assert match["model_id"] == "author/hero-style-v2"
     assert match["version_name"] == "22222222"
+
+
+def test_api_models_open_folder_opens_parent_directory(client, tmp_path, monkeypatch):
+    models_root = tmp_path / "models"
+    model_dir = models_root / "checkpoints"
+    model_dir.mkdir(parents=True, exist_ok=True)
+    model_file = model_dir / "demo.safetensors"
+    model_file.write_bytes(b"weights")
+
+    monkeypatch.setattr(app_module, "_using_shared_models_root", lambda: False)
+    monkeypatch.setattr(app_module, "_comfy_models_root", lambda: models_root)
+    monkeypatch.setattr(app_module.os, "name", "nt")
+
+    popen_calls = []
+
+    class _FakeProc:
+        pass
+
+    def fake_popen(args, stdout=None, stderr=None):
+        popen_calls.append(args)
+        return _FakeProc()
+
+    monkeypatch.setattr(app_module.subprocess, "Popen", fake_popen)
+
+    resp = client.post("/api/models/open-folder", json={"file_name": "demo.safetensors", "folder": "checkpoints"})
+
+    assert resp.status_code == 200
+    payload = resp.get_json()
+    assert payload["ok"] is True
+    assert payload["path"] == str(model_dir)
+    assert popen_calls == [["explorer", str(model_dir)]]
+
+
+def test_api_models_open_folder_rejects_invalid_file_name(client):
+    resp = client.post("/api/models/open-folder", json={"file_name": "../evil.safetensors", "folder": "checkpoints"})
+
+    assert resp.status_code == 400
+    payload = resp.get_json()
+    assert "invalid file_name" in payload["error"]
+
+
+def test_api_models_open_folder_returns_not_found_for_missing_file(client, tmp_path, monkeypatch):
+    models_root = tmp_path / "models"
+    (models_root / "checkpoints").mkdir(parents=True, exist_ok=True)
+
+    monkeypatch.setattr(app_module, "_using_shared_models_root", lambda: False)
+    monkeypatch.setattr(app_module, "_comfy_models_root", lambda: models_root)
+
+    resp = client.post("/api/models/open-folder", json={"file_name": "missing.safetensors", "folder": "checkpoints"})
+
+    assert resp.status_code == 404
+    payload = resp.get_json()
+    assert "Model file not found" in payload["error"]

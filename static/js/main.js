@@ -12633,10 +12633,17 @@ function openLocalModelDetailsModal(item) {
 					<span class="mb-model-modal-file-meta">${escHtml(typeLabel)} · ${escHtml(sizeLabel)} · ${escHtml(folderLabel)}</span>
 				</div>
 				<div class="mb-model-modal-file-actions">
+					<button class="btn btn-sm btn-ghost mb-local-modal-open-folder-btn" data-name="${escHtml(item.name || '')}" data-folder="${escHtml(item.folder || '')}">Open Folder</button>
 					<button class="btn btn-sm btn-ghost mb-local-modal-use-btn" data-name="${escHtml(item.name || '')}" data-type="${escHtml(item.type || '')}" data-folder="${escHtml(item.folder || '')}">Use in Image Gen</button>
 					<button class="btn btn-sm btn-danger mb-local-modal-delete-btn" data-name="${escHtml(item.name || '')}" data-folder="${escHtml(item.folder || '')}">Delete</button>
 				</div>
 			</div>`;
+		const openFolderBtn = mbModelModalFiles.querySelector('.mb-local-modal-open-folder-btn');
+		if (openFolderBtn) {
+			openFolderBtn.addEventListener('click', () => {
+				openLocalModelFolder(openFolderBtn.dataset.name || '', openFolderBtn.dataset.folder || '', openFolderBtn);
+			});
+		}
 		const useBtn = mbModelModalFiles.querySelector('.mb-local-modal-use-btn');
 		if (useBtn) {
 			useBtn.addEventListener('click', () => {
@@ -13346,6 +13353,7 @@ function renderLocalLibrary(models, root) {
 				${versionLabel ? `<div class="mb-local-card-version" title="Matched provider version">Matched version: ${escHtml(versionLabel)}</div>` : ''}
 				${filePath ? `<div class="mb-result-version" title="${escHtml(filePath)}">${escHtml(filePath)}</div>` : ''}
 				<div class="mb-local-card-actions">
+					<button class="btn btn-sm btn-ghost mb-open-folder-btn" data-name="${escHtml(m.name || '')}" data-folder="${escHtml(m.folder || '')}">Open Folder</button>
 					<button class="btn btn-sm btn-ghost mb-use-image-btn" data-name="${escHtml(m.name || '')}" data-type="${escHtml(m.type || '')}" data-folder="${escHtml(m.folder || '')}">Use in Image Gen</button>
 					<button class="btn btn-sm btn-danger mb-delete-btn" data-name="${escHtml(m.name)}" data-folder="${escHtml(m.folder)}">Delete</button>
 				</div>
@@ -13354,6 +13362,7 @@ function renderLocalLibrary(models, root) {
 		card.addEventListener('click', (event) => {
 			const target = event.target;
 			if (!(target instanceof HTMLElement)) return;
+			if (target.closest('.mb-open-folder-btn')) return;
 			if (target.closest('.mb-delete-btn')) return;
 			openLocalModelDetailsModal(m);
 		});
@@ -13388,6 +13397,31 @@ function renderLocalLibrary(models, root) {
 			});
 		});
 	});
+	mbLibraryGrid.querySelectorAll('.mb-open-folder-btn').forEach((btn) => {
+		btn.addEventListener('click', (event) => {
+			event.stopPropagation();
+			openLocalModelFolder(btn.dataset.name || '', btn.dataset.folder || '', btn);
+		});
+	});
+}
+
+async function openLocalModelFolder(fileName, folder, btn) {
+	if (!fileName || !folder) return;
+	if (btn) btn.disabled = true;
+	try {
+		const resp = await fetch('/api/models/open-folder', {
+			method: 'POST',
+			headers: {'Content-Type': 'application/json'},
+			body: JSON.stringify({file_name: fileName, folder}),
+		});
+		const data = await resp.json().catch(() => ({}));
+		if (!resp.ok || !data.ok) throw new Error(data.error || resp.statusText || 'Failed to open folder');
+		showToast('Opened model folder.', 'pos');
+	} catch (err) {
+		showToast('Open folder failed: ' + (err && err.message ? err.message : String(err)), 'neg');
+	} finally {
+		if (btn) btn.disabled = false;
+	}
 }
 
 async function deleteLocalModel(fileName, folder, btn) {

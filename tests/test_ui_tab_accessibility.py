@@ -1172,6 +1172,7 @@ def test_local_library_cards_use_model_card_layout_features_in_js_bundle():
     assert "class=\"mb-local-card-preview-thumb" in content
     assert "Matched version:" in content
     assert "class=\"mb-local-card-actions\"" in content
+    assert "class=\"btn btn-sm btn-ghost mb-open-folder-btn\"" in content
     assert "class=\"btn btn-sm btn-danger mb-delete-btn\"" in content
 
 
@@ -1261,9 +1262,22 @@ def test_local_library_cards_open_local_details_modal_in_js_bundle():
     assert "function openLocalModelDetailsModal(item)" in content
     assert "card.setAttribute('role', 'button');" in content
     assert "card.setAttribute('tabindex', '0');" in content
+    assert "if (target.closest('.mb-open-folder-btn')) return;" in content
     assert "if (target.closest('.mb-delete-btn')) return;" in content
     assert "openLocalModelDetailsModal(m);" in content
     assert "preview_url: previewUrl," in content
+
+
+def test_local_library_open_folder_actions_wired_in_js_bundle():
+    js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
+    content = js_path.read_text(encoding="utf-8")
+
+    assert "function openLocalModelFolder(fileName, folder, btn)" in content
+    assert "fetch('/api/models/open-folder'" in content
+    assert "showToast('Opened model folder.', 'pos');" in content
+    assert "showToast('Open folder failed: ' + (err && err.message ? err.message : String(err)), 'neg');" in content
+    assert "class=\"btn btn-sm btn-ghost mb-local-modal-open-folder-btn\"" in content
+    assert "openLocalModelFolder(btn.dataset.name || '', btn.dataset.folder || '', btn);" in content
 
 
 def test_index_local_library_has_find_missing_previews_button():

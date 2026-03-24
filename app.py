@@ -5747,6 +5747,43 @@ def api_models_delete_local():
     return jsonify({"ok": True, "deleted": file_name})
 
 
+@app.route("/api/models/open-folder", methods=["POST"])
+def api_models_open_folder():
+    """Open the folder containing a locally installed model file."""
+    body = request.get_json(silent=True) or {}
+    file_name = (body.get("file_name") or "").strip()
+    folder_raw = (body.get("folder") or "").strip()
+    folder = _normalize_model_folder(folder_raw)
+
+    if not file_name or Path(file_name).name != file_name:
+        return jsonify({"error": "invalid file_name"}), 400
+    allowed_folders = _STABILITY_MODEL_SUBFOLDERS if _using_shared_models_root() else _COMFY_MODEL_SUBFOLDERS
+    if folder is None or folder not in allowed_folders:
+        return jsonify({"error": f"folder must be one of: {', '.join(allowed_folders)}"}), 400
+
+    models_root = _comfy_models_root()
+    if models_root is None:
+        return jsonify({"error": "Set a shared model path or ComfyUI path in Configurations before managing models"}), 400
+
+    file_path = _safe_child_path(models_root, folder, file_name)
+    if not file_path.exists():
+        return jsonify({"error": "Model file not found"}), 404
+
+    target_folder = file_path.parent
+    try:
+        if os.name == "nt":
+            subprocess.Popen(["explorer", str(target_folder)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        elif sys.platform == "darwin":
+            subprocess.Popen(["open", str(target_folder)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        else:
+            subprocess.Popen(["xdg-open", str(target_folder)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except OSError as exc:
+        logger.error("Failed to open local model folder: %s", exc)
+        return jsonify({"error": f"Failed to open folder: {exc}"}), 500
+
+    return jsonify({"ok": True, "path": str(target_folder)})
+
+
 @app.route("/api/dev/slow-download-source")
 def api_dev_slow_download_source():
     """Stream bytes slowly for deterministic local download/cancel testing."""
