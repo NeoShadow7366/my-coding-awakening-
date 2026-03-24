@@ -3035,6 +3035,8 @@ def test_gallery_context_menu_keyboard_support_present():
     assert "galleryContextMenu.addEventListener('keydown', (event) => {" in js
     assert "if (event.key === 'Escape') {" in js
     assert "closeGalleryContextMenu({ restoreFocus: true });" in js
+    assert "if (event.key === '?' || event.key === 'h' || event.key === 'H') {" in js
+    assert "showToast('Menu shortcuts: O open location, Delete/D delete, 1 PNG+meta, 2 PNG, 3 JPEG, 4 WebP, arrows/tab navigate, Enter run, Esc close.', 'info');" in js
     assert "const hotkeyActionMap = {" in js
     assert "delete: 'delete-image'," in js
     assert "'1': 'export-png-meta'," in js

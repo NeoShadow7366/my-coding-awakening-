@@ -9575,6 +9575,12 @@ if (galleryContextMenu) {
 			return;
 		}
 
+		if (event.key === '?' || event.key === 'h' || event.key === 'H') {
+			event.preventDefault();
+			showToast('Menu shortcuts: O open location, Delete/D delete, 1 PNG+meta, 2 PNG, 3 JPEG, 4 WebP, arrows/tab navigate, Enter run, Esc close.', 'info');
+			return;
+		}
+
 		const menuHotkey = String(event.key || '').toLowerCase();
 		const hotkeyActionMap = {
 			o: 'open-location',
