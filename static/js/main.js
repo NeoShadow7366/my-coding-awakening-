@@ -6885,6 +6885,26 @@ function collapseSidebarSectionForControl(controlEl) {
 	return true;
 }
 
+function collapseImageSidebarSectionBySelector(sectionSelector) {
+	if (!sectionSelector) return false;
+	const section = document.querySelector(`#panel-image .sidebar .sidebar-section${sectionSelector}`);
+	if (!(section instanceof HTMLElement) || section.classList.contains('is-collapsed')) return false;
+	const toggleBtn = section.querySelector(':scope > .sidebar-section-head .sidebar-section-toggle');
+	if (toggleBtn) {
+		syncSidebarSectionCollapsedState(section, toggleBtn, true);
+		const key = section.dataset.sidebarSectionKey;
+		if (key) {
+			imageSidebarSectionCollapseState[key] = 1;
+			persistSidebarSectionCollapseState();
+		}
+		toggleBtn.focus();
+		return true;
+	}
+	section.classList.add('is-collapsed');
+	section.setAttribute('data-collapsed', '1');
+	return true;
+}
+
 function syncImageQuickState() {
 	if (!imageQuickState) return;
 	const baseModel = String(imageModelSelect?.value || '').trim();
@@ -9793,9 +9813,10 @@ document.addEventListener('keydown', (event) => {
 		return;
 	}
 
-	if (!collapseSidebarSectionForControl(targetEl)) return;
-	event.preventDefault();
-	event.stopPropagation();
+	if (collapseSidebarSectionForControl(targetEl) || collapseImageSidebarSectionBySelector('.model-stack-panel')) {
+		event.preventDefault();
+		event.stopPropagation();
+	}
 });
 
 // Preset quick-apply with number keys 1-3 (Fast, Quality, Creative)

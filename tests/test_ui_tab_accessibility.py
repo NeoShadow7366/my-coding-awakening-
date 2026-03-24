@@ -2936,12 +2936,14 @@ def test_image_panel_details_escape_to_close_keyboard_support():
     assert "if (fallbackSummary instanceof HTMLElement) {" in js
     assert "fallbackSummary.focus();" in js
     assert "function collapseSidebarSectionForControl(controlEl) {" in js
+    assert "function collapseImageSidebarSectionBySelector(sectionSelector) {" in js
+    assert "const section = document.querySelector(`#panel-image .sidebar .sidebar-section${sectionSelector}`);" in js
     assert "const section = controlEl.closest('#panel-image .sidebar .sidebar-section');" in js
     assert "syncSidebarSectionCollapsedState(section, toggleBtn, true);" in js
     assert "imageSidebarSectionCollapseState[key] = 1;" in js
     assert "persistSidebarSectionCollapseState();" in js
     assert "toggleBtn.focus();" in js
-    assert "if (!collapseSidebarSectionForControl(targetEl)) return;" in js
+    assert "if (collapseSidebarSectionForControl(targetEl) || collapseImageSidebarSectionBySelector('.model-stack-panel')) {" in js
 
 
 def test_gallery_lightbox_escape_to_close_keyboard_support():
