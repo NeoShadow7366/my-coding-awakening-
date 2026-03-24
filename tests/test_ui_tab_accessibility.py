@@ -349,6 +349,8 @@ def test_index_config_service_action_group_semantics():
     assert '<div class="config-actions-row" role="group" aria-label="ComfyUI service actions">' in html
     assert '<div class="config-actions-row" role="group" aria-label="ComfyUI custom node browser actions">' in html
     assert '<div class="config-actions-row" role="group" aria-label="Flask app actions">' in html
+    assert 'id="config-lan-sharing-enabled" type="checkbox"' in html
+    assert 'Enable LAN sharing' in html
 
 
 def test_config_service_keyboard_handler_wiring_present_in_js_bundle():
@@ -362,6 +364,9 @@ def test_config_service_keyboard_handler_wiring_present_in_js_bundle():
     assert "configComfyStartBtn.addEventListener('keydown', onConfigServiceControlsKeydown);" in content
     assert "configComfyRestartBtn.addEventListener('keydown', onConfigServiceControlsKeydown);" in content
     assert "configComfyStopBtn.addEventListener('keydown', onConfigServiceControlsKeydown);" in content
+    assert "const configLanSharingEnabled = document.getElementById('config-lan-sharing-enabled');" in content
+    assert "configLanSharingEnabled.checked = Boolean(data.lan_sharing_enabled);" in content
+    assert "lan_sharing_enabled: configLanSharingEnabled ? configLanSharingEnabled.checked : false," in content
 
 
 def test_config_comfy_custom_node_browser_markup_and_wiring_present():

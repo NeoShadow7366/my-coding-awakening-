@@ -964,6 +964,15 @@
     </div>
 
     <div class="sidebar-section">
+      <p class="field-label">Network Access</p>
+      <label class="config-inline-checkbox" for="config-lan-sharing-enabled">
+        <input id="config-lan-sharing-enabled" type="checkbox" />
+        Enable LAN sharing
+      </label>
+      <p class="hint">Allows other devices on your local network to access this interface. Requires Flask restart after saving.</p>
+    </div>
+
+    <div class="sidebar-section">
       <button class="btn btn-primary btn-full" id="config-save-btn" type="button">Save Configuration</button>
       <button class="btn btn-ghost btn-full" id="config-models-migrate-btn" type="button">Migrate Legacy Model Folders</button>
       <p id="config-save-status" class="hint">No saved changes yet.</p>

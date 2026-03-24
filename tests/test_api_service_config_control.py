@@ -34,6 +34,7 @@ def test_service_config_get_defaults(client):
         "civitai_api_key": "",
         "huggingface_api_key": "",
         "default_negative_prompt": "",
+        "lan_sharing_enabled": False,
         "updated_at": "",
     }
 
@@ -541,6 +542,7 @@ def test_service_config_post_persists_paths(client):
             "shared_models_path": " E:/AI/models ",
             "civitai_api_key": " civitai-key-123 ",
             "huggingface_api_key": " hf_token_abc ",
+            "lan_sharing_enabled": True,
         },
     )
     read_resp = client.get("/api/config/services")
@@ -555,7 +557,21 @@ def test_service_config_post_persists_paths(client):
     assert read_data["shared_models_path"] == "E:/AI/models"
     assert read_data["civitai_api_key"] == "civitai-key-123"
     assert read_data["huggingface_api_key"] == "hf_token_abc"
+    assert read_data["lan_sharing_enabled"] is True
     assert read_data["updated_at"]
+
+
+def test_service_config_lan_sharing_can_be_disabled_after_enable(client):
+    client.post("/api/config/services", json={"lan_sharing_enabled": True})
+
+    resp = client.post("/api/config/services", json={"lan_sharing_enabled": False})
+    read_resp = client.get("/api/config/services")
+
+    assert resp.status_code == 200
+    assert resp.get_json()["ok"] is True
+    assert resp.get_json()["config"]["lan_sharing_enabled"] is False
+    assert read_resp.status_code == 200
+    assert read_resp.get_json()["lan_sharing_enabled"] is False
 
 
 def test_service_start_requires_configured_path(client, monkeypatch):

@@ -1054,6 +1054,7 @@ def _default_service_config() -> dict:
         "civitai_api_key": "",
         "huggingface_api_key": "",
         "default_negative_prompt": "",
+        "lan_sharing_enabled": False,
         "updated_at": "",
     }
 
@@ -1110,6 +1111,7 @@ def _load_service_config() -> dict:
             config["civitai_api_key"] = str(raw.get("civitai_api_key") or "").strip()
             config["huggingface_api_key"] = str(raw.get("huggingface_api_key") or "").strip()
             config["default_negative_prompt"] = str(raw.get("default_negative_prompt") or "").strip()
+            config["lan_sharing_enabled"] = bool(raw.get("lan_sharing_enabled", False))
             config["updated_at"] = str(raw.get("updated_at") or "").strip()
 
         SERVICE_CONFIG_FILE.write_text(json.dumps(config, ensure_ascii=True, indent=2), encoding="utf-8")
@@ -1125,6 +1127,7 @@ def _save_service_config(config: dict) -> dict:
         "civitai_api_key": str(config.get("civitai_api_key") or "").strip(),
         "huggingface_api_key": str(config.get("huggingface_api_key") or "").strip(),
         "default_negative_prompt": str(config.get("default_negative_prompt") or "").strip(),
+        "lan_sharing_enabled": bool(config.get("lan_sharing_enabled", False)),
         "updated_at": _service_config_timestamp(),
     }
 
@@ -5870,6 +5873,7 @@ def api_config_services():
             "civitai_api_key": body.get("civitai_api_key"),
             "huggingface_api_key": body.get("huggingface_api_key"),
             "default_negative_prompt": body.get("default_negative_prompt"),
+            "lan_sharing_enabled": body.get("lan_sharing_enabled"),
         }
     )
     return jsonify({"ok": True, "config": config})
@@ -7463,6 +7467,11 @@ if __name__ == "__main__":
     print("\n" + "=" * 60)
     print("  Local AI Model Interface")
     port = int(os.environ.get("FLASK_PORT", 5000))
-    print(f"  Open http://localhost:{port} in your browser")
+    service_cfg = _load_service_config()
+    lan_enabled = bool(service_cfg.get("lan_sharing_enabled", False))
+    bind_host = "0.0.0.0" if lan_enabled else "127.0.0.1"
+    access_host = "localhost" if not lan_enabled else "<this-machine-ip>"
+    print(f"  Open http://{access_host}:{port} in your browser")
+    print(f"  LAN sharing: {'enabled' if lan_enabled else 'disabled'}")
     print("=" * 60 + "\n")
-    app.run(host="0.0.0.0", port=port, debug=False, threaded=True)
+    app.run(host=bind_host, port=port, debug=False, threaded=True)

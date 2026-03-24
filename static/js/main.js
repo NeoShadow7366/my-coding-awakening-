@@ -324,6 +324,7 @@ const configModelsPath = document.getElementById('config-models-path');
 const configCivitaiKey = document.getElementById('config-civitai-key');
 const configHuggingfaceKey = document.getElementById('config-huggingface-key');
 const configDefaultNegPrompt = document.getElementById('config-default-negative-prompt');
+const configLanSharingEnabled = document.getElementById('config-lan-sharing-enabled');
 const configOllamaBrowseBtn = document.getElementById('config-ollama-browse');
 const configComfyuiBrowseBtn = document.getElementById('config-comfyui-browse');
 const configModelsBrowseBtn = document.getElementById('config-models-browse');
@@ -2995,6 +2996,9 @@ async function loadServiceConfig() {
 			configDefaultNegPrompt.value = data.default_negative_prompt || '';
 			localStorage.setItem('defaultNegativePrompt', data.default_negative_prompt || '');
 		}
+		if (configLanSharingEnabled) {
+			configLanSharingEnabled.checked = Boolean(data.lan_sharing_enabled);
+		}
 		setConfigSavedTimestamp(data.updated_at || '');
 		setConfigStatusLine(configSaveStatus, 'Saved configuration loaded.');
 	} catch {
@@ -3013,6 +3017,7 @@ async function saveServiceConfig(options = {}) {
 		civitai_api_key: configCivitaiKey ? configCivitaiKey.value.trim() : '',
 		huggingface_api_key: configHuggingfaceKey ? configHuggingfaceKey.value.trim() : '',
 		default_negative_prompt: configDefaultNegPrompt ? configDefaultNegPrompt.value : '',
+		lan_sharing_enabled: configLanSharingEnabled ? configLanSharingEnabled.checked : false,
 	};
 
 	try {
