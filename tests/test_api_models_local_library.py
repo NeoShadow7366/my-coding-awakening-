@@ -1,6 +1,7 @@
 """Tests for local model library preview metadata and preview-serving API."""
 
 import json
+import sqlite3
 from pathlib import Path
 
 import pytest
@@ -96,6 +97,63 @@ def test_scan_local_models_uses_metadata_preview_fallback_when_no_sidecar(tmp_pa
             "https://example.test/fallback-2.jpg",
         ]
         assert models[0]["version_name"] == "v2.1"
+
+
+def test_save_model_metadata_syncs_json_and_sqlite(tmp_path, monkeypatch):
+    data_dir = tmp_path / "data"
+    monkeypatch.setattr(app_module, "DATA_DIR", Path(data_dir))
+
+    payload = {
+        "checkpoints/demo.safetensors": {
+            "file_name": "demo.safetensors",
+            "folder": "checkpoints",
+            "provider": "civitai",
+            "updated_at": 1,
+        }
+    }
+
+    app_module._save_model_metadata(payload)
+
+    json_path = data_dir / "model_metadata.json"
+    db_path = data_dir / "model_metadata.db"
+    assert json_path.exists()
+    assert db_path.exists()
+
+    stored_json = json.loads(json_path.read_text(encoding="utf-8"))
+    assert stored_json == payload
+
+    with sqlite3.connect(db_path) as conn:
+        row = conn.execute(
+            "SELECT metadata_key, payload_json FROM model_metadata WHERE metadata_key = ?",
+            ("checkpoints/demo.safetensors",),
+        ).fetchone()
+    assert row is not None
+    assert row[0] == "checkpoints/demo.safetensors"
+    assert json.loads(row[1]) == payload["checkpoints/demo.safetensors"]
+
+
+def test_load_model_metadata_bootstraps_sqlite_from_existing_json(tmp_path, monkeypatch):
+    data_dir = tmp_path / "data"
+    data_dir.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setattr(app_module, "DATA_DIR", Path(data_dir))
+
+    payload = {
+        "loras/hero-style.safetensors": {
+            "file_name": "hero-style.safetensors",
+            "folder": "loras",
+            "provider": "huggingface",
+            "updated_at": 2,
+        }
+    }
+    (data_dir / "model_metadata.json").write_text(json.dumps(payload), encoding="utf-8")
+
+    loaded = app_module._load_model_metadata()
+    assert loaded == payload
+
+    db_path = data_dir / "model_metadata.db"
+    with sqlite3.connect(db_path) as conn:
+        count = conn.execute("SELECT COUNT(*) FROM model_metadata").fetchone()[0]
+    assert count == 1
 
 
 def test_scan_local_models_uses_civitai_sidecar_metadata_for_preview_and_model_fields(tmp_path, monkeypatch):

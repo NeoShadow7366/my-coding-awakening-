@@ -449,6 +449,8 @@ const galleryLightboxBeforeImage = document.getElementById('gallery-lightbox-bef
 const galleryLightboxAfterWrap = document.getElementById('gallery-lightbox-after-wrap');
 const galleryLightboxAfterImage = document.getElementById('gallery-lightbox-after-image');
 const galleryLightboxCompareSlider = document.getElementById('gallery-lightbox-compare-slider');
+const galleryLightboxFullscreenBtn = document.getElementById('gallery-lightbox-fullscreen');
+const galleryLightboxFullscreenStatus = document.getElementById('gallery-lightbox-fullscreen-status');
 const galleryContextMenu = document.getElementById('gallery-context-menu');
 const gallerySearch = document.getElementById('gallery-search');
 const gallerySortSelect = document.getElementById('gallery-sort');
@@ -530,6 +532,7 @@ const IMAGE_RECENT_MODELS_KEY = 'imageRecentModelsV1';
 const IMAGE_FAVORITE_MODELS_KEY = 'imageFavoriteModelsV1';
 const IMAGE_MODEL_FILTER_MODE_KEY = 'imageModelFilterModeV1';
 const IMAGE_MODEL_FAMILY_MODE_KEY = 'imageModelFamilyModeV1';
+const IMAGE_MODEL_CACHE_KEY = 'imageModelCacheV1';
 const IMAGE_ACTIVE_PRESET_KEY = 'imageActivePresetV1';
 const IMAGE_SAMPLER_FILTER_QUERY_KEY = 'imageSamplerFilterQueryV1';
 const IMAGE_SCHEDULER_FILTER_QUERY_KEY = 'imageSchedulerFilterQueryV1';
@@ -566,6 +569,15 @@ const PREVIEW_ZOOM_MAX = 3;
 const PREVIEW_ZOOM_STEP = 0.12;
 let imageModelAllOptions = [];
 let imageModelDetailsByName = new Map();
+let imageModelLastGoodOptions = [];
+let imageModelLastGoodDetails = new Map();
+let imageModelsLoadRequestSeq = 0;
+let imageModelsRetryTimer = null;
+let imageModelsRetryAttempt = 0;
+let imageModelsLoadInFlight = true;
+let imageModelsLoadStartedAt = Date.now();
+let imageModelsLoadingTicker = null;
+let imageEngineAvailable = false;
 let imageModelFilterMode = localStorage.getItem(IMAGE_MODEL_FILTER_MODE_KEY) || 'all';
 if (!['all', 'recent', 'favorites'].includes(imageModelFilterMode)) {
 	imageModelFilterMode = 'all';
@@ -583,6 +595,7 @@ let imageFluxAutoApplyRecommendation = localStorage.getItem(IMAGE_FLUX_AUTO_APPL
 let imageFluxLockRecommendation = localStorage.getItem(IMAGE_FLUX_LOCK_RECOMMENDATION_KEY) === '1';
 let imageUiMode = localStorage.getItem(IMAGE_UI_MODE_KEY) === 'simple' ? 'simple' : 'advanced';
 let imageReadinessActionTarget = null;
+let imageReadinessActionCommand = '';
 let imageQuickstartDismissed = localStorage.getItem(IMAGE_QUICKSTART_DISMISSED_KEY) === '1';
 let imageQuickstartCompleted = localStorage.getItem(IMAGE_QUICKSTART_COMPLETED_KEY) === '1';
 let imageFluxLockBypassOnce = false;
@@ -635,6 +648,10 @@ const IMAGE_FAMILY_CAPABILITIES = {
 		cfg_default: 3.5,
 	},
 };
+const IMAGE_MODELS_RETRY_DELAYS_MS = [800, 1800, 3500];
+const IMAGE_MODELS_LOADING_WARN_MS = 15000;
+const FLUX_COMPONENTS_THROTTLE_MS = 5000;
+const FLUX_COMPONENTS_RETRY_COOLDOWN_MS = 15000;
 let currentGalleryImages = [];
 let currentFullHistory = [];
 let galleryViewMode = localStorage.getItem('galleryViewMode') || 'list';
@@ -644,7 +661,6 @@ const GALLERY_RENDER_CHUNK_SIZE = 24;
 const GALLERY_VIRTUALIZE_THRESHOLD = 120;
 const GALLERY_VIRTUAL_OVERSCAN_ROWS = 3;
 const GALLERY_LIST_EST_CARD_HEIGHT = 280;
-const GALLERY_GRID_EST_CARD_HEIGHT = 230;
 const GALLERY_GRID_MIN_COL_WIDTH = 148;
 let galleryLoadController = null;
 let galleryLoadSeq = 0;
@@ -660,6 +676,8 @@ let galleryModeFilter = localStorage.getItem('galleryModeFilter') || 'all';
 let galleryTagFilter = localStorage.getItem(GALLERY_TAG_FILTER_KEY) || 'all';
 const GALLERY_MODEL_FILTER_KEY = 'galleryModelFilterV1';
 let galleryModelFilter = localStorage.getItem(GALLERY_MODEL_FILTER_KEY) || 'all';
+const GALLERY_LIGHTBOX_FULLSCREEN_KEY = 'galleryLightboxFullscreenModeV1';
+let galleryLightboxFullscreenMode = localStorage.getItem(GALLERY_LIGHTBOX_FULLSCREEN_KEY) === '1';
 const VALID_GALLERY_SORT_ORDERS = new Set(['newest', 'oldest', 'favorites-first']);
 if (!VALID_GALLERY_SORT_ORDERS.has(gallerySortOrder)) {
 	gallerySortOrder = 'newest';
@@ -2052,6 +2070,148 @@ function setImageModelMessage(msg) {
 	imageModelSelect.innerHTML = `<option value="">${escHtml(msg)}</option>`;
 }
 
+function formatImageModelLoadingElapsed() {
+	if (!imageModelsLoadStartedAt) return '0s';
+	const elapsedMs = Math.max(0, Date.now() - imageModelsLoadStartedAt);
+	return `${Math.floor(elapsedMs / 1000)}s`;
+}
+
+function stopImageModelsLoadingTicker() {
+	if (!imageModelsLoadingTicker) return;
+	window.clearInterval(imageModelsLoadingTicker);
+	imageModelsLoadingTicker = null;
+}
+
+function syncImageModelsLoadingTicker(isLoading) {
+	if (!isLoading) {
+		stopImageModelsLoadingTicker();
+		return;
+	}
+	if (imageModelsLoadingTicker) return;
+	imageModelsLoadingTicker = window.setInterval(() => {
+		syncImageReadiness();
+	}, 1000);
+}
+
+function getImageModelReadinessState() {
+	if (!imageModelSelect) {
+		return { ready: false, loading: true, message: 'Checkpoint list is still loading.', allowRetry: false };
+	}
+	const availableModelCount = [...imageModelSelect.options].filter((option) => option.value && !option.disabled).length;
+	const hasSelectedModel = Boolean(imageModelSelect.value);
+	if (availableModelCount > 0 && hasSelectedModel) {
+		return { ready: true, loading: false, message: '', allowRetry: false };
+	}
+	const loadingElapsedMs = imageModelsLoadStartedAt ? (Date.now() - imageModelsLoadStartedAt) : 0;
+	const isSlowLoading = loadingElapsedMs >= IMAGE_MODELS_LOADING_WARN_MS;
+	const elapsedLabel = formatImageModelLoadingElapsed();
+	if (imageModelsLoadInFlight) {
+		const message = isSlowLoading
+			? `Checkpoint loading is taking longer than usual (${elapsedLabel}). You can retry model discovery.`
+			: `Checkpoint list is still loading (${elapsedLabel}). Please wait a few seconds.`;
+		return { ready: false, loading: true, message, allowRetry: isSlowLoading };
+	}
+	if (!imageEngineAvailable && availableModelCount === 0) {
+		return { ready: false, loading: true, message: 'ComfyUI is not ready yet. Waiting for checkpoints.', allowRetry: false };
+	}
+	if (availableModelCount === 0) {
+		return { ready: false, loading: false, message: 'No checkpoints are available. Confirm your ComfyUI model paths.', allowRetry: true };
+	}
+	return { ready: false, loading: false, message: 'Select a checkpoint model before generating.', allowRetry: false };
+}
+
+function syncImageGenerateButtonFromQueueState() {
+	if (!imageGenerateBtn) return;
+	const hasSubmissionInFlight = !!imageSubmissionAbortController;
+	const hasActiveTrackedJobs = Array.from(queueJobMeta.entries()).some(([promptId, meta]) => {
+		if (!trackedPromptIds.has(promptId)) return false;
+		const status = String(meta?.status || 'queued');
+		return status === 'queued' || status === 'running' || status === 'processing';
+	});
+
+	if (hasSubmissionInFlight) {
+		imageGenerateBtn.disabled = true;
+		if (imageGenerateBtn.textContent !== 'Submitting...') {
+			imageGenerateBtn.textContent = 'Submitting...';
+		}
+		return;
+	}
+
+	if (hasActiveTrackedJobs) {
+		imageGenerateBtn.disabled = true;
+		if (imageGenerateBtn.textContent !== 'Queued') {
+			imageGenerateBtn.textContent = 'Queued';
+		}
+		return;
+	}
+
+	const modelReadiness = getImageModelReadinessState();
+	if (!modelReadiness.ready) {
+		imageGenerateBtn.disabled = true;
+		imageGenerateBtn.textContent = modelReadiness.loading ? 'Loading checkpoints...' : 'Select checkpoint';
+		return;
+	}
+
+	imageGenerateBtn.disabled = false;
+	imageGenerateBtn.textContent = 'Generate Image';
+}
+
+function scheduleImageModelsRetry() {
+	if (!imageEngineAvailable) return;
+	if (imageModelsRetryTimer) return;
+	if (imageModelsRetryAttempt >= IMAGE_MODELS_RETRY_DELAYS_MS.length) return;
+	const delay = IMAGE_MODELS_RETRY_DELAYS_MS[imageModelsRetryAttempt];
+	imageModelsRetryAttempt += 1;
+	imageModelsRetryTimer = window.setTimeout(() => {
+		imageModelsRetryTimer = null;
+		loadImageModels();
+	}, delay);
+}
+
+function clearImageModelsRetry() {
+	if (imageModelsRetryTimer) {
+		window.clearTimeout(imageModelsRetryTimer);
+		imageModelsRetryTimer = null;
+	}
+	imageModelsRetryAttempt = 0;
+}
+
+function applyCachedImageModels(preferredValue = '') {
+	if (!imageModelLastGoodOptions.length) {
+		try {
+			const cached = JSON.parse(localStorage.getItem(IMAGE_MODEL_CACHE_KEY) || '{}');
+			const cachedModels = Array.isArray(cached?.models) ? cached.models.filter((m) => typeof m === 'string' && m.trim()) : [];
+			const cachedDetails = Array.isArray(cached?.model_details) ? cached.model_details : [];
+			if (cachedModels.length) {
+				imageModelLastGoodOptions = cachedModels.slice();
+				imageModelLastGoodDetails = new Map(
+					cachedDetails
+						.filter((entry) => entry && typeof entry.name === 'string' && entry.name.trim())
+						.map((entry) => [entry.name, entry])
+				);
+			}
+		} catch {
+			// Ignore cache parse failures and continue with normal fallback path.
+		}
+	}
+	if (!imageModelLastGoodOptions.length) return false;
+	imageModelAllOptions = imageModelLastGoodOptions.slice();
+	imageModelDetailsByName = new Map(imageModelLastGoodDetails);
+	renderFilteredImageModels(imageModelFilter ? imageModelFilter.value : '', preferredValue || imageModelSelect.value);
+	if (!imageModelSelect.value) {
+		const firstSupported = [...imageModelSelect.options].find((o) => !o.disabled && o.value);
+		if (firstSupported) imageModelSelect.value = firstSupported.value;
+	}
+	renderRecentImageModels();
+	renderFavoriteImageModels();
+	updateModelFavoriteToggleState();
+	updateModelStackBadges();
+	updateModelStackCompatibilityHint();
+	updateControlnetCompatibilityHint();
+	applyImageFamilyModeUi();
+	return true;
+}
+
 function getImageProfileState() {
 	try {
 		const parsed = JSON.parse(localStorage.getItem(IMAGE_PROFILE_STORAGE_KEY) || '{}');
@@ -2889,13 +3049,22 @@ async function restartFlaskApp() {
 }
 
 async function loadImageModels() {
+	const requestSeq = ++imageModelsLoadRequestSeq;
+	imageModelsLoadInFlight = true;
+	if (!imageModelsLoadStartedAt) {
+		imageModelsLoadStartedAt = Date.now();
+	}
 	try {
 		const res = await fetch('/api/image/models');
 		const data = await res.json();
+		if (requestSeq !== imageModelsLoadRequestSeq) return;
 		if (!res.ok) {
-			setImageModelMessage(data.error || 'ComfyUI unavailable');
-			imageModelDetailsByName = new Map();
-			applyImageFamilyModeUi();
+			if (!applyCachedImageModels(imageModelSelect.value)) {
+				setImageModelMessage(data.error || 'ComfyUI unavailable');
+				imageModelDetailsByName = new Map();
+				applyImageFamilyModeUi();
+			}
+			scheduleImageModelsRetry();
 			return;
 		}
 		const models = data.models || [];
@@ -2906,11 +3075,27 @@ async function loadImageModels() {
 				.map((entry) => [entry.name, entry])
 		);
 		if (!models.length) {
-			setImageModelMessage('No checkpoints found in ComfyUI');
-			applyImageFamilyModeUi();
+			if (!applyCachedImageModels(imageModelSelect.value)) {
+				setImageModelMessage('No checkpoints found in ComfyUI');
+				applyImageFamilyModeUi();
+			}
+			scheduleImageModelsRetry();
 			return;
 		}
+		clearImageModelsRetry();
+		imageModelsLoadStartedAt = null;
 		imageModelAllOptions = models.slice();
+		imageModelLastGoodOptions = models.slice();
+		imageModelLastGoodDetails = new Map(imageModelDetailsByName);
+		try {
+			localStorage.setItem(IMAGE_MODEL_CACHE_KEY, JSON.stringify({
+				models: imageModelLastGoodOptions,
+				model_details: Array.from(imageModelLastGoodDetails.values()),
+				saved_at: Date.now(),
+			}));
+		} catch {
+			// Ignore storage write failures.
+		}
 		renderFilteredImageModels(imageModelFilter ? imageModelFilter.value : '', imageModelSelect.value);
 		if (!imageModelSelect.value) {
 			const firstSupported = [...imageModelSelect.options].find((o) => !o.disabled && o.value);
@@ -2924,9 +3109,19 @@ async function loadImageModels() {
 		updateControlnetCompatibilityHint();
 		applyImageFamilyModeUi();
 	} catch {
-		setImageModelMessage('Could not fetch checkpoints');
-		imageModelDetailsByName = new Map();
-		applyImageFamilyModeUi();
+		if (requestSeq !== imageModelsLoadRequestSeq) return;
+		if (!applyCachedImageModels(imageModelSelect.value)) {
+			setImageModelMessage('Could not fetch checkpoints');
+			imageModelDetailsByName = new Map();
+			applyImageFamilyModeUi();
+		}
+		scheduleImageModelsRetry();
+	} finally {
+		if (requestSeq === imageModelsLoadRequestSeq) {
+			imageModelsLoadInFlight = false;
+		}
+		syncImageGenerateButtonFromQueueState();
+		syncImageReadiness();
 	}
 }
 
@@ -4328,6 +4523,7 @@ async function checkStatus() {
 
 		const textOk = data.text?.available;
 		const imageOk = data.image?.available;
+		imageEngineAvailable = !!imageOk;
 
 		if (textOk && imageOk) {
 			statusDot.className = 'status-dot online';
@@ -4375,6 +4571,7 @@ async function checkStatus() {
 			if (refinerModelSelect) refinerModelSelect.innerHTML = '<option value="">None</option>';
 			if (vaeModelSelect) vaeModelSelect.innerHTML = '<option value="">Default</option>';
 			if (hiresfixUpscalerSelect) hiresfixUpscalerSelect.innerHTML = '<option value="">None</option>';
+			clearImageModelsRetry();
 		}
 
 		renderDiagnosticsSnapshot({
@@ -4397,6 +4594,7 @@ async function checkStatus() {
 					: (!textOk ? 'Start Ollama at localhost:11434.' : 'Start ComfyUI at localhost:8188.'),
 		});
 	} catch {
+		imageEngineAvailable = false;
 		statusDot.className = 'status-dot offline';
 		statusText.textContent = 'Offline';
 		imageEngineStatus.textContent = 'Could not reach backend status endpoint';
@@ -6316,6 +6514,7 @@ function syncImageReadiness() {
 	if (!imageReadinessText || !imageReadinessBar) return;
 	imageReadinessBar.classList.remove('is-ready', 'is-warning');
 	imageReadinessActionTarget = null;
+	imageReadinessActionCommand = '';
 	if (imageReadinessActionBtn) {
 		imageReadinessActionBtn.hidden = true;
 		imageReadinessActionBtn.textContent = 'Fix';
@@ -6323,6 +6522,26 @@ function syncImageReadiness() {
 
 	if (imageGenerateBtn?.disabled && imageGenerateBtn.textContent === 'Submitting...') {
 		imageReadinessText.textContent = 'Readiness: submitting your request...';
+		syncImageModelsLoadingTicker(false);
+		return;
+	}
+
+	const modelReadiness = getImageModelReadinessState();
+	syncImageModelsLoadingTicker(modelReadiness.loading);
+	if (!modelReadiness.ready) {
+		imageReadinessBar.classList.add('is-warning');
+		imageReadinessText.textContent = `Readiness: ${modelReadiness.message}`;
+		if (modelReadiness.allowRetry && imageReadinessActionBtn) {
+			imageReadinessActionBtn.hidden = false;
+			imageReadinessActionBtn.textContent = 'Retry models';
+			imageReadinessActionCommand = 'retry-models';
+		} else if (!modelReadiness.loading && imageModelSelect) {
+			imageReadinessActionTarget = imageModelSelect;
+			if (imageReadinessActionBtn) {
+				imageReadinessActionBtn.hidden = false;
+				imageReadinessActionBtn.textContent = 'Review model';
+			}
+		}
 		return;
 	}
 
@@ -6375,6 +6594,7 @@ function syncImageReadiness() {
 	const modelName = String(common.model || '').split('/').pop().split('\\').pop() || 'selected model';
 	imageReadinessBar.classList.add('is-ready');
 	imageReadinessText.textContent = `Readiness: ready to generate using ${modelName}.`;
+	syncImageModelsLoadingTicker(false);
 }
 
 function ensureSidebarSectionExpandedForControl(controlEl) {
@@ -6387,6 +6607,26 @@ function ensureSidebarSectionExpandedForControl(controlEl) {
 		return;
 	}
 	section.classList.remove('is-collapsed');
+}
+
+function collapseSidebarSectionForControl(controlEl) {
+	if (!controlEl || typeof controlEl.closest !== 'function') return false;
+	const section = controlEl.closest('#panel-image .sidebar .sidebar-section');
+	if (!section || section.classList.contains('is-collapsed')) return false;
+	const toggleBtn = section.querySelector(':scope > .sidebar-section-head .sidebar-section-toggle');
+	if (toggleBtn) {
+		syncSidebarSectionCollapsedState(section, toggleBtn, true);
+		const key = section.dataset.sidebarSectionKey;
+		if (key) {
+			imageSidebarSectionCollapseState[key] = 1;
+			persistSidebarSectionCollapseState();
+		}
+		toggleBtn.focus();
+		return true;
+	}
+	section.classList.add('is-collapsed');
+	section.setAttribute('data-collapsed', '1');
+	return true;
 }
 
 function syncImageQuickState() {
@@ -6523,6 +6763,15 @@ if (imageUiModeAdvancedBtn) {
 }
 if (imageReadinessActionBtn) {
 	imageReadinessActionBtn.addEventListener('click', () => {
+		if (imageReadinessActionCommand === 'retry-models') {
+			imageModelsLoadStartedAt = Date.now();
+			void loadImageModels();
+			if (queueSummary) {
+				queueSummary.textContent = 'Refreshing checkpoints...';
+			}
+			syncImageReadiness();
+			return;
+		}
 		focusImageControl(imageReadinessActionTarget);
 	});
 }
@@ -6951,6 +7200,7 @@ function renderQueueStatus(running, pending, donePromptIds = new Set()) {
 	}
 	const visibleLabel = queueFilterFailedOnly ? 'Showing: Failed only' : 'Showing: All';
 	queueSummary.textContent = `Running: ${runningCount}  Pending: ${pendingCount}  Persisting: ${persistingCount}  Tracked: ${trackedPromptIds.size}  Failed: ${failedCount}  Done: ${completedCount}  ${visibleLabel}`;
+	syncImageGenerateButtonFromQueueState();
 	renderQueueRestoreHint();
 
 	const rows = Array.from(queueJobMeta.entries())
@@ -7565,15 +7815,41 @@ function resetPreviewZoom() {
 	previewImage.style.transform = 'scale(1)';
 }
 
-function closeGalleryContextMenu() {
+function getGalleryContextMenuItems() {
+	if (!galleryContextMenu) return [];
+	return [...galleryContextMenu.querySelectorAll('[role="menuitem"]')].filter((item) => {
+		if (!(item instanceof HTMLButtonElement)) return false;
+		if (item.disabled || item.hidden) return false;
+		if (item.closest('[hidden]')) return false;
+		return true;
+	});
+}
+
+function focusGalleryContextMenuItem(index) {
+	const items = getGalleryContextMenuItems();
+	if (!items.length) return false;
+	const safeIndex = Math.max(0, Math.min(index, items.length - 1));
+	items[safeIndex]?.focus();
+	return true;
+}
+
+let galleryContextMenuLastFocus = null;
+
+function closeGalleryContextMenu(options = {}) {
 	if (!galleryContextMenu) return;
+	const { restoreFocus = false } = options;
 	galleryContextMenu.hidden = true;
 	galleryContextPayload = null;
+	if (restoreFocus && galleryContextMenuLastFocus instanceof HTMLElement && galleryContextMenuLastFocus.isConnected) {
+		galleryContextMenuLastFocus.focus();
+	}
+	galleryContextMenuLastFocus = null;
 }
 
 function openGalleryContextMenu(payload, x, y) {
 	if (!galleryContextMenu) return;
 	galleryContextPayload = payload;
+	galleryContextMenuLastFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
 	galleryContextMenu.hidden = false;
 
 	const viewportW = window.innerWidth;
@@ -7583,6 +7859,52 @@ function openGalleryContextMenu(payload, x, y) {
 	const nextTop = Math.max(6, Math.min(y, viewportH - menuRect.height - 6));
 	galleryContextMenu.style.left = `${nextLeft}px`;
 	galleryContextMenu.style.top = `${nextTop}px`;
+	focusGalleryContextMenuItem(0);
+}
+
+function openGalleryContextMenuForCard(card, anchorEl = null) {
+	if (!(card instanceof HTMLElement)) return false;
+	const imageRef = buildImageRefFromElement(card);
+	if (!imageRef) return false;
+	const rectSource = anchorEl instanceof HTMLElement ? anchorEl : card;
+	const rect = rectSource.getBoundingClientRect();
+	openGalleryContextMenu(
+		{
+			imageRef,
+			baseName: card.dataset.exportBaseName || 'generated-image',
+			prompt: card.dataset.prompt || 'Generated image',
+		},
+		rect.left + Math.min(rect.width - 12, Math.max(18, rect.width * 0.7)),
+		rect.top + Math.min(rect.height - 12, Math.max(18, rect.height * 0.3)),
+	);
+	return true;
+}
+
+function getGalleryFocusableImageButtons() {
+	if (!galleryGrid) return [];
+	return [...galleryGrid.querySelectorAll('.gallery-card img[role="button"]')].filter((item) => (
+		item instanceof HTMLImageElement
+	));
+}
+
+function focusAdjacentGalleryImage(currentImage, key) {
+	const images = getGalleryFocusableImageButtons();
+	if (!images.length) return false;
+	const currentIndex = images.indexOf(currentImage);
+	if (currentIndex < 0) return false;
+	let nextIndex = currentIndex;
+	if (key === 'Home') {
+		nextIndex = 0;
+	} else if (key === 'End') {
+		nextIndex = images.length - 1;
+	} else if (key === 'ArrowRight' || key === 'ArrowDown') {
+		nextIndex = Math.min(images.length - 1, currentIndex + 1);
+	} else if (key === 'ArrowLeft' || key === 'ArrowUp') {
+		nextIndex = Math.max(0, currentIndex - 1);
+	}
+	if (nextIndex === currentIndex) return false;
+	images[nextIndex]?.focus();
+	return true;
 }
 
 function buildImageRefFromElement(element) {
@@ -8168,6 +8490,7 @@ function openGalleryLightbox(imgSrc, imgAlt, caption = '', index = 0) {
 	const entry = currentGalleryImages[index];
 	updateLightboxMedia(entry, imgSrc, imgAlt || 'Generated image', caption);
 	updateLightboxNav();
+	syncGalleryLightboxFullscreenUi();
 	galleryLightbox.hidden = false;
 	galleryLightbox.setAttribute('aria-hidden', 'false');
 	document.body.classList.add('gallery-lightbox-open');
@@ -8293,7 +8616,7 @@ function buildGalleryCardHtml(entry, index) {
 		<article class="gallery-card${isSelected ? ' is-selected' : ''}" draggable="${gallerySelectMode ? 'false' : 'true'}" data-preview-payload="${dragPayload}" data-image-ref="${imageRefPayload}" data-export-base-name="${escHtml(exportBaseName)}" data-prompt="${prompt}" data-lightbox-index="${index}" data-entry-id="${escHtml(entryId)}">
 			${selectCheck}
 			<button class="gallery-star-btn${isFav ? ' is-favorited' : ''}" type="button" aria-pressed="${isFav}" aria-label="${isFav ? 'Remove from favorites' : 'Add to favorites'}" data-entry-id="${escHtml(entryId)}">${isFav ? '\u2605' : '\u2606'}</button>
-			<img src="${imgUrl}" alt="Generated image" loading="${eagerLoad}" fetchpriority="${fetchPriority}" decoding="async" data-lightbox-src="${imgUrl}" data-lightbox-caption="${prompt}" draggable="false" />
+			<img src="${imgUrl}" alt="Generated image" loading="${eagerLoad}" fetchpriority="${fetchPriority}" decoding="async" data-lightbox-src="${imgUrl}" data-lightbox-caption="${prompt}" draggable="false" role="button" tabindex="0" aria-label="${gallerySelectMode ? 'Select generated image' : 'Open generated image'}" aria-keyshortcuts="ArrowLeft ArrowRight ArrowUp ArrowDown Home End Enter Space Shift+F10 ContextMenu" />
 			<div class="gallery-meta">
 				<p class="gallery-prompt" title="${prompt}">${prompt}</p>
 				<p class="gallery-chip-row">
@@ -8309,16 +8632,25 @@ function buildGalleryCardHtml(entry, index) {
 	`;
 }
 
+function _getGalleryVirtualRowHeight(columns, isGrid) {
+	if (!isGrid) return GALLERY_LIST_EST_CARD_HEIGHT;
+	const gap = 12;
+	const clientWidth = Math.max(galleryGrid?.clientWidth || 0, GALLERY_GRID_MIN_COL_WIDTH);
+	const totalGap = Math.max(0, (columns - 1) * gap);
+	const columnWidth = Math.max(GALLERY_GRID_MIN_COL_WIDTH, Math.floor((clientWidth - totalGap) / Math.max(1, columns)));
+	return columnWidth + gap;
+}
+
 function _getGalleryVirtualMetrics(totalItems) {
 	const isGrid = galleryViewMode === 'grid';
 	const viewportHeight = Math.max(galleryGrid?.clientHeight || 0, 200);
 	const scrollTop = Math.max(galleryGrid?.scrollTop || 0, 0);
-	const rowHeight = isGrid ? GALLERY_GRID_EST_CARD_HEIGHT : GALLERY_LIST_EST_CARD_HEIGHT;
 	const gap = 12;
 	const clientWidth = Math.max(galleryGrid?.clientWidth || 0, GALLERY_GRID_MIN_COL_WIDTH);
 	const columns = isGrid
 		? Math.max(1, Math.floor((clientWidth + gap) / (GALLERY_GRID_MIN_COL_WIDTH + gap)))
 		: 1;
+	const rowHeight = _getGalleryVirtualRowHeight(columns, isGrid);
 	const totalRows = Math.ceil(totalItems / columns);
 	const visibleRows = Math.max(1, Math.ceil(viewportHeight / rowHeight));
 	const startRow = Math.max(0, Math.floor(scrollTop / rowHeight) - GALLERY_VIRTUAL_OVERSCAN_ROWS);
@@ -8418,7 +8750,8 @@ function renderGallery(history) {
 	galleryGrid.classList.toggle('is-grid-mode', galleryViewMode === 'grid');
 
 	const renderSeq = ++galleryRenderSeq;
-	if (filteredImages.length >= GALLERY_VIRTUALIZE_THRESHOLD) {
+	const shouldVirtualize = galleryViewMode === 'grid' && filteredImages.length >= GALLERY_VIRTUALIZE_THRESHOLD;
+	if (shouldVirtualize) {
 		galleryVirtualState = {
 			entries: filteredImages,
 			seq: renderSeq,
@@ -8662,19 +8995,52 @@ if (galleryGrid) {
 		if (!(target instanceof HTMLElement)) return;
 		const card = target.closest('.gallery-card');
 		if (!(card instanceof HTMLElement)) return;
-		const imageRef = buildImageRefFromElement(card);
-		if (!imageRef) return;
 
 		event.preventDefault();
 		openGalleryContextMenu(
 			{
-				imageRef,
+				imageRef: buildImageRefFromElement(card),
 				baseName: card.dataset.exportBaseName || 'generated-image',
 				prompt: card.dataset.prompt || 'Generated image',
 			},
 			event.clientX,
 			event.clientY,
 		);
+	});
+
+	galleryGrid.addEventListener('keydown', (event) => {
+		const target = event.target;
+		if (!(target instanceof HTMLElement)) return;
+		const imageTarget = target.closest('.gallery-card img[role="button"]');
+		if (!(imageTarget instanceof HTMLImageElement)) return;
+		if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)) {
+			if (focusAdjacentGalleryImage(imageTarget, event.key)) {
+				event.preventDefault();
+			}
+			return;
+		}
+		const isContextMenuShortcut = event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10');
+		if (event.key !== 'Enter' && event.key !== ' ' && !isContextMenuShortcut) return;
+		const card = imageTarget.closest('.gallery-card');
+		if (!(card instanceof HTMLElement)) return;
+
+		event.preventDefault();
+		if (isContextMenuShortcut) {
+			openGalleryContextMenuForCard(card, imageTarget);
+			return;
+		}
+
+		const entryId = card.dataset.entryId || '';
+		const index = parseInt(card.dataset.lightboxIndex || '0', 10);
+		if (gallerySelectMode) {
+			if (!entryId) return;
+			toggleGalleryCardSelection(entryId, index, event.shiftKey);
+			return;
+		}
+
+		const src = imageTarget.getAttribute('data-lightbox-src') || imageTarget.src;
+		const caption = imageTarget.getAttribute('data-lightbox-caption') || '';
+		openGalleryLightbox(src, imageTarget.alt, caption, index);
 	});
 }
 
@@ -8821,6 +9187,7 @@ function getGalleryLightboxFocusableControls() {
 		galleryLightboxMetaToggle,
 		galleryLightboxCompareToggle,
 		galleryLightboxStarBtn,
+		galleryLightboxFullscreenBtn,
 		galleryLightboxAddTagBtn,
 		galleryLightboxCloseBtn,
 		galleryLightboxReuseBtn,
@@ -8867,7 +9234,7 @@ function onGalleryLightboxControlsKeydown(event) {
 
 document.addEventListener('keydown', (event) => {
 	const key = event.key;
-	if (key !== 'Escape' && key !== 'ArrowLeft' && key !== 'ArrowRight' && key !== 'c' && key !== 'C' && key !== 'r' && key !== 'R') return;
+	if (key !== 'Escape' && key !== 'ArrowLeft' && key !== 'ArrowRight' && key !== 'c' && key !== 'C' && key !== 'r' && key !== 'R' && key !== 'f' && key !== 'F') return;
 
 	if (key === 'Escape') {
 		if (galleryContextMenu && !galleryContextMenu.hidden) {
@@ -8902,6 +9269,15 @@ document.addEventListener('keydown', (event) => {
 		return;
 	}
 
+	if (key === 'f' || key === 'F') {
+		const target = event.target;
+		if (target instanceof HTMLElement && target.closest('#gallery-lightbox input, #gallery-lightbox select, #gallery-lightbox textarea')) return;
+		if (!galleryLightboxFullscreenBtn || galleryLightboxFullscreenBtn.hidden || galleryLightboxFullscreenBtn.disabled) return;
+		event.preventDefault();
+		toggleGalleryLightboxFullscreen();
+		return;
+	}
+
 	if (isGalleryLightboxInteractiveTarget(event.target)) return;
 	event.preventDefault();
 	if (key === 'ArrowLeft') navigateLightbox(-1);
@@ -8909,6 +9285,40 @@ document.addEventListener('keydown', (event) => {
 });
 
 if (galleryContextMenu) {
+	galleryContextMenu.addEventListener('keydown', (event) => {
+		const target = event.target;
+		if (event.key === 'Escape') {
+			event.preventDefault();
+			event.stopPropagation();
+			closeGalleryContextMenu({ restoreFocus: true });
+			return;
+		}
+
+		if (['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) {
+			const items = getGalleryContextMenuItems();
+			if (!items.length) return;
+			event.preventDefault();
+			const currentIndex = target instanceof HTMLElement ? items.indexOf(target) : -1;
+			let nextIndex = currentIndex >= 0 ? currentIndex : 0;
+			if (event.key === 'Home') {
+				nextIndex = 0;
+			} else if (event.key === 'End') {
+				nextIndex = items.length - 1;
+			} else if (event.key === 'ArrowDown') {
+				nextIndex = currentIndex < 0 ? 0 : (currentIndex + 1) % items.length;
+			} else if (event.key === 'ArrowUp') {
+				nextIndex = currentIndex < 0 ? items.length - 1 : (currentIndex - 1 + items.length) % items.length;
+			}
+			items[nextIndex]?.focus();
+			return;
+		}
+
+		if ((event.key === 'Enter' || event.key === ' ') && target instanceof HTMLButtonElement) {
+			event.preventDefault();
+			target.click();
+		}
+	});
+
 	galleryContextMenu.addEventListener('click', (event) => {
 		const target = event.target;
 		if (!(target instanceof HTMLElement)) return;
@@ -8988,22 +9398,26 @@ document.addEventListener('keydown', (event) => {
 	}
 });
 
-// Escape-to-close support for Image panel collapsible details elements
+// Escape-to-close support for Image panel collapsible details and sidebar sections
 document.addEventListener('keydown', (event) => {
 	if (event.key !== 'Escape') return;
-	
-	// Find closest open details element (ControlNet, LoRA display, LoRA legend, HiresFix)
-	const openDetails = event.target.closest('details[open]');
-	if (!openDetails) return;
-	
-	// Only handle details in the Image panel
 	const imagePanel = panelImage;
 	if (!imagePanel || imagePanel.hidden) return;
-	if (!imagePanel.contains(openDetails)) return;
+	const targetEl = event.target instanceof Element ? event.target : document.activeElement;
+	if (!(targetEl instanceof Element) || !imagePanel.contains(targetEl)) return;
 	
+	// Find closest open details element (ControlNet, LoRA display, LoRA legend, HiresFix)
+	const openDetails = targetEl.closest('details[open]');
+	if (openDetails) {
+		event.preventDefault();
+		event.stopPropagation();
+		openDetails.open = false;
+		return;
+	}
+
+	if (!collapseSidebarSectionForControl(targetEl)) return;
 	event.preventDefault();
 	event.stopPropagation();
-	openDetails.open = false;
 });
 
 // Preset quick-apply with number keys 1-3 (Fast, Quality, Creative)
@@ -9292,6 +9706,34 @@ function toggleGalleryLightboxCompare() {
 	updateLightboxMedia(entry, galleryLightboxImage?.src || '', 'Generated image', entry?.prompt || 'Untitled generation');
 }
 
+function toggleGalleryLightboxFullscreen() {
+	if (!galleryLightbox || !galleryLightboxFullscreenBtn) return;
+	galleryLightboxFullscreenMode = !galleryLightboxFullscreenMode;
+	syncGalleryLightboxFullscreenUi();
+	localStorage.setItem(GALLERY_LIGHTBOX_FULLSCREEN_KEY, galleryLightboxFullscreenMode ? '1' : '0');
+	showToast(galleryLightboxFullscreenMode ? 'Fullscreen enabled' : 'Fullscreen disabled', 'info');
+}
+
+function syncGalleryLightboxFullscreenUi() {
+	if (!galleryLightbox) return;
+	galleryLightbox.classList.toggle('is-fullscreen', galleryLightboxFullscreenMode);
+	if (galleryLightboxFullscreenBtn) {
+		galleryLightboxFullscreenBtn.setAttribute('aria-pressed', String(galleryLightboxFullscreenMode));
+		galleryLightboxFullscreenBtn.textContent = galleryLightboxFullscreenMode ? 'Exit Fullscreen' : 'Fullscreen';
+		galleryLightboxFullscreenBtn.setAttribute(
+			'aria-label',
+			galleryLightboxFullscreenMode ? 'Disable pinned fullscreen' : 'Enable pinned fullscreen',
+		);
+		galleryLightboxFullscreenBtn.title = galleryLightboxFullscreenMode
+			? 'Disable pinned fullscreen for future gallery opens'
+			: 'Enable pinned fullscreen for future gallery opens';
+	}
+	if (galleryLightboxFullscreenStatus) {
+		galleryLightboxFullscreenStatus.hidden = !galleryLightboxFullscreenMode;
+		galleryLightboxFullscreenStatus.textContent = galleryLightboxFullscreenMode ? 'Pinned fullscreen' : '';
+	}
+}
+
 function applySettingsFromCurrentLightboxEntry() {
 	const entry = currentGalleryImages[lightboxCurrentIndex];
 	if (!entry) return;
@@ -9378,6 +9820,12 @@ if (galleryLightboxMetaToggle) {
 if (galleryLightboxReuseBtn) {
 	galleryLightboxReuseBtn.addEventListener('keydown', onGalleryLightboxControlsKeydown);
 	galleryLightboxReuseBtn.addEventListener('click', applySettingsFromCurrentLightboxEntry);
+}
+
+if (galleryLightboxFullscreenBtn) {
+	galleryLightboxFullscreenBtn.addEventListener('keydown', onGalleryLightboxControlsKeydown);
+	galleryLightboxFullscreenBtn.addEventListener('click', toggleGalleryLightboxFullscreen);
+	syncGalleryLightboxFullscreenUi();
 }
 
 function updateLivePreviewFromActiveJob(payload) {
@@ -9819,10 +10267,7 @@ function reconcileTerminalTrackedQueueState() {
 async function pollQueue() {
 	const ids = Array.from(trackedPromptIds);
 	if (!ids.length) {
-		if (imageGenerateBtn) {
-			imageGenerateBtn.disabled = false;
-			imageGenerateBtn.textContent = 'Generate Image';
-		}
+		syncImageGenerateButtonFromQueueState();
 		renderQueueStatus([], [], new Set());
 		stopQueuePolling();
 		return;
@@ -9920,10 +10365,7 @@ async function pollQueue() {
 		}
 		persistTrackedQueueState();
 
-		if (!trackedPromptIds.size) {
-			imageGenerateBtn.disabled = false;
-			imageGenerateBtn.textContent = 'Generate Image';
-		}
+		syncImageGenerateButtonFromQueueState();
 
 		await processAutoRetries();
 	} catch {
@@ -9934,9 +10376,8 @@ async function pollQueue() {
 			persistTrackedQueueState();
 			renderQueueStatus([], [], new Set());
 		}
+		syncImageGenerateButtonFromQueueState();
 		if (!trackedPromptIds.size) {
-			imageGenerateBtn.disabled = false;
-			imageGenerateBtn.textContent = 'Generate Image';
 			stopQueuePolling();
 		}
 	}
@@ -10155,19 +10596,32 @@ function updateFluxRecommendationDriftHint() {
 }
 
 let fluxComponentsStatusAbortController = null;
+let fluxComponentsRequestInFlight = false;
+let fluxComponentsNextAllowedAt = 0;
 
 async function loadFluxComponentStatus() {
 	if (!fluxComponentsStatus) return;
+	if (!imageEngineAvailable) {
+		for (const pill of [fluxCompT5Pill, fluxCompClipPill, fluxCompVaePill]) {
+			if (pill) pill.classList.remove('is-loading', 'is-found', 'is-missing');
+		}
+		if (fluxCompReadyMsg) fluxCompReadyMsg.textContent = 'ComfyUI unavailable - component check skipped.';
+		return;
+	}
+	if (fluxComponentsRequestInFlight) return;
+	if (Date.now() < fluxComponentsNextAllowedAt) return;
 	for (const pill of [fluxCompT5Pill, fluxCompClipPill, fluxCompVaePill]) {
 		if (pill) { pill.classList.remove('is-found', 'is-missing'); pill.classList.add('is-loading'); }
 	}
 	if (fluxCompReadyMsg) fluxCompReadyMsg.textContent = 'Checking…';
 	if (fluxComponentsStatusAbortController) fluxComponentsStatusAbortController.abort();
 	fluxComponentsStatusAbortController = new AbortController();
+	fluxComponentsRequestInFlight = true;
 	try {
 		const resp = await fetch('/api/image/flux-components', { signal: fluxComponentsStatusAbortController.signal });
 		if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
 		const data = await resp.json();
+		fluxComponentsNextAllowedAt = Date.now() + FLUX_COMPONENTS_THROTTLE_MS;
 		const setPill = (el, filename) => {
 			if (!el) return;
 			el.classList.remove('is-loading');
@@ -10194,10 +10648,13 @@ async function loadFluxComponentStatus() {
 		}
 	} catch (err) {
 		if (err.name === 'AbortError') return;
+		fluxComponentsNextAllowedAt = Date.now() + FLUX_COMPONENTS_RETRY_COOLDOWN_MS;
 		for (const pill of [fluxCompT5Pill, fluxCompClipPill, fluxCompVaePill]) {
 			if (pill) { pill.classList.remove('is-loading', 'is-found', 'is-missing'); }
 		}
 		if (fluxCompReadyMsg) fluxCompReadyMsg.textContent = 'ComfyUI unavailable — component check skipped.';
+	} finally {
+		fluxComponentsRequestInFlight = false;
 	}
 }
 
@@ -13621,12 +14078,19 @@ function _setFavoritesOnlyFilter(enabled) {
 	catch {}
 	_updateFavoritesOnlyToggleUi();
 }
+
+function _togglePromptFavoritesOnlyFilter() {
+	_setFavoritesOnlyFilter(!_getFavoritesOnlyFilter());
+	rememberCurrentPresetFilterCombo();
+	renderPromptSavedSelect();
+}
+
 function _updateFavoritesOnlyToggleUi() {
 	if (!promptFavoritesOnlyToggle) return;
 	const isActive = _getFavoritesOnlyFilter();
 	promptFavoritesOnlyToggle.setAttribute('aria-pressed', isActive ? 'true' : 'false');
 	promptFavoritesOnlyToggle.classList.toggle('is-active', isActive);
-	promptFavoritesOnlyToggle.title = isActive ? 'Showing favorites only' : 'Show favorites only';
+	promptFavoritesOnlyToggle.title = isActive ? 'Showing favorites only (F to toggle when focused)' : 'Show favorites only (F to toggle when focused)';
 }
 function _getRecentPinnedOnlyFilter() {
 	try { return localStorage.getItem(PROMPT_SAVED_RECENT_FILTERS_PINNED_ONLY_KEY) === '1'; }
@@ -13637,14 +14101,21 @@ function _setRecentPinnedOnlyFilter(enabled) {
 	catch {}
 	_updateRecentPinnedOnlyToggleUi();
 }
+
+function _toggleRecentPinnedOnlyFilter() {
+	_setRecentPinnedOnlyFilter(!_getRecentPinnedOnlyFilter());
+	renderRecentPresetFilterChips();
+	showToast(_getRecentPinnedOnlyFilter() ? 'Pinned-only recent filters on.' : 'Pinned-only recent filters off.', 'pos');
+}
+
 function _updateRecentPinnedOnlyToggleUi() {
 	if (!promptPresetRecentPinnedOnlyToggle) return;
 	const isActive = _getRecentPinnedOnlyFilter();
 	promptPresetRecentPinnedOnlyToggle.setAttribute('aria-pressed', isActive ? 'true' : 'false');
 	promptPresetRecentPinnedOnlyToggle.classList.toggle('is-active', isActive);
 	promptPresetRecentPinnedOnlyToggle.title = isActive
-		? 'Showing pinned recent filters only'
-		: 'Show pinned recent filters only';
+		? 'Showing pinned recent filters only (P or Space to toggle when focused)'
+		: 'Show pinned recent filters only (P or Space to toggle when focused)';
 }
 function _renderPresetFilterStatus(filteredCount, totalCount) {
 	if (!promptPresetFilterStatus) return;
@@ -14414,10 +14885,11 @@ if (promptTagFilter) {
 	});
 }
 if (promptFavoritesOnlyToggle) {
-	promptFavoritesOnlyToggle.addEventListener('click', () => {
-		_setFavoritesOnlyFilter(!_getFavoritesOnlyFilter());
-		rememberCurrentPresetFilterCombo();
-		renderPromptSavedSelect();
+	promptFavoritesOnlyToggle.addEventListener('click', _togglePromptFavoritesOnlyFilter);
+	promptFavoritesOnlyToggle.addEventListener('keydown', (event) => {
+		if (event.key !== ' ' && event.key !== 'Enter' && event.key !== 'f' && event.key !== 'F') return;
+		event.preventDefault();
+		_togglePromptFavoritesOnlyFilter();
 	});
 }
 if (promptPresetTagChips) {
@@ -14573,18 +15045,11 @@ if (promptPresetClearFilters) {
 	});
 }
 if (promptPresetRecentPinnedOnlyToggle) {
-	promptPresetRecentPinnedOnlyToggle.addEventListener('click', () => {
-		_setRecentPinnedOnlyFilter(!_getRecentPinnedOnlyFilter());
-		renderRecentPresetFilterChips();
-		showToast(_getRecentPinnedOnlyFilter() ? 'Pinned-only recent filters on.' : 'Pinned-only recent filters off.', 'pos');
-	});
+	promptPresetRecentPinnedOnlyToggle.addEventListener('click', _toggleRecentPinnedOnlyFilter);
 	promptPresetRecentPinnedOnlyToggle.addEventListener('keydown', (event) => {
-		if (event.key === ' ' || event.key === 'Enter') {
-			event.preventDefault();
-			_setRecentPinnedOnlyFilter(!_getRecentPinnedOnlyFilter());
-			renderRecentPresetFilterChips();
-			showToast(_getRecentPinnedOnlyFilter() ? 'Pinned-only recent filters on.' : 'Pinned-only recent filters off.', 'pos');
-		}
+		if (event.key !== ' ' && event.key !== 'Enter' && event.key !== 'p' && event.key !== 'P') return;
+		event.preventDefault();
+		_toggleRecentPinnedOnlyFilter();
 	});
 }
 if (promptEditPresetBtn) {
@@ -14847,6 +15312,16 @@ if (promptBreakWrapBtn) {
 
 imageForm.addEventListener('submit', async (e) => {
 	e.preventDefault();
+	const modelReadiness = getImageModelReadinessState();
+	if (!modelReadiness.ready) {
+		queueSummary.textContent = `Error: ${modelReadiness.message}`;
+		syncImageReadiness();
+		if (!modelReadiness.loading && imageModelSelect) {
+			imageModelSelect.focus();
+		}
+		return;
+	}
+
 	const prompt = resolvePromptForSubmission();
 	if (prompt) saveCurrentPromptToHistory(prompt);
 	if (!prompt) {
@@ -15144,6 +15619,7 @@ window.addEventListener('beforeunload', () => {
 	stopQueueRestoreHintTicker();
 	stopQueueLastActionTicker();
 	stopWsTransportStatusTicker();
+	stopImageModelsLoadingTicker();
 	releaseBackgroundPollingOwnership();
 });
 

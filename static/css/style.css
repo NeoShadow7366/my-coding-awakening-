@@ -3009,6 +3009,7 @@ textarea {
   flex-direction: column;
   gap: var(--sp-sm);
   overflow-y: auto;
+  overflow-anchor: none;
   padding-right: 4px;
   scrollbar-gutter: stable;
   overscroll-behavior: contain;
@@ -3184,6 +3185,11 @@ textarea {
   cursor: zoom-in;
 }
 
+.gallery-card img[role="button"]:focus-visible {
+  outline: 2px solid var(--clr-primary);
+  outline-offset: -2px;
+}
+
 .gallery-lightbox {
   position: fixed;
   inset: 0;
@@ -3342,6 +3348,34 @@ textarea {
   margin-top: var(--sp-xs);
   display: flex;
   flex-wrap: wrap;
+.gallery-lightbox.is-fullscreen {
+  padding: 0;
+}
+
+.gallery-lightbox.is-fullscreen .gallery-lightbox-panel {
+  width: 100vw;
+  max-height: 100vh;
+  border-radius: 0;
+  border: none;
+  padding: var(--sp-sm);
+  box-shadow: none;
+}
+
+.gallery-lightbox.is-fullscreen #gallery-lightbox-image {
+  max-height: calc(100vh - 140px);
+}
+
+.gallery-lightbox.is-fullscreen .gallery-lightbox-compare {
+  max-height: calc(100vh - 140px);
+}
+
+.gallery-lightbox.is-fullscreen .gallery-lightbox-compare img {
+  max-height: calc(100vh - 140px);
+}
+
+.gallery-lightbox.is-fullscreen #gallery-lightbox-fullscreen {
+  background: var(--clr-surface-2);
+}
   gap: 0.3rem;
 }
 
@@ -3358,10 +3392,34 @@ textarea {
   align-items: center;
   justify-content: space-between;
   gap: var(--sp-sm);
+  flex-wrap: wrap;
 }
 
 .gallery-lightbox-counter {
   font-size: 0.78rem;
+}
+
+.gallery-lightbox-shortcuts {
+  font-size: 0.75rem;
+  margin-left: auto;
+  margin-right: 0.5rem;
+}
+
+.gallery-lightbox-fullscreen-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.18rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--clr-primary) 42%, var(--clr-border));
+  background: color-mix(in srgb, var(--clr-primary) 16%, var(--clr-surface));
+  color: color-mix(in srgb, var(--clr-primary) 68%, var(--clr-text));
+  font-size: 0.72rem;
+  white-space: nowrap;
+}
+
+.gallery-lightbox-fullscreen-status[hidden] {
+  display: none !important;
 }
 
 .gallery-lightbox-image-wrap {

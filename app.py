@@ -12,6 +12,8 @@ import logging
 import os
 import re
 import shlex
+import sqlite3
+import stat
 import subprocess
 import sys
 import threading
@@ -82,6 +84,7 @@ _history_lock = threading.Lock()
 _service_config_lock = threading.Lock()
 _service_log_lock = threading.Lock()
 _model_metadata_lock = threading.Lock()
+_link_registry_lock = threading.Lock()
 _migration_jobs_lock = threading.Lock()
 _migration_jobs: dict[str, dict] = {}
 _comfyui_update_jobs_lock = threading.Lock()
@@ -1176,12 +1179,22 @@ def _resolve_comfyui_launch(path_value: str) -> tuple[list[str], Path | None]:
         # so the tracked cmd process exits with code 0 as a false "failed" signal.
         portable_python = candidate / "python_embeded" / "python.exe"
         portable_main = candidate / "ComfyUI" / "main.py"
-        if os.name == "nt" and portable_python.exists() and portable_main.exists():
-            return (
-                [str(portable_python), "-s", str(portable_main),
-                 "--windows-standalone-build", *comfy_args],
-                portable_main.parent,
-            )
+        if os.name == "nt" and portable_main.exists():
+            if portable_python.exists() and _is_usable_python_executable(portable_python):
+                return (
+                    [str(portable_python), "-s", str(portable_main),
+                     "--windows-standalone-build", *comfy_args],
+                    portable_main.parent,
+                )
+            # If embedded python exists but is not executable on this host,
+            # continue with fallback python options instead of failing with WinError 193.
+            for portable_venv_py in [
+                portable_main.parent / ".venv" / "Scripts" / "python.exe",
+                portable_main.parent / ".venv" / "bin" / "python",
+            ]:
+                if portable_venv_py.exists():
+                    return [str(portable_venv_py), str(portable_main), *comfy_args], portable_main.parent
+            return [sys.executable, str(portable_main), *comfy_args], portable_main.parent
 
         # Git-based install: main.py at root, optional managed .venv.
         main_py = candidate / "main.py"
@@ -1195,7 +1208,7 @@ def _resolve_comfyui_launch(path_value: str) -> tuple[list[str], Path | None]:
                     return [str(venv_py), str(main_py), *comfy_args], candidate
             # Fallback: portable embedded Python one level up.
             sibling_python = candidate.parent / "python_embeded" / "python.exe"
-            if os.name == "nt" and sibling_python.exists():
+            if os.name == "nt" and sibling_python.exists() and _is_usable_python_executable(sibling_python):
                 return [str(sibling_python), str(main_py), *comfy_args], candidate
             return [sys.executable, str(main_py), *comfy_args], candidate
 
@@ -1212,7 +1225,7 @@ def _resolve_comfyui_launch(path_value: str) -> tuple[list[str], Path | None]:
         suffix = candidate.suffix.lower()
         if suffix == ".py":
             portable_python = candidate.parent.parent / "python_embeded" / "python.exe"
-            if os.name == "nt" and portable_python.exists():
+            if os.name == "nt" and portable_python.exists() and _is_usable_python_executable(portable_python):
                 return [str(portable_python), str(candidate), *comfy_args], candidate.parent
             return [sys.executable, str(candidate), *comfy_args], candidate.parent
         if suffix in {".bat", ".cmd"}:
@@ -1220,6 +1233,28 @@ def _resolve_comfyui_launch(path_value: str) -> tuple[list[str], Path | None]:
         return [str(candidate)], candidate.parent
 
     raise ValueError("Configured ComfyUI path does not exist")
+
+
+def _is_usable_python_executable(exe_path: Path) -> bool:
+    """Return True when the candidate Python executable can be launched.
+
+    This avoids Windows WinError 193 failures when a bundled executable exists
+    but is incompatible with the current OS/architecture.
+    """
+    try:
+        exe = Path(exe_path)
+        if not exe.exists() or not exe.is_file():
+            return False
+        result = subprocess.run(
+            [str(exe), "--version"],
+            capture_output=True,
+            text=True,
+            timeout=8,
+            check=False,
+        )
+        return result.returncode == 0
+    except Exception:
+        return False
 
 
 def _kill_process_on_port(port: int) -> bool:
@@ -1438,6 +1473,10 @@ def _model_metadata_path() -> Path:
     return DATA_DIR / "model_metadata.json"
 
 
+def _model_metadata_db_path() -> Path:
+    return DATA_DIR / "model_metadata.db"
+
+
 def _ensure_model_metadata_store() -> None:
     path = _model_metadata_path()
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -1445,13 +1484,75 @@ def _ensure_model_metadata_store() -> None:
         path.write_text("{}", encoding="utf-8")
 
 
+def _ensure_model_metadata_db() -> None:
+    db_path = _model_metadata_db_path()
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    with sqlite3.connect(db_path) as conn:
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS model_metadata (
+                metadata_key TEXT PRIMARY KEY,
+                payload_json TEXT NOT NULL,
+                updated_at INTEGER NOT NULL
+            )
+            """
+        )
+        conn.commit()
+
+
+def _load_model_metadata_from_db() -> dict[str, dict]:
+    db_path = _model_metadata_db_path()
+    if not db_path.exists():
+        return {}
+    result: dict[str, dict] = {}
+    with sqlite3.connect(db_path) as conn:
+        rows = conn.execute("SELECT metadata_key, payload_json FROM model_metadata").fetchall()
+    for key, payload_json in rows:
+        try:
+            payload = json.loads(payload_json)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(payload, dict):
+            result[str(key)] = payload
+    return result
+
+
+def _save_model_metadata_to_db(items: dict[str, dict]) -> None:
+    _ensure_model_metadata_db()
+    db_path = _model_metadata_db_path()
+    with sqlite3.connect(db_path) as conn:
+        conn.execute("DELETE FROM model_metadata")
+        for key, payload in (items or {}).items():
+            if not isinstance(payload, dict):
+                continue
+            conn.execute(
+                "INSERT OR REPLACE INTO model_metadata (metadata_key, payload_json, updated_at) VALUES (?, ?, ?)",
+                (str(key), json.dumps(payload, ensure_ascii=True), int(time.time())),
+            )
+        conn.commit()
+
+
 def _load_model_metadata() -> dict[str, dict]:
     _ensure_model_metadata_store()
+    _ensure_model_metadata_db()
     path = _model_metadata_path()
     with _model_metadata_lock:
         try:
+            db_items = _load_model_metadata_from_db()
+            if db_items:
+                return db_items
+        except Exception as exc:
+            logger.warning("Model metadata SQLite read failed; falling back to JSON store: %s", exc)
+        try:
             raw = json.loads(path.read_text(encoding="utf-8"))
-            return raw if isinstance(raw, dict) else {}
+            if not isinstance(raw, dict):
+                return {}
+            if raw:
+                try:
+                    _save_model_metadata_to_db(raw)
+                except Exception as exc:
+                    logger.warning("Model metadata SQLite sync from JSON failed: %s", exc)
+            return raw
         except json.JSONDecodeError:
             logger.warning("Model metadata store was invalid JSON, resetting.")
             path.write_text("{}", encoding="utf-8")
@@ -1460,9 +1561,14 @@ def _load_model_metadata() -> dict[str, dict]:
 
 def _save_model_metadata(items: dict[str, dict]) -> None:
     _ensure_model_metadata_store()
+    _ensure_model_metadata_db()
     path = _model_metadata_path()
     with _model_metadata_lock:
         path.write_text(json.dumps(items, ensure_ascii=True, indent=2), encoding="utf-8")
+        try:
+            _save_model_metadata_to_db(items)
+        except Exception as exc:
+            logger.warning("Model metadata SQLite write failed; JSON store preserved: %s", exc)
 
 
 def _sanitize_optional_preview_url(value: str) -> str:
@@ -2864,6 +2970,679 @@ _TORCH_INDEX_URLS: dict[str, str] = {
 }
 
 
+def _install_staging_root() -> Path:
+    return DATA_DIR / "staging"
+
+
+def _install_manifest_root() -> Path:
+    return DATA_DIR / "install_manifests"
+
+
+def _link_registry_db_path() -> Path:
+    return DATA_DIR / "link_registry.db"
+
+
+def _normalize_registry_path(path_value: str | Path) -> str:
+    raw = str(path_value or "").strip()
+    if not raw:
+        return ""
+    p = Path(raw).expanduser().resolve(strict=False)
+    normalized = str(p)
+    return os.path.normcase(normalized) if os.name == "nt" else normalized
+
+
+def _ensure_link_registry_db() -> None:
+    db_path = _link_registry_db_path()
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    with sqlite3.connect(db_path) as conn:
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS link_registry (
+                link_path TEXT PRIMARY KEY,
+                target_path TEXT NOT NULL,
+                package_name TEXT NOT NULL,
+                link_type TEXT NOT NULL,
+                created_at INTEGER NOT NULL,
+                updated_at INTEGER NOT NULL
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_link_registry_package_target
+            ON link_registry(package_name, target_path)
+            """
+        )
+        conn.commit()
+
+
+def _get_registered_link(link_path: str | Path) -> dict:
+    normalized_link = _normalize_registry_path(link_path)
+    if not normalized_link:
+        return {}
+    _ensure_link_registry_db()
+    with _link_registry_lock, sqlite3.connect(_link_registry_db_path()) as conn:
+        row = conn.execute(
+            """
+            SELECT link_path, target_path, package_name, link_type, created_at, updated_at
+            FROM link_registry
+            WHERE link_path = ?
+            """,
+            (normalized_link,),
+        ).fetchone()
+    if not row:
+        return {}
+    return {
+        "link_path": row[0],
+        "target_path": row[1],
+        "package_name": row[2],
+        "link_type": row[3],
+        "created_at": row[4],
+        "updated_at": row[5],
+    }
+
+
+def _unregister_global_link(link_path: str | Path, remove_link: bool = False) -> dict:
+    normalized_link = _normalize_registry_path(link_path)
+    if not normalized_link:
+        raise ValueError("link_path is required")
+
+    existing = _get_registered_link(normalized_link)
+    if not existing:
+        return {"status": "not_found", "link_path": normalized_link}
+
+    removed_link_path = False
+    if remove_link:
+        link_p = Path(normalized_link)
+        before_exists = link_p.exists() or link_p.is_symlink()
+        _remove_link_like_path(link_p)
+        after_exists = link_p.exists() or link_p.is_symlink()
+        removed_link_path = bool(before_exists and not after_exists)
+        if before_exists and not removed_link_path:
+            raise RuntimeError("remove_link requested but link_path is not a removable link-like path")
+
+    _ensure_link_registry_db()
+    with _link_registry_lock, sqlite3.connect(_link_registry_db_path()) as conn:
+        conn.execute("DELETE FROM link_registry WHERE link_path = ?", (normalized_link,))
+        conn.commit()
+
+    return {
+        "status": "unregistered",
+        "link_path": normalized_link,
+        "removed_link_path": removed_link_path,
+        "package_name": str(existing.get("package_name") or ""),
+    }
+
+
+def _unregister_package_links(package_name: str, remove_link: bool = False) -> dict:
+    package = str(package_name or "").strip().lower()
+    if not package:
+        raise ValueError("package_name is required")
+
+    rows = _list_registered_links(package_name=package)
+    results = []
+    unregistered = 0
+    failed = 0
+
+    for row in rows:
+        link_path = str(row.get("link_path") or "")
+        try:
+            item = _unregister_global_link(link_path=link_path, remove_link=remove_link)
+            if item.get("status") == "unregistered":
+                unregistered += 1
+            results.append(
+                {
+                    "link_path": link_path,
+                    "status": item.get("status", "unknown"),
+                    "removed_link_path": bool(item.get("removed_link_path", False)),
+                }
+            )
+        except Exception as exc:
+            failed += 1
+            results.append(
+                {
+                    "link_path": link_path,
+                    "status": "failed",
+                    "error": str(exc),
+                }
+            )
+
+    return {
+        "package": package,
+        "total": len(rows),
+        "unregistered": unregistered,
+        "failed": failed,
+        "results": results,
+    }
+
+
+def _register_global_link(
+    package_name: str,
+    link_path: str | Path,
+    target_path: str | Path,
+    link_type: str = "symlink",
+    allow_shared: bool = False,
+) -> dict:
+    """Register a global-vault link with strict conflict detection.
+
+    Conflicts handled:
+    - Same link path with different target.
+    - Same link path with different package when sharing is not allowed.
+    - Same package + target already registered at a different link path (double-link conflict).
+    """
+    package = str(package_name or "").strip().lower()
+    normalized_link = _normalize_registry_path(link_path)
+    normalized_target = _normalize_registry_path(target_path)
+    normalized_type = str(link_type or "symlink").strip().lower() or "symlink"
+    if not package:
+        raise ValueError("package_name is required")
+    if not normalized_link:
+        raise ValueError("link_path is required")
+    if not normalized_target:
+        raise ValueError("target_path is required")
+
+    _ensure_link_registry_db()
+    now = int(time.time())
+
+    with _link_registry_lock, sqlite3.connect(_link_registry_db_path()) as conn:
+        existing = conn.execute(
+            """
+            SELECT link_path, target_path, package_name, link_type, created_at, updated_at
+            FROM link_registry
+            WHERE link_path = ?
+            """,
+            (normalized_link,),
+        ).fetchone()
+        if existing:
+            existing_target = str(existing[1])
+            existing_package = str(existing[2])
+            if existing_target != normalized_target:
+                raise ValueError(
+                    f"Link path conflict: {normalized_link} already targets {existing_target}, not {normalized_target}"
+                )
+            if existing_package != package and not allow_shared:
+                raise ValueError(
+                    f"Link ownership conflict: {normalized_link} is owned by package {existing_package}"
+                )
+            conn.execute(
+                """
+                UPDATE link_registry
+                SET package_name = ?, link_type = ?, updated_at = ?
+                WHERE link_path = ?
+                """,
+                (package, normalized_type, now, normalized_link),
+            )
+            conn.commit()
+            return {
+                "status": "updated",
+                "link_path": normalized_link,
+                "target_path": normalized_target,
+                "package_name": package,
+                "link_type": normalized_type,
+            }
+
+        duplicate = conn.execute(
+            """
+            SELECT link_path
+            FROM link_registry
+            WHERE package_name = ? AND target_path = ?
+            """,
+            (package, normalized_target),
+        ).fetchone()
+        if duplicate and str(duplicate[0]) != normalized_link:
+            raise ValueError(
+                f"Double-link conflict: package {package} already links target {normalized_target} via {duplicate[0]}"
+            )
+
+        conn.execute(
+            """
+            INSERT INTO link_registry (link_path, target_path, package_name, link_type, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (normalized_link, normalized_target, package, normalized_type, now, now),
+        )
+        conn.commit()
+
+    return {
+        "status": "registered",
+        "link_path": normalized_link,
+        "target_path": normalized_target,
+        "package_name": package,
+        "link_type": normalized_type,
+    }
+
+
+def _list_registered_links(package_name: str = "") -> list[dict]:
+    _ensure_link_registry_db()
+    package = str(package_name or "").strip().lower()
+    with _link_registry_lock, sqlite3.connect(_link_registry_db_path()) as conn:
+        if package:
+            rows = conn.execute(
+                """
+                SELECT link_path, target_path, package_name, link_type, created_at, updated_at
+                FROM link_registry
+                WHERE package_name = ?
+                ORDER BY link_path ASC
+                """,
+                (package,),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                """
+                SELECT link_path, target_path, package_name, link_type, created_at, updated_at
+                FROM link_registry
+                ORDER BY link_path ASC
+                """
+            ).fetchall()
+    return [
+        {
+            "link_path": row[0],
+            "target_path": row[1],
+            "package_name": row[2],
+            "link_type": row[3],
+            "created_at": row[4],
+            "updated_at": row[5],
+        }
+        for row in rows
+    ]
+
+
+def _list_recent_registered_links(package_name: str = "", limit: int = 25) -> list[dict]:
+    _ensure_link_registry_db()
+    package = str(package_name or "").strip().lower()
+    safe_limit = max(1, min(int(limit), 500))
+    with _link_registry_lock, sqlite3.connect(_link_registry_db_path()) as conn:
+        if package:
+            rows = conn.execute(
+                """
+                SELECT link_path, target_path, package_name, link_type, created_at, updated_at
+                FROM link_registry
+                WHERE package_name = ?
+                ORDER BY updated_at DESC, link_path ASC
+                LIMIT ?
+                """,
+                (package, safe_limit),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                """
+                SELECT link_path, target_path, package_name, link_type, created_at, updated_at
+                FROM link_registry
+                ORDER BY updated_at DESC, link_path ASC
+                LIMIT ?
+                """,
+                (safe_limit,),
+            ).fetchall()
+    return [
+        {
+            "link_path": row[0],
+            "target_path": row[1],
+            "package_name": row[2],
+            "link_type": row[3],
+            "created_at": row[4],
+            "updated_at": row[5],
+        }
+        for row in rows
+    ]
+
+
+def _link_points_to_target(link_path: str | Path, target_path: str | Path) -> bool:
+    link_p = Path(str(link_path)).expanduser()
+    target_p = Path(str(target_path)).expanduser()
+    if not (link_p.exists() or link_p.is_symlink()):
+        return False
+    return _normalize_registry_path(link_p) == _normalize_registry_path(target_p)
+
+
+def _remove_link_like_path(path_value: str | Path) -> None:
+    p = Path(str(path_value)).expanduser()
+    if not (p.exists() or p.is_symlink()):
+        return
+    if p.is_symlink():
+        p.unlink(missing_ok=True)
+        return
+    # Do not delete regular directories/files here; this helper is for link-like paths only.
+    if os.name == "nt" and p.is_dir():
+        # Junctions are reparse points; avoid deleting regular directories.
+        try:
+            attrs = int(getattr(os.lstat(p), "st_file_attributes", 0))
+        except Exception:
+            attrs = 0
+        if attrs & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0):
+            os.rmdir(p)
+
+
+def _create_or_verify_global_link(
+    package_name: str,
+    link_path: str | Path,
+    target_path: str | Path,
+    allow_shared: bool = False,
+) -> dict:
+    """Create or verify a directory link (symlink/junction) and register it.
+
+    - Non-Windows: symlink
+    - Windows: try symlink first, fallback to junction (mklink /J)
+    """
+    package = str(package_name or "").strip().lower()
+    if not package:
+        raise ValueError("package_name is required")
+
+    link_p = Path(str(link_path)).expanduser().resolve(strict=False)
+    target_p = Path(str(target_path)).expanduser().resolve(strict=False)
+    if not target_p.exists() or not target_p.is_dir():
+        raise ValueError(f"target_path must exist as a directory: {target_p}")
+
+    if link_p.exists() or link_p.is_symlink():
+        if _link_points_to_target(link_p, target_p):
+            link_type = "symlink" if link_p.is_symlink() else ("junction" if os.name == "nt" else "dir")
+            registered = _register_global_link(
+                package_name=package,
+                link_path=link_p,
+                target_path=target_p,
+                link_type=link_type,
+                allow_shared=allow_shared,
+            )
+            return {"status": "exists", **registered}
+        raise ValueError(f"Path conflict: {link_p} already exists and does not point to {target_p}")
+
+    link_p.parent.mkdir(parents=True, exist_ok=True)
+
+    created_type = "symlink"
+    if os.name == "nt":
+        try:
+            os.symlink(str(target_p), str(link_p), target_is_directory=True)
+            created_type = "symlink"
+        except OSError:
+            proc = subprocess.run(
+                ["cmd", "/c", "mklink", "/J", str(link_p), str(target_p)],
+                capture_output=True,
+                text=True,
+                timeout=20,
+            )
+            if proc.returncode != 0:
+                detail = proc.stderr.strip() or proc.stdout.strip() or "unknown error"
+                raise RuntimeError(f"Could not create junction for {link_p}: {detail}")
+            created_type = "junction"
+    else:
+        os.symlink(str(target_p), str(link_p), target_is_directory=True)
+
+    if not _link_points_to_target(link_p, target_p):
+        _remove_link_like_path(link_p)
+        raise RuntimeError(f"Link verification failed for {link_p} -> {target_p}")
+
+    try:
+        registered = _register_global_link(
+            package_name=package,
+            link_path=link_p,
+            target_path=target_p,
+            link_type=created_type,
+            allow_shared=allow_shared,
+        )
+    except Exception:
+        _remove_link_like_path(link_p)
+        raise
+
+    return {"status": "created", **registered}
+
+
+def _collect_link_registry_health(package_name: str = "") -> dict:
+    rows = _list_registered_links(package_name=package_name)
+    links = []
+    healthy_count = 0
+    unhealthy_count = 0
+    for row in rows:
+        exists = Path(str(row["link_path"])).exists() or Path(str(row["link_path"])).is_symlink()
+        target_exists = Path(str(row["target_path"])).exists()
+        points_to_target = _link_points_to_target(row["link_path"], row["target_path"])
+        healthy = bool(exists and target_exists and points_to_target)
+        if healthy:
+            healthy_count += 1
+            reason = "ok"
+        else:
+            unhealthy_count += 1
+            if not exists:
+                reason = "missing_link_path"
+            elif not target_exists:
+                reason = "missing_target_path"
+            elif not points_to_target:
+                reason = "target_mismatch"
+            else:
+                reason = "unknown"
+        links.append({**row, "healthy": healthy, "reason": reason})
+    return {
+        "package": str(package_name or "").strip().lower(),
+        "total": len(rows),
+        "healthy": healthy_count,
+        "unhealthy": unhealthy_count,
+        "links": links,
+    }
+
+
+def _collect_link_registry_stats(package_name: str = "") -> dict:
+    package = str(package_name or "").strip().lower()
+    rows = _list_registered_links(package_name=package)
+    per_package: dict[str, int] = {}
+    link_types: dict[str, int] = {}
+    for row in rows:
+        pkg = str(row.get("package_name") or "")
+        per_package[pkg] = int(per_package.get(pkg, 0)) + 1
+        lt = str(row.get("link_type") or "unknown")
+        link_types[lt] = int(link_types.get(lt, 0)) + 1
+
+    health = _collect_link_registry_health(package_name=package)
+    return {
+        "package": package,
+        "total": len(rows),
+        "healthy": int(health.get("healthy", 0)),
+        "unhealthy": int(health.get("unhealthy", 0)),
+        "packages": per_package,
+        "link_types": link_types,
+    }
+
+
+def _prune_stale_registered_links(
+    package_name: str = "",
+    dry_run: bool = True,
+    include_missing_target: bool = False,
+) -> dict:
+    package = str(package_name or "").strip().lower()
+    health = _collect_link_registry_health(package_name=package)
+    allowed_reasons = {"missing_link_path"}
+    if include_missing_target:
+        allowed_reasons.add("missing_target_path")
+
+    considered = 0
+    pruned = 0
+    skipped = 0
+    failed = 0
+    actions = []
+
+    for row in health.get("links", []):
+        if row.get("healthy"):
+            continue
+        reason = str(row.get("reason") or "unknown")
+        link_path = str(row.get("link_path") or "")
+        if reason not in allowed_reasons:
+            skipped += 1
+            actions.append(
+                {
+                    "link_path": link_path,
+                    "package_name": str(row.get("package_name") or ""),
+                    "reason": reason,
+                    "status": "skipped_reason",
+                }
+            )
+            continue
+
+        considered += 1
+        if dry_run:
+            skipped += 1
+            actions.append(
+                {
+                    "link_path": link_path,
+                    "package_name": str(row.get("package_name") or ""),
+                    "reason": reason,
+                    "status": "would_prune",
+                }
+            )
+            continue
+
+        try:
+            _unregister_global_link(link_path=link_path, remove_link=False)
+            pruned += 1
+            actions.append(
+                {
+                    "link_path": link_path,
+                    "package_name": str(row.get("package_name") or ""),
+                    "reason": reason,
+                    "status": "pruned",
+                }
+            )
+        except Exception as exc:
+            failed += 1
+            actions.append(
+                {
+                    "link_path": link_path,
+                    "package_name": str(row.get("package_name") or ""),
+                    "reason": reason,
+                    "status": "failed",
+                    "error": str(exc),
+                }
+            )
+
+    return {
+        "package": package,
+        "dry_run": bool(dry_run),
+        "include_missing_target": bool(include_missing_target),
+        "total_unhealthy": int(health.get("unhealthy", 0)),
+        "considered": considered,
+        "pruned": pruned,
+        "skipped": skipped,
+        "failed": failed,
+        "actions": actions,
+    }
+
+
+def _repair_registered_links(package_name: str = "", dry_run: bool = True) -> dict:
+    health = _collect_link_registry_health(package_name=package_name)
+    repaired = 0
+    skipped = 0
+    failed = 0
+    actions = []
+
+    for row in health.get("links", []):
+        if row.get("healthy"):
+            continue
+        action = {
+            "link_path": row.get("link_path"),
+            "target_path": row.get("target_path"),
+            "package_name": row.get("package_name"),
+            "reason": row.get("reason"),
+            "status": "",
+            "error": "",
+        }
+        if dry_run:
+            action["status"] = "would-repair"
+            skipped += 1
+            actions.append(action)
+            continue
+        try:
+            # Only safe auto-removal for symlink paths; avoid deleting real directories.
+            link_p = Path(str(row.get("link_path") or ""))
+            if link_p.is_symlink():
+                _remove_link_like_path(link_p)
+            if link_p.exists() and not link_p.is_symlink():
+                action["status"] = "failed"
+                action["error"] = "path_conflict_requires_manual_resolution"
+                failed += 1
+                actions.append(action)
+                continue
+            _create_or_verify_global_link(
+                package_name=str(row.get("package_name") or ""),
+                link_path=str(row.get("link_path") or ""),
+                target_path=str(row.get("target_path") or ""),
+                allow_shared=True,
+            )
+            action["status"] = "repaired"
+            repaired += 1
+        except Exception as exc:
+            action["status"] = "failed"
+            action["error"] = str(exc)
+            failed += 1
+        actions.append(action)
+
+    return {
+        "package": str(package_name or "").strip().lower(),
+        "dry_run": bool(dry_run),
+        "total_unhealthy": health.get("unhealthy", 0),
+        "repaired": repaired,
+        "skipped": skipped,
+        "failed": failed,
+        "actions": actions,
+    }
+
+
+def _write_json_atomic(path: Path, payload: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = path.with_suffix(path.suffix + ".tmp")
+    tmp_path.write_text(json.dumps(payload, ensure_ascii=True, indent=2), encoding="utf-8")
+    tmp_path.replace(path)
+
+
+def _append_install_journal(job: dict, event: str, **details) -> None:
+    entry = {
+        "at": datetime.now(timezone.utc).isoformat(),
+        "event": str(event),
+        "details": details or {},
+    }
+    with _comfyui_install_jobs_lock:
+        journal = job.get("journal")
+        if not isinstance(journal, list):
+            journal = []
+            job["journal"] = journal
+        journal.append(entry)
+
+
+def _write_comfyui_install_manifest(
+    job: dict,
+    install_path: Path,
+    comfy_root: Path,
+    python_executable: str,
+    used_embedded_python: bool,
+    status: str,
+    error: str = "",
+) -> str:
+    txn_id = str(job.get("txn_id") or f"txn-{int(time.time() * 1000)}")
+    manifest_path = _install_manifest_root() / "comfyui" / f"{txn_id}.json"
+    manifest_files = []
+    for candidate in [
+        comfy_root / "main.py",
+        comfy_root / "requirements.txt",
+        comfy_root / ".git",
+        comfy_root / ".venv",
+    ]:
+        if candidate.exists():
+            manifest_files.append(str(candidate))
+
+    manifest = {
+        "schema_version": 1,
+        "package": "comfyui",
+        "txn_id": txn_id,
+        "status": status,
+        "install_path": str(install_path),
+        "comfy_root": str(comfy_root),
+        "python_executable": str(python_executable),
+        "used_embedded_python": bool(used_embedded_python),
+        "staging_dir": str(job.get("staging_dir") or ""),
+        "files": manifest_files,
+        "journal": job.get("journal") if isinstance(job.get("journal"), list) else [],
+        "error": str(error or ""),
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+    }
+    _write_json_atomic(manifest_path, manifest)
+    return str(manifest_path)
+
+
 def _find_comfyui_python(comfyui_path: Path) -> str:
     """Return the Python executable to use for a ComfyUI directory.
 
@@ -2879,7 +3658,7 @@ def _find_comfyui_python(comfyui_path: Path) -> str:
         if venv_py.exists():
             return str(venv_py)
     sibling_py = comfyui_path.parent / "python_embeded" / "python.exe"
-    if os.name == "nt" and sibling_py.exists():
+    if os.name == "nt" and sibling_py.exists() and _is_usable_python_executable(sibling_py):
         return str(sibling_py)
     return sys.executable
 
@@ -2964,6 +3743,7 @@ def _run_comfyui_install_job(job_id: str) -> None:
 
     install_path = Path(job["install_path"]).expanduser().resolve()
     gpu = job.get("gpu", "nvidia")
+    _append_install_journal(job, "txn_start", install_path=str(install_path), gpu=str(gpu))
 
     try:
         _append_install_log(job, f"=== ComfyUI Install ===")
@@ -2975,6 +3755,7 @@ def _run_comfyui_install_job(job_id: str) -> None:
         if git_check.returncode != 0:
             raise RuntimeError("git not found. Install Git and ensure it is on PATH before installing ComfyUI.")
         _append_install_log(job, f"git: {git_check.stdout.strip()}")
+        _append_install_journal(job, "git_check_ok", version=git_check.stdout.strip())
 
         # 2. Resolve the actual ComfyUI code root.
         # Portable packages use: <configured_path>/ComfyUI/main.py
@@ -2986,11 +3767,13 @@ def _run_comfyui_install_job(job_id: str) -> None:
             _append_install_log(job, f"    ComfyUI root : {comfy_root}")
         else:
             comfy_root = install_path
+        _append_install_journal(job, "resolve_layout", comfy_root=str(comfy_root))
 
         # 3. Clone if ComfyUI is not already present
         main_py = comfy_root / "main.py"
         if main_py.exists():
             _append_install_log(job, "\n>>> Clone (skip - ComfyUI already present at target)")
+            _append_install_journal(job, "clone_skip_existing")
         else:
             comfy_root.parent.mkdir(parents=True, exist_ok=True)
             ok = _run_install_step(
@@ -3000,18 +3783,24 @@ def _run_comfyui_install_job(job_id: str) -> None:
             )
             if not ok:
                 raise RuntimeError("git clone failed - check log for details")
+            _append_install_journal(job, "clone_ok", repo=COMFYUI_REPO_URL)
 
         # 4. Determine the Python executable.
         # Portable packages ship with python_embeded which already has torch;
         # for git-based installs we create a .venv and install torch ourselves.
         embedded_python = comfy_root.parent / "python_embeded" / "python.exe"
-        has_embedded_python = os.name == "nt" and embedded_python.exists()
+        has_embedded_python = (
+            os.name == "nt"
+            and embedded_python.exists()
+            and _is_usable_python_executable(embedded_python)
+        )
 
         if has_embedded_python:
             venv_python = str(embedded_python)
             _append_install_log(job, f"\n>>> Using existing python_embeded: {venv_python}")
             _append_install_log(job, ">>> Create Python virtual environment (skip - portable package)")
             _append_install_log(job, ">>> Install PyTorch (skip - portable package has pre-installed torch)")
+            _append_install_journal(job, "python_runtime_selected", mode="embedded", python=venv_python)
         else:
             venv_dir = comfy_root / ".venv"
             if not venv_dir.exists():
@@ -3027,6 +3816,7 @@ def _run_comfyui_install_job(job_id: str) -> None:
                 _append_install_log(job, "\n>>> Create Python virtual environment (skip - .venv already present)")
 
             venv_python = _find_comfyui_python(comfy_root)
+            _append_install_journal(job, "python_runtime_selected", mode="venv", python=venv_python)
 
             _run_install_step(
                 job, "Upgrade pip",
@@ -3044,6 +3834,7 @@ def _run_comfyui_install_job(job_id: str) -> None:
                                    cwd=comfy_root, timeout=600)
             if not ok:
                 raise RuntimeError("torch install failed - check log for details")
+            _append_install_journal(job, "torch_install_ok", gpu=gpu)
 
         # 5. Install / update ComfyUI requirements
         req_file = comfy_root / "requirements.txt"
@@ -3056,6 +3847,7 @@ def _run_comfyui_install_job(job_id: str) -> None:
             )
             if not ok:
                 raise RuntimeError("requirements install failed - check log for details")
+            _append_install_journal(job, "requirements_ok", requirements=str(req_file))
 
         # 6. Persist as comfyui_path in service config.
         # Always save install_path (the portable root or git clone target) so that
@@ -3064,6 +3856,18 @@ def _run_comfyui_install_job(job_id: str) -> None:
         config["comfyui_path"] = str(install_path)
         _save_service_config(config)
         _append_install_log(job, f"\n>>> Saved comfyui_path = {install_path}")
+        _append_install_journal(job, "config_saved", comfyui_path=str(install_path))
+
+        manifest_path = _write_comfyui_install_manifest(
+            job=job,
+            install_path=install_path,
+            comfy_root=comfy_root,
+            python_executable=venv_python,
+            used_embedded_python=has_embedded_python,
+            status="committed",
+            error="",
+        )
+        _append_install_journal(job, "txn_commit", manifest_path=manifest_path)
 
         _append_install_log(job, "\n=== Install complete! ===")
         with _comfyui_install_jobs_lock:
@@ -3071,26 +3875,49 @@ def _run_comfyui_install_job(job_id: str) -> None:
             if j:
                 j["status"] = "done"
                 j["finished_at"] = datetime.now(timezone.utc).isoformat()
+                j["manifest_path"] = manifest_path
 
     except Exception as exc:
         _append_install_log(job, f"\n[FATAL] {exc}")
+        _append_install_journal(job, "txn_rollback", reason=str(exc))
+        try:
+            manifest_path = _write_comfyui_install_manifest(
+                job=job,
+                install_path=install_path,
+                comfy_root=install_path / "ComfyUI" if (install_path / "ComfyUI").exists() else install_path,
+                python_executable=sys.executable,
+                used_embedded_python=False,
+                status="error",
+                error=str(exc),
+            )
+        except Exception:
+            manifest_path = ""
         with _comfyui_install_jobs_lock:
             j = _comfyui_install_jobs.get(job_id)
             if j:
                 j["status"] = "error"
                 j["error"] = str(exc)
                 j["finished_at"] = datetime.now(timezone.utc).isoformat()
+                if manifest_path:
+                    j["manifest_path"] = manifest_path
 
 
 def _start_comfyui_install_job(install_path: str, gpu: str) -> dict:
     """Create and start a background ComfyUI install job."""
     job_id = f"install-{int(time.time() * 1000)}"
+    txn_id = f"txn-{int(time.time() * 1000)}"
+    staging_dir = _install_staging_root() / txn_id
+    staging_dir.mkdir(parents=True, exist_ok=True)
     job: dict = {
         "id": job_id,
+        "txn_id": txn_id,
+        "staging_dir": str(staging_dir),
         "status": "running",
         "install_path": install_path,
         "gpu": gpu,
         "log": "",
+        "journal": [],
+        "manifest_path": "",
         "error": "",
         "started_at": datetime.now(timezone.utc).isoformat(),
         "finished_at": "",
@@ -3104,10 +3931,14 @@ def _start_comfyui_install_job(install_path: str, gpu: str) -> dict:
 def _comfyui_install_job_snapshot(job: dict) -> dict:
     return {
         "id": job.get("id"),
+        "txn_id": job.get("txn_id"),
+        "staging_dir": job.get("staging_dir"),
         "status": job.get("status"),
         "install_path": job.get("install_path"),
         "gpu": job.get("gpu"),
         "log": job.get("log", ""),
+        "journal": job.get("journal", []),
+        "manifest_path": job.get("manifest_path", ""),
         "error": job.get("error", ""),
         "started_at": job.get("started_at"),
         "finished_at": job.get("finished_at"),
@@ -5220,6 +6051,148 @@ def api_comfyui_install_status(job_id: str):
     if not job:
         return jsonify({"error": f"Job {job_id} not found"}), 404
     return jsonify(_comfyui_install_job_snapshot(job))
+
+
+@app.route("/api/vault/links/ensure", methods=["POST"])
+def api_vault_links_ensure():
+    """Create/verify and register a package link to the global vault."""
+    body = request.get_json(silent=True) or {}
+    package_name = str(body.get("package_name") or "").strip()
+    link_path = str(body.get("link_path") or "").strip()
+    target_path = str(body.get("target_path") or "").strip()
+    allow_shared = bool(body.get("allow_shared", False))
+    if not package_name:
+        return jsonify({"error": "package_name is required"}), 400
+    if not link_path:
+        return jsonify({"error": "link_path is required"}), 400
+    if not target_path:
+        return jsonify({"error": "target_path is required"}), 400
+    try:
+        result = _create_or_verify_global_link(
+            package_name=package_name,
+            link_path=link_path,
+            target_path=target_path,
+            allow_shared=allow_shared,
+        )
+        return jsonify({"ok": True, "result": result})
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 409
+    except Exception as exc:
+        logger.error("Vault link ensure failed: %s", exc)
+        return jsonify({"error": str(exc)}), 500
+
+
+@app.route("/api/vault/links/health", methods=["GET"])
+def api_vault_links_health():
+    """Return health status for registered vault links."""
+    package_name = str(request.args.get("package") or "").strip()
+    payload = _collect_link_registry_health(package_name=package_name)
+    return jsonify({"ok": True, **payload})
+
+
+@app.route("/api/vault/links/recent", methods=["GET"])
+def api_vault_links_recent():
+    """Return recent link registry activity ordered by latest update time."""
+    package_name = str(request.args.get("package") or "").strip()
+    raw_limit = str(request.args.get("limit") or "25").strip()
+    try:
+        limit = int(raw_limit)
+    except (TypeError, ValueError):
+        return jsonify({"error": "limit must be an integer between 1 and 500"}), 400
+    if limit < 1 or limit > 500:
+        return jsonify({"error": "limit must be between 1 and 500"}), 400
+
+    links = _list_recent_registered_links(package_name=package_name, limit=limit)
+    return jsonify(
+        {
+            "ok": True,
+            "package": package_name.lower(),
+            "limit": limit,
+            "count": len(links),
+            "links": links,
+        }
+    )
+
+
+@app.route("/api/vault/links/stats", methods=["GET"])
+def api_vault_links_stats():
+    """Return aggregate link registry diagnostics, optionally scoped to a package."""
+    package_name = str(request.args.get("package") or "").strip()
+    payload = _collect_link_registry_stats(package_name=package_name)
+    return jsonify({"ok": True, **payload})
+
+
+@app.route("/api/vault/links/prune-stale", methods=["POST"])
+def api_vault_links_prune_stale():
+    """Prune stale registry rows for missing link paths, optionally including missing targets."""
+    body = request.get_json(silent=True) or {}
+    package_name = str(body.get("package_name") or "").strip()
+    dry_run = bool(body.get("dry_run", True))
+    include_missing_target = bool(body.get("include_missing_target", False))
+    try:
+        payload = _prune_stale_registered_links(
+            package_name=package_name,
+            dry_run=dry_run,
+            include_missing_target=include_missing_target,
+        )
+        return jsonify({"ok": True, **payload})
+    except Exception as exc:
+        logger.error("Vault prune-stale failed: %s", exc)
+        return jsonify({"error": str(exc)}), 500
+
+
+@app.route("/api/vault/links/repair", methods=["POST"])
+def api_vault_links_repair():
+    """Attempt to repair unhealthy registered vault links."""
+    body = request.get_json(silent=True) or {}
+    package_name = str(body.get("package_name") or "").strip()
+    dry_run = bool(body.get("dry_run", True))
+    try:
+        payload = _repair_registered_links(package_name=package_name, dry_run=dry_run)
+        return jsonify({"ok": True, **payload})
+    except Exception as exc:
+        logger.error("Vault link repair failed: %s", exc)
+        return jsonify({"error": str(exc)}), 500
+
+
+@app.route("/api/vault/links/unregister", methods=["POST"])
+def api_vault_links_unregister():
+    """Unregister a vault link, optionally removing the link path when safe."""
+    body = request.get_json(silent=True) or {}
+    link_path = str(body.get("link_path") or "").strip()
+    remove_link = bool(body.get("remove_link", False))
+    if not link_path:
+        return jsonify({"error": "link_path is required"}), 400
+    try:
+        payload = _unregister_global_link(link_path=link_path, remove_link=remove_link)
+        if payload.get("status") == "not_found":
+            return jsonify({"error": f"Link not found: {link_path}"}), 404
+        return jsonify({"ok": True, "result": payload})
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    except RuntimeError as exc:
+        return jsonify({"error": str(exc)}), 409
+    except Exception as exc:
+        logger.error("Vault link unregister failed: %s", exc)
+        return jsonify({"error": str(exc)}), 500
+
+
+@app.route("/api/vault/links/unregister-package", methods=["POST"])
+def api_vault_links_unregister_package():
+    """Bulk unregister all links for a package, optionally removing link paths."""
+    body = request.get_json(silent=True) or {}
+    package_name = str(body.get("package_name") or "").strip()
+    remove_link = bool(body.get("remove_link", False))
+    if not package_name:
+        return jsonify({"error": "package_name is required"}), 400
+    try:
+        payload = _unregister_package_links(package_name=package_name, remove_link=remove_link)
+        return jsonify({"ok": True, **payload})
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    except Exception as exc:
+        logger.error("Vault package unregister failed: %s", exc)
+        return jsonify({"error": str(exc)}), 500
 
 
 @app.route("/api/app/restart", methods=["POST"])

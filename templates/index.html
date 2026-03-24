@@ -612,7 +612,7 @@
               <div class="select-wrapper prompt-tag-filter-wrap">
                 <select id="prompt-tag-filter" aria-label="Filter by tag"><option value="">All tags</option></select>
               </div>
-              <button class="btn btn-ghost btn-xs prompt-favorites-only-toggle" id="prompt-favorites-only-toggle" type="button" aria-pressed="false" title="Show favorites only">Favs</button>
+              <button class="btn btn-ghost btn-xs prompt-favorites-only-toggle" id="prompt-favorites-only-toggle" type="button" aria-pressed="false" aria-keyshortcuts="F" title="Show favorites only (F to toggle when focused)">Favs</button>
               <button class="btn btn-ghost btn-xs preset-fav-btn" id="prompt-fav-toggle" type="button" title="Add to favorites" aria-pressed="false">&#9734;</button>
               <button class="btn btn-ghost btn-xs" id="prompt-load-btn" type="button">Load</button>
               <button class="btn btn-ghost btn-xs" id="prompt-edit-preset-btn" type="button" title="Edit this preset">Edit</button>
@@ -621,8 +621,8 @@
             <div class="prompt-preset-filter-row">
               <p id="prompt-preset-filter-status" class="hint prompt-preset-filter-status" aria-live="polite">No filters active.</p>
               <div class="prompt-preset-filter-actions">
-                <span id="prompt-preset-filter-shortcut-hint" class="hint prompt-preset-filter-shortcut-hint">Shortcut: Ctrl+Shift+K. Recent chips: arrows move, Shift+arrows reorder, P pins, Del removes.</span>
-                <button class="btn btn-ghost btn-xs prompt-preset-recent-pinned-only-toggle" id="prompt-preset-recent-pinned-only-toggle" type="button" aria-pressed="false" aria-keyshortcuts="Space" title="Show pinned recent filters only (Space to toggle)">Pinned recent</button>
+                <span id="prompt-preset-filter-shortcut-hint" class="hint prompt-preset-filter-shortcut-hint">Shortcut: Ctrl+Shift+K. Filter buttons: F favs, P pinned recent. Recent chips: arrows move, Shift+arrows reorder, P pins, Del removes.</span>
+                <button class="btn btn-ghost btn-xs prompt-preset-recent-pinned-only-toggle" id="prompt-preset-recent-pinned-only-toggle" type="button" aria-pressed="false" aria-keyshortcuts="P Space" title="Show pinned recent filters only (P or Space to toggle when focused)">Pinned recent</button>
                 <button class="btn btn-ghost btn-xs" id="prompt-preset-clear-filters" type="button" aria-keyshortcuts="Control+Shift+K">Clear filters</button>
               </div>
             </div>
@@ -846,11 +846,13 @@
       <div class="gallery-lightbox-panel" role="document">
         <div class="gallery-lightbox-header">
           <span id="gallery-lightbox-counter" class="hint gallery-lightbox-counter"></span>
-          <span class="hint" style="font-size: 0.75rem; margin-left: auto; margin-right: 0.5rem;">Shortcuts: ← → arrows, C compare, R re-use, Esc close</span>
+          <span class="hint gallery-lightbox-shortcuts">Shortcuts: &larr; &rarr; arrows, C compare, R re-use, F fullscreen, Esc close</span>
+          <span id="gallery-lightbox-fullscreen-status" class="hint gallery-lightbox-fullscreen-status" hidden aria-live="polite">Pinned fullscreen</span>
           <button id="gallery-lightbox-meta-toggle" class="btn btn-ghost btn-xs" type="button" aria-pressed="false" aria-controls="gallery-lightbox-meta" hidden>Params</button>
           <button id="gallery-lightbox-compare-toggle" class="btn btn-ghost btn-xs" type="button" aria-pressed="false" aria-keyshortcuts="C" hidden>Compare</button>
           <input id="gallery-lightbox-source-upload" type="file" accept="image/*" hidden aria-hidden="true" tabindex="-1" />
           <button id="gallery-lightbox-star" class="btn btn-ghost btn-xs gallery-lightbox-star-btn" type="button" aria-pressed="false" aria-label="Add to favorites" hidden>&#9734; Fav</button>
+          <button id="gallery-lightbox-fullscreen" class="btn btn-ghost btn-xs" type="button" aria-pressed="false" aria-label="Toggle fullscreen" aria-keyshortcuts="F">Fullscreen</button>
           <button id="gallery-lightbox-close" class="btn btn-ghost btn-xs gallery-lightbox-close" type="button" aria-label="Close image viewer" aria-keyshortcuts="Escape">Close</button>
         </div>
         <div class="gallery-lightbox-image-wrap">

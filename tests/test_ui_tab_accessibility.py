@@ -1508,8 +1508,10 @@ def test_gallery_loading_optimizations_present_in_js_bundle():
     assert "let galleryRenderSeq = 0;" in content
     assert "let galleryVirtualState = null;" in content
     assert "function buildGalleryCardHtml(entry, index)" in content
+    assert "function _getGalleryVirtualRowHeight(columns, isGrid)" in content
     assert "function _renderVirtualGalleryWindow()" in content
     assert "function _scheduleVirtualGalleryWindowRender()" in content
+    assert "const shouldVirtualize = galleryViewMode === 'grid' && filteredImages.length >= GALLERY_VIRTUALIZE_THRESHOLD;" in content
     assert "loading=\"${eagerLoad}\"" in content
     assert "fetchpriority=\"${fetchPriority}\"" in content
     assert "fetch(`/api/history?type=image&limit=${GALLERY_HISTORY_LIMIT}`" in content
@@ -1524,6 +1526,7 @@ def test_gallery_virtualization_styles_present_in_css():
 
     assert ".gallery-virtual-spacer" in content
     assert ".gallery-grid.is-grid-mode .gallery-virtual-spacer" in content
+    assert "overflow-anchor: none;" in content
 
 
 def test_controlnet_preview_markup_present_in_index():
@@ -1597,7 +1600,7 @@ def test_gallery_lightbox_compare_markup_and_wiring_present():
     assert "const isImg2Img = snapshot.mode === 'img2img' && (snapshot.image || snapshot.image_name);" in js
     assert "image: snapshot.image || snapshot.image_name || ''," in js
     assert "if (isGalleryLightboxInteractiveTarget(event.target)) return;" in js
-    assert "if (key !== 'Escape' && key !== 'ArrowLeft' && key !== 'ArrowRight' && key !== 'c' && key !== 'C' && key !== 'r' && key !== 'R') return;" in js
+    assert "if (key !== 'Escape' && key !== 'ArrowLeft' && key !== 'ArrowRight' && key !== 'c' && key !== 'C' && key !== 'r' && key !== 'R' && key !== 'f' && key !== 'F') return;" in js
     assert "if (key === 'c' || key === 'C') {" in js
     assert "toggleGalleryLightboxCompare();" in js
     assert "galleryLightboxPrev.addEventListener('keydown', onGalleryLightboxControlsKeydown);" in js
@@ -2666,6 +2669,18 @@ def test_image_quick_workflow_bar_and_sticky_actions_present():
     assert "const IMAGE_QUICKSTART_COMPLETED_KEY = 'imageQuickstartCompletedV1';" in js
     assert "function ensureSidebarSectionExpandedForControl(controlEl) {" in js
     assert "function focusImageControl(controlEl) {" in js
+    assert "function getImageModelReadinessState() {" in js
+    assert "function formatImageModelLoadingElapsed() {" in js
+    assert "function syncImageModelsLoadingTicker(isLoading) {" in js
+    assert "Checkpoint list is still loading (${elapsedLabel}). Please wait a few seconds." in js
+    assert "Checkpoint loading is taking longer than usual (${elapsedLabel}). You can retry model discovery." in js
+    assert "const IMAGE_MODELS_LOADING_WARN_MS = 15000;" in js
+    assert "imageReadinessActionCommand = 'retry-models';" in js
+    assert "imageReadinessActionBtn.textContent = 'Retry models';" in js
+    assert "if (imageReadinessActionCommand === 'retry-models') {" in js
+    assert "void loadImageModels();" in js
+    assert "Refreshing checkpoints..." in js
+    assert "stopImageModelsLoadingTicker();" in js
     assert "syncImageQuickState();" in js
     assert "syncImageReadiness();" in js
     assert "syncImageRuntimeEstimate();" in js
@@ -2735,7 +2750,7 @@ def test_queue_poll_defensive_reconciliation_clears_terminal_stale_tracked_ids()
     assert "persistTrackedQueueState();" in poll_queue_block
     assert "renderQueueStatus([], [], new Set());" in poll_queue_block
     assert "if (!trackedPromptIds.size) {" in poll_queue_block
-    assert "imageGenerateBtn.textContent = 'Generate Image';" in poll_queue_block
+    assert "syncImageGenerateButtonFromQueueState();" in poll_queue_block
     assert "stopQueuePolling();" in poll_queue_block
 
 
@@ -2786,7 +2801,7 @@ def test_save_history_entry_returns_response_ok_boolean():
 
 
 def test_image_panel_details_escape_to_close_keyboard_support():
-    """Image sidebar collapsible details (ControlNet, LoRA display, LoRA legend, HiresFix) support Escape-to-close."""
+    """Image sidebar collapsible details and sections support Escape-to-close."""
     from pathlib import Path
     html_path = Path(__file__).resolve().parents[1] / "templates" / "index.html"
     html = html_path.read_text(encoding="utf-8")
@@ -2807,9 +2822,16 @@ def test_image_panel_details_escape_to_close_keyboard_support():
     
     assert "document.addEventListener('keydown', (event) => {" in js
     assert "if (event.key !== 'Escape') return;" in js
-    assert "const openDetails = event.target.closest('details[open]');" in js
+    assert "const targetEl = event.target instanceof Element ? event.target : document.activeElement;" in js
+    assert "const openDetails = targetEl.closest('details[open]');" in js
     assert "openDetails.open = false;" in js
-    assert "if (!imagePanel.contains(openDetails)) return;" in js
+    assert "function collapseSidebarSectionForControl(controlEl) {" in js
+    assert "const section = controlEl.closest('#panel-image .sidebar .sidebar-section');" in js
+    assert "syncSidebarSectionCollapsedState(section, toggleBtn, true);" in js
+    assert "imageSidebarSectionCollapseState[key] = 1;" in js
+    assert "persistSidebarSectionCollapseState();" in js
+    assert "toggleBtn.focus();" in js
+    assert "if (!collapseSidebarSectionForControl(targetEl)) return;" in js
 
 
 def test_gallery_lightbox_escape_to_close_keyboard_support():
@@ -2832,6 +2854,99 @@ def test_gallery_lightbox_escape_to_close_keyboard_support():
     assert "if (event.key === 'Escape' && !galleryLightbox.hidden) {" in js
     assert "closeGalleryLightbox();" in js
     assert "if (event.key !== 'Tab' || galleryLightbox.hidden) return;" in js
+
+
+def test_gallery_lightbox_fullscreen_button_and_f_shortcut_present():
+    """Gallery lightbox exposes fullscreen toggle button and F-key shortcut wiring."""
+    from pathlib import Path
+    html_path = Path(__file__).resolve().parents[1] / "templates" / "index.html"
+    html = html_path.read_text(encoding="utf-8")
+
+    assert 'id="gallery-lightbox-fullscreen"' in html
+    assert 'id="gallery-lightbox-fullscreen-status" class="hint gallery-lightbox-fullscreen-status" hidden aria-live="polite">Pinned fullscreen</span>' in html
+    assert 'aria-keyshortcuts="F"' in html
+    assert 'F fullscreen, Esc close' in html
+
+    js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
+    js = js_path.read_text(encoding="utf-8")
+
+    assert "const galleryLightboxFullscreenBtn = document.getElementById('gallery-lightbox-fullscreen');" in js
+    assert "const galleryLightboxFullscreenStatus = document.getElementById('gallery-lightbox-fullscreen-status');" in js
+    assert "const GALLERY_LIGHTBOX_FULLSCREEN_KEY = 'galleryLightboxFullscreenModeV1';" in js
+    assert "function syncGalleryLightboxFullscreenUi() {" in js
+    assert "function toggleGalleryLightboxFullscreen() {" in js
+    assert "galleryLightbox.classList.toggle('is-fullscreen', galleryLightboxFullscreenMode);" in js
+    assert "galleryLightboxFullscreenStatus.hidden = !galleryLightboxFullscreenMode;" in js
+    assert "galleryLightboxFullscreenStatus.textContent = galleryLightboxFullscreenMode ? 'Pinned fullscreen' : '';" in js
+    assert "galleryLightboxFullscreenBtn.setAttribute(" in js
+    assert "galleryLightboxFullscreenBtn.title = galleryLightboxFullscreenMode" in js
+    assert "galleryLightboxFullscreenBtn.addEventListener('click', toggleGalleryLightboxFullscreen);" in js
+    assert "syncGalleryLightboxFullscreenUi();" in js
+    assert "key !== 'f' && key !== 'F'" in js
+    assert "if (key === 'f' || key === 'F') {" in js
+
+    css_path = Path(__file__).resolve().parents[1] / "static" / "css" / "style.css"
+    css = css_path.read_text(encoding="utf-8")
+    assert ".gallery-lightbox-shortcuts" in css
+    assert ".gallery-lightbox-fullscreen-status" in css
+    assert ".gallery-lightbox-fullscreen-status[hidden]" in css
+
+
+def test_gallery_context_menu_keyboard_support_present():
+    """Gallery context menu exposes keyboard navigation, activation, and focus restoration wiring."""
+    from pathlib import Path
+    html_path = Path(__file__).resolve().parents[1] / "templates" / "index.html"
+    html = html_path.read_text(encoding="utf-8")
+
+    assert '<div id="gallery-context-menu" class="gallery-context-menu" hidden role="menu" aria-label="Gallery actions">' in html
+    assert '<button type="button" role="menuitem" data-gallery-action="open-location">Open image location</button>' in html
+    assert '<button type="button" role="menuitem" data-gallery-action="delete-image">Delete image</button>' in html
+    assert '<button type="button" role="menuitem" data-gallery-action="export-webp">Export WebP</button>' in html
+
+    js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
+    js = js_path.read_text(encoding="utf-8")
+
+    assert "function getGalleryContextMenuItems() {" in js
+    assert "function focusGalleryContextMenuItem(index) {" in js
+    assert "let galleryContextMenuLastFocus = null;" in js
+    assert "function closeGalleryContextMenu(options = {}) {" in js
+    assert "const { restoreFocus = false } = options;" in js
+    assert "galleryContextMenuLastFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;" in js
+    assert "focusGalleryContextMenuItem(0);" in js
+    assert "galleryContextMenu.addEventListener('keydown', (event) => {" in js
+    assert "if (event.key === 'Escape') {" in js
+    assert "closeGalleryContextMenu({ restoreFocus: true });" in js
+    assert "if (['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) {" in js
+    assert "const currentIndex = target instanceof HTMLElement ? items.indexOf(target) : -1;" in js
+    assert "if ((event.key === 'Enter' || event.key === ' ') && target instanceof HTMLButtonElement) {" in js
+    assert "target.click();" in js
+
+
+def test_gallery_image_keyboard_entrypoint_for_lightbox_and_context_menu_present():
+    """Gallery images expose keyboard shortcuts for opening the lightbox and context menu."""
+    from pathlib import Path
+    js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
+    js = js_path.read_text(encoding="utf-8")
+
+    assert 'role="button" tabindex="0"' in js
+    assert 'aria-keyshortcuts="ArrowLeft ArrowRight ArrowUp ArrowDown Home End Enter Space Shift+F10 ContextMenu"' in js
+    assert "function openGalleryContextMenuForCard(card, anchorEl = null) {" in js
+    assert "function getGalleryFocusableImageButtons() {" in js
+    assert "function focusAdjacentGalleryImage(currentImage, key) {" in js
+    assert "galleryGrid.addEventListener('keydown', (event) => {" in js
+    assert "const imageTarget = target.closest('.gallery-card img[role=\"button\"]');" in js
+    assert "if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)) {" in js
+    assert "if (focusAdjacentGalleryImage(imageTarget, event.key)) {" in js
+    assert "const isContextMenuShortcut = event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10');" in js
+    assert "if (event.key !== 'Enter' && event.key !== ' ' && !isContextMenuShortcut) return;" in js
+    assert "openGalleryContextMenuForCard(card, imageTarget);" in js
+    assert "openGalleryLightbox(src, imageTarget.alt, caption, index);" in js
+    assert "if (gallerySelectMode) {" in js
+    assert "toggleGalleryCardSelection(entryId, index, event.shiftKey);" in js
+
+    css_path = Path(__file__).resolve().parents[1] / "static" / "css" / "style.css"
+    css = css_path.read_text(encoding="utf-8")
+    assert '.gallery-card img[role="button"]:focus-visible' in css
 
 
 def test_prompt_input_escape_to_clear_keyboard_support():
@@ -3163,12 +3278,14 @@ def test_prompt_preset_v2_html_elements_present():
     assert 'id="prompt-saved-tags"' in html
     assert 'id="prompt-fav-toggle"' in html
     assert 'id="prompt-favorites-only-toggle"' in html
+    assert 'aria-keyshortcuts="F"' in html and 'prompt-favorites-only-toggle' in html.split('aria-keyshortcuts="F"')[0].split('\n')[-1]
     assert 'id="prompt-tag-filter"' in html
     assert 'id="prompt-preset-filter-status"' in html
     assert 'id="prompt-preset-filter-shortcut-hint"' in html
+    assert 'Filter buttons: F favs, P pinned recent.' in html
     assert 'Recent chips: arrows move, Shift+arrows reorder, P pins, Del removes.' in html
     assert 'id="prompt-preset-recent-pinned-only-toggle"' in html
-    assert 'aria-keyshortcuts="Space"' in html and 'prompt-preset-recent-pinned-only-toggle' in html.split('aria-keyshortcuts="Space"')[0].split('\n')[-1]
+    assert 'aria-keyshortcuts="P Space"' in html and 'prompt-preset-recent-pinned-only-toggle' in html.split('aria-keyshortcuts="P Space"')[0].split('\n')[-1]
     assert 'id="prompt-preset-clear-filters"' in html
     assert 'aria-keyshortcuts="Control+Shift+K"' in html
     assert 'id="prompt-preset-recent-filters"' in html
@@ -3190,6 +3307,7 @@ def test_prompt_preset_v2_js_functions_present():
     assert "function renderPresetTagChips(name)" in js
     assert "function _getFavoritesOnlyFilter()" in js
     assert "function _setFavoritesOnlyFilter(enabled)" in js
+    assert "function _togglePromptFavoritesOnlyFilter()" in js
     assert "function _updateFavoritesOnlyToggleUi()" in js
     assert "function _getStoredTagFilter()" in js
     assert "function _setStoredTagFilter(value)" in js
@@ -3222,6 +3340,9 @@ def test_prompt_preset_v2_js_functions_present():
     assert "promptTagFilter.addEventListener('change'" in js
     # favorites-only quick filter wired
     assert "promptFavoritesOnlyToggle.addEventListener('click'" in js
+    assert "promptFavoritesOnlyToggle.addEventListener('keydown'" in js
+    assert "event.key !== ' ' && event.key !== 'Enter' && event.key !== 'f' && event.key !== 'F'" in js
+    assert "_togglePromptFavoritesOnlyFilter();" in js
     assert "promptPresetClearFilters.addEventListener('click'" in js
     assert "Preset filters cleared." in js
     # keyboard shortcut for quick clear
@@ -3233,6 +3354,7 @@ def test_prompt_preset_v2_js_functions_present():
     assert "PROMPT_SAVED_RECENT_FILTERS_PINNED_ONLY_KEY = 'promptSavedRecentFiltersPinnedOnlyV1'" in js
     assert "function _getRecentPinnedOnlyFilter()" in js
     assert "function _setRecentPinnedOnlyFilter(enabled)" in js
+    assert "function _toggleRecentPinnedOnlyFilter()" in js
     assert "function _updateRecentPinnedOnlyToggleUi()" in js
     # tag chips are clickable filter buttons
     assert "promptPresetTagChips.addEventListener('click'" in js
@@ -3247,10 +3369,11 @@ def test_prompt_preset_v2_js_functions_present():
     assert "Unpinned recent filter." in js
     assert "Pinned-only recent filters on." in js
     assert "Pinned-only recent filters off." in js
-    # pinned recent toggle with keyboard support (Space/Enter)
+    # pinned recent toggle with keyboard support (P/Space/Enter)
     assert "promptPresetRecentPinnedOnlyToggle.addEventListener('keydown'" in js
-    assert "event.key === ' ' || event.key === 'Enter'" in js
+    assert "event.key !== ' ' && event.key !== 'Enter' && event.key !== 'p' && event.key !== 'P'" in js
     assert "event.preventDefault();" in js
+    assert "_toggleRecentPinnedOnlyFilter();" in js
     assert "window.confirm(`Delete image profile \"${name}\"? This cannot be undone.`);" in js
     assert "window.confirm('Clear current conversation messages?');" in js
     assert "function togglePinRecentPresetFilterCombo(index)" in js
