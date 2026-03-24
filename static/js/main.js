@@ -9549,7 +9549,7 @@ if (galleryContextMenu) {
 			return;
 		}
 
-		if (['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) {
+		if (['ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight', 'Home', 'End', 'Tab'].includes(event.key)) {
 			const items = getGalleryContextMenuItems();
 			if (!items.length) return;
 			event.preventDefault();
@@ -9559,9 +9559,13 @@ if (galleryContextMenu) {
 				nextIndex = 0;
 			} else if (event.key === 'End') {
 				nextIndex = items.length - 1;
-			} else if (event.key === 'ArrowDown') {
+			} else if (event.key === 'Tab') {
+				nextIndex = event.shiftKey
+					? (currentIndex < 0 ? items.length - 1 : (currentIndex - 1 + items.length) % items.length)
+					: (currentIndex < 0 ? 0 : (currentIndex + 1) % items.length);
+			} else if (event.key === 'ArrowDown' || event.key === 'ArrowRight') {
 				nextIndex = currentIndex < 0 ? 0 : (currentIndex + 1) % items.length;
-			} else if (event.key === 'ArrowUp') {
+			} else if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') {
 				nextIndex = currentIndex < 0 ? items.length - 1 : (currentIndex - 1 + items.length) % items.length;
 			}
 			items[nextIndex]?.focus();

@@ -3023,8 +3023,13 @@ def test_gallery_context_menu_keyboard_support_present():
     assert "galleryContextMenu.addEventListener('keydown', (event) => {" in js
     assert "if (event.key === 'Escape') {" in js
     assert "closeGalleryContextMenu({ restoreFocus: true });" in js
-    assert "if (['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) {" in js
+    assert "if (['ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight', 'Home', 'End', 'Tab'].includes(event.key)) {" in js
     assert "const currentIndex = target instanceof HTMLElement ? items.indexOf(target) : -1;" in js
+    assert "} else if (event.key === 'Tab') {" in js
+    assert "? (currentIndex < 0 ? items.length - 1 : (currentIndex - 1 + items.length) % items.length)" in js
+    assert ": (currentIndex < 0 ? 0 : (currentIndex + 1) % items.length);" in js
+    assert "} else if (event.key === 'ArrowDown' || event.key === 'ArrowRight') {" in js
+    assert "} else if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') {" in js
     assert "if ((event.key === 'Enter' || event.key === ' ') && target instanceof HTMLButtonElement) {" in js
     assert "target.click();" in js
 
