@@ -687,6 +687,7 @@ const GALLERY_MODEL_FILTER_KEY = 'galleryModelFilterV1';
 let galleryModelFilter = localStorage.getItem(GALLERY_MODEL_FILTER_KEY) || 'all';
 const GALLERY_LIGHTBOX_FULLSCREEN_KEY = 'galleryLightboxFullscreenModeV1';
 let galleryLightboxFullscreenMode = localStorage.getItem(GALLERY_LIGHTBOX_FULLSCREEN_KEY) === '1';
+let galleryLightboxFullscreenRestoreHintPending = galleryLightboxFullscreenMode;
 const VALID_GALLERY_SORT_ORDERS = new Set(['newest', 'oldest', 'favorites-first']);
 if (!VALID_GALLERY_SORT_ORDERS.has(gallerySortOrder)) {
 	gallerySortOrder = 'newest';
@@ -8752,6 +8753,11 @@ function openGalleryLightbox(imgSrc, imgAlt, caption = '', index = 0) {
 	if (galleryLightboxCloseBtn) {
 		galleryLightboxCloseBtn.focus();
 	}
+	if (galleryLightboxFullscreenMode && galleryLightboxFullscreenRestoreHintPending && galleryLightboxFullscreenStatus) {
+		galleryLightboxFullscreenStatus.hidden = false;
+		galleryLightboxFullscreenStatus.textContent = 'Pinned fullscreen (restored)';
+		galleryLightboxFullscreenRestoreHintPending = false;
+	}
 }
 
 function closeGalleryLightbox() {
@@ -10060,6 +10066,7 @@ function toggleGalleryLightboxCompare() {
 function toggleGalleryLightboxFullscreen() {
 	if (!galleryLightbox || !galleryLightboxFullscreenBtn) return;
 	galleryLightboxFullscreenMode = !galleryLightboxFullscreenMode;
+	galleryLightboxFullscreenRestoreHintPending = false;
 	syncGalleryLightboxFullscreenUi();
 	localStorage.setItem(GALLERY_LIGHTBOX_FULLSCREEN_KEY, galleryLightboxFullscreenMode ? '1' : '0');
 	showToast(galleryLightboxFullscreenMode ? 'Fullscreen enabled' : 'Fullscreen disabled', 'info');

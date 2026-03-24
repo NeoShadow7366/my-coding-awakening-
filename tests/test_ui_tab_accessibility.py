@@ -2980,11 +2980,15 @@ def test_gallery_lightbox_fullscreen_button_and_f_shortcut_present():
     assert "const galleryLightboxFullscreenBtn = document.getElementById('gallery-lightbox-fullscreen');" in js
     assert "const galleryLightboxFullscreenStatus = document.getElementById('gallery-lightbox-fullscreen-status');" in js
     assert "const GALLERY_LIGHTBOX_FULLSCREEN_KEY = 'galleryLightboxFullscreenModeV1';" in js
+    assert "let galleryLightboxFullscreenRestoreHintPending = galleryLightboxFullscreenMode;" in js
     assert "function syncGalleryLightboxFullscreenUi() {" in js
     assert "function toggleGalleryLightboxFullscreen() {" in js
+    assert "galleryLightboxFullscreenRestoreHintPending = false;" in js
     assert "galleryLightbox.classList.toggle('is-fullscreen', galleryLightboxFullscreenMode);" in js
     assert "galleryLightboxFullscreenStatus.hidden = !galleryLightboxFullscreenMode;" in js
     assert "galleryLightboxFullscreenStatus.textContent = galleryLightboxFullscreenMode ? 'Pinned fullscreen' : '';" in js
+    assert "if (galleryLightboxFullscreenMode && galleryLightboxFullscreenRestoreHintPending && galleryLightboxFullscreenStatus) {" in js
+    assert "galleryLightboxFullscreenStatus.textContent = 'Pinned fullscreen (restored)';" in js
     assert "galleryLightboxFullscreenBtn.setAttribute(" in js
     assert "galleryLightboxFullscreenBtn.title = galleryLightboxFullscreenMode" in js
     assert "galleryLightboxFullscreenBtn.addEventListener('click', toggleGalleryLightboxFullscreen);" in js
