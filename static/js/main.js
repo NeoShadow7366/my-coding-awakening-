@@ -9726,6 +9726,18 @@ document.addEventListener('keydown', (event) => {
 	if (!imagePanel || imagePanel.hidden) return;
 	const targetEl = event.target instanceof Element ? event.target : document.activeElement;
 	if (!(targetEl instanceof Element) || !imagePanel.contains(targetEl)) return;
+
+	if (event.shiftKey) {
+		const openDetailsAll = [...imagePanel.querySelectorAll('details[open]')];
+		if (openDetailsAll.length) {
+			event.preventDefault();
+			event.stopPropagation();
+			openDetailsAll.forEach((detailsEl) => {
+				detailsEl.open = false;
+			});
+			return;
+		}
+	}
 	
 	// Find closest open details element (ControlNet, LoRA display, LoRA legend, HiresFix)
 	const openDetails = targetEl.closest('details[open]');

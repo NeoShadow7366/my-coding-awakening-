@@ -2920,6 +2920,10 @@ def test_image_panel_details_escape_to_close_keyboard_support():
     assert "document.addEventListener('keydown', (event) => {" in js
     assert "if (event.key !== 'Escape') return;" in js
     assert "const targetEl = event.target instanceof Element ? event.target : document.activeElement;" in js
+    assert "if (event.shiftKey) {" in js
+    assert "const openDetailsAll = [...imagePanel.querySelectorAll('details[open]')];" in js
+    assert "openDetailsAll.forEach((detailsEl) => {" in js
+    assert "detailsEl.open = false;" in js
     assert "const openDetails = targetEl.closest('details[open]');" in js
     assert "openDetails.open = false;" in js
     assert "const panelOpenDetails = [...imagePanel.querySelectorAll('details[open]')];" in js
