@@ -9620,6 +9620,7 @@ if (gallerySearch) {
 	});
 	gallerySearch.addEventListener('keydown', (e) => {
 		if (e.key !== 'Escape') return;
+		if (!gallerySearch.value && !gallerySearchQuery) return;
 		e.stopPropagation();
 		gallerySearch.value = '';
 		gallerySearchQuery = '';

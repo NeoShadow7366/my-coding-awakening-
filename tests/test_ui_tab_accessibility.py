@@ -2333,6 +2333,8 @@ def test_gallery_search_markup_and_keyboard_shortcut_present():
     assert 'id="gallery-search"' in html
     assert 'type="search"' in html
     assert 'placeholder="Filter by prompt…"' in html
+    assert 'aria-keyshortcuts="Escape"' in html
+    assert 'Press Escape to clear gallery search' in html
 
     js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
     js = js_path.read_text(encoding="utf-8")
@@ -2341,6 +2343,7 @@ def test_gallery_search_markup_and_keyboard_shortcut_present():
     assert "gallerySearch.addEventListener('input'" in js
     assert "gallerySearch.addEventListener('keydown'" in js
     assert "if (e.key !== 'Escape') return;" in js
+    assert "if (!gallerySearch.value && !gallerySearchQuery) return;" in js
     assert "gallerySearchQuery = gallerySearch.value || '';" in js
     assert "localStorage.setItem(GALLERY_SEARCH_QUERY_KEY, gallerySearchQuery);" in js
     assert "localStorage.removeItem(GALLERY_SEARCH_QUERY_KEY);" in js
