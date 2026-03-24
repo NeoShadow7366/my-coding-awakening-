@@ -9637,6 +9637,15 @@ if (galleryContextMenu) {
 		if (!action) return;
 		handleGalleryContextAction(action);
 	});
+	document.addEventListener('keydown', (event) => {
+		if (galleryContextMenu.hidden || event.key !== 'Tab') return;
+		if (event.target instanceof Node && galleryContextMenu.contains(event.target)) return;
+		const items = getGalleryContextMenuItems();
+		if (!items.length) return;
+		event.preventDefault();
+		const nextIndex = event.shiftKey ? items.length - 1 : 0;
+		items[nextIndex]?.focus();
+	});
 
 	document.addEventListener('click', (event) => {
 		if (galleryContextMenu.hidden) return;

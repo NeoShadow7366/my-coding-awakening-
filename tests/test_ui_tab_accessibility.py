@@ -3053,6 +3053,11 @@ def test_gallery_context_menu_keyboard_support_present():
     assert "} else if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') {" in js
     assert "if ((event.key === 'Enter' || event.key === ' ') && target instanceof HTMLButtonElement) {" in js
     assert "target.click();" in js
+    assert "document.addEventListener('keydown', (event) => {" in js
+    assert "if (galleryContextMenu.hidden || event.key !== 'Tab') return;" in js
+    assert "if (event.target instanceof Node && galleryContextMenu.contains(event.target)) return;" in js
+    assert "const nextIndex = event.shiftKey ? items.length - 1 : 0;" in js
+    assert "items[nextIndex]?.focus();" in js
 
     css_path = Path(__file__).resolve().parents[1] / "static" / "css" / "style.css"
     css = css_path.read_text(encoding="utf-8")
