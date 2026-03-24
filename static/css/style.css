@@ -1683,6 +1683,99 @@ textarea {
   opacity: 0.6;
 }
 
+/* Command palette */
+.command-palette {
+  position: fixed;
+  inset: 0;
+  z-index: 260;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: max(7vh, 1.25rem) var(--sp-lg) var(--sp-lg);
+}
+
+.command-palette[hidden] {
+  display: none;
+}
+
+.command-palette-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(8, 14, 30, 0.56);
+}
+
+.command-palette-panel {
+  position: relative;
+  width: min(680px, 100%);
+  max-height: min(78vh, 720px);
+  overflow-y: auto;
+  border: 1px solid var(--clr-border);
+  border-radius: var(--radius-lg);
+  background: var(--clr-surface);
+  box-shadow: var(--shadow-md);
+  padding: var(--sp-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-sm);
+}
+
+.command-palette-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-sm);
+}
+
+.command-palette-results {
+  border: 1px solid var(--clr-border);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--clr-bg) 90%, var(--clr-surface));
+  padding: var(--sp-xs);
+  max-height: min(50vh, 420px);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.command-palette-item {
+  width: 100%;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--clr-text);
+  text-align: left;
+  padding: 0.45rem 0.55rem;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.command-palette-item:hover,
+.command-palette-item:focus-visible,
+.command-palette-item.is-active {
+  border-color: color-mix(in srgb, var(--clr-primary) 58%, var(--clr-border));
+  background: color-mix(in srgb, var(--clr-primary) 9%, var(--clr-surface));
+  outline: none;
+}
+
+.command-palette-item-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.command-palette-item-hint {
+  font-size: 0.75rem;
+  color: var(--clr-text-muted);
+}
+
+.command-palette-empty {
+  padding: 0.7rem;
+  color: var(--clr-text-muted);
+  font-size: 0.84rem;
+}
+
 .prompt-history-row {
   margin-top: var(--sp-xs);
   display: flex;

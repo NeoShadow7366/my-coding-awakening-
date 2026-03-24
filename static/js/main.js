@@ -11,6 +11,10 @@ if (window.location.hostname === 'localhost') {
 	 DOM references
 	 -------------------------------------------------------------------------- */
 const themeToggle = document.getElementById('theme-toggle');
+const commandPalette = document.getElementById('command-palette');
+const commandPaletteInput = document.getElementById('command-palette-input');
+const commandPaletteResults = document.getElementById('command-palette-results');
+const commandPaletteCloseBtn = document.getElementById('command-palette-close');
 const statusDot = document.getElementById('status-dot');
 const statusText = document.getElementById('status-text');
 const navGenerative = document.getElementById('nav-generative');
@@ -520,6 +524,10 @@ let queueLastActionInfo = null;
 let queueLastActionTimer = null;
 let queueLastActionPinned = localStorage.getItem(QUEUE_LAST_ACTION_PINNED_KEY) === '1';
 let queueRestoreHintHidden = localStorage.getItem(QUEUE_RESTORE_HINT_HIDDEN_KEY) === '1';
+let commandPaletteItems = [];
+let commandPaletteFilteredItems = [];
+let commandPaletteActiveIndex = 0;
+let commandPaletteReturnFocusEl = null;
 let diagDrawerCollapsed = diagDrawerCollapsedStored === null ? null : diagDrawerCollapsedStored === '1';
 const IMAGE_PROFILE_STORAGE_KEY = 'imagePresetProfilesV1';
 const IMAGE_PROFILE_SELECTED_KEY = 'imagePresetProfilesSelectedV1';
@@ -1803,6 +1811,163 @@ function escHtml(str) {
 		.replace(/</g, '&lt;')
 		.replace(/>/g, '&gt;')
 		.replace(/"/g, '&quot;');
+}
+
+function _focusElementSoon(el, shouldSelect = false) {
+	if (!(el instanceof HTMLElement)) return;
+	window.requestAnimationFrame(() => {
+		window.requestAnimationFrame(() => {
+			el.focus();
+			if (shouldSelect && typeof el.select === 'function') {
+				el.select();
+			}
+		});
+	});
+}
+
+function _buildCommandPaletteItems() {
+	return [
+		{
+			id: 'show-generative',
+			label: 'Go to Text Model tab',
+			hint: 'Switch to the text generation panel',
+			searchText: 'text model generative tab',
+			action: () => showPanel('generative'),
+		},
+		{
+			id: 'show-image',
+			label: 'Go to Image tab',
+			hint: 'Switch to the image generation panel',
+			searchText: 'image tab panel',
+			action: () => showPanel('image'),
+		},
+		{
+			id: 'show-config',
+			label: 'Go to Configurations tab',
+			hint: 'Switch to service and path configuration',
+			searchText: 'config configurations services paths',
+			action: () => showPanel('config'),
+		},
+		{
+			id: 'show-models',
+			label: 'Go to Models tab',
+			hint: 'Switch to the model browser and library',
+			searchText: 'models browser library',
+			action: () => showPanel('models'),
+		},
+		{
+			id: 'focus-gallery-search',
+			label: 'Focus Gallery search',
+			hint: 'Jump to image gallery filter input',
+			searchText: 'gallery search filter image',
+			action: () => {
+				showPanel('image');
+				_focusElementSoon(gallerySearch, true);
+			},
+		},
+		{
+			id: 'focus-model-search',
+			label: 'Focus Model Browser search',
+			hint: 'Jump to model provider query input',
+			searchText: 'model browser search query',
+			action: () => {
+				showPanel('models');
+				_focusElementSoon(mbSearchQuery, true);
+			},
+		},
+		{
+			id: 'refresh-gallery',
+			label: 'Refresh Gallery',
+			hint: 'Reload current generation history view',
+			searchText: 'refresh gallery history reload',
+			action: () => {
+				showPanel('image');
+				window.requestAnimationFrame(() => {
+					if (refreshGalleryBtn) refreshGalleryBtn.click();
+				});
+			},
+		},
+	];
+}
+
+function _renderCommandPaletteResults() {
+	if (!commandPaletteResults) return;
+	if (!commandPaletteFilteredItems.length) {
+		commandPaletteResults.innerHTML = '<p class="command-palette-empty">No commands match your search.</p>';
+		return;
+	}
+	commandPaletteResults.innerHTML = commandPaletteFilteredItems
+		.map((item, index) => `
+			<button
+				type="button"
+				class="command-palette-item${index === commandPaletteActiveIndex ? ' is-active' : ''}"
+				data-command-id="${escHtml(item.id)}"
+				role="option"
+				aria-selected="${index === commandPaletteActiveIndex ? 'true' : 'false'}"
+			>
+				<span class="command-palette-item-title">${escHtml(item.label)}</span>
+				<span class="command-palette-item-hint">${escHtml(item.hint)}</span>
+			</button>
+		`)
+		.join('');
+}
+
+function _filterCommandPaletteItems(query) {
+	const q = String(query || '').trim().toLowerCase();
+	if (!q) return commandPaletteItems.slice();
+	return commandPaletteItems.filter((item) => {
+		const search = `${item.label} ${item.hint} ${item.searchText || ''}`.toLowerCase();
+		return search.includes(q);
+	});
+}
+
+function closeCommandPalette() {
+	if (!commandPalette || commandPalette.hidden) return;
+	commandPalette.hidden = true;
+	commandPalette.setAttribute('aria-hidden', 'true');
+	if (commandPaletteInput) commandPaletteInput.value = '';
+	commandPaletteFilteredItems = [];
+	commandPaletteActiveIndex = 0;
+	const returnFocus = commandPaletteReturnFocusEl;
+	commandPaletteReturnFocusEl = null;
+	if (returnFocus instanceof HTMLElement) {
+		window.requestAnimationFrame(() => returnFocus.focus());
+	}
+}
+
+function runCommandPaletteSelection() {
+	const item = commandPaletteFilteredItems[commandPaletteActiveIndex];
+	if (!item || typeof item.action !== 'function') return;
+	closeCommandPalette();
+	item.action();
+	showToast(`Ran: ${item.label}`, 'pos');
+}
+
+function openCommandPalette() {
+	if (!commandPalette || !commandPaletteInput || !commandPaletteResults) return;
+	commandPaletteItems = _buildCommandPaletteItems();
+	commandPaletteFilteredItems = commandPaletteItems.slice();
+	commandPaletteActiveIndex = 0;
+	commandPaletteReturnFocusEl = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+	commandPalette.hidden = false;
+	commandPalette.setAttribute('aria-hidden', 'false');
+	_renderCommandPaletteResults();
+	window.requestAnimationFrame(() => {
+		commandPaletteInput.focus();
+		commandPaletteInput.select();
+	});
+}
+
+function _moveCommandPaletteSelection(delta) {
+	if (!commandPaletteFilteredItems.length) return;
+	const maxIndex = commandPaletteFilteredItems.length - 1;
+	commandPaletteActiveIndex = Math.max(0, Math.min(maxIndex, commandPaletteActiveIndex + delta));
+	_renderCommandPaletteResults();
+	if (!commandPaletteResults) return;
+	const activeBtn = commandPaletteResults.querySelectorAll('.command-palette-item')[commandPaletteActiveIndex];
+	if (activeBtn instanceof HTMLElement) {
+		activeBtn.scrollIntoView({ block: 'nearest' });
+	}
 }
 
 function getFocusedQueueAction() {
@@ -9397,6 +9562,72 @@ document.addEventListener('keydown', (event) => {
 		showToast('Focus on gallery search.', 'pos');
 	}
 });
+
+// Global Ctrl+K shortcut for command palette
+document.addEventListener('keydown', (event) => {
+	const hotkey = String(event.key || '').toLowerCase();
+	const isPaletteHotkey = (event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey && hotkey === 'k';
+	if (isPaletteHotkey) {
+		event.preventDefault();
+		if (commandPalette && !commandPalette.hidden) {
+			closeCommandPalette();
+			return;
+		}
+		openCommandPalette();
+		return;
+	}
+	if (event.key === 'Escape' && commandPalette && !commandPalette.hidden) {
+		event.preventDefault();
+		closeCommandPalette();
+	}
+});
+
+if (commandPaletteCloseBtn) {
+	commandPaletteCloseBtn.addEventListener('click', closeCommandPalette);
+}
+
+if (commandPalette) {
+	commandPalette.addEventListener('click', (event) => {
+		const target = event.target instanceof HTMLElement ? event.target : null;
+		if (!target) return;
+		if (target === commandPalette || target.dataset.commandPaletteClose === 'backdrop') {
+			closeCommandPalette();
+			return;
+		}
+		const row = target.closest('.command-palette-item');
+		if (!row) return;
+		const id = row.getAttribute('data-command-id');
+		const index = commandPaletteFilteredItems.findIndex((item) => item.id === id);
+		if (index < 0) return;
+		commandPaletteActiveIndex = index;
+		runCommandPaletteSelection();
+	});
+}
+
+if (commandPaletteInput) {
+	commandPaletteInput.addEventListener('input', () => {
+		commandPaletteFilteredItems = _filterCommandPaletteItems(commandPaletteInput.value);
+		commandPaletteActiveIndex = 0;
+		_renderCommandPaletteResults();
+	});
+
+	commandPaletteInput.addEventListener('keydown', (event) => {
+		if (event.key === 'ArrowDown') {
+			event.preventDefault();
+			_moveCommandPaletteSelection(1);
+			return;
+		}
+		if (event.key === 'ArrowUp') {
+			event.preventDefault();
+			_moveCommandPaletteSelection(-1);
+			return;
+		}
+		if (event.key === 'Enter') {
+			event.preventDefault();
+			runCommandPaletteSelection();
+		}
+	});
+}
 
 // Escape-to-close support for Image panel collapsible details and sidebar sections
 document.addEventListener('keydown', (event) => {

@@ -253,6 +253,43 @@ def test_gallery_search_query_persistence_present_in_js_bundle():
     assert "localStorage.removeItem(GALLERY_SEARCH_QUERY_KEY);" in content
 
 
+def test_command_palette_markup_and_shortcut_wiring_present_in_assets():
+    app_module.app.config["TESTING"] = True
+    client = app_module.app.test_client()
+
+    resp = client.get("/")
+    assert resp.status_code == 200
+    html = resp.get_data(as_text=True)
+
+    assert 'id="command-palette" class="command-palette" hidden aria-hidden="true" role="dialog"' in html
+    assert 'id="command-palette-title" class="section-heading">Command Palette<' in html
+    assert 'id="command-palette-close"' in html
+    assert 'id="command-palette-input"' in html
+    assert 'id="command-palette-results" class="command-palette-results" role="listbox"' in html
+    assert 'Ctrl+K or Cmd+K opens, arrows move, Enter runs, Esc closes.' in html
+
+    js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
+    js = js_path.read_text(encoding="utf-8")
+    assert "const commandPalette = document.getElementById('command-palette');" in js
+    assert "const commandPaletteInput = document.getElementById('command-palette-input');" in js
+    assert "const commandPaletteResults = document.getElementById('command-palette-results');" in js
+    assert "function openCommandPalette()" in js
+    assert "function closeCommandPalette()" in js
+    assert "function runCommandPaletteSelection()" in js
+    assert "function _buildCommandPaletteItems()" in js
+    assert "if (isPaletteHotkey) {" in js
+    assert "(event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey && hotkey === 'k'" in js
+    assert "if (event.key === 'Escape' && commandPalette && !commandPalette.hidden) {" in js
+    assert "showToast(`Ran: ${item.label}`, 'pos');" in js
+
+    css_path = Path(__file__).resolve().parents[1] / "static" / "css" / "style.css"
+    css = css_path.read_text(encoding="utf-8")
+    assert ".command-palette" in css
+    assert ".command-palette-panel" in css
+    assert ".command-palette-results" in css
+    assert ".command-palette-item" in css
+
+
 def test_image_sidebar_section_collapse_persistence_present_in_assets():
     js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
     content = js_path.read_text(encoding="utf-8")
