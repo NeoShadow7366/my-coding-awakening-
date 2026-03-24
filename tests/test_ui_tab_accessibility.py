@@ -3021,6 +3021,7 @@ def test_gallery_context_menu_keyboard_support_present():
     assert 'data-gallery-action="export-png" aria-keyshortcuts="2"' in html
     assert 'data-gallery-action="export-jpeg" aria-keyshortcuts="3"' in html
     assert 'data-gallery-action="export-webp" aria-keyshortcuts="4"' in html
+    assert 'class="gallery-context-shortcuts" aria-hidden="true">Shortcuts: O open, Del delete, 1-4 export, ? help</p>' in html
 
     js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
     js = js_path.read_text(encoding="utf-8")
@@ -3052,6 +3053,10 @@ def test_gallery_context_menu_keyboard_support_present():
     assert "} else if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') {" in js
     assert "if ((event.key === 'Enter' || event.key === ' ') && target instanceof HTMLButtonElement) {" in js
     assert "target.click();" in js
+
+    css_path = Path(__file__).resolve().parents[1] / "static" / "css" / "style.css"
+    css = css_path.read_text(encoding="utf-8")
+    assert ".gallery-context-shortcuts" in css
 
 
 def test_gallery_image_keyboard_entrypoint_for_lightbox_and_context_menu_present():

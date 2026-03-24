@@ -3605,6 +3605,16 @@ textarea {
   background: var(--clr-border);
 }
 
+.gallery-context-shortcuts {
+  margin: 0.2rem 0.35rem 0.15rem;
+  padding-top: 0.25rem;
+  border-top: 1px dashed color-mix(in srgb, var(--clr-border) 75%, transparent);
+  color: var(--clr-text-subtle);
+  font-size: 0.7rem;
+  letter-spacing: 0.01em;
+  user-select: none;
+}
+
 body.gallery-lightbox-open {
   overflow: hidden;
 }
