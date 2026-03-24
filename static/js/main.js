@@ -9555,6 +9555,26 @@ if (galleryContextMenu) {
 			return;
 		}
 
+		const menuHotkey = String(event.key || '').toLowerCase();
+		const hotkeyActionMap = {
+			o: 'open-location',
+			d: 'delete-image',
+			delete: 'delete-image',
+			'1': 'export-png-meta',
+			'2': 'export-png',
+			'3': 'export-jpeg',
+			'4': 'export-webp',
+		};
+		const hotkeyAction = hotkeyActionMap[menuHotkey];
+		if (hotkeyAction) {
+			const hotkeyBtn = galleryContextMenu.querySelector(`[data-gallery-action="${hotkeyAction}"]`);
+			if (hotkeyBtn instanceof HTMLButtonElement && !hotkeyBtn.disabled && !hotkeyBtn.hidden) {
+				event.preventDefault();
+				hotkeyBtn.click();
+				return;
+			}
+		}
+
 		if (['ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight', 'Home', 'End', 'Tab'].includes(event.key)) {
 			const items = getGalleryContextMenuItems();
 			if (!items.length) return;

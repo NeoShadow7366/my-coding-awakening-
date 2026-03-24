@@ -3013,9 +3013,12 @@ def test_gallery_context_menu_keyboard_support_present():
     html = html_path.read_text(encoding="utf-8")
 
     assert '<div id="gallery-context-menu" class="gallery-context-menu" hidden role="menu" aria-label="Gallery actions">' in html
-    assert '<button type="button" role="menuitem" data-gallery-action="open-location">Open image location</button>' in html
-    assert '<button type="button" role="menuitem" data-gallery-action="delete-image">Delete image</button>' in html
-    assert '<button type="button" role="menuitem" data-gallery-action="export-webp">Export WebP</button>' in html
+    assert 'data-gallery-action="open-location" aria-keyshortcuts="O"' in html
+    assert 'data-gallery-action="delete-image" aria-keyshortcuts="Delete D"' in html
+    assert 'data-gallery-action="export-png-meta" aria-keyshortcuts="1"' in html
+    assert 'data-gallery-action="export-png" aria-keyshortcuts="2"' in html
+    assert 'data-gallery-action="export-jpeg" aria-keyshortcuts="3"' in html
+    assert 'data-gallery-action="export-webp" aria-keyshortcuts="4"' in html
 
     js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
     js = js_path.read_text(encoding="utf-8")
@@ -3030,6 +3033,12 @@ def test_gallery_context_menu_keyboard_support_present():
     assert "galleryContextMenu.addEventListener('keydown', (event) => {" in js
     assert "if (event.key === 'Escape') {" in js
     assert "closeGalleryContextMenu({ restoreFocus: true });" in js
+    assert "const hotkeyActionMap = {" in js
+    assert "delete: 'delete-image'," in js
+    assert "'1': 'export-png-meta'," in js
+    assert "const hotkeyBtn = galleryContextMenu.querySelector(`[data-gallery-action=\"${hotkeyAction}\"]`);" in js
+    assert "if (hotkeyBtn instanceof HTMLButtonElement && !hotkeyBtn.disabled && !hotkeyBtn.hidden) {" in js
+    assert "hotkeyBtn.click();" in js
     assert "if (['ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight', 'Home', 'End', 'Tab'].includes(event.key)) {" in js
     assert "const currentIndex = target instanceof HTMLElement ? items.indexOf(target) : -1;" in js
     assert "} else if (event.key === 'Tab') {" in js
