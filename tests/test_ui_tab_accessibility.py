@@ -290,6 +290,31 @@ def test_command_palette_markup_and_shortcut_wiring_present_in_assets():
     assert ".command-palette-item" in css
 
 
+def test_model_browser_thumbnail_fallback_and_video_preview_wiring_present_in_assets():
+    js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
+    js = js_path.read_text(encoding="utf-8")
+
+    assert "function isVideoPreviewUrl(url)" in js
+    assert "function renderModelPreviewPlaceholder(modelName, badgeText = 'No preview')" in js
+    assert "function renderModelCardMainMedia(previewUrl, modelName, badgeText = 'No preview')" in js
+    assert "function setCardMainPreviewMedia(card, previewSrc, modelName, badgeText = 'No preview')" in js
+    assert "function bindModelCardMediaFallbacks(scopeEl, modelName, badgeText = 'No preview')" in js
+    assert "if (isVideoPreviewUrl(url)) {" in js
+    assert "mb-result-thumb mb-result-thumb-video" in js
+    assert "Generated placeholder preview for" in js
+    assert "renderModelCardMainMedia(activePreview, m.name || 'Local model', 'Local model')" in js
+    assert "setCardMainPreviewMedia(card, targetSrc, m.name || 'Local model', 'Local model');" in js
+    assert "renderModelCardMainMedia(item.preview_url, item.name || 'Model', 'No preview')" in js
+    assert "bindModelCardMediaFallbacks(card, item.name || 'Model', 'No preview');" in js
+
+    css_path = Path(__file__).resolve().parents[1] / "static" / "css" / "style.css"
+    css = css_path.read_text(encoding="utf-8")
+    assert ".mb-result-thumb-video" in css
+    assert ".mb-result-thumb-placeholder.is-generated" in css
+    assert ".mb-result-thumb-placeholder-title" in css
+    assert ".mb-local-card-preview-thumb-video" in css
+
+
 def test_image_sidebar_section_collapse_persistence_present_in_assets():
     js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
     content = js_path.read_text(encoding="utf-8")

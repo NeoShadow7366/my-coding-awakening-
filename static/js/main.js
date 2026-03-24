@@ -1813,6 +1813,91 @@ function escHtml(str) {
 		.replace(/"/g, '&quot;');
 }
 
+function isVideoPreviewUrl(url) {
+	const raw = String(url || '').trim().toLowerCase();
+	if (!raw) return false;
+	const clean = raw.split('?')[0].split('#')[0];
+	return clean.endsWith('.mp4') || clean.endsWith('.webm') || clean.endsWith('.mov') || clean.endsWith('.m4v') || clean.endsWith('.ogv');
+}
+
+function _hashStringForHue(value) {
+	const s = String(value || '');
+	let hash = 0;
+	for (let i = 0; i < s.length; i += 1) {
+		hash = ((hash << 5) - hash) + s.charCodeAt(i);
+		hash |= 0;
+	}
+	return Math.abs(hash) % 360;
+}
+
+function renderModelPreviewPlaceholder(modelName, badgeText = 'No preview') {
+	const safeName = String(modelName || 'Model').trim() || 'Model';
+	const hue = _hashStringForHue(safeName);
+	const gradient = `linear-gradient(140deg, hsl(${hue} 52% 42% / 0.72), hsl(${(hue + 42) % 360} 58% 34% / 0.7))`;
+	const shortName = safeName.length > 56 ? `${safeName.slice(0, 56)}...` : safeName;
+	return `<div class="mb-result-thumb-placeholder is-generated" role="img" aria-label="No preview available" title="Generated placeholder preview for ${escHtml(safeName)}" style="--mb-placeholder-gradient:${escHtml(gradient)}"><span class="mb-result-thumb-placeholder-title">${escHtml(shortName)}</span><span class="mb-result-thumb-placeholder-badge">${escHtml(badgeText)}</span></div>`;
+}
+
+function renderModelCardMainMedia(previewUrl, modelName, badgeText = 'No preview') {
+	const url = String(previewUrl || '').trim();
+	if (!url) return renderModelPreviewPlaceholder(modelName, badgeText);
+	if (isVideoPreviewUrl(url)) {
+		return `<video class="mb-result-thumb mb-result-thumb-video" src="${escHtml(url)}" aria-label="Video preview for ${escHtml(modelName || 'model')}" muted loop playsinline preload="metadata" data-preview-main="1"></video>`;
+	}
+	return `<img class="mb-result-thumb" src="${escHtml(url)}" alt="" loading="lazy" data-preview-main="1">`;
+}
+
+function setCardMainPreviewMedia(card, previewSrc, modelName, badgeText = 'No preview') {
+	if (!(card instanceof HTMLElement)) return;
+	const src = String(previewSrc || '').trim();
+	const current = card.querySelector('[data-preview-main="1"]');
+	if (!src) {
+		if (current instanceof HTMLElement) {
+			current.outerHTML = renderModelPreviewPlaceholder(modelName, badgeText);
+		}
+		return;
+	}
+	const shouldVideo = isVideoPreviewUrl(src);
+	if (current instanceof HTMLVideoElement && shouldVideo) {
+		current.src = src;
+		current.load();
+		return;
+	}
+	if (current instanceof HTMLImageElement && !shouldVideo) {
+		current.src = src;
+		return;
+	}
+	if (current instanceof HTMLElement) {
+		current.outerHTML = renderModelCardMainMedia(src, modelName, badgeText);
+		bindModelCardMediaFallbacks(card, modelName, badgeText);
+	}
+}
+
+function bindModelCardMediaFallbacks(scopeEl, modelName, badgeText = 'No preview') {
+	if (!(scopeEl instanceof HTMLElement)) return;
+	scopeEl.querySelectorAll('.mb-result-thumb').forEach((node) => {
+		if (node.dataset.fallbackBound === '1') return;
+		node.dataset.fallbackBound = '1';
+		if (node instanceof HTMLImageElement) {
+			node.addEventListener('error', () => {
+				node.outerHTML = renderModelPreviewPlaceholder(modelName, badgeText);
+			}, { once: true });
+			return;
+		}
+		if (node instanceof HTMLVideoElement) {
+			node.addEventListener('loadedmetadata', () => {
+				if (Number.isFinite(node.duration) && node.duration > 0.08) {
+					node.currentTime = 0.08;
+				}
+				node.pause();
+			}, { once: true });
+			node.addEventListener('error', () => {
+				node.outerHTML = renderModelPreviewPlaceholder(modelName, badgeText);
+			}, { once: true });
+		}
+	});
+}
+
 function _focusElementSoon(el, shouldSelect = false) {
 	if (!(el instanceof HTMLElement)) return;
 	window.requestAnimationFrame(() => {
@@ -13233,11 +13318,9 @@ function renderLocalLibrary(models, root) {
 			cardPreviewUrls.unshift(String(m.preview_url));
 		}
 		const activePreview = cardPreviewUrls[0] || '';
-		const thumb = activePreview
-			? `<img class="mb-result-thumb" src="${escHtml(activePreview)}" alt="" loading="lazy" data-preview-main="1">`
-			: '<div class="mb-result-thumb-placeholder" role="img" aria-label="No preview available"><span class="mb-result-thumb-placeholder-badge">Local model</span></div>';
+		const thumb = renderModelCardMainMedia(activePreview, m.name || 'Local model', 'Local model');
 		const previewStrip = cardPreviewUrls.length > 1
-			? `<div class="mb-local-card-preview-strip">${cardPreviewUrls.slice(0, 6).map((url, idx) => (`<button class="mb-local-card-preview-thumb ${idx === 0 ? 'is-active' : ''}" type="button" data-preview-src="${escHtml(url)}" aria-label="Show preview ${idx + 1}"><img src="${escHtml(url)}" alt="" loading="lazy"></button>`)).join('')}</div>`
+			? `<div class="mb-local-card-preview-strip">${cardPreviewUrls.slice(0, 6).map((url, idx) => (`<button class="mb-local-card-preview-thumb ${idx === 0 ? 'is-active' : ''}" type="button" data-preview-src="${escHtml(url)}" aria-label="Show preview ${idx + 1}">${isVideoPreviewUrl(url) ? '<span class="mb-local-card-preview-thumb-video" aria-hidden="true">VID</span>' : `<img src="${escHtml(url)}" alt="" loading="lazy">`}</button>`)).join('')}</div>`
 			: '';
 		const sizeLabel = formatBytes(m.size_bytes);
 		const filePath = String(m.path || '');
@@ -13274,16 +13357,14 @@ function renderLocalLibrary(models, root) {
 			event.preventDefault();
 			openLocalModelDetailsModal(m);
 		});
+		bindModelCardMediaFallbacks(card, m.name || 'Local model', 'Local model');
 		card.querySelectorAll('.mb-local-card-preview-thumb').forEach((thumbBtn) => {
 			thumbBtn.addEventListener('click', (event) => {
 				event.preventDefault();
 				event.stopPropagation();
 				const targetSrc = String(thumbBtn.dataset.previewSrc || '').trim();
 				if (!targetSrc) return;
-				const mainPreview = card.querySelector('[data-preview-main="1"]');
-				if (mainPreview instanceof HTMLImageElement) {
-					mainPreview.src = targetSrc;
-				}
+				setCardMainPreviewMedia(card, targetSrc, m.name || 'Local model', 'Local model');
 				card.querySelectorAll('.mb-local-card-preview-thumb').forEach((node) => node.classList.remove('is-active'));
 				thumbBtn.classList.add('is-active');
 			});
@@ -13461,9 +13542,7 @@ function renderSearchResults(items, totalItems, hasProviderTotal = false) {
 		card.setAttribute('role', 'button');
 		card.setAttribute('tabindex', '0');
 		card.setAttribute('aria-label', `Open model ${item.name || 'details'}`);
-		const thumb = item.preview_url
-			? `<img class="mb-result-thumb" src="${escHtml(item.preview_url)}" alt="" loading="lazy">`
-			: `<div class="mb-result-thumb-placeholder" role="img" aria-label="No preview available"><span class="mb-result-thumb-placeholder-badge">No preview</span></div>`;
+			const thumb = renderModelCardMainMedia(item.preview_url, item.name || 'Model', 'No preview');
 		const sourceLink = item.model_url
 			? `<a class="mb-result-source-link" href="${escHtml(item.model_url)}" target="_blank" rel="noopener noreferrer" title="Open on source site" aria-label="Open on source site">↗</a>`
 			: '';
@@ -13498,6 +13577,7 @@ function renderSearchResults(items, totalItems, hasProviderTotal = false) {
 			event.preventDefault();
 			openModelDetailsModal(item);
 		});
+			bindModelCardMediaFallbacks(card, item.name || 'Model', 'No preview');
 	});
 	updatePagination();
 }
