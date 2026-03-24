@@ -1172,6 +1172,7 @@ def test_local_library_cards_use_model_card_layout_features_in_js_bundle():
     assert "class=\"mb-local-card-preview-thumb" in content
     assert "Matched version:" in content
     assert "class=\"mb-local-card-actions\"" in content
+    assert "class=\"btn btn-sm btn-ghost mb-copy-path-btn\"" in content
     assert "class=\"btn btn-sm btn-ghost mb-open-folder-btn\"" in content
     assert "class=\"btn btn-sm btn-danger mb-delete-btn\"" in content
 
@@ -1262,6 +1263,7 @@ def test_local_library_cards_open_local_details_modal_in_js_bundle():
     assert "function openLocalModelDetailsModal(item)" in content
     assert "card.setAttribute('role', 'button');" in content
     assert "card.setAttribute('tabindex', '0');" in content
+    assert "if (target.closest('.mb-copy-path-btn')) return;" in content
     assert "if (target.closest('.mb-open-folder-btn')) return;" in content
     assert "if (target.closest('.mb-delete-btn')) return;" in content
     assert "openLocalModelDetailsModal(m);" in content
@@ -1278,6 +1280,20 @@ def test_local_library_open_folder_actions_wired_in_js_bundle():
     assert "showToast('Open folder failed: ' + (err && err.message ? err.message : String(err)), 'neg');" in content
     assert "class=\"btn btn-sm btn-ghost mb-local-modal-open-folder-btn\"" in content
     assert "openLocalModelFolder(btn.dataset.name || '', btn.dataset.folder || '', btn);" in content
+
+
+def test_local_library_copy_path_actions_wired_in_js_bundle():
+    js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
+    content = js_path.read_text(encoding="utf-8")
+
+    assert "function copyLocalModelPath(pathValue)" in content
+    assert "navigator.clipboard && typeof navigator.clipboard.writeText === 'function'" in content
+    assert "document.execCommand('copy');" in content
+    assert "showToast('Model path copied.', 'pos');" in content
+    assert "showToast('No model path available to copy.', 'neg');" in content
+    assert "showToast('Copy path failed: ' + (err && err.message ? err.message : String(err)), 'neg');" in content
+    assert "class=\"btn btn-sm btn-ghost mb-local-modal-copy-path-btn\"" in content
+    assert "copyLocalModelPath(btn.dataset.path || '');" in content
 
 
 def test_index_local_library_has_find_missing_previews_button():

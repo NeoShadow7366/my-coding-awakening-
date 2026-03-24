@@ -12633,11 +12633,18 @@ function openLocalModelDetailsModal(item) {
 					<span class="mb-model-modal-file-meta">${escHtml(typeLabel)} · ${escHtml(sizeLabel)} · ${escHtml(folderLabel)}</span>
 				</div>
 				<div class="mb-model-modal-file-actions">
+					<button class="btn btn-sm btn-ghost mb-local-modal-copy-path-btn" data-path="${escHtml(item.path || '')}">Copy Path</button>
 					<button class="btn btn-sm btn-ghost mb-local-modal-open-folder-btn" data-name="${escHtml(item.name || '')}" data-folder="${escHtml(item.folder || '')}">Open Folder</button>
 					<button class="btn btn-sm btn-ghost mb-local-modal-use-btn" data-name="${escHtml(item.name || '')}" data-type="${escHtml(item.type || '')}" data-folder="${escHtml(item.folder || '')}">Use in Image Gen</button>
 					<button class="btn btn-sm btn-danger mb-local-modal-delete-btn" data-name="${escHtml(item.name || '')}" data-folder="${escHtml(item.folder || '')}">Delete</button>
 				</div>
 			</div>`;
+		const copyPathBtn = mbModelModalFiles.querySelector('.mb-local-modal-copy-path-btn');
+		if (copyPathBtn) {
+			copyPathBtn.addEventListener('click', () => {
+				copyLocalModelPath(copyPathBtn.dataset.path || '');
+			});
+		}
 		const openFolderBtn = mbModelModalFiles.querySelector('.mb-local-modal-open-folder-btn');
 		if (openFolderBtn) {
 			openFolderBtn.addEventListener('click', () => {
@@ -13353,6 +13360,7 @@ function renderLocalLibrary(models, root) {
 				${versionLabel ? `<div class="mb-local-card-version" title="Matched provider version">Matched version: ${escHtml(versionLabel)}</div>` : ''}
 				${filePath ? `<div class="mb-result-version" title="${escHtml(filePath)}">${escHtml(filePath)}</div>` : ''}
 				<div class="mb-local-card-actions">
+					<button class="btn btn-sm btn-ghost mb-copy-path-btn" data-path="${escHtml(filePath)}">Copy Path</button>
 					<button class="btn btn-sm btn-ghost mb-open-folder-btn" data-name="${escHtml(m.name || '')}" data-folder="${escHtml(m.folder || '')}">Open Folder</button>
 					<button class="btn btn-sm btn-ghost mb-use-image-btn" data-name="${escHtml(m.name || '')}" data-type="${escHtml(m.type || '')}" data-folder="${escHtml(m.folder || '')}">Use in Image Gen</button>
 					<button class="btn btn-sm btn-danger mb-delete-btn" data-name="${escHtml(m.name)}" data-folder="${escHtml(m.folder)}">Delete</button>
@@ -13362,6 +13370,7 @@ function renderLocalLibrary(models, root) {
 		card.addEventListener('click', (event) => {
 			const target = event.target;
 			if (!(target instanceof HTMLElement)) return;
+			if (target.closest('.mb-copy-path-btn')) return;
 			if (target.closest('.mb-open-folder-btn')) return;
 			if (target.closest('.mb-delete-btn')) return;
 			openLocalModelDetailsModal(m);
@@ -13403,6 +13412,38 @@ function renderLocalLibrary(models, root) {
 			openLocalModelFolder(btn.dataset.name || '', btn.dataset.folder || '', btn);
 		});
 	});
+	mbLibraryGrid.querySelectorAll('.mb-copy-path-btn').forEach((btn) => {
+		btn.addEventListener('click', (event) => {
+			event.stopPropagation();
+			copyLocalModelPath(btn.dataset.path || '');
+		});
+	});
+}
+
+async function copyLocalModelPath(pathValue) {
+	const value = String(pathValue || '').trim();
+	if (!value) {
+		showToast('No model path available to copy.', 'neg');
+		return;
+	}
+	try {
+		if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+			await navigator.clipboard.writeText(value);
+		} else {
+			const temp = document.createElement('textarea');
+			temp.value = value;
+			temp.setAttribute('readonly', 'readonly');
+			temp.style.position = 'fixed';
+			temp.style.opacity = '0';
+			document.body.appendChild(temp);
+			temp.select();
+			document.execCommand('copy');
+			document.body.removeChild(temp);
+		}
+		showToast('Model path copied.', 'pos');
+	} catch (err) {
+		showToast('Copy path failed: ' + (err && err.message ? err.message : String(err)), 'neg');
+	}
 }
 
 async function openLocalModelFolder(fileName, folder, btn) {
