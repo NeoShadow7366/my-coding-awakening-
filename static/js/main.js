@@ -310,6 +310,8 @@ const imageCancelSubmissionBtn = document.getElementById('image-cancel-submissio
 const queueTelemetry = document.getElementById('queue-telemetry');
 const queueTelemetryResetBtn = document.getElementById('queue-telemetry-reset');
 const queueHelpDetails = document.getElementById('queue-help-details');
+const queueHelpToggle = document.getElementById('queue-help-toggle');
+const queueMiniToolbar = document.getElementById('queue-mini-toolbar');
 const queueRestoreWrap = document.getElementById('queue-restore-wrap');
 const queueRestoreHint = document.getElementById('queue-restore-hint');
 const queueRestoreHideBtn = document.getElementById('queue-restore-hide');
@@ -454,8 +456,10 @@ const galleryLightboxBeforeImage = document.getElementById('gallery-lightbox-bef
 const galleryLightboxAfterWrap = document.getElementById('gallery-lightbox-after-wrap');
 const galleryLightboxAfterImage = document.getElementById('gallery-lightbox-after-image');
 const galleryLightboxCompareSlider = document.getElementById('gallery-lightbox-compare-slider');
+const galleryLightboxCompareHint = document.getElementById('gallery-lightbox-compare-hint');
 const galleryLightboxFullscreenBtn = document.getElementById('gallery-lightbox-fullscreen');
 const galleryLightboxFullscreenStatus = document.getElementById('gallery-lightbox-fullscreen-status');
+const galleryLightboxFullscreenStatusDismissBtn = document.getElementById('gallery-lightbox-fullscreen-status-dismiss');
 const galleryContextMenu = document.getElementById('gallery-context-menu');
 const gallerySearch = document.getElementById('gallery-search');
 const gallerySortSelect = document.getElementById('gallery-sort');
@@ -471,12 +475,15 @@ const gallerySelectAllBtn = document.getElementById('gallery-select-all-btn');
 const galleryBulkDeleteBtn = document.getElementById('gallery-bulk-delete-btn');
 const galleryBulkExportBtn = document.getElementById('gallery-bulk-export-btn');
 const galleryDeselectAllBtn = document.getElementById('gallery-deselect-all-btn');
+const galleryShortcutsToggleBtn = document.getElementById('gallery-shortcuts-toggle-btn');
+const galleryShortcutsHelp = document.getElementById('gallery-shortcuts-help');
 const galleryFilterHint = document.getElementById('gallery-filter-hint');
 const galleryLightboxPrev = document.getElementById('gallery-lightbox-prev');
 const galleryLightboxNext = document.getElementById('gallery-lightbox-next');
 const galleryLightboxCounter = document.getElementById('gallery-lightbox-counter');
 const galleryLightboxTagInput = document.getElementById('gallery-lightbox-tag-input');
 const galleryLightboxAddTagBtn = document.getElementById('gallery-lightbox-add-tag-btn');
+const galleryLightboxMetaShortcutsBtn = document.getElementById('gallery-lightbox-meta-shortcuts');
 const galleryLightboxTags = document.getElementById('gallery-lightbox-tags');
 const imagePresetButtons = document.querySelectorAll('[data-image-preset]');
 const imagePresetFamilyBadge = document.getElementById('image-preset-family-badge');
@@ -588,6 +595,8 @@ let imageModelsLoadStartedAt = Date.now();
 let imageModelsLoadingTicker = null;
 let imageEngineAvailable = false;
 let imageModelFilterMode = localStorage.getItem(IMAGE_MODEL_FILTER_MODE_KEY) || 'all';
+let imagePromptHistoryIndex = -1; // -1 = currently editing, >=0 = browsing history
+let imagePromptHistoryDraft = ''; // stashed draft text while browsing history
 if (!['all', 'recent', 'favorites'].includes(imageModelFilterMode)) {
 	imageModelFilterMode = 'all';
 }
@@ -679,13 +688,16 @@ let galleryVirtualRaf = null;
 const img2imgSourceResolveCache = new Map();
 let controlnetPreviewObjectUrl = '';
 const GALLERY_SEARCH_QUERY_KEY = 'gallerySearchQueryV1';
+const GALLERY_SHORTCUTS_HELP_EXPANDED_KEY = 'galleryShortcutsHelpExpandedV1';
 let gallerySearchQuery = localStorage.getItem(GALLERY_SEARCH_QUERY_KEY) || '';
+let galleryShortcutsHelpExpanded = localStorage.getItem(GALLERY_SHORTCUTS_HELP_EXPANDED_KEY) === '1';
 let gallerySortOrder = localStorage.getItem('gallerySortOrder') || 'newest';
 let galleryModeFilter = localStorage.getItem('galleryModeFilter') || 'all';
 let galleryTagFilter = localStorage.getItem(GALLERY_TAG_FILTER_KEY) || 'all';
 const GALLERY_MODEL_FILTER_KEY = 'galleryModelFilterV1';
 let galleryModelFilter = localStorage.getItem(GALLERY_MODEL_FILTER_KEY) || 'all';
 const GALLERY_LIGHTBOX_FULLSCREEN_KEY = 'galleryLightboxFullscreenModeV1';
+const GALLERY_LIGHTBOX_FULLSCREEN_STATUS_HIDE_MS = 2200;
 let galleryLightboxFullscreenMode = localStorage.getItem(GALLERY_LIGHTBOX_FULLSCREEN_KEY) === '1';
 let galleryLightboxFullscreenRestoreHintPending = galleryLightboxFullscreenMode;
 const VALID_GALLERY_SORT_ORDERS = new Set(['newest', 'oldest', 'favorites-first']);
@@ -784,6 +796,8 @@ let lightboxCompareEnabled = false;
 let lightboxCompareSplit = 50;
 let lightboxMetaOpen = false;
 let galleryLightboxLastFocus = null;
+let galleryLightboxFullscreenStatusTimer = null;
+let galleryLightboxFullscreenStatusDismissed = false;
 let promptSyntaxLastFocus = null;
 const TAG_CATEGORY_LABELS = {
 	'enhanced-subject': 'Subject',
@@ -1224,7 +1238,9 @@ function syncQueueLastActionPinButton() {
 	queueLastActionPinBtn.textContent = queueLastActionPinned ? 'Unpin' : 'Pin';
 	queueLastActionPinBtn.setAttribute('aria-pressed', queueLastActionPinned ? 'true' : 'false');
 	queueLastActionPinBtn.setAttribute('aria-label', queueLastActionPinned ? 'Unpin queue last action status' : 'Pin queue last action status');
-	queueLastActionPinBtn.title = queueLastActionPinned ? 'Unpin to allow auto-clear after inactivity' : 'Pin this status so it does not auto-clear';
+	queueLastActionPinBtn.title = queueLastActionPinned
+		? 'Unpin to allow auto-clear after inactivity. Arrow keys and Home/End move between queue restore and status controls'
+		: 'Pin this status so it does not auto-clear. Arrow keys and Home/End move between queue restore and status controls';
 }
 
 function renderQueueLastAction() {
@@ -1259,6 +1275,90 @@ function setQueueLastAction(message) {
 	renderQueueLastAction();
 }
 
+function isQueueHelpFocusControlFocusable(control) {
+	if (!(control instanceof HTMLElement)) return false;
+	if ('disabled' in control && control.disabled) return false;
+	if (control.hidden || control.hasAttribute('hidden')) return false;
+	if (control.closest('[hidden]')) return false;
+	return true;
+}
+
+function getQueueHelpFocusControls() {
+	return [queueHelpToggle, queueUiResetBtn].filter(isQueueHelpFocusControlFocusable);
+}
+
+function onQueueHelpDisclosureKeydown(event) {
+	if (event.defaultPrevented) return;
+	const key = event.key;
+	const hotkey = String(key || '').toLowerCase();
+	if (hotkey === 'h') {
+		event.preventDefault();
+		if (queueHelpDetails) {
+			queueHelpDetails.open = !queueHelpDetails.open;
+			queueHelpToggle?.focus();
+		}
+		return;
+	}
+	if (key === 'Escape' && queueHelpDetails?.open) {
+		event.preventDefault();
+		queueHelpDetails.open = false;
+		queueHelpToggle?.focus();
+		return;
+	}
+	if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(key)) return;
+	const controls = getQueueHelpFocusControls();
+	if (controls.length < 2) return;
+	const currentIndex = controls.indexOf(event.currentTarget);
+	if (currentIndex < 0) return;
+	event.preventDefault();
+	let nextIndex = currentIndex;
+	if (key === 'Home') {
+		nextIndex = 0;
+	} else if (key === 'End') {
+		nextIndex = controls.length - 1;
+	} else if (key === 'ArrowRight') {
+		nextIndex = (currentIndex + 1) % controls.length;
+	} else if (key === 'ArrowLeft') {
+		nextIndex = (currentIndex - 1 + controls.length) % controls.length;
+	}
+	controls[nextIndex]?.focus();
+}
+
+function isQueueMiniToolbarControlFocusable(control) {
+	if (!(control instanceof HTMLElement)) return false;
+	if ('disabled' in control && control.disabled) return false;
+	if (control.hidden || control.hasAttribute('hidden')) return false;
+	if (control.closest('[hidden]')) return false;
+	return true;
+}
+
+function getQueueMiniToolbarControls() {
+	const restoreControl = queueRestoreHintHidden ? queueRestoreShowBtn : queueRestoreHideBtn;
+	return [restoreControl, queueLastActionPinBtn].filter(isQueueMiniToolbarControlFocusable);
+}
+
+function onQueueMiniToolbarKeydown(event) {
+	if (event.defaultPrevented) return;
+	const key = event.key;
+	if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(key)) return;
+	const controls = getQueueMiniToolbarControls();
+	if (controls.length < 2) return;
+	const currentIndex = controls.indexOf(event.currentTarget);
+	if (currentIndex < 0) return;
+	event.preventDefault();
+	let nextIndex = currentIndex;
+	if (key === 'Home') {
+		nextIndex = 0;
+	} else if (key === 'End') {
+		nextIndex = controls.length - 1;
+	} else if (key === 'ArrowRight') {
+		nextIndex = (currentIndex + 1) % controls.length;
+	} else if (key === 'ArrowLeft') {
+		nextIndex = (currentIndex - 1 + controls.length) % controls.length;
+	}
+	controls[nextIndex]?.focus();
+}
+
 function renderQueueRestoreHint() {
 	if (!queueRestoreHint || !queueRestoreWrap || !queueRestoreShowBtn) return;
 	if (!restoredQueueStateInfo || !trackedPromptIds.size) {
@@ -1290,6 +1390,7 @@ function renderQueueRestoreHint() {
 }
 
 if (queueRestoreHideBtn) {
+	queueRestoreHideBtn.addEventListener('keydown', onQueueMiniToolbarKeydown);
 	queueRestoreHideBtn.addEventListener('click', () => {
 		queueRestoreHintHidden = true;
 		localStorage.setItem(QUEUE_RESTORE_HINT_HIDDEN_KEY, '1');
@@ -1299,6 +1400,7 @@ if (queueRestoreHideBtn) {
 }
 
 if (queueRestoreShowBtn) {
+	queueRestoreShowBtn.addEventListener('keydown', onQueueMiniToolbarKeydown);
 	queueRestoreShowBtn.addEventListener('click', () => {
 		queueRestoreHintHidden = false;
 		localStorage.removeItem(QUEUE_RESTORE_HINT_HIDDEN_KEY);
@@ -1308,6 +1410,7 @@ if (queueRestoreShowBtn) {
 }
 
 if (queueLastActionPinBtn) {
+	queueLastActionPinBtn.addEventListener('keydown', onQueueMiniToolbarKeydown);
 	queueLastActionPinBtn.addEventListener('click', () => {
 		queueLastActionPinned = !queueLastActionPinned;
 		if (queueLastActionPinned) {
@@ -1436,6 +1539,57 @@ if (queueHelpDetails) {
 		localStorage.setItem(QUEUE_HELP_EXPANDED_KEY, queueHelpDetails.open ? '1' : '0');
 		setQueueLastAction(queueHelpDetails.open ? 'Queue help opened.' : 'Queue help closed.');
 	});
+}
+
+if (queueHelpToggle) {
+	queueHelpToggle.addEventListener('keydown', onQueueHelpDisclosureKeydown);
+}
+
+if (queueUiResetBtn) {
+	queueUiResetBtn.addEventListener('keydown', onQueueHelpDisclosureKeydown);
+}
+
+if (queueMiniToolbar) {
+	queueMiniToolbar.setAttribute('data-keyboard-grouped', '1');
+}
+
+function isQueueToolbarControlFocusable(control) {
+	if (!(control instanceof HTMLElement)) return false;
+	if ('disabled' in control && control.disabled) return false;
+	if (control.hidden || control.hasAttribute('hidden')) return false;
+	if (control.closest('[hidden]')) return false;
+	return true;
+}
+
+function getQueueToolbarControls() {
+	return [failedOnlyToggle, clearFailedQueueBtn, clearCompletedQueueBtn, queueUiResetBtn]
+		.filter(isQueueToolbarControlFocusable);
+}
+
+function onQueueToolbarControlKeydown(event) {
+	const key = event.key;
+	if (key === ' ' || key === 'Enter') {
+		event.preventDefault();
+		event.currentTarget?.click();
+		return;
+	}
+	if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(key)) return;
+	const controls = getQueueToolbarControls();
+	if (controls.length < 2) return;
+	const currentIndex = controls.indexOf(event.currentTarget);
+	if (currentIndex < 0) return;
+	event.preventDefault();
+	let nextIndex = currentIndex;
+	if (key === 'Home') {
+		nextIndex = 0;
+	} else if (key === 'End') {
+		nextIndex = controls.length - 1;
+	} else if (key === 'ArrowRight') {
+		nextIndex = (currentIndex + 1) % controls.length;
+	} else if (key === 'ArrowLeft') {
+		nextIndex = (currentIndex - 1 + controls.length) % controls.length;
+	}
+	controls[nextIndex]?.focus();
 }
 
 if (loraFamilyLegend) {
@@ -6457,12 +6611,39 @@ clearChat.addEventListener('click', () => {
 	appendSystemMessage('Conversation cleared.');
 });
 
+const CHAT_INPUT_LINE_HEIGHT = 20;
+const CHAT_INPUT_MIN_HEIGHT = 40;
+const CHAT_INPUT_MAX_HEIGHT = 180;
+
+function getChatInputCurrentHeight() {
+	const inlineHeight = parseInt(chatInput.style.height || '', 10);
+	if (Number.isFinite(inlineHeight) && inlineHeight > 0) {
+		return inlineHeight;
+	}
+	return Math.max(chatInput.offsetHeight || 0, chatInput.scrollHeight || 0, CHAT_INPUT_MIN_HEIGHT);
+}
+
 chatInput.addEventListener('input', () => {
 	chatInput.style.height = 'auto';
-	chatInput.style.height = `${Math.min(chatInput.scrollHeight, 180)}px`;
+	chatInput.style.height = `${Math.min(chatInput.scrollHeight, CHAT_INPUT_MAX_HEIGHT)}px`;
 });
 
 chatInput.addEventListener('keydown', (e) => {
+	// Ctrl+Shift+Up/Down to resize chat input height
+	if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+		e.preventDefault();
+		const currentHeight = getChatInputCurrentHeight();
+		let newHeight = currentHeight;
+		if (e.key === 'ArrowUp') {
+			newHeight = Math.max(currentHeight - CHAT_INPUT_LINE_HEIGHT, CHAT_INPUT_MIN_HEIGHT);
+		} else {
+			newHeight = Math.min(currentHeight + CHAT_INPUT_LINE_HEIGHT, CHAT_INPUT_MAX_HEIGHT);
+		}
+		chatInput.style.height = `${newHeight}px`;
+		showToast(`Chat input height: ${Math.round(newHeight / CHAT_INPUT_LINE_HEIGHT)} lines`, 'pos');
+		return;
+	}
+
 	// Escape-to-clear support
 	if (e.key === 'Escape') {
 		if (!chatInput.value) return; // skip if empty
@@ -6479,9 +6660,22 @@ chatInput.addEventListener('keydown', (e) => {
 	}
 });
 
-// Text panel negative prompt Escape-to-clear
+// Text panel negative prompt Escape-to-clear + Ctrl+Shift+Up/Down height resize
 if (textNegativePrompt) {
 	textNegativePrompt.addEventListener('keydown', (e) => {
+		if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+			e.preventDefault();
+			const lineHeight = 20;
+			const minHeight = 40;
+			const maxHeight = 300;
+			const currentHeight = parseInt(textNegativePrompt.style.height || '0', 10) || textNegativePrompt.offsetHeight;
+			const newHeight = e.key === 'ArrowUp'
+				? Math.max(currentHeight - lineHeight, minHeight)
+				: Math.min(currentHeight + lineHeight, maxHeight);
+			textNegativePrompt.style.height = `${newHeight}px`;
+			showToast(`Negative prompt height: ${Math.round(newHeight / lineHeight)} lines`, 'pos');
+			return;
+		}
 		if (e.key !== 'Escape') return;
 		if (!textNegativePrompt.value) return; // skip if empty
 		e.stopPropagation();
@@ -6905,6 +7099,26 @@ function collapseImageSidebarSectionBySelector(sectionSelector) {
 	return true;
 }
 
+// Escape to close the next open layer in the model stack panel
+function closeModelStackOpenDetails() {
+	const modelStackPanel = document.querySelector('#panel-image .sidebar-section.model-stack-panel');
+	if (!modelStackPanel) return false;
+	const openDetails = [...modelStackPanel.querySelectorAll('details[open]')];
+	if (openDetails.length) {
+		const lastOpenDetails = openDetails[openDetails.length - 1];
+		lastOpenDetails.open = false;
+		const lastOpenSummary = lastOpenDetails.querySelector(':scope > summary');
+		if (lastOpenSummary instanceof HTMLElement) {
+			lastOpenSummary.focus();
+		}
+		return true;
+	}
+	if (collapseImageSidebarSectionBySelector('.model-stack-panel')) {
+		return true;
+	}
+	return false;
+}
+
 function syncImageQuickState() {
 	if (!imageQuickState) return;
 	const baseModel = String(imageModelSelect?.value || '').trim();
@@ -6999,6 +7213,26 @@ if (imageModelFilter) {
 		updateModelStackBadges();
 		updateModelStackCompatibilityHint();
 		updateControlnetCompatibilityHint();
+	});
+	imageModelFilter.addEventListener('keydown', (event) => {
+		if (event.key !== 'Escape') return;
+		if (imageModelFilter.value) {
+			event.preventDefault();
+			event.stopPropagation();
+			imageModelFilter.value = '';
+			renderFilteredImageModels('', imageModelSelect ? imageModelSelect.value : '');
+			updateModelFavoriteToggleState();
+			updateModelStackBadges();
+			updateModelStackCompatibilityHint();
+			updateControlnetCompatibilityHint();
+			return;
+		}
+		// Escape pressed with empty filter: unwind the next open model-stack layer.
+		if (closeModelStackOpenDetails()) {
+			event.preventDefault();
+			event.stopPropagation();
+			showToast('Model stack layer closed.', 'pos');
+		}
 	});
 }
 bindSelectFilterInput(imageSamplerFilter, imageSamplerSelect, IMAGE_SAMPLER_FILTER_QUERY_KEY, imageSamplerFilterStatus, 'samplers');
@@ -7947,6 +8181,7 @@ queueList.addEventListener('click', async (e) => {
 queueList.addEventListener('keydown', onQueueActionKeydown);
 
 if (clearFailedQueueBtn) {
+	clearFailedQueueBtn.addEventListener('keydown', onQueueToolbarControlKeydown);
 	clearFailedQueueBtn.addEventListener('click', async () => {
 		clearFailedQueueBtn.disabled = true;
 		await clearFailedQueueItems();
@@ -7954,6 +8189,7 @@ if (clearFailedQueueBtn) {
 }
 
 if (clearCompletedQueueBtn) {
+	clearCompletedQueueBtn.addEventListener('keydown', onQueueToolbarControlKeydown);
 	clearCompletedQueueBtn.addEventListener('click', async () => {
 		clearCompletedQueueBtn.disabled = true;
 		await clearCompletedQueueItems();
@@ -7961,6 +8197,7 @@ if (clearCompletedQueueBtn) {
 }
 
 if (queueUiResetBtn) {
+	queueUiResetBtn.addEventListener('keydown', onQueueToolbarControlKeydown);
 	queueUiResetBtn.addEventListener('click', () => {
 		queueFilterFailedOnly = false;
 		queueRestoreHintHidden = false;
@@ -7971,6 +8208,10 @@ if (queueUiResetBtn) {
 		renderQueueStatus([], [], new Set());
 		showToast('Queue UI preferences reset.', 'pos');
 	});
+}
+
+if (failedOnlyToggle) {
+	failedOnlyToggle.addEventListener('keydown', onQueueToolbarControlKeydown);
 }
 
 async function saveHistoryEntry(entry) {
@@ -8109,13 +8350,35 @@ function focusGalleryContextMenuItem(index) {
 	return true;
 }
 
+function focusGalleryContextMenuItemByPrefix(prefix, startIndex = -1) {
+	const items = getGalleryContextMenuItems();
+	if (!items.length) return false;
+	const normalized = String(prefix || '').trim().toLowerCase();
+	if (!normalized) return false;
+	for (let offset = 1; offset <= items.length; offset += 1) {
+		const idx = (Math.max(-1, startIndex) + offset) % items.length;
+		const item = items[idx];
+		const label = String(item?.textContent || '').trim().toLowerCase();
+		if (label.startsWith(normalized)) {
+			item.focus();
+			return true;
+		}
+	}
+	return false;
+}
+
 let galleryContextMenuLastFocus = null;
+let galleryContextMenuTypeaheadTimer = null;
 
 function closeGalleryContextMenu(options = {}) {
 	if (!galleryContextMenu) return;
 	const { restoreFocus = false } = options;
 	galleryContextMenu.hidden = true;
 	galleryContextPayload = null;
+	if (galleryContextMenuTypeaheadTimer) {
+		window.clearTimeout(galleryContextMenuTypeaheadTimer);
+		galleryContextMenuTypeaheadTimer = null;
+	}
 	if (restoreFocus && galleryContextMenuLastFocus instanceof HTMLElement && galleryContextMenuLastFocus.isConnected) {
 		galleryContextMenuLastFocus.focus();
 	}
@@ -8140,20 +8403,27 @@ function openGalleryContextMenu(payload, x, y) {
 
 function openGalleryContextMenuForCard(card, anchorEl = null) {
 	if (!(card instanceof HTMLElement)) return false;
-	const imageRef = buildImageRefFromElement(card);
-	if (!imageRef) return false;
+	const payload = buildGalleryContextPayloadForCard(card);
+	if (!payload || !payload.imageRef) return false;
 	const rectSource = anchorEl instanceof HTMLElement ? anchorEl : card;
 	const rect = rectSource.getBoundingClientRect();
 	openGalleryContextMenu(
-		{
-			imageRef,
-			baseName: card.dataset.exportBaseName || 'generated-image',
-			prompt: card.dataset.prompt || 'Generated image',
-		},
+		payload,
 		rect.left + Math.min(rect.width - 12, Math.max(18, rect.width * 0.7)),
 		rect.top + Math.min(rect.height - 12, Math.max(18, rect.height * 0.3)),
 	);
 	return true;
+}
+
+function buildGalleryContextPayloadForCard(card) {
+	if (!(card instanceof HTMLElement)) return null;
+	const imageRef = buildImageRefFromElement(card);
+	if (!imageRef) return null;
+	return {
+		imageRef,
+		baseName: card.dataset.exportBaseName || 'generated-image',
+		prompt: card.dataset.prompt || 'Generated image',
+	};
 }
 
 function getGalleryFocusableImageButtons() {
@@ -8281,10 +8551,12 @@ async function exportGalleryImage(payload, format, keepMetadata = false) {
 	showToast(`Exported ${formatLabel}: ${filename}`, 'pos');
 }
 
-async function handleGalleryContextAction(action) {
-	if (!galleryContextPayload) return;
-	const payload = galleryContextPayload;
-	closeGalleryContextMenu();
+async function handleGalleryContextAction(action, payloadOverride = null) {
+	const payload = payloadOverride || galleryContextPayload;
+	if (!payload) return;
+	if (!payloadOverride) {
+		closeGalleryContextMenu({ restoreFocus: true });
+	}
 
 	try {
 		if (action === 'open-location') {
@@ -8762,6 +9034,11 @@ function applyGalleryPayloadToImageForm(payload) {
 function openGalleryLightbox(imgSrc, imgAlt, caption = '', index = 0) {
 	if (!galleryLightbox || !galleryLightboxImage) return;
 	galleryLightboxLastFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+	galleryLightboxFullscreenStatusDismissed = false;
+	if (galleryLightboxFullscreenStatusTimer) {
+		window.clearTimeout(galleryLightboxFullscreenStatusTimer);
+		galleryLightboxFullscreenStatusTimer = null;
+	}
 	lightboxCurrentIndex = index;
 	const entry = currentGalleryImages[index];
 	updateLightboxMedia(entry, imgSrc, imgAlt || 'Generated image', caption);
@@ -8775,13 +9052,19 @@ function openGalleryLightbox(imgSrc, imgAlt, caption = '', index = 0) {
 	}
 	if (galleryLightboxFullscreenMode && galleryLightboxFullscreenRestoreHintPending && galleryLightboxFullscreenStatus) {
 		galleryLightboxFullscreenStatus.hidden = false;
-		galleryLightboxFullscreenStatus.textContent = 'Pinned fullscreen (restored)';
 		galleryLightboxFullscreenRestoreHintPending = false;
+		galleryLightboxFullscreenStatusTimer = window.setTimeout(() => {
+			galleryLightboxFullscreenStatusTimer = null;
+		}, GALLERY_LIGHTBOX_FULLSCREEN_STATUS_HIDE_MS);
 	}
 }
 
 function closeGalleryLightbox() {
 	if (!galleryLightbox || !galleryLightboxImage) return;
+	if (galleryLightboxFullscreenStatusTimer) {
+		window.clearTimeout(galleryLightboxFullscreenStatusTimer);
+		galleryLightboxFullscreenStatusTimer = null;
+	}
 	galleryLightbox.hidden = true;
 	galleryLightbox.setAttribute('aria-hidden', 'true');
 	galleryLightboxImage.src = '';
@@ -8897,7 +9180,7 @@ function buildGalleryCardHtml(entry, index) {
 		<article class="gallery-card${isSelected ? ' is-selected' : ''}" draggable="${gallerySelectMode ? 'false' : 'true'}" data-preview-payload="${dragPayload}" data-image-ref="${imageRefPayload}" data-export-base-name="${escHtml(exportBaseName)}" data-prompt="${prompt}" data-lightbox-index="${index}" data-entry-id="${escHtml(entryId)}">
 			${selectCheck}
 			<button class="gallery-star-btn${isFav ? ' is-favorited' : ''}" type="button" aria-pressed="${isFav}" aria-label="${isFav ? 'Remove from favorites' : 'Add to favorites'}" data-entry-id="${escHtml(entryId)}">${isFav ? '\u2605' : '\u2606'}</button>
-			<img src="${imgUrl}" alt="Generated image" loading="${eagerLoad}" fetchpriority="${fetchPriority}" decoding="async" data-lightbox-src="${imgUrl}" data-lightbox-caption="${prompt}" draggable="false" role="button" tabindex="0" aria-label="${gallerySelectMode ? 'Select generated image' : 'Open generated image'}" aria-keyshortcuts="ArrowLeft ArrowRight ArrowUp ArrowDown Home End Enter Space Shift+F10 ContextMenu" />
+			<img src="${imgUrl}" alt="Generated image" loading="${eagerLoad}" fetchpriority="${fetchPriority}" decoding="async" data-lightbox-src="${imgUrl}" data-lightbox-caption="${prompt}" draggable="false" role="button" tabindex="0" aria-label="${gallerySelectMode ? 'Select generated image' : 'Open generated image'}" aria-keyshortcuts="M=toggle select ArrowLeft ArrowRight ArrowUp ArrowDown Home End Enter Space Shift+F10 ContextMenu O Delete 1 2 3 4 A=select all X=clear D=delete E=export" />
 			<div class="gallery-meta">
 				<p class="gallery-prompt" title="${prompt}">${prompt}</p>
 				<p class="gallery-chip-row">
@@ -9278,15 +9561,9 @@ if (galleryGrid) {
 		if (!(card instanceof HTMLElement)) return;
 
 		event.preventDefault();
-		openGalleryContextMenu(
-			{
-				imageRef: buildImageRefFromElement(card),
-				baseName: card.dataset.exportBaseName || 'generated-image',
-				prompt: card.dataset.prompt || 'Generated image',
-			},
-			event.clientX,
-			event.clientY,
-		);
+		const payload = buildGalleryContextPayloadForCard(card);
+		if (!payload) return;
+		openGalleryContextMenu(payload, event.clientX, event.clientY);
 	});
 
 	galleryGrid.addEventListener('keydown', (event) => {
@@ -9300,10 +9577,74 @@ if (galleryGrid) {
 			}
 			return;
 		}
-		const isContextMenuShortcut = event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10');
-		if (event.key !== 'Enter' && event.key !== ' ' && !isContextMenuShortcut) return;
 		const card = imageTarget.closest('.gallery-card');
 		if (!(card instanceof HTMLElement)) return;
+
+		const menuHotkey = String(event.key || '').toLowerCase();
+		const quickActionMap = {
+			o: 'open-location',
+			d: 'delete-image',
+			delete: 'delete-image',
+			'1': 'export-png-meta',
+			'2': 'export-png',
+			'3': 'export-jpeg',
+			'4': 'export-webp',
+		};
+		if (!gallerySelectMode && quickActionMap[menuHotkey]) {
+			event.preventDefault();
+			const payload = buildGalleryContextPayloadForCard(card);
+			if (!payload) return;
+			handleGalleryContextAction(quickActionMap[menuHotkey], payload);
+			return;
+		}
+
+		// Gallery select mode toggle and toolbar shortcuts
+		if (menuHotkey === 'm') {
+			event.preventDefault();
+			if (gallerySelectMode) {
+				exitGallerySelectMode();
+				showToast('Gallery select mode disabled.', 'pos');
+			} else {
+				enterGallerySelectMode();
+				showToast('Gallery select mode enabled. M=toggle, A=select all, X=deselect, D=delete, E=export.', 'pos');
+			}
+			return;
+		}
+
+		if (gallerySelectMode) {
+			if (menuHotkey === 'a') {
+				event.preventDefault();
+				currentGalleryImages.forEach((e) => { if (e.id) gallerySelectedIds.add(e.id); });
+				updateGallerySelectToolbar();
+				renderGallery(currentFullHistory);
+				showToast(`Selected ${gallerySelectedIds.size} item${gallerySelectedIds.size === 1 ? '' : 's'}.`, 'pos');
+				return;
+			}
+			if (menuHotkey === 'x') {
+				event.preventDefault();
+				galleryDeselectAllBtn?.click();
+				showToast('Cleared gallery selection.', 'pos');
+				return;
+			}
+			if (menuHotkey === 'd' || event.key === 'Delete') {
+				event.preventDefault();
+				bulkDeleteSelectedGalleryItems();
+				return;
+			}
+			if (menuHotkey === 'e') {
+				event.preventDefault();
+				bulkExportSelectedGalleryItems();
+				return;
+			}
+		}
+
+		if (event.key === '?' || event.key === 'h' || event.key === 'H') {
+			event.preventDefault();
+			showToast('Gallery shortcuts: Enter open, Shift+F10 menu, O/Delete/1-4 quick actions, M select mode, A=all, X=none, D=delete, E=export.', 'info');
+			return;
+		}
+		const isContextMenuShortcut = event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10');
+		if (event.key !== 'Enter' && event.key !== ' ' && !isContextMenuShortcut) return;
 
 		event.preventDefault();
 		if (isContextMenuShortcut) {
@@ -9467,13 +9808,47 @@ function getGalleryLightboxFocusableControls() {
 		galleryLightboxPrev,
 		galleryLightboxMetaToggle,
 		galleryLightboxCompareToggle,
+		galleryLightboxCompareSlider,
 		galleryLightboxStarBtn,
 		galleryLightboxFullscreenBtn,
-		galleryLightboxAddTagBtn,
-		galleryLightboxCloseBtn,
 		galleryLightboxReuseBtn,
+		galleryLightboxTagInput,
+		galleryLightboxAddTagBtn,
+		galleryLightboxMetaShortcutsBtn,
+		galleryLightboxCloseBtn,
 		galleryLightboxNext,
 	].filter((control) => control && !control.disabled && isGalleryLightboxControlVisible(control));
+}
+
+function getGalleryLightboxMetaActionControls() {
+	return [
+		galleryLightboxReuseBtn,
+		galleryLightboxTagInput,
+		galleryLightboxAddTagBtn,
+		galleryLightboxMetaShortcutsBtn,
+	].filter((control) => control && !control.disabled && isGalleryLightboxControlVisible(control));
+}
+
+function onGalleryLightboxMetaActionsKeydown(event) {
+	const key = event.key;
+	if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(key)) return false;
+	const controls = getGalleryLightboxMetaActionControls();
+	if (controls.length < 2) return false;
+	const currentIndex = controls.indexOf(event.currentTarget);
+	if (currentIndex < 0) return false;
+	event.preventDefault();
+	let nextIndex = currentIndex;
+	if (key === 'Home') {
+		nextIndex = 0;
+	} else if (key === 'End') {
+		nextIndex = controls.length - 1;
+	} else if (key === 'ArrowRight') {
+		nextIndex = (currentIndex + 1) % controls.length;
+	} else if (key === 'ArrowLeft') {
+		nextIndex = (currentIndex - 1 + controls.length) % controls.length;
+	}
+	controls[nextIndex]?.focus();
+	return true;
 }
 
 function getGalleryLightboxTabStops() {
@@ -9515,7 +9890,7 @@ function onGalleryLightboxControlsKeydown(event) {
 
 document.addEventListener('keydown', (event) => {
 	const key = event.key;
-	if (key !== 'Escape' && key !== 'ArrowLeft' && key !== 'ArrowRight' && key !== 'c' && key !== 'C' && key !== 'r' && key !== 'R' && key !== 'f' && key !== 'F') return;
+	if (key !== 'Escape' && key !== 'ArrowLeft' && key !== 'ArrowRight' && key !== 'c' && key !== 'C' && key !== 'r' && key !== 'R' && key !== 'f' && key !== 'F' && key !== 'p' && key !== 'P' && key !== '[' && key !== ']') return;
 
 	if (key === 'Escape') {
 		if (galleryContextMenu && !galleryContextMenu.hidden) {
@@ -9538,6 +9913,29 @@ document.addEventListener('keydown', (event) => {
 		if (!galleryLightboxCompareToggle || galleryLightboxCompareToggle.hidden || galleryLightboxCompareToggle.disabled) return;
 		event.preventDefault();
 		toggleGalleryLightboxCompare();
+		if (lightboxCompareEnabled && galleryLightboxCompareSlider && !galleryLightboxCompare?.hidden) {
+			galleryLightboxCompareSlider.focus();
+		}
+		return;
+	}
+
+	if (key === '[') {
+		const target = event.target;
+		if (target instanceof HTMLElement && target.closest('#gallery-lightbox input, #gallery-lightbox select, #gallery-lightbox textarea')) return;
+		if (!lightboxCompareEnabled || !galleryLightboxCompare || galleryLightboxCompare.hidden) return;
+		event.preventDefault();
+		applyLightboxCompareSplit(0);
+		showToast('Compare: full source view.', 'pos');
+		return;
+	}
+
+	if (key === ']') {
+		const target = event.target;
+		if (target instanceof HTMLElement && target.closest('#gallery-lightbox input, #gallery-lightbox select, #gallery-lightbox textarea')) return;
+		if (!lightboxCompareEnabled || !galleryLightboxCompare || galleryLightboxCompare.hidden) return;
+		event.preventDefault();
+		applyLightboxCompareSplit(100);
+		showToast('Compare: full result view.', 'pos');
 		return;
 	}
 
@@ -9560,6 +9958,25 @@ document.addEventListener('keydown', (event) => {
 	}
 
 	if (isGalleryLightboxInteractiveTarget(event.target)) return;
+		if (key === 'p' || key === 'P') {
+			const target = event.target;
+			if (target instanceof HTMLElement && target.closest('#gallery-lightbox input, #gallery-lightbox select, #gallery-lightbox textarea')) return;
+			if (!galleryLightboxMetaToggle || galleryLightboxMetaToggle.hidden || galleryLightboxMetaToggle.disabled) return;
+			event.preventDefault();
+			lightboxMetaOpen = !lightboxMetaOpen;
+			galleryLightboxMetaToggle.setAttribute('aria-pressed', String(lightboxMetaOpen));
+			if (galleryLightboxMeta) {
+				galleryLightboxMeta.hidden = !lightboxMetaOpen;
+			}
+			if (lightboxMetaOpen) {
+				const entry = currentGalleryImages[lightboxCurrentIndex];
+				updateLightboxMeta(entry);
+			}
+			showToast(lightboxMetaOpen ? 'Generation params shown.' : 'Generation params hidden.', 'pos');
+			return;
+		}
+
+		if (isGalleryLightboxInteractiveTarget(event.target)) return;
 	event.preventDefault();
 	if (key === 'ArrowLeft') navigateLightbox(-1);
 	if (key === 'ArrowRight') navigateLightbox(1);
@@ -9575,9 +9992,9 @@ if (galleryContextMenu) {
 			return;
 		}
 
-		if (event.key === '?' || event.key === 'h' || event.key === 'H') {
+		if (event.key === 'F1' || event.key === '?' || event.key === 'h' || event.key === 'H') {
 			event.preventDefault();
-			showToast('Menu shortcuts: O open location, Delete/D delete, 1 PNG+meta, 2 PNG, 3 JPEG, 4 WebP, arrows/tab navigate, Enter run, Esc close.', 'info');
+			showToast('Menu shortcuts: O open location, Delete/D delete, 1 PNG+meta, 2 PNG, 3 JPEG, 4 WebP, arrows/tab and PgUp/PgDn navigate, letters jump, Enter run, Esc close (?/H/F1 help).', 'info');
 			return;
 		}
 
@@ -9601,7 +10018,23 @@ if (galleryContextMenu) {
 			}
 		}
 
-		if (['ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight', 'Home', 'End', 'Tab'].includes(event.key)) {
+		if (!event.ctrlKey && !event.metaKey && !event.altKey && /^[a-z]$/.test(menuHotkey) && !hotkeyAction && menuHotkey !== 'h') {
+			const items = getGalleryContextMenuItems();
+			if (!items.length) return;
+			event.preventDefault();
+			const currentIndex = target instanceof HTMLElement ? items.indexOf(target) : -1;
+			if (focusGalleryContextMenuItemByPrefix(menuHotkey, currentIndex)) {
+				if (galleryContextMenuTypeaheadTimer) {
+					window.clearTimeout(galleryContextMenuTypeaheadTimer);
+				}
+				galleryContextMenuTypeaheadTimer = window.setTimeout(() => {
+					galleryContextMenuTypeaheadTimer = null;
+				}, 600);
+				return;
+			}
+		}
+
+		if (['ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight', 'Home', 'End', 'PageUp', 'PageDown', 'Tab'].includes(event.key)) {
 			const items = getGalleryContextMenuItems();
 			if (!items.length) return;
 			event.preventDefault();
@@ -9610,6 +10043,10 @@ if (galleryContextMenu) {
 			if (event.key === 'Home') {
 				nextIndex = 0;
 			} else if (event.key === 'End') {
+				nextIndex = items.length - 1;
+			} else if (event.key === 'PageUp') {
+				nextIndex = 0;
+			} else if (event.key === 'PageDown') {
 				nextIndex = items.length - 1;
 			} else if (event.key === 'Tab') {
 				nextIndex = event.shiftKey
@@ -9685,20 +10122,87 @@ if (gallerySearch) {
 }
 
 // Escape-to-clear support for prompt input fields
-// Image generation prompt
+// Image generation prompt (Escape-to-clear + Ctrl+Shift+Up/Down height resize)
 if (imagePrompt) {
 	imagePrompt.addEventListener('keydown', (e) => {
+		// Alt+Up/Down: browse recent prompt history (terminal-style)
+		if (e.altKey && !e.ctrlKey && !e.metaKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+			const history = loadPromptRecentHistory();
+			if (!history.length) return;
+			e.preventDefault();
+			if (e.key === 'ArrowUp') {
+				if (imagePromptHistoryIndex === -1) {
+					imagePromptHistoryDraft = imagePrompt.value; // stash current text
+				}
+				const nextIdx = imagePromptHistoryIndex === -1 ? 0 : Math.min(imagePromptHistoryIndex + 1, history.length - 1);
+				imagePromptHistoryIndex = nextIdx;
+				imagePrompt.value = history[nextIdx];
+				imagePrompt.setSelectionRange(0, 0);
+				showToast(`Prompt history ${nextIdx + 1}/${history.length}`, 'pos');
+			} else {
+				if (imagePromptHistoryIndex === -1) return;
+				const nextIdx = imagePromptHistoryIndex - 1;
+				if (nextIdx < 0) {
+					imagePromptHistoryIndex = -1;
+					imagePrompt.value = imagePromptHistoryDraft;
+					const len = imagePrompt.value.length;
+					imagePrompt.setSelectionRange(len, len);
+					showToast('Prompt history: current', 'pos');
+				} else {
+					imagePromptHistoryIndex = nextIdx;
+					imagePrompt.value = history[nextIdx];
+					imagePrompt.setSelectionRange(0, 0);
+					showToast(`Prompt history ${nextIdx + 1}/${history.length}`, 'pos');
+				}
+			}
+			return;
+		}
+		if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+			e.preventDefault();
+			const lineHeight = 20;
+			const minHeight = 40;
+			const maxHeight = 300;
+			const currentHeight = parseInt(imagePrompt.style.height || '0', 10) || imagePrompt.offsetHeight;
+			const newHeight = e.key === 'ArrowUp'
+				? Math.max(currentHeight - lineHeight, minHeight)
+				: Math.min(currentHeight + lineHeight, maxHeight);
+			imagePrompt.style.height = `${newHeight}px`;
+			showToast(`Prompt height: ${Math.round(newHeight / lineHeight)} lines`, 'pos');
+			return;
+		}
 		if (e.key !== 'Escape') return;
 		if (!imagePrompt.value) return; // skip if empty
 		e.stopPropagation();
 		imagePrompt.value = '';
 		imagePrompt.focus();
 	});
+	// Reset history index when user types manually
+	imagePrompt.addEventListener('input', () => {
+		imagePromptHistoryIndex = -1;
+	});
 }
 
-// Image generation negative prompt
+// Image generation negative prompt Escape-to-clear + Ctrl+Shift+Up/Down height resize
 if (imageNegativePrompt) {
 	imageNegativePrompt.addEventListener('keydown', (e) => {
+		if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && !imageGenerateBtn?.disabled) {
+			e.preventDefault();
+			imageForm.requestSubmit();
+			return;
+		}
+		if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+			e.preventDefault();
+			const lineHeight = 20;
+			const minHeight = 40;
+			const maxHeight = 300;
+			const currentHeight = parseInt(imageNegativePrompt.style.height || '0', 10) || imageNegativePrompt.offsetHeight;
+			const newHeight = e.key === 'ArrowUp'
+				? Math.max(currentHeight - lineHeight, minHeight)
+				: Math.min(currentHeight + lineHeight, maxHeight);
+			imageNegativePrompt.style.height = `${newHeight}px`;
+			showToast(`Negative prompt height: ${Math.round(newHeight / lineHeight)} lines`, 'pos');
+			return;
+		}
 		if (e.key !== 'Escape') return;
 		if (!imageNegativePrompt.value) return; // skip if empty
 		e.stopPropagation();
@@ -9735,6 +10239,93 @@ document.addEventListener('keydown', (event) => {
 	if (event.key === 'Escape' && commandPalette && !commandPalette.hidden) {
 		event.preventDefault();
 		closeCommandPalette();
+	}
+});
+
+// Global Ctrl/Cmd+Shift gallery power-user shortcuts (Image panel only)
+document.addEventListener('keydown', (event) => {
+	const isGalleryHelpEscape = event.key === 'Escape' && galleryShortcutsHelpExpanded;
+	if (isGalleryHelpEscape) {
+		const imagePanel = panelImage;
+		if (!imagePanel || imagePanel.hidden) return;
+		if (galleryLightbox && !galleryLightbox.hidden) return;
+		if (galleryContextMenu && !galleryContextMenu.hidden) return;
+		const target = event.target;
+		if (target instanceof HTMLElement) {
+			const tag = String(target.tagName || '').toLowerCase();
+			if (target.isContentEditable || tag === 'input' || tag === 'textarea' || tag === 'select') return;
+		}
+		event.preventDefault();
+		event.stopPropagation();
+		galleryShortcutsHelpExpanded = false;
+		localStorage.removeItem(GALLERY_SHORTCUTS_HELP_EXPANDED_KEY);
+		syncGalleryShortcutsHelpUi();
+		galleryShortcutsToggleBtn?.focus();
+		showToast('Gallery keyboard help hidden.', 'pos');
+		return;
+	}
+
+	const helpHotkey = String(event.key || '').toLowerCase();
+	const isGalleryHelpQuickHotkey = !event.ctrlKey && !event.metaKey && !event.altKey && helpHotkey === '?';
+	const isGalleryHelpHotkey = (event.ctrlKey || event.metaKey) && event.shiftKey && !event.altKey
+		&& (event.code === 'Slash' || event.key === '?' || helpHotkey === 'h');
+	if (isGalleryHelpHotkey || isGalleryHelpQuickHotkey) {
+		const imagePanel = panelImage;
+		if (!imagePanel || imagePanel.hidden) return;
+		if (galleryLightbox && !galleryLightbox.hidden) return;
+		if (isGalleryHelpQuickHotkey && galleryContextMenu && !galleryContextMenu.hidden) return;
+		const target = event.target;
+		if (target instanceof HTMLElement) {
+			const tag = String(target.tagName || '').toLowerCase();
+			if (target.isContentEditable || tag === 'input' || tag === 'textarea' || tag === 'select') return;
+		}
+		if (toggleGalleryShortcutsHelp()) {
+			event.preventDefault();
+			galleryShortcutsToggleBtn?.focus();
+			showToast(galleryShortcutsHelpExpanded ? 'Gallery keyboard help shown.' : 'Gallery keyboard help hidden.', 'pos');
+		}
+		return;
+	}
+
+	const hotkey = String(event.key || '').toLowerCase();
+	const isGalleryPowerShortcut = (event.ctrlKey || event.metaKey) && event.shiftKey && !event.altKey
+		&& (hotkey === 'g' || hotkey === 's' || hotkey === 'a' || hotkey === 'x');
+	if (!isGalleryPowerShortcut) return;
+	const imagePanel = panelImage;
+	if (!imagePanel || imagePanel.hidden) return;
+	if (galleryLightbox && !galleryLightbox.hidden) return;
+	const target = event.target;
+	if (target instanceof HTMLElement) {
+		const tag = String(target.tagName || '').toLowerCase();
+		if (target.isContentEditable || tag === 'input' || tag === 'textarea' || tag === 'select') return;
+	}
+
+	event.preventDefault();
+	if (hotkey === 'g') {
+		galleryViewToggle?.click();
+		showToast('Gallery view toggled.', 'pos');
+		return;
+	}
+	if (hotkey === 's') {
+		gallerySelectModeBtn?.click();
+		showToast(gallerySelectMode ? 'Gallery select mode enabled.' : 'Gallery select mode disabled.', 'pos');
+		return;
+	}
+	if (hotkey === 'a') {
+		if (!gallerySelectMode && gallerySelectModeBtn) {
+			gallerySelectModeBtn.click();
+		}
+		gallerySelectAllBtn?.click();
+		showToast('Selected all visible gallery items.', 'pos');
+		return;
+	}
+	if (hotkey === 'x') {
+		if (!gallerySelectMode) {
+			showToast('Gallery select mode is not active.', 'info');
+			return;
+		}
+		galleryDeselectAllBtn?.click();
+		showToast('Cleared gallery selection.', 'pos');
 	}
 });
 
@@ -9811,6 +10402,10 @@ document.addEventListener('keydown', (event) => {
 		event.preventDefault();
 		event.stopPropagation();
 		openDetails.open = false;
+		const openDetailsSummary = openDetails.querySelector(':scope > summary');
+		if (openDetailsSummary instanceof HTMLElement) {
+			openDetailsSummary.focus();
+		}
 		return;
 	}
 
@@ -9838,6 +10433,32 @@ document.addEventListener('keydown', (event) => {
 document.addEventListener('keydown', (event) => {
 	const key = event.key;
 	const code = String(event.code || '');
+	
+	// Check for Ctrl+S / Cmd+S to save image profile
+	const isSaveProfile = (event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey && key.toLowerCase() === 's';
+	if (isSaveProfile) {
+		const panelImage = document.getElementById('panel-image');
+		if (panelImage && !panelImage.hidden) {
+			// Allow save if focus is on profile name input
+			const target = event.target;
+			if (target === imageProfileName || (target instanceof HTMLElement && target.closest('#image-profile-name'))) {
+				// Save happens in Enter handler, but allow Ctrl+S to trigger save from profile name
+				event.preventDefault();
+				saveCurrentImageProfile();
+				return;
+			}
+			// Also allow Ctrl+S to trigger save from anywhere in Image panel (except other inputs)
+			if (target instanceof HTMLElement) {
+				const inProfileArea = target.closest('#image-profile-name, #image-profile-save, .profile-row');
+				if (inProfileArea) {
+					event.preventDefault();
+					saveCurrentImageProfile();
+					return;
+				}
+			}
+		}
+	}
+	
 	if (event.ctrlKey || event.metaKey || event.altKey) return;
 	const presetMapByKey = { '1': 'fast', '2': 'quality', '3': 'creative' };
 	const presetMapByCode = { Numpad1: 'fast', Numpad2: 'quality', Numpad3: 'creative' };
@@ -9905,10 +10526,25 @@ if (galleryModelFilterSelect) {
 	});
 }
 
+function hideGalleryShortcutsHelp() {
+	if (!galleryShortcutsHelpExpanded) return false;
+	galleryShortcutsHelpExpanded = false;
+	localStorage.removeItem(GALLERY_SHORTCUTS_HELP_EXPANDED_KEY);
+	syncGalleryShortcutsHelpUi();
+	galleryShortcutsToggleBtn?.focus();
+	showToast('Gallery keyboard help hidden.', 'pos');
+	return true;
+}
+
 function onGalleryToolbarButtonKeydown(event) {
 	const key = event.key;
+	if (key === 'Escape' && galleryShortcutsHelpExpanded) {
+		event.preventDefault();
+		hideGalleryShortcutsHelp();
+		return;
+	}
 	if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(key)) return;
-	const buttons = [galleryViewToggle, refreshGalleryBtn].filter(Boolean);
+	const buttons = [galleryViewToggle, galleryShortcutsToggleBtn, refreshGalleryBtn].filter(Boolean);
 	if (buttons.length < 2) return;
 	const currentIndex = buttons.indexOf(event.currentTarget);
 	if (currentIndex < 0) return;
@@ -9927,6 +10563,25 @@ function onGalleryToolbarButtonKeydown(event) {
 	if (nextButton) nextButton.focus();
 }
 
+function syncGalleryShortcutsHelpUi() {
+	if (!galleryShortcutsToggleBtn || !galleryShortcutsHelp) return;
+	galleryShortcutsHelp.hidden = !galleryShortcutsHelpExpanded;
+	galleryShortcutsToggleBtn.setAttribute('aria-expanded', galleryShortcutsHelpExpanded ? 'true' : 'false');
+	galleryShortcutsToggleBtn.textContent = galleryShortcutsHelpExpanded ? 'Hide keyboard help' : 'Show keyboard help';
+}
+
+function toggleGalleryShortcutsHelp() {
+	if (!galleryShortcutsToggleBtn || !galleryShortcutsHelp) return false;
+	galleryShortcutsHelpExpanded = !galleryShortcutsHelpExpanded;
+	if (galleryShortcutsHelpExpanded) {
+		localStorage.setItem(GALLERY_SHORTCUTS_HELP_EXPANDED_KEY, '1');
+	} else {
+		localStorage.removeItem(GALLERY_SHORTCUTS_HELP_EXPANDED_KEY);
+	}
+	syncGalleryShortcutsHelpUi();
+	return true;
+}
+
 if (galleryViewToggle) {
 	galleryViewToggle.addEventListener('click', () => {
 		galleryViewMode = galleryViewMode === 'grid' ? 'list' : 'grid';
@@ -9943,6 +10598,14 @@ if (galleryViewToggle) {
 if (gallerySelectModeBtn) {
 	gallerySelectModeBtn.addEventListener('click', () => {
 		if (gallerySelectMode) { exitGallerySelectMode(); } else { enterGallerySelectMode(); }
+	});
+}
+
+if (galleryShortcutsToggleBtn && galleryShortcutsHelp) {
+	syncGalleryShortcutsHelpUi();
+	galleryShortcutsToggleBtn.addEventListener('keydown', onGalleryToolbarButtonKeydown);
+	galleryShortcutsToggleBtn.addEventListener('click', () => {
+		toggleGalleryShortcutsHelp();
 	});
 }
 
@@ -10018,14 +10681,25 @@ if (galleryLightboxAddTagBtn) {
 		syncGalleryTagFilterOptions(currentFullHistory.filter((item) => item.type === 'image'));
 		renderGallery(currentFullHistory);
 	});
-	galleryLightboxAddTagBtn.addEventListener('keydown', onGalleryLightboxControlsKeydown);
+	galleryLightboxAddTagBtn.addEventListener('keydown', onGalleryLightboxMetaActionsKeydown);
 }
 
 if (galleryLightboxTagInput) {
 	galleryLightboxTagInput.addEventListener('keydown', (event) => {
+		if (onGalleryLightboxMetaActionsKeydown(event)) {
+			event.stopPropagation();
+			return;
+		}
 		if (event.key !== 'Enter') return;
 		event.preventDefault();
 		galleryLightboxAddTagBtn?.click();
+	});
+}
+
+if (galleryLightboxMetaShortcutsBtn) {
+	galleryLightboxMetaShortcutsBtn.addEventListener('keydown', onGalleryLightboxMetaActionsKeydown);
+	galleryLightboxMetaShortcutsBtn.addEventListener('click', () => {
+		showToast('Lightbox keys: R re-use settings, P toggle params, Esc close viewer.', 'info');
 	});
 }
 
@@ -10123,10 +10797,20 @@ function toggleGalleryLightboxCompare() {
 function toggleGalleryLightboxFullscreen() {
 	if (!galleryLightbox || !galleryLightboxFullscreenBtn) return;
 	galleryLightboxFullscreenMode = !galleryLightboxFullscreenMode;
+	galleryLightboxFullscreenStatusDismissed = false;
 	galleryLightboxFullscreenRestoreHintPending = false;
 	syncGalleryLightboxFullscreenUi();
 	localStorage.setItem(GALLERY_LIGHTBOX_FULLSCREEN_KEY, galleryLightboxFullscreenMode ? '1' : '0');
-	showToast(galleryLightboxFullscreenMode ? 'Fullscreen enabled' : 'Fullscreen disabled', 'info');
+	if (galleryLightboxFullscreenStatusTimer) {
+		window.clearTimeout(galleryLightboxFullscreenStatusTimer);
+		galleryLightboxFullscreenStatusTimer = null;
+	}
+	showToast(
+		galleryLightboxFullscreenMode
+			? 'Pinned fullscreen enabled for next opens'
+			: 'Pinned fullscreen disabled for next opens',
+		'info',
+	);
 }
 
 function syncGalleryLightboxFullscreenUi() {
@@ -10144,8 +10828,10 @@ function syncGalleryLightboxFullscreenUi() {
 			: 'Enable pinned fullscreen for future gallery opens';
 	}
 	if (galleryLightboxFullscreenStatus) {
-		galleryLightboxFullscreenStatus.hidden = !galleryLightboxFullscreenMode;
-		galleryLightboxFullscreenStatus.textContent = galleryLightboxFullscreenMode ? 'Pinned fullscreen' : '';
+		galleryLightboxFullscreenStatus.hidden = !galleryLightboxFullscreenMode || galleryLightboxFullscreenStatusDismissed;
+	}
+	if (galleryLightboxFullscreenStatusDismissBtn) {
+		galleryLightboxFullscreenStatusDismissBtn.hidden = !galleryLightboxFullscreenMode || galleryLightboxFullscreenStatusDismissed;
 	}
 }
 
@@ -10215,6 +10901,13 @@ if (galleryLightboxCompareSlider) {
 	galleryLightboxCompareSlider.addEventListener('input', () => {
 		applyLightboxCompareSplit(galleryLightboxCompareSlider.value);
 	});
+	galleryLightboxCompareSlider.addEventListener('keydown', (event) => {
+		if (event.key === '=') {
+			event.preventDefault();
+			applyLightboxCompareSplit(50);
+			showToast('Compare: centered (50%).', 'pos');
+		}
+	});
 }
 
 if (galleryLightboxMetaToggle) {
@@ -10233,7 +10926,7 @@ if (galleryLightboxMetaToggle) {
 }
 
 if (galleryLightboxReuseBtn) {
-	galleryLightboxReuseBtn.addEventListener('keydown', onGalleryLightboxControlsKeydown);
+	galleryLightboxReuseBtn.addEventListener('keydown', onGalleryLightboxMetaActionsKeydown);
 	galleryLightboxReuseBtn.addEventListener('click', applySettingsFromCurrentLightboxEntry);
 }
 
@@ -10241,6 +10934,14 @@ if (galleryLightboxFullscreenBtn) {
 	galleryLightboxFullscreenBtn.addEventListener('keydown', onGalleryLightboxControlsKeydown);
 	galleryLightboxFullscreenBtn.addEventListener('click', toggleGalleryLightboxFullscreen);
 	syncGalleryLightboxFullscreenUi();
+}
+
+if (galleryLightboxFullscreenStatusDismissBtn) {
+	galleryLightboxFullscreenStatusDismissBtn.addEventListener('click', () => {
+		galleryLightboxFullscreenStatusDismissed = true;
+		syncGalleryLightboxFullscreenUi();
+		showToast('Fullscreen status badge dismissed.', 'pos');
+	});
 }
 
 function updateLivePreviewFromActiveJob(payload) {
@@ -11327,11 +12028,12 @@ function normalizeImageRequestByFamily(common) {
 /**
  * Build <option> elements, optionally grouped by compatibility with baseFamily.
  * When baseFamily is known, compatible models appear first, then unknown family,
- * then incompatible. When baseFamily is unknown, returns a flat list.
+	 * and finally possibly incompatible models.
  */
-function buildCompatGroupedOptions(models, baseFamily, inferFn) {
-	if (!models.length) return '';
-	const toOption = (name) => `<option value="${escHtml(name)}">${escHtml(name)}</option>`;
+function buildCompatGroupedOptions(models = [], baseFamily = '', inferFn = inferCheckpointFamily) {
+	const escapeAttr = (value) => String(value || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+	const escapeText = (value) => String(value || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+	const toOption = (name) => `<option value="${escapeAttr(name)}">${escapeText(name)}</option>`;
 	if (!baseFamily) {
 		return models.map(toOption).join('');
 	}
@@ -15582,6 +16284,30 @@ document.addEventListener('keydown', (e) => {
 	}
 	e.preventDefault();
 	clearPromptPresetFilters(true);
+});
+
+// Global Ctrl/Cmd+Shift shortcuts for prompt preset filters (Image panel only)
+document.addEventListener('keydown', (e) => {
+	const hotkey = String(e.key || '').toLowerCase();
+	const isFilterShortcut = (e.ctrlKey || e.metaKey) && e.shiftKey && !e.altKey && (hotkey === 'f' || hotkey === 'r');
+	if (!isFilterShortcut) return;
+	const panelImage = document.getElementById('panel-image');
+	if (!panelImage || panelImage.hidden) return;
+	if (presetEditModal && !presetEditModal.hidden) return;
+	const target = e.target;
+	if (target instanceof HTMLElement) {
+		const tag = String(target.tagName || '').toLowerCase();
+		if (target.isContentEditable || tag === 'input' || tag === 'textarea' || tag === 'select') return;
+	}
+	e.preventDefault();
+	if (hotkey === 'f') {
+		_togglePromptFavoritesOnlyFilter();
+		showToast(_getFavoritesOnlyFilter() ? 'Favorites-only filter on.' : 'Favorites-only filter off.', 'pos');
+		return;
+	}
+	if (hotkey === 'r') {
+		_toggleRecentPinnedOnlyFilter();
+	}
 });
 if (promptRecentClearBtn) {
 	promptRecentClearBtn.addEventListener('click', () => {

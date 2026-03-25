@@ -72,7 +72,7 @@
         rows="3"
         placeholder="Avoid specific style, tone, or topics."
         aria-label="Negative prompt for text generation"
-        aria-keyshortcuts="Escape"
+        aria-keyshortcuts="Escape Ctrl+Shift+ArrowUp Ctrl+Shift+ArrowDown"
       ></textarea>
     </div>
 
@@ -116,7 +116,8 @@
         rows="1"
         placeholder="Type a message… (Enter to send, Shift+Enter for newline)"
         aria-label="Message input"
-        aria-keyshortcuts="Escape"
+        aria-keyshortcuts="Escape Ctrl+Shift+ArrowUp Ctrl+Shift+ArrowDown Cmd+Shift+ArrowUp Cmd+Shift+ArrowDown"
+        title="Escape clears; Ctrl/Cmd+Shift+Up/Down resizes chat input"
         required
       ></textarea>
       <button class="btn btn-primary" type="submit" id="send-btn" aria-label="Send message">
@@ -145,8 +146,8 @@
           </select>
         </div>
         <div class="inline-field-row profile-row">
-          <input id="image-profile-name" type="text" class="compact-input" placeholder="Profile name" />
-          <button class="btn btn-ghost btn-xs" id="image-profile-save" type="button">Save</button>
+          <input id="image-profile-name" type="text" class="compact-input" placeholder="Profile name" aria-keyshortcuts="Ctrl+S Cmd+S Enter" />
+          <button class="btn btn-ghost btn-xs" id="image-profile-save" type="button" aria-keyshortcuts="Ctrl+S Cmd+S">Save</button>
         </div>
         <div class="preset-row" role="group" aria-label="Profile actions">
           <button class="btn btn-ghost btn-xs" id="image-profile-apply" type="button">Apply</button>
@@ -172,7 +173,7 @@
         <button class="btn btn-ghost btn-xs" id="image-model-mode-recent" type="button" data-model-mode="recent" aria-pressed="false">Recent</button>
         <button class="btn btn-ghost btn-xs" id="image-model-mode-favorites" type="button" data-model-mode="favorites" aria-pressed="false">Favorites</button>
       </div>
-      <input id="image-model-filter" type="text" class="compact-input" placeholder="Filter checkpoints..." aria-label="Filter checkpoint list" />
+      <input id="image-model-filter" type="text" class="compact-input" placeholder="Filter checkpoints..." aria-label="Filter checkpoint list" aria-keyshortcuts="Escape" title="Press Escape to clear filter, then press Escape again to close the most recent Model Stack layer" />
       <div class="select-wrapper">
         <select id="image-model-select">
           <option value="">- loading checkpoints -</option>
@@ -579,7 +580,7 @@
             <button class="btn btn-ghost btn-xs" id="prompt-weight-down-btn" type="button" title="Wrap selection as [text:0.8]">[text:0.8]</button>
             <button class="btn btn-ghost btn-xs" id="prompt-break-wrap-btn" type="button" title="Insert or wrap with BREAK">BREAK</button>
           </div>
-          <textarea id="image-prompt" rows="4" placeholder="A cinematic forest temple, volumetric light, detailed illustration" aria-keyshortcuts="Escape"></textarea>
+          <textarea id="image-prompt" rows="4" placeholder="A cinematic forest temple, volumetric light, detailed illustration" aria-keyshortcuts="Escape Ctrl+Shift+ArrowUp Ctrl+Shift+ArrowDown Alt+ArrowUp Alt+ArrowDown" title="Alt+↑/↓ to browse prompt history"></textarea>
           <div class="prompt-history-row" aria-label="Prompt history quick picks">
             <p class="hint prompt-history-label">Recent prompts</p>
             <button class="btn btn-ghost btn-xs" id="prompt-recent-clear-btn" type="button" title="Clear recent prompt history">Clear</button>
@@ -621,7 +622,7 @@
             <div class="prompt-preset-filter-row">
               <p id="prompt-preset-filter-status" class="hint prompt-preset-filter-status" aria-live="polite">No filters active.</p>
               <div class="prompt-preset-filter-actions">
-                <span id="prompt-preset-filter-shortcut-hint" class="hint prompt-preset-filter-shortcut-hint">Shortcut: Ctrl+Shift+K. Filter buttons: F favs, P pinned recent. Recent chips: arrows move, Shift+arrows reorder, P pins, Del removes.</span>
+                <span id="prompt-preset-filter-shortcut-hint" class="hint prompt-preset-filter-shortcut-hint">Shortcut: Ctrl+Shift+K. Filter buttons: F favs, P pinned recent. Global shortcuts: Ctrl/Cmd+Shift+F toggles favs, Ctrl/Cmd+Shift+R toggles pinned recent, Ctrl/Cmd+Shift+K clears. Recent chips: arrows move, Shift+arrows reorder, P pins, Del removes.</span>
                 <button class="btn btn-ghost btn-xs prompt-preset-recent-pinned-only-toggle" id="prompt-preset-recent-pinned-only-toggle" type="button" aria-pressed="false" aria-keyshortcuts="P Space" title="Show pinned recent filters only (P or Space to toggle when focused)">Pinned recent</button>
                 <button class="btn btn-ghost btn-xs" id="prompt-preset-clear-filters" type="button" aria-keyshortcuts="Control+Shift+K">Clear filters</button>
               </div>
@@ -637,7 +638,7 @@
             <label for="image-negative-prompt" class="field-label">Negative prompt</label>
             <button class="btn btn-ghost btn-xs" id="negative-prompt-default-btn" type="button" title="Load default negative prompt from Configurations">Default</button>
           </div>
-          <textarea id="image-negative-prompt" rows="3" placeholder="blurry, low quality, watermark, text" aria-keyshortcuts="Escape"></textarea>
+          <textarea id="image-negative-prompt" rows="3" placeholder="blurry, low quality, watermark, text" aria-keyshortcuts="Escape Ctrl+Shift+ArrowUp Ctrl+Shift+ArrowDown Ctrl+Enter Cmd+Enter" title="Ctrl/Cmd+Enter submits image generation"></textarea>
           <div class="enhanced-tag-head">
             <p class="hint enhanced-tag-hint">+Suggestion tags</p>
             <button class="btn btn-ghost btn-xs" type="button" data-suggest-toggle="negative-prompt-tags" aria-controls="negative-prompt-tags" aria-expanded="false">Show</button>
@@ -724,7 +725,7 @@
     <section class="queue-wrap" aria-label="Queue status">
       <div class="gallery-head">
         <h3 class="history-heading">Queue</h3>
-        <div class="queue-policy-wrap">
+        <div class="queue-policy-wrap" id="queue-toolbar-controls" role="group" aria-label="Queue toolbar controls">
           <label for="auto-retry-policy" class="hint">Auto retry</label>
           <select id="auto-retry-policy" class="queue-policy-select">
             <option value="0">Off</option>
@@ -732,21 +733,27 @@
             <option value="2">2 retries</option>
           </select>
           <label for="failed-only-toggle" class="hint queue-toggle-label">
-            <input id="failed-only-toggle" type="checkbox" />
+            <input id="failed-only-toggle" type="checkbox" aria-keyshortcuts="Enter Space ArrowLeft ArrowRight Home End" title="Enter or Space toggles; Arrow keys and Home/End move between queue toolbar controls" />
             Failed only
           </label>
-          <button class="btn btn-ghost btn-xs" id="clear-failed-queue" type="button">Clear failed</button>
-          <button class="btn btn-ghost btn-xs" id="clear-completed-queue" type="button">Clear done</button>
-          <button class="btn btn-ghost btn-xs" id="queue-ui-reset" type="button">Reset queue UI</button>
+          <button class="btn btn-ghost btn-xs" id="clear-failed-queue" type="button" aria-keyshortcuts="Enter Space ArrowLeft ArrowRight Home End" title="Enter or Space activates; Arrow keys and Home/End move between queue toolbar controls">Clear failed</button>
+          <button class="btn btn-ghost btn-xs" id="clear-completed-queue" type="button" aria-keyshortcuts="Enter Space ArrowLeft ArrowRight Home End" title="Enter or Space activates; Arrow keys and Home/End move between queue toolbar controls">Clear done</button>
+          <button class="btn btn-ghost btn-xs" id="queue-ui-reset" type="button" aria-keyshortcuts="Enter Space ArrowLeft ArrowRight Home End" title="Enter or Space activates; Arrow keys and Home/End move between queue toolbar controls">Reset queue UI</button>
         </div>
       </div>
       <div class="queue-telemetry-wrap">
         <p id="queue-telemetry" class="hint">Session: submitted 0 | canceled 0 | retried 0 | failed 0</p>
         <button class="btn btn-ghost btn-xs" id="queue-telemetry-reset" type="button">Reset counters</button>
       </div>
-      <p id="queue-shortcuts-hint" class="hint queue-shortcuts-hint">Shortcut: Alt+ArrowUp on a queue action prioritizes that job.</p>
+      <p id="queue-shortcuts-hint" class="hint queue-shortcuts-hint">Queue toolbar: Arrow keys or Home/End move between Failed only and queue actions; Space/Enter activates the focused control. Queue help controls: H toggles help; Arrow/Home/End moves between help and reset. Queue mini-toolbar: Arrow/Home/End moves between restore hint and pin controls. Queue rows: Alt+ArrowUp on a queue action prioritizes that job.</p>
+      <div id="queue-shortcuts-legend" class="queue-shortcuts-legend" role="group" aria-label="Queue keyboard shortcut legend">
+        <span class="queue-shortcut-chip" title="Space or Enter activates the focused queue toolbar control">Space/Enter: activate</span>
+        <span class="queue-shortcut-chip" title="Arrow keys, Home, and End move focus between queue control groups">Arrows/Home/End: move focus</span>
+        <span class="queue-shortcut-chip" title="H toggles Queue help and Escape closes it when open">H/Esc: help toggle</span>
+        <span class="queue-shortcut-chip" title="Alt+ArrowUp prioritizes the selected queue row action">Alt+ArrowUp: prioritize row</span>
+      </div>
       <details class="queue-help" id="queue-help-details">
-        <summary id="queue-help-toggle">Queue help</summary>
+        <summary id="queue-help-toggle" aria-keyshortcuts="H Escape ArrowLeft ArrowRight Home End" title="H toggles help; Escape closes; Arrow keys and Home/End move between queue help controls">Queue help</summary>
         <div id="queue-help-copy" class="hint queue-help-copy">
           <p>Use Alt+ArrowUp on a prioritize action to move a queued job to the front.</p>
           <p>Persisting counts jobs that are done in ComfyUI but still saving local history. These rows show a SAVE badge until persistence succeeds.</p>
@@ -754,14 +761,16 @@
           <p>Reset queue UI clears the failed-only filter and restore-hint visibility preference.</p>
         </div>
       </details>
-      <div class="queue-restore-wrap" id="queue-restore-wrap" hidden>
-        <p id="queue-restore-hint" class="hint queue-restore-hint"></p>
-        <button class="btn btn-ghost btn-xs" id="queue-restore-hide" type="button" aria-label="Hide queue restore hint">Hide</button>
-      </div>
-      <button class="btn btn-ghost btn-xs queue-restore-show" id="queue-restore-show" type="button" aria-label="Show queue restore hint" hidden>Show restore hint</button>
-      <div class="queue-last-action-row">
-        <p id="queue-last-action" class="hint queue-last-action" role="status" aria-live="polite">Last action: none yet.</p>
-        <button class="btn btn-ghost btn-xs queue-last-action-pin" id="queue-last-action-pin" type="button" aria-pressed="false" aria-label="Pin queue last action status" title="Pin this status so it does not auto-clear">Pin</button>
+      <div class="queue-mini-toolbar" id="queue-mini-toolbar" role="group" aria-label="Queue restore and status controls">
+        <div class="queue-restore-wrap" id="queue-restore-wrap" hidden>
+          <p id="queue-restore-hint" class="hint queue-restore-hint"></p>
+          <button class="btn btn-ghost btn-xs" id="queue-restore-hide" type="button" aria-label="Hide queue restore hint" aria-keyshortcuts="ArrowLeft ArrowRight Home End" title="Arrow keys and Home/End move between queue restore and status controls">Hide</button>
+        </div>
+        <button class="btn btn-ghost btn-xs queue-restore-show" id="queue-restore-show" type="button" aria-label="Show queue restore hint" aria-keyshortcuts="ArrowLeft ArrowRight Home End" title="Arrow keys and Home/End move between queue restore and status controls" hidden>Show restore hint</button>
+        <div class="queue-last-action-row">
+          <p id="queue-last-action" class="hint queue-last-action" role="status" aria-live="polite">Last action: none yet.</p>
+          <button class="btn btn-ghost btn-xs queue-last-action-pin" id="queue-last-action-pin" type="button" aria-pressed="false" aria-label="Pin queue last action status" aria-keyshortcuts="ArrowLeft ArrowRight Home End" title="Pin this status so it does not auto-clear. Arrow keys and Home/End move between queue restore and status controls">Pin</button>
+        </div>
       </div>
       <p id="queue-summary" class="hint" title="Persisting counts done jobs waiting for local history save before leaving tracked queue.">No jobs submitted yet.</p>
       <ul id="queue-list" class="history-list"></ul>
@@ -825,17 +834,24 @@
               <option value="all">All models</option>
             </select>
           </div>
-          <button class="btn btn-ghost btn-xs" id="gallery-view-toggle" type="button" aria-pressed="false">Grid</button>
-          <button class="btn btn-ghost btn-xs" id="gallery-select-mode-btn" type="button" aria-pressed="false">Select</button>
+          <button class="btn btn-ghost btn-xs" id="gallery-view-toggle" type="button" aria-pressed="false" aria-keyshortcuts="Ctrl+Shift+G Cmd+Shift+G">Grid</button>
+          <button class="btn btn-ghost btn-xs" id="gallery-select-mode-btn" type="button" aria-pressed="false" aria-keyshortcuts="M">Select</button>
           <button class="btn btn-ghost btn-xs" id="refresh-gallery" type="button">Refresh</button>
         </div>
       </div>
+      <div class="gallery-shortcuts-help-row">
+        <p id="gallery-shortcuts-hint" class="hint">Shortcuts: Ctrl/Cmd+Shift+G view, Ctrl/Cmd+Shift+S select mode, Ctrl/Cmd+Shift+A select all, Ctrl/Cmd+Shift+X clear, ? or Ctrl/Cmd+Shift+/ or Ctrl/Cmd+Shift+H keyboard help, Esc hide help.</p>
+        <button class="btn btn-ghost btn-xs" id="gallery-shortcuts-toggle-btn" type="button" aria-expanded="false" aria-controls="gallery-shortcuts-help" aria-keyshortcuts="? Ctrl+Shift+/ Cmd+Shift+/ Ctrl+Shift+H Cmd+Shift+H" title="Toggle keyboard help (?, Ctrl/Cmd+Shift+/, or Ctrl/Cmd+Shift+H)">Show keyboard help</button>
+      </div>
+      <div id="gallery-shortcuts-help" class="hint gallery-shortcuts-help" hidden>
+        Gallery keyboard: M toggle select mode; A select all; X clear selection; D delete selected; E export selected; ? show this help.
+      </div>
       <div id="gallery-select-toolbar" class="gallery-select-toolbar" hidden role="toolbar" aria-label="Gallery selection actions">
         <span id="gallery-select-count" class="gallery-select-count">0 selected</span>
-        <button class="btn btn-ghost btn-xs" id="gallery-select-all-btn" type="button">Select all</button>
-        <button class="btn btn-ghost btn-xs" id="gallery-bulk-delete-btn" type="button" disabled>Delete selected</button>
-        <button class="btn btn-ghost btn-xs" id="gallery-bulk-export-btn" type="button" disabled>Export ZIP</button>
-        <button class="btn btn-ghost btn-xs" id="gallery-deselect-all-btn" type="button">Clear &amp; exit</button>
+        <button class="btn btn-ghost btn-xs" id="gallery-select-all-btn" type="button" aria-keyshortcuts="A">Select all</button>
+        <button class="btn btn-ghost btn-xs" id="gallery-bulk-delete-btn" type="button" disabled aria-keyshortcuts="D Delete">Delete selected</button>
+        <button class="btn btn-ghost btn-xs" id="gallery-bulk-export-btn" type="button" disabled aria-keyshortcuts="E">Export ZIP</button>
+        <button class="btn btn-ghost btn-xs" id="gallery-deselect-all-btn" type="button" aria-keyshortcuts="X">Clear &amp; exit</button>
       </div>
       <p id="gallery-filter-hint" class="hint" hidden></p>
       <div id="gallery-grid" class="gallery-grid"></div>
@@ -846,9 +862,12 @@
       <div class="gallery-lightbox-panel" role="document">
         <div class="gallery-lightbox-header">
           <span id="gallery-lightbox-counter" class="hint gallery-lightbox-counter"></span>
-          <span class="hint gallery-lightbox-shortcuts">Shortcuts: &larr; &rarr; arrows, C compare, R re-use, F fullscreen, Esc close</span>
-          <span id="gallery-lightbox-fullscreen-status" class="hint gallery-lightbox-fullscreen-status" hidden aria-live="polite">Pinned fullscreen</span>
-          <button id="gallery-lightbox-meta-toggle" class="btn btn-ghost btn-xs" type="button" aria-pressed="false" aria-controls="gallery-lightbox-meta" hidden>Params</button>
+          <span class="hint gallery-lightbox-shortcuts">Shortcuts: &larr; &rarr; arrows, P params, C compare, [ ] snap, R re-use, F fullscreen, Esc close</span>
+          <span id="gallery-lightbox-fullscreen-status" class="gallery-lightbox-fullscreen-status-badge" hidden aria-live="polite" aria-label="Fullscreen mode active">
+            <span id="gallery-lightbox-fullscreen-status-text">&#x2326; Press F to exit</span>
+            <button id="gallery-lightbox-fullscreen-status-dismiss" class="gallery-lightbox-fullscreen-status-dismiss" type="button" aria-label="Dismiss fullscreen status badge" title="Dismiss fullscreen status badge" hidden>&times;</button>
+          </span>
+          <button id="gallery-lightbox-meta-toggle" class="btn btn-ghost btn-xs" type="button" aria-pressed="false" aria-controls="gallery-lightbox-meta" aria-keyshortcuts="P" hidden>Params</button>
           <button id="gallery-lightbox-compare-toggle" class="btn btn-ghost btn-xs" type="button" aria-pressed="false" aria-keyshortcuts="C" hidden>Compare</button>
           <input id="gallery-lightbox-source-upload" type="file" accept="image/*" hidden aria-hidden="true" tabindex="-1" />
           <button id="gallery-lightbox-star" class="btn btn-ghost btn-xs gallery-lightbox-star-btn" type="button" aria-pressed="false" aria-label="Add to favorites" hidden>&#9734; Fav</button>
@@ -863,7 +882,8 @@
             <div id="gallery-lightbox-after-wrap" class="gallery-lightbox-compare-after-wrap">
               <img id="gallery-lightbox-after-image" src="" alt="Generated image" class="gallery-lightbox-compare-after" />
             </div>
-            <input id="gallery-lightbox-compare-slider" class="gallery-lightbox-compare-slider" type="range" min="0" max="100" step="1" value="50" aria-label="Before after split" />
+            <input id="gallery-lightbox-compare-slider" class="gallery-lightbox-compare-slider" type="range" min="0" max="100" step="1" value="50" aria-label="Before/after split — left/right adjust, Home full before, End full after, = center" title="Adjust split: ← /→ move · Home full before · End full after · = center" />
+            <p id="gallery-lightbox-compare-hint" class="gallery-lightbox-compare-hint" aria-hidden="true">&larr; &rarr; adjust &middot; Home/End snap &middot; = center</p>
           </div>
           <button id="gallery-lightbox-next" class="gallery-lightbox-nav-btn" type="button" aria-label="Next image" hidden>&#8250;</button>
         </div>
@@ -875,6 +895,7 @@
             <button id="gallery-lightbox-reuse" class="btn btn-secondary btn-xs" type="button" aria-keyshortcuts="R">&#8617; Re-use settings</button>
             <input id="gallery-lightbox-tag-input" class="gallery-lightbox-tag-input" type="text" maxlength="40" placeholder="Add tag" aria-label="Add tag to this image" />
             <button id="gallery-lightbox-add-tag-btn" class="btn btn-ghost btn-xs" type="button">Add tag</button>
+            <button id="gallery-lightbox-meta-shortcuts" class="btn btn-ghost btn-xs gallery-lightbox-meta-shortcuts" type="button" aria-label="Show lightbox keyboard shortcuts" title="Show lightbox keyboard shortcuts">Keys: R re-use, P params, Esc close, [ ] compare</button>
           </div>
           <div id="gallery-lightbox-tags" class="gallery-lightbox-tags" aria-live="polite"></div>
         </div>
@@ -889,7 +910,7 @@
       <button type="button" role="menuitem" data-gallery-action="export-png" aria-keyshortcuts="2" title="Export PNG (2)">Export PNG</button>
       <button type="button" role="menuitem" data-gallery-action="export-jpeg" aria-keyshortcuts="3" title="Export JPEG (3)">Export JPEG</button>
       <button type="button" role="menuitem" data-gallery-action="export-webp" aria-keyshortcuts="4" title="Export WebP (4)">Export WebP</button>
-      <p class="gallery-context-shortcuts" aria-hidden="true">Shortcuts: O open, Del delete, 1-4 export, ? help</p>
+      <p class="gallery-context-shortcuts" aria-hidden="true">Shortcuts: O open, Del delete, 1-4 export, arrows/tab + PgUp/PgDn navigate, letters jump, ?/F1 help</p>
     </div>
   </div>
 

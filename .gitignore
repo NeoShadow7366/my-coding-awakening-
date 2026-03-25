@@ -44,3 +44,5 @@ htmlcov/
 data/history.json
 data/service_config.json
 data/tmp_img2img_source.png
+data/link_registry.db
+data/model_metadata.db
