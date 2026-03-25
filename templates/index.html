@@ -733,7 +733,7 @@
             <option value="2">2 retries</option>
           </select>
           <label for="failed-only-toggle" class="hint queue-toggle-label">
-            <input id="failed-only-toggle" type="checkbox" aria-keyshortcuts="Enter Space ArrowLeft ArrowRight Home End" title="Enter or Space toggles; Arrow keys and Home/End move between queue toolbar controls" />
+            <input id="failed-only-toggle" type="checkbox" aria-keyshortcuts="Q Enter Space ArrowLeft ArrowRight Home End" title="Q toggles from anywhere (no input focused); Enter or Space toggles when focused; Arrow keys and Home/End move between queue toolbar controls" />
             Failed only
           </label>
           <button class="btn btn-ghost btn-xs" id="clear-failed-queue" type="button" aria-keyshortcuts="Enter Space ArrowLeft ArrowRight Home End" title="Enter or Space activates; Arrow keys and Home/End move between queue toolbar controls">Clear failed</button>
@@ -745,12 +745,13 @@
         <p id="queue-telemetry" class="hint">Session: submitted 0 | canceled 0 | retried 0 | failed 0</p>
         <button class="btn btn-ghost btn-xs" id="queue-telemetry-reset" type="button">Reset counters</button>
       </div>
-      <p id="queue-shortcuts-hint" class="hint queue-shortcuts-hint">Queue toolbar: Arrow keys or Home/End move between Failed only and queue actions; Space/Enter activates the focused control. Queue help controls: H toggles help; Arrow/Home/End moves between help and reset. Queue mini-toolbar: Arrow/Home/End moves between restore hint and pin controls. Queue rows: Alt+ArrowUp on a queue action prioritizes that job.</p>
+      <p id="queue-shortcuts-hint" class="hint queue-shortcuts-hint">Queue toolbar: Arrow keys or Home/End move between Failed only and queue actions; Space/Enter activates the focused control. Queue help controls: H toggles help; Arrow/Home/End moves between help and reset. Queue mini-toolbar: Arrow/Home/End moves between restore hint and pin controls. Queue rows: Alt+ArrowUp on a queue action prioritizes that job. Global (Image panel, no input focused): Q toggles failed-only filter; H toggles queue help.</p>
       <div id="queue-shortcuts-legend" class="queue-shortcuts-legend" role="group" aria-label="Queue keyboard shortcut legend">
         <span class="queue-shortcut-chip" title="Space or Enter activates the focused queue toolbar control">Space/Enter: activate</span>
         <span class="queue-shortcut-chip" title="Arrow keys, Home, and End move focus between queue control groups">Arrows/Home/End: move focus</span>
         <span class="queue-shortcut-chip" title="H toggles Queue help and Escape closes it when open">H/Esc: help toggle</span>
         <span class="queue-shortcut-chip" title="Alt+ArrowUp prioritizes the selected queue row action">Alt+ArrowUp: prioritize row</span>
+        <span class="queue-shortcut-chip" title="Q toggles the failed-only queue filter (global shortcut when no input is focused)">Q: failed filter</span>
       </div>
       <details class="queue-help" id="queue-help-details">
         <summary id="queue-help-toggle" aria-keyshortcuts="H Escape ArrowLeft ArrowRight Home End" title="H toggles help; Escape closes; Arrow keys and Home/End move between queue help controls">Queue help</summary>

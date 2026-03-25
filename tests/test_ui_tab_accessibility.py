@@ -259,7 +259,7 @@ def test_index_queue_toolbar_group_semantics():
     assert 'id="clear-completed-queue"' in html
     assert 'id="queue-ui-reset"' in html
     assert 'aria-keyshortcuts="Enter Space ArrowLeft ArrowRight Home End"' in html
-    assert 'title="Enter or Space toggles; Arrow keys and Home/End move between queue toolbar controls"' in html
+    assert 'Q toggles from anywhere (no input focused)' in html
     assert 'title="Enter or Space activates; Arrow keys and Home/End move between queue toolbar controls"' in html
     assert 'Queue toolbar: Arrow keys or Home/End move between Failed only and queue actions; Space/Enter activates the focused control.' in html
     assert 'id="queue-shortcuts-legend"' in html
@@ -328,6 +328,40 @@ def test_queue_mini_toolbar_keyboard_handler_wiring_present_in_js_bundle():
     assert "queueRestoreHideBtn.addEventListener('keydown', onQueueMiniToolbarKeydown);" in content
     assert "queueRestoreShowBtn.addEventListener('keydown', onQueueMiniToolbarKeydown);" in content
     assert "queueLastActionPinBtn.addEventListener('keydown', onQueueMiniToolbarKeydown);" in content
+
+
+def test_queue_help_quick_action_hotkeys_wiring_present():
+    """Sprint 14: Q key toggles failed-only filter and H key toggles queue help globally."""
+    js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
+    html_path = Path(__file__).resolve().parents[1] / "templates" / "index.html"
+    js = js_path.read_text(encoding="utf-8")
+    html = html_path.read_text(encoding="utf-8")
+
+    # Global handler guards
+    assert "// Global queue quick-action hotkeys: Q toggles failed-only filter, H toggles queue help (Image panel only)" in js
+    assert "if (hotkey !== 'q' && hotkey !== 'h') return;" in js
+    assert "if (!panelImage || panelImage.hidden) return;" in js
+    assert "if (galleryLightbox && !galleryLightbox.hidden) return;" in js
+    assert "if (commandPalette && !commandPalette.hidden) return;" in js
+    # Q branch: click failed-only toggle
+    assert "if (hotkey === 'q') {" in js
+    assert "failedOnlyToggle.click();" in js
+    assert "Queue: showing failed only." in js
+    assert "Queue: showing all jobs." in js
+    # H branch: toggle queue help disclosure globally
+    assert "if (hotkey === 'h') {" in js
+    assert "queueHelpDetails.open = !queueHelpDetails.open;" in js
+    assert "queueHelpToggle?.focus();" in js
+    assert "Queue help opened." in js
+    assert "Queue help closed." in js
+
+    # HTML: Q chip in legend
+    assert 'Q: failed filter' in html
+    assert 'Q toggles the failed-only queue filter' in html
+    # HTML: Q in aria-keyshortcuts on failed-only-toggle
+    assert 'aria-keyshortcuts="Q Enter Space' in html
+    # HTML: hint text mentions Q global shortcut
+    assert 'Q toggles failed-only filter' in html
 
 
 def test_gallery_toolbar_keyboard_handler_wiring_present_in_js_bundle():

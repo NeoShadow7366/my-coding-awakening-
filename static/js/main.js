@@ -16286,6 +16286,42 @@ document.addEventListener('keydown', (e) => {
 	clearPromptPresetFilters(true);
 });
 
+// Global queue quick-action hotkeys: Q toggles failed-only filter, H toggles queue help (Image panel only)
+document.addEventListener('keydown', (event) => {
+	if (event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return;
+	const hotkey = String(event.key || '').toLowerCase();
+	if (hotkey !== 'q' && hotkey !== 'h') return;
+	if (!panelImage || panelImage.hidden) return;
+	if (galleryLightbox && !galleryLightbox.hidden) return;
+	if (commandPalette && !commandPalette.hidden) return;
+	const target = event.target;
+	if (target instanceof HTMLElement) {
+		const tag = String(target.tagName || '').toLowerCase();
+		if (target.isContentEditable || tag === 'input' || tag === 'textarea' || tag === 'select') return;
+	}
+	if (hotkey === 'q') {
+		event.preventDefault();
+		if (failedOnlyToggle) {
+			failedOnlyToggle.click();
+			showToast(failedOnlyToggle.checked ? 'Queue: showing failed only.' : 'Queue: showing all jobs.', 'pos');
+		}
+		return;
+	}
+	if (hotkey === 'h') {
+		event.preventDefault();
+		if (queueHelpDetails) {
+			queueHelpDetails.open = !queueHelpDetails.open;
+			if (typeof localStorage !== 'undefined') {
+				localStorage.setItem(QUEUE_HELP_EXPANDED_KEY, queueHelpDetails.open ? '1' : '0');
+			}
+			queueHelpToggle?.focus();
+			setQueueLastAction(queueHelpDetails.open ? 'Queue help opened.' : 'Queue help closed.');
+			showToast(queueHelpDetails.open ? 'Queue help opened.' : 'Queue help closed.', 'pos');
+		}
+		return;
+	}
+});
+
 // Global Ctrl/Cmd+Shift shortcuts for prompt preset filters (Image panel only)
 document.addEventListener('keydown', (e) => {
 	const hotkey = String(e.key || '').toLowerCase();
