@@ -23,7 +23,7 @@
         <a href="#" class="tab-btn {% block nav_disc %}{% endblock %}" id="nav-image"
           role="tab" aria-controls="panel-image" aria-selected="false" tabindex="-1">Image</a>
         <a href="#" class="tab-btn" id="nav-config"
-          role="tab" aria-controls="panel-config" aria-selected="false" tabindex="-1">Configurations</a>
+          role="tab" aria-controls="panel-config" aria-selected="false" tabindex="-1">Settings</a>
         <a href="#" class="tab-btn" id="nav-models"
           role="tab" aria-controls="panel-models" aria-selected="false" tabindex="-1">Models</a>
       </nav>
@@ -34,6 +34,13 @@
           <span class="status-dot" id="status-dot"></span>
           <span id="status-text">Checking…</span>
         </span>
+        <!-- Resource Monitor Toggle -->
+        <button class="icon-btn" id="resource-monitor-toggle" aria-label="Toggle system resource monitor" title="Toggle Hardware Monitor">
+          <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+          </svg>
+        </button>
+
         <!-- Dark/light mode toggle -->
         <button class="icon-btn" id="theme-toggle" aria-label="Toggle dark mode" title="Toggle dark / light mode">
           <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">

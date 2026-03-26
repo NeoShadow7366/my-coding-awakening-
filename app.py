@@ -1500,6 +1500,15 @@ def _ensure_model_metadata_db() -> None:
             )
             """
         )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS model_embeddings (
+                metadata_key TEXT PRIMARY KEY,
+                vector_json TEXT NOT NULL,
+                updated_at INTEGER NOT NULL
+            )
+            """
+        )
         conn.commit()
 
 
@@ -1574,6 +1583,35 @@ def _save_model_metadata(items: dict[str, dict]) -> None:
             logger.warning("Model metadata SQLite write failed; JSON store preserved: %s", exc)
 
 
+def _load_model_embeddings_from_db() -> dict[str, list[float]]:
+    _ensure_model_metadata_db()
+    db_path = _model_metadata_db_path()
+    if not db_path.exists():
+        return {}
+    result: dict[str, list[float]] = {}
+    with sqlite3.connect(db_path) as conn:
+        rows = conn.execute("SELECT metadata_key, vector_json FROM model_embeddings").fetchall()
+    for key, vector_json in rows:
+        try:
+            vector = json.loads(vector_json)
+            if isinstance(vector, list):
+                result[str(key)] = vector
+        except json.JSONDecodeError:
+            continue
+    return result
+
+
+def _save_model_embedding_to_db(key: str, vector: list[float]) -> None:
+    _ensure_model_metadata_db()
+    db_path = _model_metadata_db_path()
+    with sqlite3.connect(db_path) as conn:
+        conn.execute(
+            "INSERT OR REPLACE INTO model_embeddings (metadata_key, vector_json, updated_at) VALUES (?, ?, ?)",
+            (str(key), json.dumps(vector, ensure_ascii=True), int(time.time())),
+        )
+        conn.commit()
+
+
 def _sanitize_optional_preview_url(value: str) -> str:
     url = str(value or "").strip()
     if not url:
@@ -1605,6 +1643,35 @@ def _extract_preview_urls_from_images(images: list[dict]) -> list[str]:
         if cleaned and cleaned not in urls:
             urls.append(cleaned)
     return urls
+
+
+def _generate_text_embedding(text: str) -> list[float]:
+    config = _load_service_config()
+    ollama_path = config.get("ollama_path")
+    if not (ollama_path and _ollama_available()):
+        return []
+    try:
+        resp = requests.post(
+            f"{_OLLAMA_API}/api/embeddings",
+            json={"model": "nomic-embed-text", "prompt": text},
+            timeout=10,
+        )
+        resp.raise_for_status()
+        return resp.json().get("embedding") or []
+    except Exception as exc:
+        logger.warning("Failed to generate embedding for query: %s", exc)
+        return []
+
+
+def _cosine_similarity(vec_a: list[float], vec_b: list[float]) -> float:
+    if not vec_a or not vec_b or len(vec_a) != len(vec_b):
+        return 0.0
+    dot_product = sum(a * b for a, b in zip(vec_a, vec_b))
+    norm_a = sum(a * a for a in vec_a) ** 0.5
+    norm_b = sum(b * b for b in vec_b) ** 0.5
+    if norm_a == 0 or norm_b == 0:
+        return 0.0
+    return dot_product / (norm_a * norm_b)
 
 
 def _upsert_model_download_metadata(file_name: str, folder: str, body: dict, provider: str, model_id: str) -> None:
@@ -5717,6 +5784,239 @@ def api_models_download_cancel(download_id: str):
     return jsonify({"ok": True})
 
 
+@app.route("/api/models/tags", methods=["POST"])
+def api_models_update_tags():
+    """Mutate user_tags for a model."""
+    body = request.get_json(silent=True) or {}
+    file_name = (body.get("file_name") or "").strip()
+    folder_raw = (body.get("folder") or "").strip()
+    folder = _normalize_model_folder(folder_raw)
+    tags = body.get("user_tags")
+
+    if not file_name or folder is None or not isinstance(tags, list):
+        return jsonify({"error": "invalid file_name, folder, or user_tags array"}), 400
+
+    key = f"{folder}/{file_name}".lower()
+    metadata_map = _load_model_metadata()
+    existing = metadata_map.get(key)
+    if not isinstance(existing, dict):
+        existing = {"file_name": file_name, "folder": folder}
+
+    clean_tags = [str(t).strip() for t in tags if str(t).strip()]
+    existing["user_tags"] = list(dict.fromkeys(clean_tags))
+    existing["updated_at"] = int(time.time())
+    metadata_map[key] = existing
+
+    _save_model_metadata(metadata_map)
+    # Clear cached embedding so the background worker regenerates it with the new tags
+    db_path = _model_metadata_db_path()
+    if db_path.exists():
+        with sqlite3.connect(db_path) as conn:
+            conn.execute("DELETE FROM model_embeddings WHERE metadata_key = ?", (key,))
+            conn.commit()
+
+    return jsonify({"ok": True, "user_tags": existing["user_tags"]})
+
+
+@app.route("/api/vault/bulk/tag", methods=["POST"])
+def api_vault_bulk_tag():
+    """Bulk apply, remove, or set tags for selected models."""
+    body = request.get_json(silent=True) or {}
+    models = body.get("models", [])
+    tags = body.get("tags", [])
+    action = body.get("action", "add")
+    
+    if not isinstance(models, list) or not isinstance(tags, list):
+        return jsonify({"error": "invalid payload"}), 400
+        
+    metadata_map = _load_model_metadata()
+    clean_tags = [str(t).strip() for t in tags if str(t).strip()]
+    affected_keys = []
+    
+    for m in models:
+        file_name = m.get("file_name")
+        folder_raw = m.get("folder")
+        if not file_name or not folder_raw:
+            continue
+            
+        folder = _normalize_model_folder(folder_raw)
+        if folder is None:
+            continue
+            
+        key = f"{folder}/{file_name}".lower()
+        existing = metadata_map.get(key)
+        if not isinstance(existing, dict):
+            existing = {"file_name": file_name, "folder": folder}
+            
+        current_tags = set(existing.get("user_tags", []))
+        if action == "add":
+            current_tags.update(clean_tags)
+        elif action == "remove":
+            current_tags.difference_update(clean_tags)
+        elif action == "set":
+            current_tags = set(clean_tags)
+            
+        existing["user_tags"] = list(sorted(current_tags))
+        existing["updated_at"] = int(time.time())
+        metadata_map[key] = existing
+        affected_keys.append(key)
+        
+    _save_model_metadata(metadata_map)
+    
+    if affected_keys:
+        db_path = _model_metadata_db_path()
+        if db_path.exists():
+            with sqlite3.connect(db_path) as conn:
+                placeholders = ",".join("?" for _ in affected_keys)
+                conn.execute(f"DELETE FROM model_embeddings WHERE metadata_key IN ({placeholders})", affected_keys)
+                conn.commit()
+                
+    return jsonify({"ok": True, "affected": len(affected_keys)})
+
+
+@app.route("/api/vault/bulk/delete", methods=["POST"])
+def api_vault_bulk_delete():
+    """Bulk delete physical weights and metadata for selected models."""
+    body = request.get_json(silent=True) or {}
+    models = body.get("models", [])
+    
+    if not isinstance(models, list):
+        return jsonify({"error": "invalid payload"}), 400
+        
+    metadata_map = _load_model_metadata()
+    deleted_count = 0
+    affected_keys = []
+    
+    for m in models:
+        file_name = m.get("file_name")
+        folder_raw = m.get("folder")
+        if not file_name or not folder_raw:
+            continue
+            
+        folder = _normalize_model_folder(folder_raw)
+        if folder is None:
+            continue
+            
+        filepath = _resolve_model_path(file_name, folder)
+        if filepath and filepath.exists():
+            try:
+                filepath.unlink()
+            except OSError:
+                pass
+                
+        key = f"{folder}/{file_name}".lower()
+        if key in metadata_map:
+            del metadata_map[key]
+            affected_keys.append(key)
+        deleted_count += 1
+        
+    _save_model_metadata(metadata_map)
+    
+    if affected_keys:
+        db_path = _model_metadata_db_path()
+        if db_path.exists():
+            with sqlite3.connect(db_path) as conn:
+                placeholders = ",".join("?" for _ in affected_keys)
+                conn.execute(f"DELETE FROM model_embeddings WHERE metadata_key IN ({placeholders})", affected_keys)
+                conn.commit()
+                
+    return jsonify({"ok": True, "deleted": deleted_count})
+
+
+@app.route("/api/vault/bulk/export", methods=["POST"])
+def api_vault_bulk_export():
+    """Create a portable JSON metadata snapshot of selections for vault restoration."""
+    body = request.get_json(silent=True) or {}
+    models = body.get("models", [])
+    
+    if not isinstance(models, list):
+        return jsonify({"error": "invalid payload"}), 400
+        
+    metadata_map = _load_model_metadata()
+    export_payload = {
+        "version": 1,
+        "created_at": int(time.time()),
+        "models": []
+    }
+    
+    for m in models:
+        file_name = m.get("file_name")
+        folder_raw = m.get("folder")
+        if not file_name or not folder_raw:
+            continue
+            
+        folder = _normalize_model_folder(folder_raw)
+        if folder is None:
+            continue
+            
+        key = f"{folder}/{file_name}".lower()
+        meta = metadata_map.get(key, {})
+        
+        export_payload["models"].append({
+            "file_name": file_name,
+            "folder": folder,
+            "civitai_id": meta.get("model_id"),
+            "civitai_version_id": meta.get("version_id"),
+            "hash": meta.get("hash"),
+            "user_tags": meta.get("user_tags", []),
+            "download_url": meta.get("downloadUrl"),
+            "baseModel": meta.get("baseModel")
+        })
+        
+    return jsonify({"ok": True, "export": export_payload})
+
+
+@app.route("/api/search/models", methods=["GET"])
+def api_search_models():
+    """Returns top models matching a text query block using Semantic Math."""
+    query = request.args.get("q", "").strip()
+    tags_param = request.args.get("tags", "").strip()
+    required_tags = [t.strip().lower() for t in tags_param.split(",") if t.strip()]
+
+    if not query and not required_tags:
+        return jsonify({"results": []})
+
+    metadata_map = _load_model_metadata()
+    embeddings_map = _load_model_embeddings_from_db()
+
+    query_vector = _generate_text_embedding(query) if query else []
+
+    results = []
+    for key, data in metadata_map.items():
+        if not isinstance(data, dict):
+            continue
+
+        # Tag filtering
+        model_tags = [str(t).lower() for t in data.get("user_tags") or []]
+        if required_tags and not all(t in model_tags for t in required_tags):
+            continue
+
+        score = 0.0
+        if query_vector:
+            model_vec = embeddings_map.get(key)
+            if model_vec:
+                score = _cosine_similarity(query_vector, model_vec)
+            else:
+                # Fallback to basic string match if no embedding is ready yet
+                text_block = f"{data.get('file_name')} {data.get('model_name')} {' '.join(model_tags)}".lower()
+                if query.lower() in text_block:
+                    score = 0.5
+        elif required_tags:
+            score = 1.0
+
+        if score > 0.15 or (not query_vector and score > 0):
+            results.append({
+                "key": key,
+                "file_name": data.get("file_name"),
+                "folder": data.get("folder"),
+                "score": score,
+                "user_tags": data.get("user_tags", [])
+            })
+
+    results.sort(key=lambda x: x["score"], reverse=True)
+    return jsonify({"results": results[:20]})
+
+
 @app.route("/api/models/delete", methods=["POST"])
 def api_models_delete_local():
     """Delete a locally installed model file."""
@@ -5843,6 +6143,10 @@ def api_status():
             },
         }
     )
+@app.route("/api/system/resources")
+def api_system_resources():
+    from scripts.resource_monitor import get_system_resources
+    return jsonify(get_system_resources())
 
 
 @app.route("/api/healthz")
@@ -5969,6 +6273,104 @@ def api_config_migrate_model_folders_status(job_id: str):
     if not job:
         return jsonify({"error": "unknown migration job id"}), 404
     return jsonify({"ok": True, "job": _migration_job_snapshot(job)})
+
+
+def _scan_for_external_models(base_path: str | Path) -> dict:
+    base_p = Path(str(base_path)).expanduser()
+    if not base_p.exists() or not base_p.is_dir():
+        return {}
+    
+    mapping_rules = {
+        "models/Stable-diffusion": "StableDiffusion",
+        "models/Lora": "Lora",
+        "models/VAE": "VAE",
+        "extensions/sd-webui-controlnet/models": "ControlNet",
+        "models/checkpoints": "StableDiffusion",
+        "models/loras": "Lora",
+        "models/vae": "VAE",
+        "models/controlnet": "ControlNet",
+        "models/embeddings": "Embeddings",
+        "checkpoints": "StableDiffusion",
+        "loras": "Lora",
+        "vae": "VAE"
+    }
+    
+    found_folders = {}
+    for subpath, category in mapping_rules.items():
+        test_dir = base_p.joinpath(*subpath.split("/"))
+        if test_dir.exists() and test_dir.is_dir():
+            k = f"{category}_{subpath.split('/')[-1]}"
+            found_folders[k] = {
+                "absolute_path": str(test_dir.resolve()),
+                "category": category,
+                "subpath": str(subpath)
+            }
+            
+    return found_folders
+
+@app.route("/api/config/scan-models", methods=["POST"])
+def api_config_scan_models():
+    """Scan a given directory for common AI model subfolders."""
+    body = request.get_json(silent=True) or {}
+    base_path = body.get("path", "")
+    if not base_path:
+        return jsonify({"error": "path is required"}), 400
+        
+    try:
+        found = _scan_for_external_models(base_path)
+        return jsonify({"ok": True, "folders": list(found.values())})
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
+
+
+@app.route("/api/config/symlink-models", methods=["POST"])
+def api_config_symlink_models():
+    """Symlink an array of discovered model folders into the Shared Models Root."""
+    body = request.get_json(silent=True) or {}
+    folders = body.get("folders", [])
+    link_prefix = str(body.get("link_prefix", "LinkedEnv")).strip() or "LinkedEnv"
+    
+    shared_root = _resolve_shared_models_root_dir()
+    if not shared_root:
+        return jsonify({"error": "Shared model root path is not configured."}), 400
+        
+    results = []
+    
+    for folder in folders:
+        source_target = folder.get("absolute_path")
+        category = folder.get("category")
+        
+        if not source_target or not category:
+            continue
+            
+        source_p = Path(source_target)
+        if not source_p.exists() or not source_p.is_dir():
+            results.append({"path": source_target, "status": "failed", "error": "Source directory does not exist"})
+            continue
+            
+        safe_prefix = "".join(c for c in link_prefix if c.isalnum() or c in "-_")
+        if not safe_prefix:
+            safe_prefix = "LinkedFolder"
+            
+        link_dest = shared_root / category / safe_prefix
+        
+        try:
+            res = _link_directory(
+                package_name=f"migration_{safe_prefix.lower()}",
+                link_path=link_dest,
+                target_path=source_p,
+                allow_shared=True
+            )
+            results.append({
+                "path": source_target,
+                "category": category,
+                "status": "linked",
+                "destination": str(link_dest)
+            })
+        except Exception as exc:
+            results.append({"path": source_target, "status": "failed", "error": str(exc)})
+            
+    return jsonify({"ok": True, "results": results})
 
 
 @app.route("/api/service/<service>/<action>", methods=["POST"])
@@ -6255,6 +6657,37 @@ def api_app_restart():
         logger.error("App restart failed: %s", exc)
         return jsonify({"error": str(exc)}), 500
 
+
+@app.route("/api/app/updater/check", methods=["GET"])
+def api_app_updater_check():
+    """Check for AI Manager updates via git."""
+    try:
+        from scripts.updater import check_for_updates
+        res = check_for_updates()
+        if res.get("error"):
+            return jsonify({"ok": False, "error": res["error"]}), 500
+        return jsonify({"ok": True, "update_available": res.get("update_available"), "commits": res.get("commits")})
+    except Exception as exc:
+        logger.error("Update check failed: %s", exc)
+        return jsonify({"error": str(exc)}), 500
+
+
+@app.route("/api/app/updater/apply", methods=["POST"])
+def api_app_updater_apply():
+    """Apply AI Manager update and trigger a detached app restart."""
+    body = request.get_json(silent=True) or {}
+    port = int(body.get("port", os.environ.get("FLASK_PORT", 5000)))
+    try:
+        from scripts.updater import apply_update
+        success = apply_update()
+        if not success:
+            return jsonify({"error": "Failed to apply updates. Check server logs."}), 500
+            
+        helper_pid = _restart_flask_via_helper(port=port)
+        return jsonify({"ok": True, "status": "restarting", "port": port, "helper_pid": helper_pid}), 202
+    except Exception as exc:
+        logger.error("App update apply failed: %s", exc)
+        return jsonify({"error": str(exc)}), 500
 
 @app.route("/api/models")
 def api_models():
@@ -7511,4 +7944,11 @@ if __name__ == "__main__":
     print(f"  Open http://{access_host}:{port} in your browser")
     print(f"  LAN sharing: {'enabled' if lan_enabled else 'disabled'}")
     print("=" * 60 + "\n")
+    
+    # Start semantic search engine silently
+    embedding_script = Path(app.root_path) / "scripts" / "embedding_engine.py"
+    if embedding_script.exists():
+        kwargs = {"creationflags": getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)} if os.name == "nt" else {}
+        subprocess.Popen([sys.executable, str(embedding_script)], **kwargs)
+
     app.run(host=bind_host, port=port, debug=False, threaded=True)

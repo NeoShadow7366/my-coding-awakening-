@@ -113,6 +113,9 @@ const clearChat = document.getElementById('clear-chat');
 
 // Image panel
 const imageModelSelect = document.getElementById('image-model-select');
+const imageModelSemanticSearchBtn = document.getElementById('image-model-semantic-search-btn');
+const imageModelTagsInput = document.getElementById('image-model-tags-input');
+const imageModelTagsSave = document.getElementById('image-model-tags-save');
 const imageModelFamilySelect = document.getElementById('image-model-family-select');
 const imageModelFamilyHint = document.getElementById('image-model-family-hint');
 const imageModelFilter = document.getElementById('image-model-filter');
@@ -344,6 +347,12 @@ const configComfyStopBtn = document.getElementById('config-comfy-stop');
 const configComfyCheckUpdatesBtn = document.getElementById('config-comfy-check-updates');
 const configComfyUpdateBtn = document.getElementById('config-comfy-update');
 const configComfyVersionInfo = document.getElementById('config-comfy-version-info');
+const configAppCheckUpdatesBtn = document.getElementById('config-app-check-updates');
+const configAppUpdateBtn = document.getElementById('config-app-update');
+const configAppVersionInfo = document.getElementById('config-app-version-info');
+const configAppCommitsDetails = document.getElementById('config-app-commits-details');
+const configAppCommitsList = document.getElementById('config-app-commits-list');
+const uiThemeSelect = document.getElementById('ui-theme-select');
 const comfyuiInstallSection = document.getElementById('comfyui-install-section');
 const comfyuiInstallStatusLine = document.getElementById('comfyui-install-status-line');
 const comfyuiInstallGpu = document.getElementById('comfyui-install-gpu');
@@ -1819,25 +1828,47 @@ function showToast(msg, type = '') {
 	 Theme
 	 -------------------------------------------------------------------------- */
 function applyTheme(theme) {
-	document.body.setAttribute('data-theme', theme);
+	let activeTheme = theme;
+	if (theme === 'system') {
+		const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+		activeTheme = prefersDark ? 'dark' : 'light';
+	}
+	document.body.setAttribute('data-theme', activeTheme);
 	localStorage.setItem('theme', theme);
 	const path = themeToggle.querySelector('path');
-	if (theme === 'dark') {
+	if (activeTheme === 'dark') {
 		path.setAttribute('d', 'M12 3v1m0 16v1m8.66-9H21M3 12H2m15.07-7.07l-.71.71M6.34 17.66l-.71.71M18.37 17.66l-.71-.71M6.34 6.34l-.71-.71M12 7a5 5 0 1 0 0 10A5 5 0 0 0 12 7z');
 	} else {
 		path.setAttribute('d', 'M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z');
 	}
+	if (uiThemeSelect && uiThemeSelect.value !== theme) {
+		uiThemeSelect.value = theme;
+	}
 }
 
 (function initTheme() {
-	const saved = localStorage.getItem('theme');
-	applyTheme(saved || 'dark');
+	const saved = localStorage.getItem('theme') || 'system';
+	applyTheme(saved);
+	
+	if (window.matchMedia) {
+		window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+			if (localStorage.getItem('theme') === 'system') {
+				applyTheme('system');
+			}
+		});
+	}
 })();
 
 themeToggle.addEventListener('click', () => {
 	const current = document.body.getAttribute('data-theme');
 	applyTheme(current === 'dark' ? 'light' : 'dark');
 });
+
+if (uiThemeSelect) {
+	uiThemeSelect.addEventListener('change', () => {
+		applyTheme(uiThemeSelect.value);
+	});
+}
 
 /* --------------------------------------------------------------------------
 	 Tab navigation
@@ -5240,6 +5271,76 @@ function onConfigServiceControlsKeydown(event) {
 	if (nextButton) nextButton.focus();
 }
 
+if (configAppCheckUpdatesBtn) {
+	configAppCheckUpdatesBtn.addEventListener('click', async () => {
+		configAppCheckUpdatesBtn.disabled = true;
+		configAppVersionInfo.textContent = 'Checking...';
+		if (configAppCommitsDetails) configAppCommitsDetails.hidden = true;
+		
+		try {
+			const res = await fetch('/api/app/updater/check');
+			const data = await res.json();
+			
+			if (res.ok) {
+				if (data.update_available) {
+					configAppVersionInfo.textContent = `Updates available (${data.commits?.length || 0} commits behind)`;
+					if (configAppUpdateBtn) configAppUpdateBtn.disabled = false;
+					
+					if (data.commits && data.commits.length > 0 && configAppCommitsList) {
+						configAppCommitsList.innerHTML = data.commits.map(c => `<li>${escHtml(c)}</li>`).join('');
+						if (configAppCommitsDetails) configAppCommitsDetails.hidden = false;
+					}
+				} else {
+					configAppVersionInfo.textContent = 'You are up to date!';
+					if (configAppUpdateBtn) configAppUpdateBtn.disabled = true;
+				}
+			} else {
+				configAppVersionInfo.textContent = `Check failed: ${data.error || 'Unknown error'}`;
+			}
+		} catch (e) {
+			configAppVersionInfo.textContent = 'Network or server error during check.';
+		} finally {
+			configAppCheckUpdatesBtn.disabled = false;
+		}
+	});
+}
+
+if (configAppUpdateBtn) {
+	configAppUpdateBtn.addEventListener('click', async () => {
+		if (!confirm('This will pull the latest code and restart the Application. Are you sure you want to proceed?')) {
+			return;
+		}
+		
+		configAppUpdateBtn.disabled = true;
+		if (configAppCheckUpdatesBtn) configAppCheckUpdatesBtn.disabled = true;
+		configAppVersionInfo.textContent = 'Applying updates and restarting...';
+		
+		try {
+			const res = await fetch('/api/app/updater/apply', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({})
+			});
+			const data = await res.json();
+			
+			if (res.ok) {
+				showToast('Update initiated! Reconnecting in 5 seconds...', 'pos');
+				setTimeout(() => {
+					window.location.reload();
+				}, 5000);
+			} else {
+				configAppVersionInfo.textContent = `Update failed: ${data.error || 'Unknown error'}`;
+				configAppUpdateBtn.disabled = false;
+				if (configAppCheckUpdatesBtn) configAppCheckUpdatesBtn.disabled = false;
+			}
+		} catch (e) {
+			configAppVersionInfo.textContent = 'Error initiating update.';
+			configAppUpdateBtn.disabled = false;
+			if (configAppCheckUpdatesBtn) configAppCheckUpdatesBtn.disabled = false;
+		}
+	});
+}
+
 if (configOllamaStartBtn) {
 	configOllamaStartBtn.addEventListener('click', async () => {
 		await controlService('ollama', 'start', configOllamaStatus, [configOllamaStartBtn, configOllamaRestartBtn, configOllamaStopBtn]);
@@ -7196,6 +7297,7 @@ if (imageModelSelect) {
 		refreshCompatibilityGroupings();
 		applyImageFamilyModeUi();
 		syncImageQuickState();
+		syncImageModelTagsUi();
 	});
 }
 if (imageModelFamilySelect) {
@@ -7208,14 +7310,106 @@ if (imageModelFamilySelect) {
 		syncImageReadiness();
 	});
 }
-if (imageModelFilter) {
-	imageModelFilter.addEventListener('input', () => {
-		renderFilteredImageModels(imageModelFilter.value, imageModelSelect ? imageModelSelect.value : '');
+
+function syncImageModelTagsUi() {
+	if (!imageModelTagsInput) return;
+	const modelName = imageModelSelect?.value;
+	if (!modelName || !imageModelDetailsByName) {
+		imageModelTagsInput.value = '';
+		imageModelTagsInput.disabled = true;
+		if (imageModelTagsSave) imageModelTagsSave.disabled = true;
+		return;
+	}
+	const details = imageModelDetailsByName.get(modelName) || {};
+	const tags = details.user_tags || [];
+	imageModelTagsInput.value = tags.join(', ');
+	imageModelTagsInput.disabled = false;
+	if (imageModelTagsSave) imageModelTagsSave.disabled = false;
+}
+
+if (imageModelTagsSave) {
+	imageModelTagsSave.addEventListener('click', async () => {
+		const modelName = imageModelSelect?.value;
+		if (!modelName) return;
+		const rawTags = imageModelTagsInput.value || '';
+		const user_tags = rawTags.split(',').map(t => t.trim()).filter(Boolean);
+		
+		imageModelTagsSave.disabled = true;
+		imageModelTagsSave.textContent = 'Saving...';
+		
+		try {
+			const res = await fetch('/api/models/tags', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ file_name: modelName, folder: 'checkpoints', user_tags })
+			});
+			const data = await res.json();
+			if (res.ok) {
+				showToast('Tags saved successfully', 'pos');
+				if (imageModelDetailsByName && imageModelDetailsByName.has(modelName)) {
+					imageModelDetailsByName.get(modelName).user_tags = data.user_tags || [];
+				}
+			} else {
+				showToast('Failed to save tags: ' + (data.error || 'Unknown'), 'neg');
+			}
+		} catch (e) {
+			showToast('Request error saving tags', 'neg');
+		} finally {
+			imageModelTagsSave.disabled = false;
+			imageModelTagsSave.textContent = 'Save Tags';
+			syncImageModelTagsUi();
+		}
+	});
+}
+
+let isSemanticSearchEnabled = false;
+let semanticSearchDebounceTimer = null;
+
+if (imageModelSemanticSearchBtn) {
+	imageModelSemanticSearchBtn.addEventListener('click', () => {
+		isSemanticSearchEnabled = !isSemanticSearchEnabled;
+		imageModelSemanticSearchBtn.classList.toggle('enabled', isSemanticSearchEnabled);
+		imageModelSemanticSearchBtn.setAttribute('aria-pressed', String(isSemanticSearchEnabled));
+		triggerSemanticModelSearch();
+	});
+}
+
+function triggerSemanticModelSearch() {
+	if (!imageModelFilter) return;
+	const query = imageModelFilter.value.trim();
+	if (!isSemanticSearchEnabled || !query) {
+		renderFilteredImageModels(query, imageModelSelect ? imageModelSelect.value : '');
 		updateModelFavoriteToggleState();
 		updateModelStackBadges();
 		updateModelStackCompatibilityHint();
 		updateControlnetCompatibilityHint();
-	});
+		return;
+	}
+	
+	clearTimeout(semanticSearchDebounceTimer);
+	semanticSearchDebounceTimer = setTimeout(async () => {
+		imageModelFilter.style.opacity = '0.5';
+		try {
+			const res = await fetch(`/api/search/models?q=${encodeURIComponent(query)}`);
+			const data = await res.json();
+			if (res.ok && data.results) {
+				const semanticResults = data.results.map(r => r.file_name);
+				renderFilteredImageModels(query, imageModelSelect ? imageModelSelect.value : '', semanticResults);
+				updateModelFavoriteToggleState();
+				updateModelStackBadges();
+				updateModelStackCompatibilityHint();
+				updateControlnetCompatibilityHint();
+			}
+		} catch (e) {
+			console.error('Semantic search failed', e);
+		} finally {
+			imageModelFilter.style.opacity = '1';
+		}
+	}, 600);
+}
+
+if (imageModelFilter) {
+	imageModelFilter.addEventListener('input', triggerSemanticModelSearch);
 	imageModelFilter.addEventListener('keydown', (event) => {
 		if (event.key !== 'Escape') return;
 		if (imageModelFilter.value) {
@@ -17183,3 +17377,657 @@ window.addEventListener('beforeunload', () => {
 });
 
 
+
+/* --------------------------------------------------------------------------
+   Hardware Resource Monitor
+   -------------------------------------------------------------------------- */
+const hwToggleBtn = document.getElementById('resource-monitor-toggle');
+const hwOverlay = document.getElementById('hardware-monitor-overlay');
+const hwCloseBtn = document.getElementById('hardware-monitor-close');
+
+let hwPollInterval = null;
+
+function getColorForPercent(p) {
+    if (p < 60) return 'var(--primary)';
+    if (p < 85) return '#f59e0b';
+    return '#ef4444';
+}
+
+async function fetchHardwareData() {
+    try {
+        const res = await fetch('/api/system/resources');
+        const data = await res.json();
+        
+        const cpuP = data.cpu_percent || 0;
+        document.getElementById('hw-cpu-val').textContent = cpuP.toFixed(1) + '%';
+        const cpuBar = document.getElementById('hw-cpu-bar');
+        cpuBar.style.width = cpuP + '%';
+        cpuBar.style.backgroundColor = getColorForPercent(cpuP);
+        
+        const ramP = data.ram_percent || 0;
+        document.getElementById('hw-ram-val').textContent = (data.ram_used_gb || 0) + ' / ' + (data.ram_total_gb || 0) + ' GB (' + ramP + '%)';
+        const ramBar = document.getElementById('hw-ram-bar');
+        ramBar.style.width = ramP + '%';
+        ramBar.style.backgroundColor = getColorForPercent(ramP);
+        
+        const gpuContainer = document.getElementById('hw-gpu-container');
+        if (data.gpus && data.gpus.length > 0) {
+            let html = '';
+            data.gpus.forEach(gpu => {
+                const memP = (gpu.memory_used_mb / gpu.memory_total_mb) * 100;
+                html += \
+                <div class="hardware-stat-group" style="margin-top:0.75rem;">
+                  <div class="hardware-stat-label">
+                    <span>\ <span class="hw-temp-badge">\°C</span></span> 
+                    <span>\%</span>
+                  </div>
+                  <div class="hardware-bar"><div class="hardware-bar-fill" style="width: \%; background-color: \"></div></div>
+                  <div class="hardware-bar" style="margin-top:0.2rem; height:4px; opacity:0.8"><div class="hardware-bar-fill" style="width: \%; background-color: var(--secondary)"></div></div>
+                  <div class="hardware-stat-label" style="font-size:0.7rem; color:var(--hint-color); justify-content:flex-end;">
+                     \ / \ GB VRAM
+                  </div>
+                </div>
+                \;
+            });
+            gpuContainer.innerHTML = html;
+        } else {
+            gpuContainer.innerHTML = '<div class="hardware-stat-group hint" style="margin-top:0.5rem">No discrete GPUs reported.</div>';
+        }
+    } catch (e) {
+        console.error("Hardware poll failed", e);
+    }
+}
+
+function stopHardwarePoll() {
+    if (hwPollInterval) {
+        clearInterval(hwPollInterval);
+        hwPollInterval = null;
+    }
+}
+
+function startHardwarePoll() {
+    stopHardwarePoll();
+    fetchHardwareData();
+    hwPollInterval = setInterval(fetchHardwareData, 2000);
+}
+
+if (hwToggleBtn && hwOverlay && hwCloseBtn) {
+    hwToggleBtn.addEventListener('click', () => {
+        const isHidden = hwOverlay.hasAttribute('hidden');
+        if (isHidden) {
+            hwOverlay.removeAttribute('hidden');
+            hwOverlay.setAttribute('aria-hidden', 'false');
+            startHardwarePoll();
+        } else {
+            hwOverlay.setAttribute('hidden', '');
+            hwOverlay.setAttribute('aria-hidden', 'true');
+            stopHardwarePoll();
+        }
+    });
+
+    hwCloseBtn.addEventListener('click', () => {
+        hwOverlay.setAttribute('hidden', '');
+        hwOverlay.setAttribute('aria-hidden', 'true');
+        stopHardwarePoll();
+    });
+}
+
+/* --------------------------------------------------------------------------
+   Model Migration Wizard
+   -------------------------------------------------------------------------- */
+const wizardMigrateBtn = document.getElementById('config-wizard-migrate-btn');
+const wizardModal = document.getElementById('migration-wizard-modal');
+const wizardClose = document.getElementById('migration-wizard-close');
+const wizardBackdrop = document.getElementById('migration-wizard-backdrop');
+const wizardStep1 = document.getElementById('wizard-step-1');
+const wizardStep2 = document.getElementById('wizard-step-2');
+const wizardSourcePath = document.getElementById('wizard-source-path');
+const wizardBrowseBtn = document.getElementById('wizard-browse-btn');
+const wizardScanBtn = document.getElementById('wizard-scan-btn');
+const wizardFoundFolders = document.getElementById('wizard-found-folders');
+const wizardStatusMsg = document.getElementById('wizard-status-msg');
+const wizardBackBtn = document.getElementById('wizard-back-btn');
+const wizardConfirmBtn = document.getElementById('wizard-confirm-btn');
+const wizardLinkPrefix = document.getElementById('wizard-link-prefix');
+
+let discoveredFolders = [];
+
+function resetWizard() {
+    if (!wizardStep1) return;
+    wizardStep1.removeAttribute('hidden');
+    wizardStep2.setAttribute('hidden', '');
+    wizardStatusMsg.textContent = '';
+    wizardSourcePath.value = '';
+    wizardScanBtn.disabled = true;
+    discoveredFolders = [];
+    wizardFoundFolders.innerHTML = '';
+}
+
+function closeWizard() {
+    if(!wizardModal) return;
+    wizardModal.setAttribute('hidden', '');
+    wizardModal.setAttribute('aria-hidden', 'true');
+    resetWizard();
+}
+
+if (wizardMigrateBtn) {
+    wizardMigrateBtn.addEventListener('click', () => {
+        resetWizard();
+        wizardModal.removeAttribute('hidden');
+        wizardModal.setAttribute('aria-hidden', 'false');
+    });
+}
+
+if (wizardClose) wizardClose.addEventListener('click', closeWizard);
+if (wizardBackdrop) wizardBackdrop.addEventListener('click', closeWizard);
+
+if (wizardBrowseBtn) {
+    wizardBrowseBtn.addEventListener('click', async () => {
+        try {
+            const res = await fetch('/api/config/pick-path', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ directory_only: true })
+            });
+            const data = await res.json();
+            if (data.ok && data.path) {
+                wizardSourcePath.value = data.path;
+                wizardScanBtn.disabled = false;
+                
+                const parts = data.path.split(/[/\\]/);
+                const lastPart = parts[parts.length - 1];
+                if (lastPart) {
+                    wizardLinkPrefix.value = lastPart + "_Linked";
+                }
+            }
+        } catch (e) {
+            console.error(e);
+        }
+    });
+}
+
+if (wizardScanBtn) {
+    wizardScanBtn.addEventListener('click', async () => {
+        const path = wizardSourcePath.value.trim();
+        if (!path) return;
+        
+        wizardScanBtn.disabled = true;
+        wizardScanBtn.textContent = 'Scanning...';
+        
+        try {
+            const res = await fetch('/api/config/scan-models', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ path })
+            });
+            const data = await res.json();
+            
+            wizardScanBtn.disabled = false;
+            wizardScanBtn.textContent = 'Scan Directory';
+            
+            if (data.ok) {
+                discoveredFolders = data.folders || [];
+                if (discoveredFolders.length === 0) {
+                    showToast('No standard model subfolders found at this path.', 'neg');
+                    return;
+                }
+                
+                wizardStep1.setAttribute('hidden', '');
+                wizardStep2.removeAttribute('hidden');
+                
+                let html = '';
+                discoveredFolders.forEach((f, idx) => {
+                    html += \
+                    <label class="config-inline-checkbox" style="padding:0.4rem;" title="\">
+                      <input type="checkbox" id="wizard-check-\" checked data-idx="\" />
+                      <span style="user-select:none"><strong>\</strong> <span class="hint">(\)</span></span>
+                    </label>
+                    \;
+                });
+                wizardFoundFolders.innerHTML = html;
+            } else {
+                showToast(data.error || 'Scan failed', 'neg');
+            }
+        } catch (e) {
+            wizardScanBtn.disabled = false;
+            wizardScanBtn.textContent = 'Scan Directory';
+            showToast('Network error while scanning', 'neg');
+        }
+    });
+}
+
+if (wizardBackBtn) {
+    wizardBackBtn.addEventListener('click', () => {
+        wizardStep2.setAttribute('hidden', '');
+        wizardStep1.removeAttribute('hidden');
+        wizardStatusMsg.textContent = '';
+    });
+}
+
+if (wizardConfirmBtn) {
+    wizardConfirmBtn.addEventListener('click', async () => {
+        const checkboxes = Array.from(wizardFoundFolders.querySelectorAll('input[type="checkbox"]:checked'));
+        if (checkboxes.length === 0) {
+            wizardStatusMsg.textContent = 'Select at least one folder.';
+            wizardStatusMsg.style.color = 'var(--error)';
+            return;
+        }
+        
+        wizardConfirmBtn.disabled = true;
+        wizardBackBtn.disabled = true;
+        wizardStatusMsg.style.color = '';
+        wizardStatusMsg.textContent = 'Creating symlinks...';
+        
+        const selectedFolders = checkboxes.map(cb => discoveredFolders[parseInt(cb.getAttribute('data-idx'))]);
+        const linkPrefix = wizardLinkPrefix.value.trim() || 'LinkedEnv';
+        
+        try {
+            const res = await fetch('/api/config/symlink-models', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ folders: selectedFolders, link_prefix: linkPrefix })
+            });
+            const data = await res.json();
+            
+            if (data.ok) {
+                const successes = data.results.filter(r => r.status === 'linked').length;
+                wizardStatusMsg.textContent = \Successfully symlinked \ folder(s)!\;
+                wizardStatusMsg.style.color = 'var(--primary)';
+                setTimeout(() => {
+                    closeWizard();
+                    if (typeof loadGlobalModels === 'function') loadGlobalModels();
+                }, 2000);
+            } else {
+                wizardStatusMsg.textContent = data.error || 'Symlink failed.';
+                wizardStatusMsg.style.color = 'var(--error)';
+            }
+        } catch (e) {
+            wizardStatusMsg.textContent = 'Network error.';
+            wizardStatusMsg.style.color = 'var(--error)';
+        } finally {
+            wizardConfirmBtn.disabled = false;
+            wizardBackBtn.disabled = false;
+        }
+    });
+}
+
+/* --------------------------------------------------------------------------
+   Bulk Model Operations
+   -------------------------------------------------------------------------- */
+const bulkSelectToggle = document.getElementById('mb-bulk-select-toggle');
+const localLibraryGrid = document.getElementById('mb-local-grid');
+let inBulkMode = false;
+let selectedModels = new Map();
+
+if (bulkSelectToggle) {
+    bulkSelectToggle.addEventListener('click', () => {
+        inBulkMode = !inBulkMode;
+        if (inBulkMode) {
+            document.body.classList.add('mb-bulk-mode');
+            bulkSelectToggle.textContent = 'Exit Bulk Select Mode';
+            bulkSelectToggle.classList.replace('btn-secondary', 'btn-primary');
+            document.getElementById('bulk-action-bar').removeAttribute('hidden');
+        } else {
+            exitBulkMode();
+        }
+        updateBulkCount();
+    });
+}
+
+function exitBulkMode() {
+    inBulkMode = false;
+    document.body.classList.remove('mb-bulk-mode');
+    if (bulkSelectToggle) {
+        bulkSelectToggle.textContent = 'Enter Bulk Select Mode';
+        bulkSelectToggle.classList.replace('btn-primary', 'btn-secondary');
+    }
+    document.getElementById('bulk-action-bar').setAttribute('hidden', '');
+    selectedModels.clear();
+    document.querySelectorAll('.mb-card').forEach(c => {
+        c.classList.remove('selected');
+        const cb = c.querySelector('.vault-card-select-cb');
+        if (cb) cb.checked = false;
+    });
+}
+
+function updateBulkCount() {
+    document.getElementById('bulk-count-val').textContent = selectedModels.size;
+}
+
+document.addEventListener('click', (e) => {
+    if (!inBulkMode) return;
+    const card = e.target.closest('.mb-card');
+    const localLibraryGrid = document.getElementById('mb-local-list');
+    
+    if (card && localLibraryGrid && localLibraryGrid.contains(card)) {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        const folder = card.dataset.folder;
+        const filename = card.dataset.filename;
+        if (!folder || !filename) return;
+        
+        const key = folder + '/' + filename;
+        const cb = card.querySelector('.vault-card-select-cb');
+        
+        if (card.classList.contains('selected')) {
+            card.classList.remove('selected');
+            selectedModels.delete(key);
+            if(cb) cb.checked = false;
+        } else {
+            card.classList.add('selected');
+            selectedModels.set(key, { folder, file_name: filename });
+            if(cb) cb.checked = true;
+        }
+        updateBulkCount();
+    }
+}, true);
+
+const bulkObserver = new MutationObserver((mutations) => {
+    mutations.forEach((mutation) => {
+        if (mutation.addedNodes) {
+            mutation.addedNodes.forEach((node) => {
+                if (node.nodeType === 1) { 
+                    const cards = node.classList && node.classList.contains('mb-card') ? [node] : node.querySelectorAll('.mb-card');
+                    if (cards && cards.length > 0) {
+                        cards.forEach(card => {
+                            if (!card.querySelector('.vault-card-select-wrap')) {
+                                card.insertAdjacentHTML('afterbegin', \
+                                    <div class="vault-card-select-wrap">
+                                        <input type="checkbox" class="vault-card-select-cb" tabindex="-1">
+                                    </div>
+                                \);
+                            }
+                        });
+                    }
+                }
+            });
+        }
+    });
+});
+
+const observedGrid = document.getElementById('mb-local-list');
+if (observedGrid) {
+    bulkObserver.observe(observedGrid, { childList: true, subtree: true });
+} else {
+    // For when the tab is populated later
+    document.addEventListener('DOMContentLoaded', () => {
+        const grid = document.getElementById('mb-local-list');
+        if(grid) bulkObserver.observe(grid, { childList: true, subtree: true });
+    });
+}
+
+document.getElementById('bulk-action-delete')?.addEventListener('click', async () => {
+    if (selectedModels.size === 0) return;
+    if (!confirm(\Are you sure you want to permanently delete \ models and their previews? This cannot be undone.\)) return;
+    
+    document.getElementById('bulk-action-delete').disabled = true;
+    try {
+        const modelsArray = Array.from(selectedModels.values());
+        const res = await fetch('/api/vault/bulk/delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ models: modelsArray })
+        });
+        const data = await res.json();
+        if (data.ok) {
+            showToast(\Deleted \ models successfully.\, 'pos');
+            exitBulkMode();
+            document.getElementById('mb-library-refresh-btn')?.click();
+        } else {
+            showToast(data.error || 'Failed to delete models', 'neg');
+        }
+    } catch (e) {
+        showToast('Network error', 'neg');
+    } finally {
+        document.getElementById('bulk-action-delete').disabled = false;
+    }
+});
+
+const bulkTagModal = document.getElementById('bulk-tag-modal');
+document.getElementById('bulk-action-tag')?.addEventListener('click', () => {
+    if (selectedModels.size === 0) return showToast('No models selected', 'neg');
+    document.getElementById('bulk-tag-input').value = '';
+    bulkTagModal.removeAttribute('hidden');
+    bulkTagModal.setAttribute('aria-hidden', 'false');
+});
+
+function closeBulkTagModal() {
+    bulkTagModal.setAttribute('hidden', '');
+    bulkTagModal.setAttribute('aria-hidden', 'true');
+}
+
+document.getElementById('bulk-tag-close')?.addEventListener('click', closeBulkTagModal);
+document.getElementById('bulk-tag-cancel-btn')?.addEventListener('click', closeBulkTagModal);
+document.getElementById('bulk-tag-backdrop')?.addEventListener('click', closeBulkTagModal);
+
+document.getElementById('bulk-tag-apply-btn')?.addEventListener('click', async () => {
+    const rawTags = document.getElementById('bulk-tag-input').value.split(',').map(t => t.trim()).filter(t => t);
+    if (rawTags.length === 0) {
+        return showToast('Please enter at least one tag', 'neg');
+    }
+    
+    const action = document.getElementById('bulk-tag-action').value;
+    document.getElementById('bulk-tag-apply-btn').disabled = true;
+    try {
+        const modelsArray = Array.from(selectedModels.values());
+        const res = await fetch('/api/vault/bulk/tag', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ models: modelsArray, tags: rawTags, action: action })
+        });
+        const data = await res.json();
+        if (data.ok) {
+            closeBulkTagModal();
+            exitBulkMode();
+            showToast(\Updated tags for \ models.\, 'pos');
+            document.getElementById('mb-library-refresh-btn')?.click();
+        } else {
+            showToast(data.error || 'Tagging failed', 'neg');
+        }
+    } catch (e) {
+        showToast('Network error', 'neg');
+    } finally {
+        document.getElementById('bulk-tag-apply-btn').disabled = false;
+    }
+});
+
+document.getElementById('bulk-action-export')?.addEventListener('click', async () => {
+    if (selectedModels.size === 0) return showToast('No models selected', 'neg');
+    
+    try {
+        const modelsArray = Array.from(selectedModels.values());
+        const res = await fetch('/api/vault/bulk/export', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ models: modelsArray })
+        });
+        const data = await res.json();
+        if (data.ok && data.export) {
+            const blob = new Blob([JSON.stringify(data.export, null, 2)], { type: 'application/json' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            a.download = \ault_backup_\.json\;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+            showToast('Snapshot exported successfully!', 'pos');
+            exitBulkMode();
+        } else {
+            showToast(data.error || 'Export failed', 'neg');
+        }
+    } catch (e) {
+        showToast('Network error', 'neg');
+    }
+});
+
+document.getElementById('bulk-action-cancel')?.addEventListener('click', exitBulkMode);
+
+/* --------------------------------------------------------------------------
+   Ctrl+K Command Palette
+   -------------------------------------------------------------------------- */
+const cmdPaletteModal = document.getElementById('cmd-palette-modal');
+const cmdPaletteInput = document.getElementById('cmd-palette-input');
+const cmdPaletteResults = document.getElementById('cmd-palette-results');
+let cmdPaletteActiveIndex = -1;
+let cmdPaletteItemsRendered = [];
+
+const STATIC_COMMANDS = [
+    { id: 'nav-txt2img', label: 'Go to Inference Studio', icon: '??', action: () => document.getElementById('nav-txt2img')?.click() },
+    { id: 'nav-models', label: 'Go to Global Vault (Models)', icon: '??', action: () => document.getElementById('nav-models')?.click() },
+    { id: 'nav-settings', label: 'Go to Settings', icon: '??', action: () => document.getElementById('nav-settings')?.click() },
+    { id: 'nav-my-creations', label: 'Go to My Creations', icon: '???', action: () => document.getElementById('nav-my-creations')?.click() },
+    { id: 'action-refresh', label: 'Refresh Local Library', icon: '??', action: () => { document.getElementById('nav-models')?.click(); document.getElementById('mb-library-refresh-btn')?.click(); } },
+    { id: 'action-bulk', label: 'Enter Bulk Select Mode', icon: '??', action: () => { document.getElementById('nav-models')?.click(); document.getElementById('mb-bulk-select-toggle')?.click(); } }
+];
+
+document.addEventListener('keydown', (e) => {
+    const isCtrlK = (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k';
+    const isCtrlShiftP = (e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'p';
+    
+    if (isCtrlK || isCtrlShiftP) {
+        e.preventDefault();
+        toggleCmdPalette();
+    }
+    
+    if (e.key === 'Escape' && cmdPaletteModal && !cmdPaletteModal.hasAttribute('hidden')) {
+        closeCmdPalette();
+    }
+});
+
+function toggleCmdPalette() {
+    if (cmdPaletteModal.hasAttribute('hidden')) {
+        openCmdPalette();
+    } else {
+        closeCmdPalette();
+    }
+}
+
+function openCmdPalette() {
+    cmdPaletteModal.removeAttribute('hidden');
+    cmdPaletteModal.setAttribute('aria-hidden', 'false');
+    cmdPaletteInput.value = '';
+    cmdPaletteInput.focus();
+    updateCmdPaletteResults('');
+}
+
+function closeCmdPalette() {
+    cmdPaletteModal.setAttribute('hidden', '');
+    cmdPaletteModal.setAttribute('aria-hidden', 'true');
+    cmdPaletteInput.blur();
+}
+
+document.getElementById('cmd-palette-backdrop')?.addEventListener('click', closeCmdPalette);
+
+cmdPaletteInput?.addEventListener('input', (e) => {
+    updateCmdPaletteResults(e.target.value);
+});
+
+cmdPaletteInput?.addEventListener('keydown', (e) => {
+    if (!cmdPaletteItemsRendered.length) return;
+    
+    if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        cmdPaletteActiveIndex = (cmdPaletteActiveIndex + 1) % cmdPaletteItemsRendered.length;
+        renderCmdPaletteHighlights();
+    } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        cmdPaletteActiveIndex = (cmdPaletteActiveIndex - 1 + cmdPaletteItemsRendered.length) % cmdPaletteItemsRendered.length;
+        renderCmdPaletteHighlights();
+    } else if (e.key === 'Enter') {
+        e.preventDefault();
+        if (cmdPaletteActiveIndex >= 0 && cmdPaletteActiveIndex < cmdPaletteItemsRendered.length) {
+            executeCmdPaletteItem(cmdPaletteItemsRendered[cmdPaletteActiveIndex]);
+        }
+    }
+});
+
+function updateCmdPaletteResults(query) {
+    const q = query.toLowerCase().trim();
+    cmdPaletteItemsRendered = [];
+    cmdPaletteResults.innerHTML = '';
+    
+    const cmds = STATIC_COMMANDS.filter(c => c.label.toLowerCase().includes(q) || c.id.toLowerCase().includes(q));
+    
+    if (cmds.length > 0) {
+        cmdPaletteResults.insertAdjacentHTML('beforeend', '<div class="cmd-palette-group-lbl">Commands</div>');
+        cmds.forEach(cmd => {
+            cmdPaletteItemsRendered.push({ type: 'cmd', data: cmd });
+            cmdPaletteResults.insertAdjacentHTML('beforeend', \
+                <div class="cmd-palette-item" data-idx="\">
+                    <div class="cmd-palette-item-icon">\</div>
+                    <div class="cmd-palette-item-text">\</div>
+                    <div class="cmd-palette-item-shortcut">Action</div>
+                </div>
+            \);
+        });
+    }
+    
+    if (q.length > 1 && typeof _globalModelsCache !== 'undefined' && Array.isArray(_globalModelsCache)) {
+        const models = _globalModelsCache.filter(m => (m.file_name || '').toLowerCase().includes(q) || (m.name || '').toLowerCase().includes(q)).slice(0, 15);
+        
+        if (models.length > 0) {
+            cmdPaletteResults.insertAdjacentHTML('beforeend', '<div class="cmd-palette-group-lbl">Models</div>');
+            models.forEach(m => {
+                cmdPaletteItemsRendered.push({ type: 'model', data: m });
+                const name = escHtml(m.name || m.file_name);
+                const type = escHtml(m.model_type || 'Unknown');
+                cmdPaletteResults.insertAdjacentHTML('beforeend', \
+                    <div class="cmd-palette-item" data-idx="\">
+                        <div class="cmd-palette-item-icon">??</div>
+                        <div class="cmd-palette-item-text">\ <span class="hint" style="font-size:0.8em">\</span></div>
+                        <div class="cmd-palette-item-shortcut">Model</div>
+                    </div>
+                \);
+            });
+        }
+    }
+    
+    if (cmdPaletteItemsRendered.length === 0) {
+        cmdPaletteResults.insertAdjacentHTML('beforeend', '<div style="padding:1.5rem; text-align:center; color:var(--text-muted)">No results found.</div>');
+    }
+    
+    cmdPaletteActiveIndex = cmdPaletteItemsRendered.length > 0 ? 0 : -1;
+    renderCmdPaletteHighlights();
+}
+
+function renderCmdPaletteHighlights() {
+    const items = cmdPaletteResults.querySelectorAll('.cmd-palette-item');
+    items.forEach(el => {
+        const idx = parseInt(el.dataset.idx, 10);
+        if (idx === cmdPaletteActiveIndex) {
+            el.classList.add('active');
+            el.scrollIntoView({ block: 'nearest' });
+        } else {
+            el.classList.remove('active');
+        }
+    });
+}
+
+cmdPaletteResults?.addEventListener('click', (e) => {
+    const item = e.target.closest('.cmd-palette-item');
+    if (!item) return;
+    const idx = parseInt(item.dataset.idx, 10);
+    if (!isNaN(idx) && idx >= 0 && idx < cmdPaletteItemsRendered.length) {
+        executeCmdPaletteItem(cmdPaletteItemsRendered[idx]);
+    }
+});
+
+function executeCmdPaletteItem(item) {
+    closeCmdPalette();
+    if (item.type === 'cmd') {
+        item.data.action();
+    } else if (item.type === 'model') {
+        document.getElementById('nav-models')?.click();
+        document.getElementById('mb-view-library-btn')?.click();
+        
+        const searchInput = document.getElementById('mb-local-query');
+        if (searchInput) {
+            searchInput.value = item.data.file_name;
+            searchInput.dispatchEvent(new Event('input'));
+        }
+    }
+}

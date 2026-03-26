@@ -173,7 +173,10 @@
         <button class="btn btn-ghost btn-xs" id="image-model-mode-recent" type="button" data-model-mode="recent" aria-pressed="false">Recent</button>
         <button class="btn btn-ghost btn-xs" id="image-model-mode-favorites" type="button" data-model-mode="favorites" aria-pressed="false">Favorites</button>
       </div>
-      <input id="image-model-filter" type="text" class="compact-input" placeholder="Filter checkpoints..." aria-label="Filter checkpoint list" aria-keyshortcuts="Escape" title="Press Escape to clear filter, then press Escape again to close the most recent Model Stack layer" />
+      <div class="model-search-row">
+        <input id="image-model-filter" type="text" class="compact-input" placeholder="Filter checkpoints..." aria-label="Filter checkpoint list" aria-keyshortcuts="Escape" title="Press Escape to clear filter, then press Escape again to close the most recent Model Stack layer" />
+        <button class="btn btn-ghost btn-xs semantic-search-toggle" id="image-model-semantic-search-btn" type="button" title="Use pure text filter, or execute pure Semantic Search with Ollama" aria-pressed="false">Sem Search</button>
+      </div>
       <div class="select-wrapper">
         <select id="image-model-select">
           <option value="">- loading checkpoints -</option>
@@ -193,6 +196,10 @@
       <div class="model-favorite-toggle-row" role="group" aria-label="Favorite checkpoint toggle">
         <button class="btn btn-ghost btn-xs" id="image-model-favorite-toggle" type="button" aria-pressed="false">Favorite Selected</button>
         <button class="btn btn-ghost btn-xs hint-info-btn model-stack-compat-hint" id="model-stack-compat-hint" type="button" aria-live="polite" aria-label="Model stack compatibility tip" title="Tip: keep Base, Refiner, and VAE in the same family (SD1.5 vs SDXL) when possible.">i</button>
+      </div>
+      <div class="model-tags-row" role="group" aria-label="Model Semantic Tags">
+        <input id="image-model-tags-input" type="text" class="compact-input" placeholder="Add semantic tags (comma separated)..." aria-label="Model semantic tags" />
+        <button class="btn btn-ghost btn-xs" id="image-model-tags-save" type="button">Save Tags</button>
       </div>
       <div class="model-recent-wrap" aria-label="Recent checkpoints">
         <div id="image-model-recent-list" class="model-recent-list" role="group" aria-label="Recent checkpoint selections"></div>
@@ -933,6 +940,18 @@
 <section id="panel-config" class="panel" role="tabpanel" aria-labelledby="nav-config" hidden>
   <aside class="sidebar" aria-label="Service path configuration">
     <div class="sidebar-section">
+      <p class="field-label">Appearance</p>
+      <div class="select-wrapper">
+        <select id="ui-theme-select" aria-label="UI Theme">
+          <option value="system">System Default</option>
+          <option value="dark">Dark Mode</option>
+          <option value="light">Light Mode</option>
+        </select>
+      </div>
+      <p class="hint">Changes the visual theme.</p>
+    </div>
+
+    <div class="sidebar-section">
       <p class="field-label">Service Launch Paths</p>
       <p class="hint">Set install locations so the app can start or restart local services directly.</p>
     </div>
@@ -998,13 +1017,27 @@
 
     <div class="sidebar-section">
       <button class="btn btn-primary btn-full" id="config-save-btn" type="button">Save Configuration</button>
-      <button class="btn btn-ghost btn-full" id="config-models-migrate-btn" type="button">Migrate Legacy Model Folders</button>
+      <button class="btn btn-ghost btn-full" id="config-wizard-migrate-btn" type="button">Launch Migration Wizard</button>
       <p id="config-save-status" class="hint">No saved changes yet.</p>
       <p id="config-last-saved" class="hint">Last saved: never</p>
     </div>
   </aside>
 
   <div class="config-container" aria-label="Service controls">
+    <section class="config-card" aria-label="AI Manager Self-Updater">
+      <h2 class="section-heading">AI Manager Update</h2>
+      <p class="section-desc">Keep the local dashboard up to date.</p>
+      <div class="config-actions-row" role="group" aria-label="AI Manager update actions">
+        <button class="btn btn-ghost" id="config-app-check-updates" type="button">Check for Updates</button>
+        <button class="btn btn-primary" id="config-app-update" type="button" disabled>Update & Restart</button>
+      </div>
+      <details id="config-app-commits-details" hidden>
+        <summary>View release notes</summary>
+        <ul id="config-app-commits-list" class="hint" style="list-style:inside; padding-top:0.5rem"></ul>
+      </details>
+      <p id="config-app-version-info" class="hint">Status: Awaiting check.</p>
+    </section>
+
     <section class="config-card" aria-label="Ollama service controls">
       <h2 class="section-heading">Ollama Service</h2>
       <p class="section-desc">Launch text inference backend using the configured path.</p>
@@ -1328,6 +1361,7 @@
       </button>
     </div>
     <div class="sidebar-section">
+      <button class="btn btn-secondary btn-full" id="mb-bulk-select-toggle" type="button" style="margin-bottom:0.8rem; border:1px solid var(--primary);">Enter Bulk Select Mode</button>
       <button class="btn btn-ghost btn-full" id="mb-library-refresh-btn" type="button">Refresh Local Library</button>
       <button class="btn btn-ghost btn-full" id="mb-library-enrich-previews-btn" type="button">Find Missing Previews</button>
       <button class="btn btn-ghost btn-full" id="mb-library-recover-metadata-btn" type="button">Find Missing Metadata and Previews</button>
@@ -1444,6 +1478,50 @@
 
   </div>
 </section>
+<!-- Model Migration Wizard Modal -->
+<div id="migration-wizard-modal" class="preset-edit-modal" hidden aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="migration-wizard-title">
+  <div class="preset-edit-modal-backdrop" id="migration-wizard-backdrop"></div>
+  <div class="preset-edit-modal-panel" role="document" style="max-width:550px; padding:1.5rem;">
+    <div class="preset-edit-modal-head" style="margin-bottom:1.5rem;">
+      <h3 id="migration-wizard-title" class="section-heading">Model Migration Wizard</h3>
+      <button id="migration-wizard-close" class="btn btn-ghost btn-xs" type="button" aria-label="Close wizard">Close</button>
+    </div>
+    
+    <!-- Step 1: Select Source -->
+    <div id="wizard-step-1" class="wizard-step">
+      <p class="section-desc" style="margin-bottom:1rem">Select the root directory of an existing generative AI interface (e.g. A1111, ComfyUI, Fooocus) to scan for models.</p>
+      <div class="config-path-row">
+        <input id="wizard-source-path" type="text" placeholder="e.g. D:/AI/stable-diffusion-webui" readonly />
+        <button class="btn btn-ghost" id="wizard-browse-btn" type="button">Browse Folder</button>
+      </div>
+      <div class="preset-edit-modal-actions" style="margin-top:2rem;">
+        <button id="wizard-scan-btn" class="btn btn-primary" type="button" disabled>Scan Directory</button>
+      </div>
+    </div>
+
+    <!-- Step 2: Review and Link -->
+    <div id="wizard-step-2" class="wizard-step" hidden>
+      <p class="section-desc">We found the following model categories. Select the ones safely symlink into your Global Vault.</p>
+      <p class="hint" style="margin-bottom:1rem">Symlinking utilizes zero extra disk space.</p>
+      
+      <div class="form-field" style="margin-bottom:1rem;">
+        <label for="wizard-link-prefix" class="field-label">Linked Folder Name (Optional)</label>
+        <input id="wizard-link-prefix" type="text" class="compact-input" placeholder="e.g. A1111_Linked" value="LinkedEnv" style="max-width:200px" />
+      </div>
+
+      <div id="wizard-found-folders" style="max-height:180px; overflow-y:auto; border:1px solid var(--border); padding:0.5rem; border-radius:var(--radius-md); display:flex; flex-direction:column; gap:0.5rem">
+        <!-- Checkboxes injected here -->
+      </div>
+      
+      <p id="wizard-status-msg" class="hint" style="margin-top:1rem; min-height:1.2em" aria-live="polite"></p>
+
+      <div class="preset-edit-modal-actions" style="margin-top:1.5rem; justify-content:space-between; flex-direction:row;">
+        <button id="wizard-back-btn" class="btn btn-ghost" type="button">Back</button>
+        <button id="wizard-confirm-btn" class="btn btn-primary" type="button">Symlink Selected</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <div id="preset-edit-modal" class="preset-edit-modal" hidden aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="preset-edit-modal-title">
   <div class="preset-edit-modal-backdrop"></div>
@@ -1473,6 +1551,88 @@
       <button id="preset-edit-save" class="btn btn-primary btn-sm" type="button">Save changes</button>
       <button id="preset-edit-cancel" class="btn btn-ghost btn-sm" type="button">Cancel</button>
       <button id="preset-edit-delete" class="btn btn-ghost btn-sm preset-edit-delete-btn" type="button">Delete preset</button>
+    </div>
+  </div>
+</div>
+
+<!-- Hardware Resource Monitor Overlay -->
+<div id="hardware-monitor-overlay" class="hardware-monitor-overlay" hidden aria-hidden="true" role="region" aria-label="System Hardware Monitor">
+  <div class="hardware-monitor-header">
+    <h3 class="section-heading" style="margin:0; font-size:0.8rem; letter-spacing:0.5px">System Telemetry</h3>
+    <button id="hardware-monitor-close" class="btn btn-ghost btn-xs" type="button" aria-label="Close monitor" style="padding:0 0.4rem; font-size:1.2rem">×</button>
+  </div>
+  <div class="hardware-monitor-body">
+    <div class="hardware-stat-group">
+      <div class="hardware-stat-label"><span>CPU</span> <span id="hw-cpu-val">--%</span></div>
+      <div class="hardware-bar"><div id="hw-cpu-bar" class="hardware-bar-fill" style="width: 0%"></div></div>
+    </div>
+    <div class="hardware-stat-group">
+      <div class="hardware-stat-label"><span>RAM</span> <span id="hw-ram-val">-- / -- GB (--%)</span></div>
+      <div class="hardware-bar"><div id="hw-ram-bar" class="hardware-bar-fill" style="width: 0%"></div></div>
+    </div>
+    <div id="hw-gpu-container">
+      <div class="hardware-stat-group hint" style="margin-top:0.5rem">Checking GPU...</div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- Bulk Tag Modal -->
+<div id="bulk-tag-modal" class="preset-edit-modal" hidden aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="bulk-tag-title">
+  <div class="preset-edit-modal-backdrop" id="bulk-tag-backdrop"></div>
+  <div class="preset-edit-modal-panel" role="document">
+    <div class="preset-edit-modal-head" style="margin-bottom:1rem;">
+      <h3 id="bulk-tag-title" class="section-heading">Bulk Tag Selected</h3>
+      <button id="bulk-tag-close" class="btn btn-ghost btn-xs" type="button" aria-label="Close modal">Close</button>
+    </div>
+    <div class="form-field">
+      <label for="bulk-tag-input" class="field-label">Tags to Apply / Remove <span class="hint">(comma-separated)</span></label>
+      <input id="bulk-tag-input" type="text" class="compact-input" placeholder="e.g. landscape, favorites" autocomplete="off" />
+    </div>
+    <div class="form-field">
+      <label class="field-label">Action</label>
+      <div class="select-wrapper">
+        <select id="bulk-tag-action">
+          <option value="add">Add tags to selected models</option>
+          <option value="remove">Remove tags from selected models</option>
+          <option value="set">Overwrite all existing tags with these</option>
+        </select>
+      </div>
+    </div>
+    <div class="preset-edit-modal-actions" style="margin-top:1.5rem">
+      <button id="bulk-tag-apply-btn" class="btn btn-primary" type="button">Apply Tags</button>
+      <button id="bulk-tag-cancel-btn" class="btn btn-ghost" type="button">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Bulk Action Bar -->
+<div id="bulk-action-bar" class="bulk-action-bar" hidden aria-hidden="true" role="toolbar" aria-label="Bulk actions">
+  <div class="bulk-action-bar-content">
+    <div class="bulk-selected-count"><span id="bulk-count-val">0</span> models selected</div>
+    <div class="bulk-actions">
+      <button class="btn btn-secondary btn-sm" id="bulk-action-tag" type="button">Tag Selected</button>
+      <button class="btn btn-secondary btn-sm" id="bulk-action-export" type="button" title="Export portable metadata JSON backup">Export Snapshot</button>
+      <button class="btn btn-ghost btn-sm" id="bulk-action-delete" type="button" style="color:var(--error);">Delete Models</button>
+      <div style="width:1px; height:24px; background:var(--border); margin:0 0.5rem;"></div>
+      <button class="btn btn-ghost btn-sm" id="bulk-action-cancel" type="button">Exit Select Mode</button>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- Ctrl+K Command Palette Modal -->
+<div id="cmd-palette-modal" class="preset-edit-modal" hidden aria-hidden="true" role="dialog" aria-modal="true" aria-label="Command Palette">
+  <div class="preset-edit-modal-backdrop" id="cmd-palette-backdrop"></div>
+  <div class="preset-edit-modal-panel cmd-palette-panel" role="document" style="max-width: 600px; padding: 0;">
+    <div class="cmd-palette-search-wrap">
+      <input id="cmd-palette-input" type="text" placeholder="Search commands, panels, or models... (↑/↓ to navigate, Enter to select)" autocomplete="off" spellcheck="false" />
+    </div>
+    <div id="cmd-palette-results" class="cmd-palette-results" role="listbox">
+      <!-- Results injected dynamically -->
+    </div>
+    <div class="cmd-palette-footer">
+      <span class="hint"><strong>↑/↓</strong> navigate &nbsp;&bull;&nbsp; <strong>Enter</strong> select &nbsp;&bull;&nbsp; <strong>Esc</strong> close</span>
     </div>
   </div>
 </div>
