@@ -17397,37 +17397,37 @@ async function fetchHardwareData() {
     try {
         const res = await fetch('/api/system/resources');
         const data = await res.json();
-        
+
         const cpuP = data.cpu_percent || 0;
         document.getElementById('hw-cpu-val').textContent = cpuP.toFixed(1) + '%';
         const cpuBar = document.getElementById('hw-cpu-bar');
         cpuBar.style.width = cpuP + '%';
         cpuBar.style.backgroundColor = getColorForPercent(cpuP);
-        
+
         const ramP = data.ram_percent || 0;
         document.getElementById('hw-ram-val').textContent = (data.ram_used_gb || 0) + ' / ' + (data.ram_total_gb || 0) + ' GB (' + ramP + '%)';
         const ramBar = document.getElementById('hw-ram-bar');
         ramBar.style.width = ramP + '%';
         ramBar.style.backgroundColor = getColorForPercent(ramP);
-        
+
         const gpuContainer = document.getElementById('hw-gpu-container');
         if (data.gpus && data.gpus.length > 0) {
             let html = '';
             data.gpus.forEach(gpu => {
                 const memP = (gpu.memory_used_mb / gpu.memory_total_mb) * 100;
-                html += \
+                html += `
                 <div class="hardware-stat-group" style="margin-top:0.75rem;">
                   <div class="hardware-stat-label">
-                    <span>\ <span class="hw-temp-badge">\�C</span></span> 
-                    <span>\%</span>
+                    <span>${gpu.name} <span class="hw-temp-badge">${gpu.temperature_c}C</span></span>
+                    <span>${gpu.utilization_gpu}%</span>
                   </div>
-                  <div class="hardware-bar"><div class="hardware-bar-fill" style="width: \%; background-color: \"></div></div>
-                  <div class="hardware-bar" style="margin-top:0.2rem; height:4px; opacity:0.8"><div class="hardware-bar-fill" style="width: \%; background-color: var(--secondary)"></div></div>
-                  <div class="hardware-stat-label" style="font-size:0.7rem; color:var(--hint-color); justify-content:flex-end;">
-                     \ / \ GB VRAM
+                  <div class="hardware-bar"><div class="hardware-bar-fill" style="width: ${gpu.utilization_gpu}%; background-color: ${getColorForPercent(gpu.utilization_gpu)}"></div></div>
+                  <div class="hardware-bar" style="margin-top:0.2rem; height:4px; opacity:0.8"><div class="hardware-bar-fill" style="width: ${memP}%; background-color: var(--clr-text-muted)"></div></div>       
+                  <div class="hardware-stat-label" style="font-size:0.7rem; color:var(--clr-text-muted); justify-content:flex-end;">
+                     ${(gpu.memory_used_mb / 1024).toFixed(1)} / ${(gpu.memory_total_mb / 1024).toFixed(1)} GB VRAM
                   </div>
                 </div>
-                \;
+                `;
             });
             gpuContainer.innerHTML = html;
         } else {
@@ -17577,12 +17577,12 @@ if (wizardScanBtn) {
                 
                 let html = '';
                 discoveredFolders.forEach((f, idx) => {
-                    html += \
-                    <label class="config-inline-checkbox" style="padding:0.4rem;" title="\">
-                      <input type="checkbox" id="wizard-check-\" checked data-idx="\" />
-                      <span style="user-select:none"><strong>\</strong> <span class="hint">(\)</span></span>
+                    html += `
+                    <label class="config-inline-checkbox" style="padding:0.4rem;" title="${f.path}">
+                      <input type="checkbox" id="wizard-check-${idx}" checked data-idx="${idx}" />
+                      <span style="user-select:none"><strong>${f.vault_category}</strong> <span class="hint">(${f.path})</span></span>
                     </label>
-                    \;
+                    `;
                 });
                 wizardFoundFolders.innerHTML = html;
             } else {
@@ -17628,22 +17628,22 @@ if (wizardConfirmBtn) {
                 body: JSON.stringify({ folders: selectedFolders, link_prefix: linkPrefix })
             });
             const data = await res.json();
-            
+
             if (data.ok) {
                 const successes = data.results.filter(r => r.status === 'linked').length;
-                wizardStatusMsg.textContent = \Successfully symlinked \ folder(s)!\;
-                wizardStatusMsg.style.color = 'var(--primary)';
+                wizardStatusMsg.textContent = `Successfully symlinked ${successes} folder(s)!`;
+                wizardStatusMsg.style.color = 'var(--clr-primary)';
                 setTimeout(() => {
                     closeWizard();
                     if (typeof loadGlobalModels === 'function') loadGlobalModels();
                 }, 2000);
             } else {
                 wizardStatusMsg.textContent = data.error || 'Symlink failed.';
-                wizardStatusMsg.style.color = 'var(--error)';
+                wizardStatusMsg.style.color = 'var(--clr-error)';
             }
         } catch (e) {
             wizardStatusMsg.textContent = 'Network error.';
-            wizardStatusMsg.style.color = 'var(--error)';
+            wizardStatusMsg.style.color = 'var(--clr-error)';
         } finally {
             wizardConfirmBtn.disabled = false;
             wizardBackBtn.disabled = false;
@@ -17651,11 +17651,18 @@ if (wizardConfirmBtn) {
     });
 }
 
+if (wizardBackBtn) {
+    wizardBackBtn.addEventListener('click', () => {
+        wizardStep2.setAttribute('hidden', '');
+        wizardStep1.removeAttribute('hidden');
+        wizardStatusMsg.textContent = '';
+    });
+}
+
 /* --------------------------------------------------------------------------
    Bulk Model Operations
    -------------------------------------------------------------------------- */
 const bulkSelectToggle = document.getElementById('mb-bulk-select-toggle');
-const localLibraryGrid = document.getElementById('mb-local-grid');
 let inBulkMode = false;
 let selectedModels = new Map();
 
@@ -17691,76 +17698,66 @@ function exitBulkMode() {
 }
 
 function updateBulkCount() {
-    document.getElementById('bulk-count-val').textContent = selectedModels.size;
+    const el = document.getElementById('bulk-count-val');
+    if (el) el.textContent = selectedModels.size;
 }
 
 document.addEventListener('click', (e) => {
     if (!inBulkMode) return;
     const card = e.target.closest('.mb-card');
     const localLibraryGrid = document.getElementById('mb-local-list');
-    
+
     if (card && localLibraryGrid && localLibraryGrid.contains(card)) {
         e.preventDefault();
         e.stopPropagation();
-        
+
         const folder = card.dataset.folder;
         const filename = card.dataset.filename;
         if (!folder || !filename) return;
-        
+
         const key = folder + '/' + filename;
         const cb = card.querySelector('.vault-card-select-cb');
-        
-        if (card.classList.contains('selected')) {
-            card.classList.remove('selected');
+
+        if (selectedModels.has(key)) {
             selectedModels.delete(key);
-            if(cb) cb.checked = false;
+            card.classList.remove('selected');
+            if (cb) cb.checked = false;
         } else {
+            selectedModels.set(key, { folder, filename });
             card.classList.add('selected');
-            selectedModels.set(key, { folder, file_name: filename });
-            if(cb) cb.checked = true;
+            if (cb) cb.checked = true;
         }
         updateBulkCount();
     }
-}, true);
+}, true); // Use capture phase so event intercept runs immediately
 
-const bulkObserver = new MutationObserver((mutations) => {
-    mutations.forEach((mutation) => {
-        if (mutation.addedNodes) {
-            mutation.addedNodes.forEach((node) => {
-                if (node.nodeType === 1) { 
-                    const cards = node.classList && node.classList.contains('mb-card') ? [node] : node.querySelectorAll('.mb-card');
-                    if (cards && cards.length > 0) {
-                        cards.forEach(card => {
-                            if (!card.querySelector('.vault-card-select-wrap')) {
-                                card.insertAdjacentHTML('afterbegin', \
-                                    <div class="vault-card-select-wrap">
-                                        <input type="checkbox" class="vault-card-select-cb" tabindex="-1">
-                                    </div>
-                                \);
-                            }
-                        });
-                    }
+const observer = new MutationObserver((mutations) => {
+    if (!inBulkMode) return;
+    mutations.forEach(mutation => {
+        mutation.addedNodes.forEach(node => {
+            if (node.nodeType === 1 && node.classList.contains('mb-card')) {
+                if (!node.querySelector('.vault-card-select-wrap')) {
+                    const wrap = document.createElement('div');
+                    wrap.className = 'vault-card-select-wrap';
+                    wrap.innerHTML = `<input type="checkbox" class="vault-card-select-cb" tabindex="-1">`;
+                    node.appendChild(wrap);
                 }
-            });
-        }
+            }
+        });
     });
 });
 
 const observedGrid = document.getElementById('mb-local-list');
 if (observedGrid) {
-    bulkObserver.observe(observedGrid, { childList: true, subtree: true });
-} else {
-    // For when the tab is populated later
-    document.addEventListener('DOMContentLoaded', () => {
-        const grid = document.getElementById('mb-local-list');
-        if(grid) bulkObserver.observe(grid, { childList: true, subtree: true });
-    });
+    observer.observe(observedGrid, { childList: true, subtree: true });
 }
 
+document.getElementById('bulk-action-cancel')?.addEventListener('click', exitBulkMode);
+
 document.getElementById('bulk-action-delete')?.addEventListener('click', async () => {
-    if (selectedModels.size === 0) return;
-    if (!confirm(\Are you sure you want to permanently delete \ models and their previews? This cannot be undone.\)) return;
-    
+    if (selectedModels.size === 0) return showToast('No models selected', 'neg');
+    if (!confirm(`Are you sure you want to permanently delete ${selectedModels.size} models and their previews?`)) return;
+
     document.getElementById('bulk-action-delete').disabled = true;
     try {
         const modelsArray = Array.from(selectedModels.values());
@@ -17771,7 +17768,7 @@ document.getElementById('bulk-action-delete')?.addEventListener('click', async (
         });
         const data = await res.json();
         if (data.ok) {
-            showToast(\Deleted \ models successfully.\, 'pos');
+            showToast(`Deleted ${data.deleted} models successfully.`, 'pos');
             exitBulkMode();
             document.getElementById('mb-library-refresh-btn')?.click();
         } else {
@@ -17797,44 +17794,47 @@ function closeBulkTagModal() {
     bulkTagModal.setAttribute('aria-hidden', 'true');
 }
 
-document.getElementById('bulk-tag-close')?.addEventListener('click', closeBulkTagModal);
 document.getElementById('bulk-tag-cancel-btn')?.addEventListener('click', closeBulkTagModal);
-document.getElementById('bulk-tag-backdrop')?.addEventListener('click', closeBulkTagModal);
+document.getElementById('bulk-tag-close')?.addEventListener('click', closeBulkTagModal);
 
 document.getElementById('bulk-tag-apply-btn')?.addEventListener('click', async () => {
-    const rawTags = document.getElementById('bulk-tag-input').value.split(',').map(t => t.trim()).filter(t => t);
-    if (rawTags.length === 0) {
-        return showToast('Please enter at least one tag', 'neg');
-    }
-    
+    const rawTags = document.getElementById('bulk-tag-input').value;
     const action = document.getElementById('bulk-tag-action').value;
-    document.getElementById('bulk-tag-apply-btn').disabled = true;
+    const btn = document.getElementById('bulk-tag-apply-btn');
+
+    const tags = rawTags.split(',').map(s => s.trim()).filter(Boolean);
+
+    btn.disabled = true;
+    btn.textContent = 'Applying...';
     try {
         const modelsArray = Array.from(selectedModels.values());
         const res = await fetch('/api/vault/bulk/tag', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ models: modelsArray, tags: rawTags, action: action })
+            body: JSON.stringify({ models: modelsArray, tags, action })
         });
         const data = await res.json();
         if (data.ok) {
+            showToast(`Updated tags across ${data.updated} models.`, 'pos');
             closeBulkTagModal();
             exitBulkMode();
-            showToast(\Updated tags for \ models.\, 'pos');
             document.getElementById('mb-library-refresh-btn')?.click();
         } else {
-            showToast(data.error || 'Tagging failed', 'neg');
+            showToast(data.error || 'Failed to tag models', 'neg');
         }
     } catch (e) {
         showToast('Network error', 'neg');
     } finally {
-        document.getElementById('bulk-tag-apply-btn').disabled = false;
+        btn.disabled = false;
+        btn.textContent = 'Apply Tags';
     }
 });
 
 document.getElementById('bulk-action-export')?.addEventListener('click', async () => {
     if (selectedModels.size === 0) return showToast('No models selected', 'neg');
-    
+    const btn = document.getElementById('bulk-action-export');
+    btn.disabled = true;
+
     try {
         const modelsArray = Array.from(selectedModels.values());
         const res = await fetch('/api/vault/bulk/export', {
@@ -17842,29 +17842,26 @@ document.getElementById('bulk-action-export')?.addEventListener('click', async (
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ models: modelsArray })
         });
-        const data = await res.json();
-        if (data.ok && data.export) {
-            const blob = new Blob([JSON.stringify(data.export, null, 2)], { type: 'application/json' });
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.style.display = 'none';
-            a.href = url;
-            a.download = \ault_backup_\.json\;
-            document.body.appendChild(a);
-            a.click();
-            window.URL.revokeObjectURL(url);
-            document.body.removeChild(a);
-            showToast('Snapshot exported successfully!', 'pos');
-            exitBulkMode();
-        } else {
-            showToast(data.error || 'Export failed', 'neg');
-        }
+        const blob = await res.blob();
+        
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = url;
+        const dateStr = new Date().toISOString().split('T')[0];
+        a.download = `vault_backup_${dateStr}.json`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        
+        showToast('Snapshot exported successfully.', 'pos');
+        exitBulkMode();
     } catch (e) {
-        showToast('Network error', 'neg');
+        showToast('Export failed', 'neg');
+    } finally {
+        btn.disabled = false;
     }
 });
-
-document.getElementById('bulk-action-cancel')?.addEventListener('click', exitBulkMode);
 
 /* --------------------------------------------------------------------------
    Ctrl+K Command Palette
@@ -17876,12 +17873,11 @@ let cmdPaletteActiveIndex = -1;
 let cmdPaletteItemsRendered = [];
 
 const STATIC_COMMANDS = [
-    { id: 'nav-txt2img', label: 'Go to Inference Studio', icon: '??', action: () => document.getElementById('nav-txt2img')?.click() },
-    { id: 'nav-models', label: 'Go to Global Vault (Models)', icon: '??', action: () => document.getElementById('nav-models')?.click() },
-    { id: 'nav-settings', label: 'Go to Settings', icon: '??', action: () => document.getElementById('nav-settings')?.click() },
-    { id: 'nav-my-creations', label: 'Go to My Creations', icon: '???', action: () => document.getElementById('nav-my-creations')?.click() },
-    { id: 'action-refresh', label: 'Refresh Local Library', icon: '??', action: () => { document.getElementById('nav-models')?.click(); document.getElementById('mb-library-refresh-btn')?.click(); } },
-    { id: 'action-bulk', label: 'Enter Bulk Select Mode', icon: '??', action: () => { document.getElementById('nav-models')?.click(); document.getElementById('mb-bulk-select-toggle')?.click(); } }
+    { id: 'nav-txt2img', label: 'Go to Inference Studio', icon: '🎨', action: () => document.getElementById('nav-generative')?.click() },
+    { id: 'nav-models', label: 'Go to Global Vault (Models)', icon: '📦', action: () => document.getElementById('nav-models')?.click() },
+    { id: 'nav-settings', label: 'Go to Settings', icon: '⚙️', action: () => document.getElementById('nav-config')?.click() },
+    { id: 'action-refresh', label: 'Refresh Local Library', icon: '🔄', action: () => { document.getElementById('nav-models')?.click(); document.getElementById('mb-library-refresh-btn')?.click(); } },
+    { id: 'action-bulk', label: 'Enter Bulk Select Mode', icon: '☑️', action: () => { document.getElementById('nav-models')?.click(); document.getElementById('mb-bulk-select-toggle')?.click(); } }
 ];
 
 document.addEventListener('keydown', (e) => {
@@ -17909,15 +17905,19 @@ function toggleCmdPalette() {
 function openCmdPalette() {
     cmdPaletteModal.removeAttribute('hidden');
     cmdPaletteModal.setAttribute('aria-hidden', 'false');
-    cmdPaletteInput.value = '';
-    cmdPaletteInput.focus();
+    if(cmdPaletteInput) {
+        cmdPaletteInput.value = '';
+        cmdPaletteInput.focus();
+    }
     updateCmdPaletteResults('');
 }
 
 function closeCmdPalette() {
-    cmdPaletteModal.setAttribute('hidden', '');
-    cmdPaletteModal.setAttribute('aria-hidden', 'true');
-    cmdPaletteInput.blur();
+    if(cmdPaletteModal) {
+        cmdPaletteModal.setAttribute('hidden', '');
+        cmdPaletteModal.setAttribute('aria-hidden', 'true');
+    }
+    if(cmdPaletteInput) cmdPaletteInput.blur();
 }
 
 document.getElementById('cmd-palette-backdrop')?.addEventListener('click', closeCmdPalette);
@@ -17946,6 +17946,7 @@ cmdPaletteInput?.addEventListener('keydown', (e) => {
 });
 
 function updateCmdPaletteResults(query) {
+    if(!cmdPaletteResults) return;
     const q = query.toLowerCase().trim();
     cmdPaletteItemsRendered = [];
     cmdPaletteResults.innerHTML = '';
@@ -17956,13 +17957,13 @@ function updateCmdPaletteResults(query) {
         cmdPaletteResults.insertAdjacentHTML('beforeend', '<div class="cmd-palette-group-lbl">Commands</div>');
         cmds.forEach(cmd => {
             cmdPaletteItemsRendered.push({ type: 'cmd', data: cmd });
-            cmdPaletteResults.insertAdjacentHTML('beforeend', \
-                <div class="cmd-palette-item" data-idx="\">
-                    <div class="cmd-palette-item-icon">\</div>
-                    <div class="cmd-palette-item-text">\</div>
+            cmdPaletteResults.insertAdjacentHTML('beforeend', `
+                <div class="cmd-palette-item" data-idx="${cmdPaletteItemsRendered.length - 1}">
+                    <div class="cmd-palette-item-icon">${cmd.icon}</div>
+                    <div class="cmd-palette-item-text">${encodeURI(cmd.label).replace(/%20/g, ' ')}</div>
                     <div class="cmd-palette-item-shortcut">Action</div>
                 </div>
-            \);
+            `);
         });
     }
     
@@ -17973,15 +17974,15 @@ function updateCmdPaletteResults(query) {
             cmdPaletteResults.insertAdjacentHTML('beforeend', '<div class="cmd-palette-group-lbl">Models</div>');
             models.forEach(m => {
                 cmdPaletteItemsRendered.push({ type: 'model', data: m });
-                const name = escHtml(m.name || m.file_name);
-                const type = escHtml(m.model_type || 'Unknown');
-                cmdPaletteResults.insertAdjacentHTML('beforeend', \
-                    <div class="cmd-palette-item" data-idx="\">
-                        <div class="cmd-palette-item-icon">??</div>
-                        <div class="cmd-palette-item-text">\ <span class="hint" style="font-size:0.8em">\</span></div>
+                const name = m.name || m.file_name || 'Unknown';
+                const type = m.model_type || 'Unknown';
+                cmdPaletteResults.insertAdjacentHTML('beforeend', `
+                    <div class="cmd-palette-item" data-idx="${cmdPaletteItemsRendered.length - 1}">
+                        <div class="cmd-palette-item-icon">🧠</div>
+                        <div class="cmd-palette-item-text">${encodeURI(name).replace(/%20/g, ' ')} <span class="hint" style="font-size:0.8em">${encodeURI(type).replace(/%20/g, ' ')}</span></div>
                         <div class="cmd-palette-item-shortcut">Model</div>
                     </div>
-                \);
+                `);
             });
         }
     }
@@ -18024,7 +18025,7 @@ function executeCmdPaletteItem(item) {
         document.getElementById('nav-models')?.click();
         document.getElementById('mb-view-library-btn')?.click();
         
-        const searchInput = document.getElementById('mb-local-query');
+        const searchInput = document.getElementById('mb-search-query');
         if (searchInput) {
             searchInput.value = item.data.file_name;
             searchInput.dispatchEvent(new Event('input'));
