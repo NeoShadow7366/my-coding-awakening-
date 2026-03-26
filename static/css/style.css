@@ -3709,6 +3709,21 @@ textarea {
   user-select: none;
 }
 
+.gallery-context-jump-hint {
+  margin: 0 0.35rem 0.2rem;
+  color: var(--clr-text-subtle);
+  font-size: 0.72rem;
+  min-height: 1.1em;
+}
+
+.gallery-context-jump-hint.is-match {
+  color: color-mix(in srgb, var(--clr-accent-pos) 65%, var(--clr-text));
+}
+
+.gallery-context-jump-hint.is-miss {
+  color: color-mix(in srgb, var(--clr-accent-neg) 70%, var(--clr-text));
+}
+
 body.gallery-lightbox-open {
   overflow: hidden;
 }

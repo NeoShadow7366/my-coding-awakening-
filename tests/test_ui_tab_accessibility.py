@@ -389,6 +389,10 @@ def test_gallery_power_user_shortcuts_markup_and_wiring_present():
     assert 'id="gallery-shortcuts-help"' in html
     assert 'Gallery keyboard: M toggle select mode' in html
     assert 'id="gallery-view-toggle"' in html
+    assert 'id="gallery-sort"' in html and 'aria-keyshortcuts="Ctrl+Shift+O Cmd+Shift+O"' in html
+    assert 'id="gallery-mode-filter"' in html and 'aria-keyshortcuts="Ctrl+Shift+M Cmd+Shift+M"' in html
+    assert 'id="gallery-tag-filter"' in html and 'aria-keyshortcuts="Ctrl+Shift+T Cmd+Shift+T"' in html
+    assert 'id="gallery-model-filter"' in html and 'aria-keyshortcuts="Ctrl+Shift+L Cmd+Shift+L"' in html
     assert 'id="gallery-select-mode-btn"' in html and 'aria-keyshortcuts="M"' in html
     assert 'id="gallery-select-all-btn"' in html and 'aria-keyshortcuts="A"' in html
     assert 'id="gallery-bulk-delete-btn"' in html and 'aria-keyshortcuts="D Delete"' in html
@@ -399,8 +403,11 @@ def test_gallery_power_user_shortcuts_markup_and_wiring_present():
     js = js_path.read_text(encoding="utf-8")
     assert "// Global Ctrl/Cmd+Shift gallery power-user shortcuts (Image panel only)" in js
     assert "const isGalleryPowerShortcut = (event.ctrlKey || event.metaKey) && event.shiftKey && !event.altKey" in js
-    assert "&& (hotkey === 'g' || hotkey === 's' || hotkey === 'a' || hotkey === 'x');" in js
+    assert "&& (hotkey === 'g' || hotkey === 's' || hotkey === 'a' || hotkey === 'x' || hotkey === 'o' || hotkey === 'm' || hotkey === 't' || hotkey === 'l');" in js
     assert "if (galleryLightbox && !galleryLightbox.hidden) return;" in js
+    assert "function cycleGallerySortOrder(delta = 1) {" in js
+    assert "function cycleGalleryModeFilter(delta = 1) {" in js
+    assert "function focusGalleryFilterSelect(selectEl, label) {" in js
     assert "if (hotkey === 'g') {" in js
     assert "galleryViewToggle?.click();" in js
     assert "if (hotkey === 's') {" in js
@@ -409,6 +416,16 @@ def test_gallery_power_user_shortcuts_markup_and_wiring_present():
     assert "gallerySelectAllBtn?.click();" in js
     assert "if (hotkey === 'x') {" in js
     assert "galleryDeselectAllBtn?.click();" in js
+    assert "if (hotkey === 'o') {" in js
+    assert "const label = cycleGallerySortOrder(1);" in js
+    assert "if (label) showToast(`Gallery sort: ${label}.`, 'pos');" in js
+    assert "if (hotkey === 'm') {" in js
+    assert "const label = cycleGalleryModeFilter(1);" in js
+    assert "if (label) showToast(`Gallery mode filter: ${label}.`, 'pos');" in js
+    assert "if (hotkey === 't') {" in js
+    assert "focusGalleryFilterSelect(galleryTagFilterSelect, 'tag');" in js
+    assert "if (hotkey === 'l') {" in js
+    assert "focusGalleryFilterSelect(galleryModelFilterSelect, 'model');" in js
     assert "const galleryShortcutsToggleBtn = document.getElementById('gallery-shortcuts-toggle-btn');" in js
     assert "const galleryShortcutsHelp = document.getElementById('gallery-shortcuts-help');" in js
     assert "const GALLERY_SHORTCUTS_HELP_EXPANDED_KEY = 'galleryShortcutsHelpExpandedV1';" in js
@@ -443,6 +460,28 @@ def test_gallery_power_user_shortcuts_markup_and_wiring_present():
     assert "if (toggleGalleryShortcutsHelp()) {" in js
     assert "galleryShortcutsToggleBtn?.focus();" in js
     assert "showToast(galleryShortcutsHelpExpanded ? 'Gallery keyboard help shown.' : 'Gallery keyboard help hidden.', 'pos');" in js
+
+
+def test_gallery_lightbox_meta_action_shortcut_polish_markup_and_wiring_present():
+    app_module.app.config["TESTING"] = True
+    client = app_module.app.test_client()
+
+    html = client.get("/").get_data(as_text=True)
+    assert 'Shortcuts: &larr; &rarr; arrows, P params, C compare, [ ] snap, R re-use, K actions, ? help, F fullscreen, Esc close' in html
+    assert 'id="gallery-lightbox-meta-actions" class="gallery-lightbox-meta-actions" role="group" aria-label="Lightbox metadata actions" aria-keyshortcuts="K ArrowLeft ArrowRight Home End"' in html
+    assert 'id="gallery-lightbox-meta-shortcuts"' in html
+    assert 'aria-keyshortcuts="? F1 K ArrowLeft ArrowRight Home End"' in html
+    assert 'Keys: ? help + K focus' in html
+
+    js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
+    js = js_path.read_text(encoding="utf-8")
+    assert "'K focus metadata actions'" in js
+    assert "'?/F1 shortcut help'" in js
+    assert "galleryLightboxMetaShortcutsBtn.textContent = 'Keys: ? help + K focus';" in js
+    assert "Press K to focus metadata actions." in js
+    assert "key !== 'k' && key !== 'K'" in js
+    assert "if (key === 'k' || key === 'K') {" in js
+    assert "showToast('Focused lightbox metadata actions.', 'pos');" in js
 
 
 def test_gallery_search_query_persistence_present_in_js_bundle():
@@ -1933,7 +1972,8 @@ def test_gallery_lightbox_compare_markup_and_wiring_present():
     assert "const isImg2Img = snapshot.mode === 'img2img' && (snapshot.image || snapshot.image_name);" in js
     assert "image: snapshot.image || snapshot.image_name || ''," in js
     assert "if (isGalleryLightboxInteractiveTarget(event.target)) return;" in js
-    assert "key !== '[' && key !== ']') return;" in js
+    assert "key !== '[' && key !== ']'" in js
+    assert "key !== '?' && key !== 'F1'" in js
     assert "if (key === 'c' || key === 'C') {" in js
     assert "toggleGalleryLightboxCompare();" in js
     assert "galleryLightboxPrev.addEventListener('keydown', onGalleryLightboxControlsKeydown);" in js
@@ -1966,7 +2006,8 @@ def test_gallery_lightbox_meta_panel_markup_and_wiring_present():
     assert 'id="gallery-lightbox-meta"' in html
     assert 'id="gallery-lightbox-meta-chips"' in html
     assert 'id="gallery-lightbox-reuse"' in html
-    assert 'aria-keyshortcuts="R"' in html
+    assert 'Action row shortcuts: ArrowLeft/ArrowRight move focus, Home/End jump.' in html
+    assert 'aria-keyshortcuts="R ArrowLeft ArrowRight Home End"' in html
     assert 'R re-use' in html or 'R re-use' in html
 
     js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
@@ -1975,6 +2016,10 @@ def test_gallery_lightbox_meta_panel_markup_and_wiring_present():
     assert "const galleryLightboxMeta = document.getElementById('gallery-lightbox-meta');" in js
     assert "const galleryLightboxMetaChips = document.getElementById('gallery-lightbox-meta-chips');" in js
     assert "const galleryLightboxReuseBtn = document.getElementById('gallery-lightbox-reuse');" in js
+    assert "function getGalleryLightboxMetaActionRowHint()" in js
+    assert "function syncGalleryLightboxMetaActionTooltips()" in js
+    assert "syncGalleryLightboxMetaActionTooltips();" in js
+    assert "const actionRowHint = getGalleryLightboxMetaActionRowHint();" in js
     assert "let galleryLightboxLastFocus = null;" in js
     assert "let lightboxMetaOpen = false;" in js
     assert "function updateLightboxMeta(entry)" in js
@@ -1994,6 +2039,9 @@ def test_gallery_lightbox_meta_panel_markup_and_wiring_present():
     assert "if (galleryLightboxLastFocus && document.contains(galleryLightboxLastFocus)) {" in js
     assert "galleryLightboxMetaToggle.hidden = !hasParams;" in js
     assert "galleryLightboxMetaToggle.setAttribute('aria-hidden', hasParams ? 'false' : 'true');" in js
+    assert "galleryLightboxReuseBtn.setAttribute('aria-label', reuseTitle);" in js
+    assert "galleryLightboxTagInput.setAttribute('aria-label', `Add tag to this image. Press Enter to add. ${actionRowHint}`);" in js
+    assert "galleryLightboxAddTagBtn.setAttribute('aria-label', addTagTitle);" in js
     assert "if (p.scheduler) chips.push(`<span class=\"chip\">scheduler: ${escHtml(p.scheduler)}</span>`);" in js
     assert "galleryLightboxMetaToggle.hidden = true;" in js
     assert "galleryLightboxMetaToggle.setAttribute('aria-hidden', 'true');" in js
@@ -3341,19 +3389,39 @@ def test_gallery_lightbox_p_key_params_toggle_shortcut():
     assert 'aria-keyshortcuts="P" hidden>Params</button>' in html
 
     # Shortcuts hint text includes P params
-    assert 'P params, C compare, [ ] snap, R re-use, F fullscreen, Esc close' in html
+    assert 'P params, C compare, [ ] snap, R re-use, K actions, ? help, F fullscreen, Esc close' in html
     assert 'id="gallery-lightbox-meta-shortcuts"' in html
-    assert 'Keys: R re-use, P params, Esc close' in html
-    assert 'aria-label="Show lightbox keyboard shortcuts"' in html
-    assert 'title="Show lightbox keyboard shortcuts"' in html
+    assert 'Keys: ? help + K focus' in html
+    assert 'aria-label="Show lightbox keyboard shortcuts (? / F1). Action row shortcuts: ArrowLeft/ArrowRight move focus, Home/End jump."' in html
+    assert 'aria-keyshortcuts="? F1 K ArrowLeft ArrowRight Home End"' in html
+    assert 'title="Show lightbox keyboard shortcuts (? / F1). Action row shortcuts: ArrowLeft/ArrowRight move focus, Home/End jump."' in html
+    assert 'id="gallery-lightbox-reuse"' in html
+    assert 'aria-keyshortcuts="R ArrowLeft ArrowRight Home End"' in html
+    assert 'id="gallery-lightbox-tag-input"' in html
+    assert 'aria-keyshortcuts="Enter ArrowLeft ArrowRight Home End"' in html
+    assert 'id="gallery-lightbox-add-tag-btn"' in html
+    assert 'aria-keyshortcuts="Enter Space ArrowLeft ArrowRight Home End"' in html
 
     js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
     js = js_path.read_text(encoding="utf-8")
 
     # Key guard whitelist includes p/P
     assert "key !== 'p' && key !== 'P'" in js
+    assert "key !== 'k' && key !== 'K'" in js
+    assert "key !== '?' && key !== 'F1'" in js
     # Handler is wired
     assert "if (key === 'p' || key === 'P') {" in js
+    assert "if (key === 'k' || key === 'K') {" in js
+    assert "if (key === '?' || key === 'F1') {" in js
+    assert "showGalleryLightboxShortcutsHelpToast();" in js
+    assert "function getGalleryLightboxShortcutHelpText() {" in js
+    assert "function syncGalleryLightboxMetaShortcutsButton() {" in js
+    assert "galleryLightboxMetaShortcutsBtn.textContent = 'Keys: ? help + K focus';" in js
+    assert "showToast('Focused lightbox metadata actions.', 'pos');" in js
+    assert "'K focus metadata actions'" in js
+    assert "'Enter add tag from tag field'" in js
+    assert "'Meta action row:" in js
+    assert "function showGalleryLightboxShortcutsHelpToast() {" in js
     assert "if (!galleryLightboxMetaToggle || galleryLightboxMetaToggle.hidden || galleryLightboxMetaToggle.disabled) return;" in js
     assert "lightboxMetaOpen = !lightboxMetaOpen;" in js
     assert "galleryLightboxMetaToggle.setAttribute('aria-pressed', String(lightboxMetaOpen));" in js
@@ -3368,7 +3436,7 @@ def test_gallery_lightbox_p_key_params_toggle_shortcut():
     assert "galleryLightboxAddTagBtn.addEventListener('keydown', onGalleryLightboxMetaActionsKeydown);" in js
     assert "if (onGalleryLightboxMetaActionsKeydown(event)) {" in js
     assert "galleryLightboxMetaShortcutsBtn.addEventListener('keydown', onGalleryLightboxMetaActionsKeydown);" in js
-    assert "showToast('Lightbox keys: R re-use settings, P toggle params, Esc close viewer.', 'info');" in js
+    assert "syncGalleryLightboxMetaShortcutsButton();" in js
 
     css_path = Path(__file__).resolve().parents[1] / "static" / "css" / "style.css"
     css = css_path.read_text(encoding="utf-8")
@@ -3406,14 +3474,15 @@ def test_gallery_context_menu_keyboard_support_present():
     html_path = Path(__file__).resolve().parents[1] / "templates" / "index.html"
     html = html_path.read_text(encoding="utf-8")
 
-    assert '<div id="gallery-context-menu" class="gallery-context-menu" hidden role="menu" aria-label="Gallery actions">' in html
+    assert '<div id="gallery-context-menu" class="gallery-context-menu" hidden role="menu" aria-label="Gallery actions" aria-describedby="gallery-context-shortcuts gallery-context-jump-hint">' in html
     assert 'data-gallery-action="open-location" aria-keyshortcuts="O"' in html
     assert 'data-gallery-action="delete-image" aria-keyshortcuts="Delete D"' in html
     assert 'data-gallery-action="export-png-meta" aria-keyshortcuts="1"' in html
     assert 'data-gallery-action="export-png" aria-keyshortcuts="2"' in html
     assert 'data-gallery-action="export-jpeg" aria-keyshortcuts="3"' in html
     assert 'data-gallery-action="export-webp" aria-keyshortcuts="4"' in html
-    assert 'class="gallery-context-shortcuts" aria-hidden="true">Shortcuts: O open, Del delete, 1-4 export, arrows/tab + PgUp/PgDn navigate, letters jump, ?/F1 help</p>' in html
+    assert 'id="gallery-context-shortcuts" class="gallery-context-shortcuts" aria-hidden="true">Shortcuts: O open, Del delete, 1-4 export, arrows/tab + PgUp/PgDn navigate, letters jump (Backspace edits, Ctrl+Backspace clear), Esc clear/close, ?/F1 help</p>' in html
+    assert 'id="gallery-context-jump-hint"' in html
 
     js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
     js = js_path.read_text(encoding="utf-8")
@@ -3424,6 +3493,13 @@ def test_gallery_context_menu_keyboard_support_present():
     assert "function focusGalleryContextMenuItemByPrefix(prefix, startIndex = -1) {" in js
     assert "let galleryContextMenuLastFocus = null;" in js
     assert "let galleryContextMenuTypeaheadTimer = null;" in js
+    assert "let galleryContextMenuTypeaheadBuffer = '';" in js
+    assert "const GALLERY_CONTEXT_JUMP_HINT_IDLE = 'Type letters to jump; Backspace edits; Ctrl+Backspace clears.';" in js
+    assert "function setGalleryContextJumpHint(text, tone = '') {" in js
+    assert "function scheduleGalleryContextMenuTypeaheadReset(delayMs = 900) {" in js
+    assert "function clearGalleryContextMenuTypeahead() {" in js
+    assert "const shouldShowIdleHint = Boolean(galleryContextMenu && !galleryContextMenu.hidden);" in js
+    assert "setGalleryContextJumpHint(shouldShowIdleHint ? GALLERY_CONTEXT_JUMP_HINT_IDLE : '');" in js
     assert "function closeGalleryContextMenu(options = {}) {" in js
     assert "const { restoreFocus = false } = options;" in js
     assert "if (galleryContextMenuTypeaheadTimer) {" in js
@@ -3435,16 +3511,29 @@ def test_gallery_context_menu_keyboard_support_present():
     assert "if (event.key === 'Escape') {" in js
     assert "closeGalleryContextMenu({ restoreFocus: true });" in js
     assert "if (event.key === 'F1' || event.key === '?' || event.key === 'h' || event.key === 'H') {" in js
-    assert "showToast('Menu shortcuts: O open location, Delete/D delete, 1 PNG+meta, 2 PNG, 3 JPEG, 4 WebP, arrows/tab and PgUp/PgDn navigate, letters jump, Enter run, Esc close (?/H/F1 help).', 'info');" in js
+    assert "showToast('Menu shortcuts: O open location, Delete/D delete, 1 PNG+meta, 2 PNG, 3 JPEG, 4 WebP, arrows/tab and PgUp/PgDn navigate, letters jump (Backspace edits, Ctrl+Backspace clears), Esc clears jump then closes, Enter run (?/H/F1 help).', 'info');" in js
+    assert "if (galleryContextMenuTypeaheadBuffer) {" in js
+    assert "setGalleryContextJumpHint('Jump buffer cleared. Press Esc again to close menu.', 'match');" in js
+    assert "scheduleGalleryContextMenuTypeaheadReset(1100);" in js
     assert "const hotkeyActionMap = {" in js
     assert "delete: 'delete-image'," in js
     assert "'1': 'export-png-meta'," in js
     assert "const hotkeyBtn = galleryContextMenu.querySelector(`[data-gallery-action=\"${hotkeyAction}\"]`);" in js
     assert "if (hotkeyBtn instanceof HTMLButtonElement && !hotkeyBtn.disabled && !hotkeyBtn.hidden) {" in js
     assert "hotkeyBtn.click();" in js
+    assert "if (!event.altKey && event.key === 'Backspace' && (event.ctrlKey || event.metaKey)) {" in js
+    assert "setGalleryContextJumpHint('Jump buffer cleared.', 'match');" in js
+    assert "setGalleryContextJumpHint('Jump buffer is already empty.', 'miss');" in js
+    assert "scheduleGalleryContextMenuTypeaheadReset(950);" in js
     assert "if (!event.ctrlKey && !event.metaKey && !event.altKey && /^[a-z]$/.test(menuHotkey) && !hotkeyAction && menuHotkey !== 'h') {" in js
+    assert "if (!event.ctrlKey && !event.metaKey && !event.altKey && event.key === 'Backspace' && galleryContextMenuTypeaheadBuffer) {" in js
+    assert "galleryContextMenuTypeaheadBuffer = galleryContextMenuTypeaheadBuffer.slice(0, -1);" in js
+    assert "const extendedBuffer = `${galleryContextMenuTypeaheadBuffer}${menuHotkey}`;" in js
+    assert "if (galleryContextMenuTypeaheadBuffer && focusGalleryContextMenuItemByPrefix(extendedBuffer, currentIndex)) {" in js
     assert "if (focusGalleryContextMenuItemByPrefix(menuHotkey, currentIndex)) {" in js
-    assert "galleryContextMenuTypeaheadTimer = window.setTimeout(() => {" in js
+    assert "setGalleryContextJumpHint(`Jump \"${galleryContextMenuTypeaheadBuffer}\"" in js
+    assert "setGalleryContextJumpHint(`No match for \"${galleryContextMenuTypeaheadBuffer}\"`, 'miss');" in js
+    assert "scheduleGalleryContextMenuTypeaheadReset();" in js
     assert "if (['ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight', 'Home', 'End', 'PageUp', 'PageDown', 'Tab'].includes(event.key)) {" in js
     assert "const currentIndex = target instanceof HTMLElement ? items.indexOf(target) : -1;" in js
     assert "} else if (event.key === 'PageUp') {" in js
@@ -3465,6 +3554,23 @@ def test_gallery_context_menu_keyboard_support_present():
     css_path = Path(__file__).resolve().parents[1] / "static" / "css" / "style.css"
     css = css_path.read_text(encoding="utf-8")
     assert ".gallery-context-shortcuts" in css
+    assert ".gallery-context-jump-hint" in css
+    assert ".gallery-context-jump-hint.is-match" in css
+    assert ".gallery-context-jump-hint.is-miss" in css
+
+
+def test_gallery_context_menu_jump_letter_polish_present():
+    """Gallery context menu jump-letter UX includes repeat-key cycling and match-count hints."""
+    from pathlib import Path
+    js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
+    js = js_path.read_text(encoding="utf-8")
+
+    assert "function getGalleryContextMenuMatchCount(prefix) {" in js
+    assert "const shouldCycleCurrentPrefix = galleryContextMenuTypeaheadBuffer && menuHotkey === galleryContextMenuTypeaheadBuffer.slice(-1);" in js
+    assert "if (shouldCycleCurrentPrefix && focusGalleryContextMenuItemByPrefix(galleryContextMenuTypeaheadBuffer, currentIndex)) {" in js
+    assert "const matchCount = getGalleryContextMenuMatchCount(galleryContextMenuTypeaheadBuffer);" in js
+    assert "setGalleryContextJumpHint(`Jump \"${galleryContextMenuTypeaheadBuffer}\" -> ${focusedLabel} (${matchCount} matches)`, 'match');" in js
+    assert 'setGalleryContextJumpHint(`No match for "${galleryContextMenuTypeaheadBuffer}". Backspace edits, Ctrl+Backspace clears.`, \'miss\');' in js
 
 
 def test_gallery_image_keyboard_entrypoint_for_lightbox_and_context_menu_present():
@@ -3993,15 +4099,18 @@ def test_prompt_preset_v2_html_elements_present():
     assert 'id="prompt-favorites-only-toggle"' in html
     assert 'aria-keyshortcuts="F"' in html and 'prompt-favorites-only-toggle' in html.split('aria-keyshortcuts="F"')[0].split('\n')[-1]
     assert 'id="prompt-tag-filter"' in html
+    assert 'id="prompt-preset-filter-row"' in html
+    assert 'role="group" aria-label="Prompt preset filter controls"' in html
+    assert 'aria-keyshortcuts="F P K Ctrl+Shift+F Ctrl+Shift+R Ctrl+Shift+K"' in html
     assert 'id="prompt-preset-filter-status"' in html
     assert 'id="prompt-preset-filter-shortcut-hint"' in html
-    assert 'Filter buttons: F favs, P pinned recent.' in html
+    assert 'Toolbar keys: F favs, P pinned recent, K clear.' in html
     assert 'Global shortcuts: Ctrl/Cmd+Shift+F toggles favs, Ctrl/Cmd+Shift+R toggles pinned recent, Ctrl/Cmd+Shift+K clears.' in html
     assert 'Recent chips: arrows move, Shift+arrows reorder, P pins, Del removes.' in html
     assert 'id="prompt-preset-recent-pinned-only-toggle"' in html
     assert 'aria-keyshortcuts="P Space"' in html and 'prompt-preset-recent-pinned-only-toggle' in html.split('aria-keyshortcuts="P Space"')[0].split('\n')[-1]
     assert 'id="prompt-preset-clear-filters"' in html
-    assert 'aria-keyshortcuts="Control+Shift+K"' in html
+    assert 'aria-keyshortcuts="Control+Shift+K K"' in html
     assert 'id="prompt-preset-recent-filters"' in html
     assert 'id="prompt-preset-tag-chips"' in html
     assert 'id="prompt-saved-select"' in html
@@ -4028,6 +4137,9 @@ def test_prompt_preset_v2_js_functions_present():
     assert "function _restoreStoredTagFilterSelection()" in js
     assert "function _renderPresetFilterStatus(filteredCount, totalCount)" in js
     assert "function clearPromptPresetFilters(showToastOnClear = true)" in js
+    assert "function onPromptPresetFilterRowKeydown(event) {" in js
+    assert "if (hotkey !== 'f' && hotkey !== 'p' && hotkey !== 'k') return;" in js
+    assert "if (target.closest('[data-recent-filter-index]')) return;" in js
     assert "function _loadRecentPresetFilters()" in js
     assert "function _saveRecentPresetFilters(list)" in js
     assert "function removeRecentPresetFilterCombo(index)" in js
@@ -4070,6 +4182,8 @@ def test_prompt_preset_v2_js_functions_present():
     assert "showToast(_getFavoritesOnlyFilter() ? 'Favorites-only filter on.' : 'Favorites-only filter off.', 'pos');" in js
     assert "if (hotkey === 'r') {" in js
     assert "_toggleRecentPinnedOnlyFilter();" in js
+    assert "if (promptPresetFilterRow) {" in js
+    assert "promptPresetFilterRow.addEventListener('keydown', onPromptPresetFilterRowKeydown);" in js
     # persisted tag filter key
     assert "PROMPT_SAVED_TAG_FILTER_KEY = 'promptSavedTagFilterV1'" in js
     assert "PROMPT_SAVED_RECENT_FILTERS_KEY = 'promptSavedRecentFiltersV1'" in js
@@ -4132,6 +4246,7 @@ def test_prompt_preset_v2_dom_refs_present():
     assert "const promptFavToggle = document.getElementById('prompt-fav-toggle');" in js
     assert "const promptFavoritesOnlyToggle = document.getElementById('prompt-favorites-only-toggle');" in js
     assert "const promptTagFilter = document.getElementById('prompt-tag-filter');" in js
+    assert "const promptPresetFilterRow = document.getElementById('prompt-preset-filter-row');" in js
     assert "const promptPresetFilterStatus = document.getElementById('prompt-preset-filter-status');" in js
     assert "const promptPresetRecentPinnedOnlyToggle = document.getElementById('prompt-preset-recent-pinned-only-toggle');" in js
     assert "const promptPresetClearFilters = document.getElementById('prompt-preset-clear-filters');" in js
@@ -4269,7 +4384,8 @@ def test_gallery_lightbox_compare_slider_keyboard_discoverability():
     assert 'gallery-lightbox-shortcuts' in html
 
     # Meta shortcuts button text updated
-    assert 'Keys: R re-use, P params, Esc close, [ ] compare' in html
+    assert 'Keys: ? help' in html
+    assert '? F1' in html
 
     js_path = Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
     js = js_path.read_text(encoding="utf-8")

@@ -229,6 +229,7 @@ const promptDeleteSavedBtn = document.getElementById('prompt-delete-saved-btn');
 const promptFavToggle = document.getElementById('prompt-fav-toggle');
 const promptFavoritesOnlyToggle = document.getElementById('prompt-favorites-only-toggle');
 const promptTagFilter = document.getElementById('prompt-tag-filter');
+const promptPresetFilterRow = document.getElementById('prompt-preset-filter-row');
 const promptPresetFilterStatus = document.getElementById('prompt-preset-filter-status');
 const promptPresetRecentPinnedOnlyToggle = document.getElementById('prompt-preset-recent-pinned-only-toggle');
 const promptPresetClearFilters = document.getElementById('prompt-preset-clear-filters');
@@ -461,6 +462,7 @@ const galleryLightboxFullscreenBtn = document.getElementById('gallery-lightbox-f
 const galleryLightboxFullscreenStatus = document.getElementById('gallery-lightbox-fullscreen-status');
 const galleryLightboxFullscreenStatusDismissBtn = document.getElementById('gallery-lightbox-fullscreen-status-dismiss');
 const galleryContextMenu = document.getElementById('gallery-context-menu');
+const galleryContextJumpHint = document.getElementById('gallery-context-jump-hint');
 const gallerySearch = document.getElementById('gallery-search');
 const gallerySortSelect = document.getElementById('gallery-sort');
 const galleryModeFilterSelect = document.getElementById('gallery-mode-filter');
@@ -8364,21 +8366,77 @@ function focusGalleryContextMenuItemByPrefix(prefix, startIndex = -1) {
 			return true;
 		}
 	}
+	for (let offset = 1; offset <= items.length; offset += 1) {
+		const idx = (Math.max(-1, startIndex) + offset) % items.length;
+		const item = items[idx];
+		const label = String(item?.textContent || '').trim().toLowerCase();
+		if (label.includes(normalized)) {
+			item.focus();
+			return true;
+		}
+	}
 	return false;
+}
+
+function getGalleryContextMenuMatchCount(prefix) {
+	const normalized = String(prefix || '').trim().toLowerCase();
+	if (!normalized) return 0;
+	const items = getGalleryContextMenuItems();
+	if (!items.length) return 0;
+	let startsWithMatches = 0;
+	let includesMatches = 0;
+	for (const item of items) {
+		const label = String(item?.textContent || '').trim().toLowerCase();
+		if (!label) continue;
+		if (label.startsWith(normalized)) {
+			startsWithMatches += 1;
+		} else if (label.includes(normalized)) {
+			includesMatches += 1;
+		}
+	}
+	return startsWithMatches || includesMatches;
 }
 
 let galleryContextMenuLastFocus = null;
 let galleryContextMenuTypeaheadTimer = null;
+let galleryContextMenuTypeaheadBuffer = '';
+const GALLERY_CONTEXT_JUMP_HINT_IDLE = 'Type letters to jump; Backspace edits; Ctrl+Backspace clears.';
+
+function setGalleryContextJumpHint(text, tone = '') {
+	if (!galleryContextJumpHint) return;
+	const value = String(text || '').trim();
+	galleryContextJumpHint.hidden = !value;
+	galleryContextJumpHint.textContent = value;
+	galleryContextJumpHint.classList.remove('is-match', 'is-miss');
+	if (tone === 'match') galleryContextJumpHint.classList.add('is-match');
+	if (tone === 'miss') galleryContextJumpHint.classList.add('is-miss');
+}
+
+function scheduleGalleryContextMenuTypeaheadReset(delayMs = 900) {
+	if (galleryContextMenuTypeaheadTimer) {
+		window.clearTimeout(galleryContextMenuTypeaheadTimer);
+	}
+	galleryContextMenuTypeaheadTimer = window.setTimeout(() => {
+		clearGalleryContextMenuTypeahead();
+	}, Math.max(100, Number(delayMs) || 900));
+}
+
+function clearGalleryContextMenuTypeahead() {
+	galleryContextMenuTypeaheadBuffer = '';
+	if (galleryContextMenuTypeaheadTimer) {
+		window.clearTimeout(galleryContextMenuTypeaheadTimer);
+		galleryContextMenuTypeaheadTimer = null;
+	}
+	const shouldShowIdleHint = Boolean(galleryContextMenu && !galleryContextMenu.hidden);
+	setGalleryContextJumpHint(shouldShowIdleHint ? GALLERY_CONTEXT_JUMP_HINT_IDLE : '');
+}
 
 function closeGalleryContextMenu(options = {}) {
 	if (!galleryContextMenu) return;
 	const { restoreFocus = false } = options;
 	galleryContextMenu.hidden = true;
 	galleryContextPayload = null;
-	if (galleryContextMenuTypeaheadTimer) {
-		window.clearTimeout(galleryContextMenuTypeaheadTimer);
-		galleryContextMenuTypeaheadTimer = null;
-	}
+	clearGalleryContextMenuTypeahead();
 	if (restoreFocus && galleryContextMenuLastFocus instanceof HTMLElement && galleryContextMenuLastFocus.isConnected) {
 		galleryContextMenuLastFocus.focus();
 	}
@@ -8390,6 +8448,7 @@ function openGalleryContextMenu(payload, x, y) {
 	galleryContextPayload = payload;
 	galleryContextMenuLastFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
 	galleryContextMenu.hidden = false;
+	clearGalleryContextMenuTypeahead();
 
 	const viewportW = window.innerWidth;
 	const viewportH = window.innerHeight;
@@ -8649,6 +8708,73 @@ function computeGenerationStats(params) {
 	};
 }
 
+function getGalleryLightboxShortcutHelpText() {
+	const parts = [
+		'\u2190/\u2192 previous/next image',
+		'P toggle params',
+		'R re-use settings',
+		'K focus metadata actions',
+		'Enter add tag from tag field',
+		'?/F1 shortcut help',
+		'F toggle fullscreen',
+		'Esc close viewer',
+	];
+	const compareMode = String(galleryLightboxCompareToggle?.dataset.mode || '').trim();
+	if (compareMode === 'compare' && !galleryLightboxCompareToggle?.hidden && !galleryLightboxCompareToggle?.disabled) {
+		parts.push('C compare on/off');
+		parts.push('[ ] compare snap');
+		parts.push('= compare center');
+	} else if (compareMode === 'attach' && !galleryLightboxCompareToggle?.hidden && !galleryLightboxCompareToggle?.disabled) {
+		parts.push('C attach source image');
+	}
+	parts.push('Meta action row: \u2190/\u2192 move focus, Home/End jump');
+	return `Lightbox keys: ${parts.join(', ')}.`;
+}
+
+function getGalleryLightboxMetaActionRowHint() {
+	return 'Action row shortcuts: ArrowLeft/ArrowRight move focus, Home/End jump.';
+}
+
+function syncGalleryLightboxMetaActionTooltips() {
+	const actionRowHint = getGalleryLightboxMetaActionRowHint();
+	if (galleryLightboxReuseBtn) {
+		const reuseTitle = `Re-use generation settings (R). ${actionRowHint}`;
+		galleryLightboxReuseBtn.title = reuseTitle;
+		galleryLightboxReuseBtn.setAttribute('aria-label', reuseTitle);
+	}
+	if (galleryLightboxTagInput) {
+		const tagInputTitle = `Type a tag and press Enter to add. ${actionRowHint}`;
+		galleryLightboxTagInput.title = tagInputTitle;
+		galleryLightboxTagInput.setAttribute('aria-label', `Add tag to this image. Press Enter to add. ${actionRowHint}`);
+	}
+	if (galleryLightboxAddTagBtn) {
+		const addTagTitle = `Add typed tag (Enter or Space). ${actionRowHint}`;
+		galleryLightboxAddTagBtn.title = addTagTitle;
+		galleryLightboxAddTagBtn.setAttribute('aria-label', addTagTitle);
+	}
+}
+
+function syncGalleryLightboxMetaShortcutsButton() {
+	syncGalleryLightboxMetaActionTooltips();
+	if (!galleryLightboxMetaShortcutsBtn) return;
+	const compareMode = String(galleryLightboxCompareToggle?.dataset.mode || '').trim();
+	let compareHint = 'Compare is unavailable for this entry.';
+	if (compareMode === 'compare' && !galleryLightboxCompareToggle?.hidden && !galleryLightboxCompareToggle?.disabled) {
+		compareHint = 'Compare available: C toggles, [ and ] snap, = centers.';
+	} else if (compareMode === 'attach' && !galleryLightboxCompareToggle?.hidden && !galleryLightboxCompareToggle?.disabled) {
+		compareHint = 'Compare can be enabled by attaching a source image with C.';
+	}
+	const actionRowHint = getGalleryLightboxMetaActionRowHint();
+	galleryLightboxMetaShortcutsBtn.textContent = 'Keys: ? help + K focus';
+	galleryLightboxMetaShortcutsBtn.setAttribute('aria-label', `Show lightbox keyboard shortcuts (? / F1). ${actionRowHint}`);
+	galleryLightboxMetaShortcutsBtn.title = `Show lightbox keyboard shortcuts (? / F1). Press K to focus metadata actions. ${compareHint} ${actionRowHint}`;
+}
+
+function showGalleryLightboxShortcutsHelpToast() {
+	syncGalleryLightboxMetaShortcutsButton();
+	showToast(getGalleryLightboxShortcutHelpText(), 'info');
+}
+
 function updateLightboxMeta(entry) {
 	const hasParams = entry && (entry.model || entry.params);
 	if (galleryLightboxMetaToggle) {
@@ -8830,6 +8956,7 @@ function updateLightboxMedia(entry, fallbackSrc = '', fallbackAlt = 'Generated i
 			galleryLightboxCompareToggle.setAttribute('aria-pressed', 'false');
 		}
 	}
+	syncGalleryLightboxMetaShortcutsButton();
 
 	const showCompare = Boolean(sourceUrl && lightboxCompareEnabled && galleryLightboxCompare && galleryLightboxBeforeImage && galleryLightboxAfterImage);
 	if (showCompare) {
@@ -9890,7 +10017,7 @@ function onGalleryLightboxControlsKeydown(event) {
 
 document.addEventListener('keydown', (event) => {
 	const key = event.key;
-	if (key !== 'Escape' && key !== 'ArrowLeft' && key !== 'ArrowRight' && key !== 'c' && key !== 'C' && key !== 'r' && key !== 'R' && key !== 'f' && key !== 'F' && key !== 'p' && key !== 'P' && key !== '[' && key !== ']') return;
+	if (key !== 'Escape' && key !== 'ArrowLeft' && key !== 'ArrowRight' && key !== 'c' && key !== 'C' && key !== 'r' && key !== 'R' && key !== 'f' && key !== 'F' && key !== 'p' && key !== 'P' && key !== 'k' && key !== 'K' && key !== '[' && key !== ']' && key !== '?' && key !== 'F1') return;
 
 	if (key === 'Escape') {
 		if (galleryContextMenu && !galleryContextMenu.hidden) {
@@ -9907,6 +10034,13 @@ document.addEventListener('keydown', (event) => {
 	}
 
 	if (!galleryLightbox || galleryLightbox.hidden) return;
+	if (key === '?' || key === 'F1') {
+		const target = event.target;
+		if (target instanceof HTMLElement && target.closest('#gallery-lightbox input, #gallery-lightbox select, #gallery-lightbox textarea')) return;
+		event.preventDefault();
+		showGalleryLightboxShortcutsHelpToast();
+		return;
+	}
 	if (key === 'c' || key === 'C') {
 		const target = event.target;
 		if (target instanceof HTMLElement && target.closest('#gallery-lightbox input, #gallery-lightbox select, #gallery-lightbox textarea')) return;
@@ -9957,6 +10091,25 @@ document.addEventListener('keydown', (event) => {
 		return;
 	}
 
+	if (key === 'k' || key === 'K') {
+		const target = event.target;
+		if (target instanceof HTMLElement && target.closest('#gallery-lightbox input, #gallery-lightbox select, #gallery-lightbox textarea')) return;
+		if (!galleryLightboxMetaToggle || galleryLightboxMetaToggle.hidden || galleryLightboxMetaToggle.disabled) return;
+		event.preventDefault();
+		if (!lightboxMetaOpen) {
+			lightboxMetaOpen = true;
+			galleryLightboxMetaToggle.setAttribute('aria-pressed', 'true');
+			if (galleryLightboxMeta) galleryLightboxMeta.hidden = false;
+			const entry = currentGalleryImages[lightboxCurrentIndex];
+			updateLightboxMeta(entry);
+		}
+		const controls = getGalleryLightboxMetaActionControls();
+		if (!controls.length) return;
+		controls[0].focus();
+		showToast('Focused lightbox metadata actions.', 'pos');
+		return;
+	}
+
 	if (isGalleryLightboxInteractiveTarget(event.target)) return;
 		if (key === 'p' || key === 'P') {
 			const target = event.target;
@@ -9988,13 +10141,19 @@ if (galleryContextMenu) {
 		if (event.key === 'Escape') {
 			event.preventDefault();
 			event.stopPropagation();
+			if (galleryContextMenuTypeaheadBuffer) {
+				clearGalleryContextMenuTypeahead();
+				setGalleryContextJumpHint('Jump buffer cleared. Press Esc again to close menu.', 'match');
+				scheduleGalleryContextMenuTypeaheadReset(1100);
+				return;
+			}
 			closeGalleryContextMenu({ restoreFocus: true });
 			return;
 		}
 
 		if (event.key === 'F1' || event.key === '?' || event.key === 'h' || event.key === 'H') {
 			event.preventDefault();
-			showToast('Menu shortcuts: O open location, Delete/D delete, 1 PNG+meta, 2 PNG, 3 JPEG, 4 WebP, arrows/tab and PgUp/PgDn navigate, letters jump, Enter run, Esc close (?/H/F1 help).', 'info');
+			showToast('Menu shortcuts: O open location, Delete/D delete, 1 PNG+meta, 2 PNG, 3 JPEG, 4 WebP, arrows/tab and PgUp/PgDn navigate, letters jump (Backspace edits, Ctrl+Backspace clears), Esc clears jump then closes, Enter run (?/H/F1 help).', 'info');
 			return;
 		}
 
@@ -10013,9 +10172,44 @@ if (galleryContextMenu) {
 			const hotkeyBtn = galleryContextMenu.querySelector(`[data-gallery-action="${hotkeyAction}"]`);
 			if (hotkeyBtn instanceof HTMLButtonElement && !hotkeyBtn.disabled && !hotkeyBtn.hidden) {
 				event.preventDefault();
+				clearGalleryContextMenuTypeahead();
 				hotkeyBtn.click();
 				return;
 			}
+		}
+
+		if (!event.altKey && event.key === 'Backspace' && (event.ctrlKey || event.metaKey)) {
+			event.preventDefault();
+			if (!galleryContextMenuTypeaheadBuffer) {
+				setGalleryContextJumpHint('Jump buffer is already empty.', 'miss');
+				scheduleGalleryContextMenuTypeaheadReset(950);
+				return;
+			}
+			galleryContextMenuTypeaheadBuffer = '';
+			setGalleryContextJumpHint('Jump buffer cleared.', 'match');
+			scheduleGalleryContextMenuTypeaheadReset(950);
+			return;
+		}
+
+		if (!event.ctrlKey && !event.metaKey && !event.altKey && event.key === 'Backspace' && galleryContextMenuTypeaheadBuffer) {
+			event.preventDefault();
+			const items = getGalleryContextMenuItems();
+			if (!items.length) return;
+			const currentIndex = target instanceof HTMLElement ? items.indexOf(target) : -1;
+			galleryContextMenuTypeaheadBuffer = galleryContextMenuTypeaheadBuffer.slice(0, -1);
+			if (!galleryContextMenuTypeaheadBuffer) {
+				clearGalleryContextMenuTypeahead();
+				return;
+			}
+			if (focusGalleryContextMenuItemByPrefix(galleryContextMenuTypeaheadBuffer, currentIndex)) {
+				const focused = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+				const focusedLabel = String(focused?.textContent || '').trim();
+				setGalleryContextJumpHint(`Jump "${galleryContextMenuTypeaheadBuffer}" -> ${focusedLabel}`, 'match');
+			} else {
+				setGalleryContextJumpHint(`No match for "${galleryContextMenuTypeaheadBuffer}"`, 'miss');
+			}
+			scheduleGalleryContextMenuTypeaheadReset();
+			return;
 		}
 
 		if (!event.ctrlKey && !event.metaKey && !event.altKey && /^[a-z]$/.test(menuHotkey) && !hotkeyAction && menuHotkey !== 'h') {
@@ -10023,13 +10217,48 @@ if (galleryContextMenu) {
 			if (!items.length) return;
 			event.preventDefault();
 			const currentIndex = target instanceof HTMLElement ? items.indexOf(target) : -1;
-			if (focusGalleryContextMenuItemByPrefix(menuHotkey, currentIndex)) {
-				if (galleryContextMenuTypeaheadTimer) {
-					window.clearTimeout(galleryContextMenuTypeaheadTimer);
+			const shouldCycleCurrentPrefix = galleryContextMenuTypeaheadBuffer && menuHotkey === galleryContextMenuTypeaheadBuffer.slice(-1);
+			if (shouldCycleCurrentPrefix && focusGalleryContextMenuItemByPrefix(galleryContextMenuTypeaheadBuffer, currentIndex)) {
+				const focused = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+				const focusedLabel = String(focused?.textContent || '').trim();
+				setGalleryContextJumpHint(`Jump "${galleryContextMenuTypeaheadBuffer}" -> ${focusedLabel}`, 'match');
+				const matchCount = getGalleryContextMenuMatchCount(galleryContextMenuTypeaheadBuffer);
+				if (matchCount > 1) {
+					setGalleryContextJumpHint(`Jump "${galleryContextMenuTypeaheadBuffer}" -> ${focusedLabel} (${matchCount} matches)`, 'match');
 				}
-				galleryContextMenuTypeaheadTimer = window.setTimeout(() => {
-					galleryContextMenuTypeaheadTimer = null;
-				}, 600);
+				scheduleGalleryContextMenuTypeaheadReset();
+				return;
+			}
+			const extendedBuffer = `${galleryContextMenuTypeaheadBuffer}${menuHotkey}`;
+			if (galleryContextMenuTypeaheadBuffer && focusGalleryContextMenuItemByPrefix(extendedBuffer, currentIndex)) {
+				galleryContextMenuTypeaheadBuffer = extendedBuffer;
+				const focused = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+				const focusedLabel = String(focused?.textContent || '').trim();
+				setGalleryContextJumpHint(`Jump "${galleryContextMenuTypeaheadBuffer}" -> ${focusedLabel}`, 'match');
+				const matchCount = getGalleryContextMenuMatchCount(galleryContextMenuTypeaheadBuffer);
+				if (matchCount > 1) {
+					setGalleryContextJumpHint(`Jump "${galleryContextMenuTypeaheadBuffer}" -> ${focusedLabel} (${matchCount} matches)`, 'match');
+				}
+				scheduleGalleryContextMenuTypeaheadReset();
+				return;
+			}
+			if (focusGalleryContextMenuItemByPrefix(menuHotkey, currentIndex)) {
+				galleryContextMenuTypeaheadBuffer = menuHotkey;
+				const focused = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+				const focusedLabel = String(focused?.textContent || '').trim();
+				setGalleryContextJumpHint(`Jump "${galleryContextMenuTypeaheadBuffer}" -> ${focusedLabel}`, 'match');
+				const matchCount = getGalleryContextMenuMatchCount(galleryContextMenuTypeaheadBuffer);
+				if (matchCount > 1) {
+					setGalleryContextJumpHint(`Jump "${galleryContextMenuTypeaheadBuffer}" -> ${focusedLabel} (${matchCount} matches)`, 'match');
+				}
+				scheduleGalleryContextMenuTypeaheadReset();
+				return;
+			}
+			if (galleryContextMenuTypeaheadBuffer) {
+				galleryContextMenuTypeaheadBuffer = extendedBuffer;
+				setGalleryContextJumpHint(`No match for "${galleryContextMenuTypeaheadBuffer}"`, 'miss');
+				setGalleryContextJumpHint(`No match for "${galleryContextMenuTypeaheadBuffer}". Backspace edits, Ctrl+Backspace clears.`, 'miss');
+				scheduleGalleryContextMenuTypeaheadReset();
 				return;
 			}
 		}
@@ -10038,6 +10267,7 @@ if (galleryContextMenu) {
 			const items = getGalleryContextMenuItems();
 			if (!items.length) return;
 			event.preventDefault();
+			clearGalleryContextMenuTypeahead();
 			const currentIndex = target instanceof HTMLElement ? items.indexOf(target) : -1;
 			let nextIndex = currentIndex >= 0 ? currentIndex : 0;
 			if (event.key === 'Home') {
@@ -10063,6 +10293,7 @@ if (galleryContextMenu) {
 
 		if ((event.key === 'Enter' || event.key === ' ') && target instanceof HTMLButtonElement) {
 			event.preventDefault();
+			clearGalleryContextMenuTypeahead();
 			target.click();
 		}
 	});
@@ -10289,7 +10520,7 @@ document.addEventListener('keydown', (event) => {
 
 	const hotkey = String(event.key || '').toLowerCase();
 	const isGalleryPowerShortcut = (event.ctrlKey || event.metaKey) && event.shiftKey && !event.altKey
-		&& (hotkey === 'g' || hotkey === 's' || hotkey === 'a' || hotkey === 'x');
+		&& (hotkey === 'g' || hotkey === 's' || hotkey === 'a' || hotkey === 'x' || hotkey === 'o' || hotkey === 'm' || hotkey === 't' || hotkey === 'l');
 	if (!isGalleryPowerShortcut) return;
 	const imagePanel = panelImage;
 	if (!imagePanel || imagePanel.hidden) return;
@@ -10326,6 +10557,24 @@ document.addEventListener('keydown', (event) => {
 		}
 		galleryDeselectAllBtn?.click();
 		showToast('Cleared gallery selection.', 'pos');
+		return;
+	}
+	if (hotkey === 'o') {
+		const label = cycleGallerySortOrder(1);
+		if (label) showToast(`Gallery sort: ${label}.`, 'pos');
+		return;
+	}
+	if (hotkey === 'm') {
+		const label = cycleGalleryModeFilter(1);
+		if (label) showToast(`Gallery mode filter: ${label}.`, 'pos');
+		return;
+	}
+	if (hotkey === 't') {
+		focusGalleryFilterSelect(galleryTagFilterSelect, 'tag');
+		return;
+	}
+	if (hotkey === 'l') {
+		focusGalleryFilterSelect(galleryModelFilterSelect, 'model');
 	}
 });
 
@@ -10536,6 +10785,41 @@ function hideGalleryShortcutsHelp() {
 	return true;
 }
 
+function cycleGallerySortOrder(delta = 1) {
+	if (!gallerySortSelect) return '';
+	const options = [...gallerySortSelect.options].map((opt) => String(opt.value || '').trim()).filter(Boolean);
+	if (!options.length) return '';
+	const current = String(gallerySortSelect.value || gallerySortOrder || 'newest').trim();
+	const currentIndex = options.indexOf(current);
+	const safeIndex = currentIndex >= 0 ? currentIndex : 0;
+	const nextIndex = (safeIndex + delta + options.length) % options.length;
+	gallerySortSelect.value = options[nextIndex];
+	gallerySortSelect.dispatchEvent(new Event('change', { bubbles: true }));
+	const selectedOption = gallerySortSelect.options[gallerySortSelect.selectedIndex];
+	return String(selectedOption?.textContent || gallerySortSelect.value || '').trim();
+}
+
+function cycleGalleryModeFilter(delta = 1) {
+	if (!galleryModeFilterSelect) return '';
+	const options = [...galleryModeFilterSelect.options].map((opt) => String(opt.value || '').trim()).filter(Boolean);
+	if (!options.length) return '';
+	const current = String(galleryModeFilterSelect.value || galleryModeFilter || 'all').trim();
+	const currentIndex = options.indexOf(current);
+	const safeIndex = currentIndex >= 0 ? currentIndex : 0;
+	const nextIndex = (safeIndex + delta + options.length) % options.length;
+	galleryModeFilterSelect.value = options[nextIndex];
+	galleryModeFilterSelect.dispatchEvent(new Event('change', { bubbles: true }));
+	const selectedOption = galleryModeFilterSelect.options[galleryModeFilterSelect.selectedIndex];
+	return String(selectedOption?.textContent || galleryModeFilterSelect.value || '').trim();
+}
+
+function focusGalleryFilterSelect(selectEl, label) {
+	if (!(selectEl instanceof HTMLSelectElement) || selectEl.disabled || selectEl.hidden) return false;
+	selectEl.focus();
+	showToast(`Focused ${label} filter.`, 'pos');
+	return true;
+}
+
 function onGalleryToolbarButtonKeydown(event) {
 	const key = event.key;
 	if (key === 'Escape' && galleryShortcutsHelpExpanded) {
@@ -10699,8 +10983,9 @@ if (galleryLightboxTagInput) {
 if (galleryLightboxMetaShortcutsBtn) {
 	galleryLightboxMetaShortcutsBtn.addEventListener('keydown', onGalleryLightboxMetaActionsKeydown);
 	galleryLightboxMetaShortcutsBtn.addEventListener('click', () => {
-		showToast('Lightbox keys: R re-use settings, P toggle params, Esc close viewer.', 'info');
+		showGalleryLightboxShortcutsHelpToast();
 	});
+	syncGalleryLightboxMetaShortcutsButton();
 }
 
 if (galleryLightboxTags) {
@@ -15458,6 +15743,30 @@ function clearPromptPresetFilters(showToastOnClear = true) {
 	renderRecentPresetFilterChips();
 	if (showToastOnClear) showToast('Preset filters cleared.', 'pos');
 }
+
+function onPromptPresetFilterRowKeydown(event) {
+	if (event.defaultPrevented) return;
+	if (event.ctrlKey || event.metaKey || event.altKey) return;
+	const hotkey = String(event.key || '').toLowerCase();
+	if (hotkey !== 'f' && hotkey !== 'p' && hotkey !== 'k') return;
+	const target = event.target;
+	if (target instanceof HTMLElement) {
+		const tag = String(target.tagName || '').toLowerCase();
+		if (target.isContentEditable || tag === 'input' || tag === 'textarea' || tag === 'select') return;
+		if (target.closest('[data-recent-filter-index]')) return;
+	}
+	event.preventDefault();
+	if (hotkey === 'f') {
+		_togglePromptFavoritesOnlyFilter();
+		showToast(_getFavoritesOnlyFilter() ? 'Favorites-only filter on.' : 'Favorites-only filter off.', 'pos');
+		return;
+	}
+	if (hotkey === 'p') {
+		_toggleRecentPinnedOnlyFilter();
+		return;
+	}
+	clearPromptPresetFilters(true);
+}
 function renderPromptSavedSelect() {
 	if (!promptSavedSelect) return;
 	const presets = loadPromptSavedPresets();
@@ -16238,6 +16547,9 @@ if (promptPresetRecentPinnedOnlyToggle) {
 		event.preventDefault();
 		_toggleRecentPinnedOnlyFilter();
 	});
+}
+if (promptPresetFilterRow) {
+	promptPresetFilterRow.addEventListener('keydown', onPromptPresetFilterRowKeydown);
 }
 if (promptEditPresetBtn) {
 	promptEditPresetBtn.addEventListener('click', () => {

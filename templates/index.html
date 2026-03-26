@@ -619,12 +619,12 @@
               <button class="btn btn-ghost btn-xs" id="prompt-edit-preset-btn" type="button" title="Edit this preset">Edit</button>
               <button class="btn btn-ghost btn-xs" id="prompt-delete-saved-btn" type="button">Del</button>
             </div>
-            <div class="prompt-preset-filter-row">
+            <div id="prompt-preset-filter-row" class="prompt-preset-filter-row" role="group" aria-label="Prompt preset filter controls" tabindex="0" aria-keyshortcuts="F P K Ctrl+Shift+F Ctrl+Shift+R Ctrl+Shift+K" title="Filter shortcuts: F favorites, P pinned recent, K clear filters">
               <p id="prompt-preset-filter-status" class="hint prompt-preset-filter-status" aria-live="polite">No filters active.</p>
               <div class="prompt-preset-filter-actions">
-                <span id="prompt-preset-filter-shortcut-hint" class="hint prompt-preset-filter-shortcut-hint">Shortcut: Ctrl+Shift+K. Filter buttons: F favs, P pinned recent. Global shortcuts: Ctrl/Cmd+Shift+F toggles favs, Ctrl/Cmd+Shift+R toggles pinned recent, Ctrl/Cmd+Shift+K clears. Recent chips: arrows move, Shift+arrows reorder, P pins, Del removes.</span>
+                <span id="prompt-preset-filter-shortcut-hint" class="hint prompt-preset-filter-shortcut-hint">Toolbar keys: F favs, P pinned recent, K clear. Global shortcuts: Ctrl/Cmd+Shift+F toggles favs, Ctrl/Cmd+Shift+R toggles pinned recent, Ctrl/Cmd+Shift+K clears. Recent chips: arrows move, Shift+arrows reorder, P pins, Del removes.</span>
                 <button class="btn btn-ghost btn-xs prompt-preset-recent-pinned-only-toggle" id="prompt-preset-recent-pinned-only-toggle" type="button" aria-pressed="false" aria-keyshortcuts="P Space" title="Show pinned recent filters only (P or Space to toggle when focused)">Pinned recent</button>
-                <button class="btn btn-ghost btn-xs" id="prompt-preset-clear-filters" type="button" aria-keyshortcuts="Control+Shift+K">Clear filters</button>
+                <button class="btn btn-ghost btn-xs" id="prompt-preset-clear-filters" type="button" aria-keyshortcuts="Control+Shift+K K" title="Clear preset filters (K when filter row is focused; Ctrl/Cmd+Shift+K globally)">Clear filters</button>
               </div>
             </div>
             <div id="prompt-preset-recent-filters" class="prompt-preset-recent-filters" aria-label="Recent preset filters"></div>
@@ -811,14 +811,14 @@
         <div class="gallery-controls" role="group" aria-label="Gallery controls">
           <input id="gallery-search" type="search" class="gallery-search-input" placeholder="Filter by prompt…" aria-label="Filter gallery by prompt text" aria-keyshortcuts="Escape" title="Press Escape to clear gallery search" autocomplete="off" />
           <div class="select-wrapper gallery-sort-wrap">
-            <select id="gallery-sort" aria-label="Sort gallery">
+            <select id="gallery-sort" aria-label="Sort gallery" aria-keyshortcuts="Ctrl+Shift+O Cmd+Shift+O" title="Cycle sort with Ctrl/Cmd+Shift+O">
               <option value="newest">Newest</option>
               <option value="oldest">Oldest</option>
               <option value="favorites-first">Favorites first</option>
             </select>
           </div>
           <div class="select-wrapper gallery-mode-filter-wrap">
-            <select id="gallery-mode-filter" aria-label="Filter by generation mode">
+            <select id="gallery-mode-filter" aria-label="Filter by generation mode" aria-keyshortcuts="Ctrl+Shift+M Cmd+Shift+M" title="Cycle mode filter with Ctrl/Cmd+Shift+M">
               <option value="all">All</option>
               <option value="text">Text2Img</option>
               <option value="img2img">Img2Img</option>
@@ -826,12 +826,12 @@
             </select>
           </div>
           <div class="select-wrapper gallery-tag-filter-wrap">
-            <select id="gallery-tag-filter" aria-label="Filter by tag">
+            <select id="gallery-tag-filter" aria-label="Filter by tag" aria-keyshortcuts="Ctrl+Shift+T Cmd+Shift+T" title="Focus tag filter with Ctrl/Cmd+Shift+T">
               <option value="all">All tags</option>
             </select>
           </div>
           <div class="select-wrapper gallery-model-filter-wrap">
-            <select id="gallery-model-filter" aria-label="Filter by model">
+            <select id="gallery-model-filter" aria-label="Filter by model" aria-keyshortcuts="Ctrl+Shift+L Cmd+Shift+L" title="Focus model filter with Ctrl/Cmd+Shift+L">
               <option value="all">All models</option>
             </select>
           </div>
@@ -841,7 +841,7 @@
         </div>
       </div>
       <div class="gallery-shortcuts-help-row">
-        <p id="gallery-shortcuts-hint" class="hint">Shortcuts: Ctrl/Cmd+Shift+G view, Ctrl/Cmd+Shift+S select mode, Ctrl/Cmd+Shift+A select all, Ctrl/Cmd+Shift+X clear, ? or Ctrl/Cmd+Shift+/ or Ctrl/Cmd+Shift+H keyboard help, Esc hide help.</p>
+        <p id="gallery-shortcuts-hint" class="hint">Shortcuts: Ctrl/Cmd+Shift+G view, Ctrl/Cmd+Shift+S select mode, Ctrl/Cmd+Shift+A select all, Ctrl/Cmd+Shift+X clear, Ctrl/Cmd+Shift+O cycle sort, Ctrl/Cmd+Shift+M cycle mode, Ctrl/Cmd+Shift+T focus tag filter, Ctrl/Cmd+Shift+L focus model filter, ? or Ctrl/Cmd+Shift+/ or Ctrl/Cmd+Shift+H keyboard help, Esc hide help.</p>
         <button class="btn btn-ghost btn-xs" id="gallery-shortcuts-toggle-btn" type="button" aria-expanded="false" aria-controls="gallery-shortcuts-help" aria-keyshortcuts="? Ctrl+Shift+/ Cmd+Shift+/ Ctrl+Shift+H Cmd+Shift+H" title="Toggle keyboard help (?, Ctrl/Cmd+Shift+/, or Ctrl/Cmd+Shift+H)">Show keyboard help</button>
       </div>
       <div id="gallery-shortcuts-help" class="hint gallery-shortcuts-help" hidden>
@@ -863,7 +863,7 @@
       <div class="gallery-lightbox-panel" role="document">
         <div class="gallery-lightbox-header">
           <span id="gallery-lightbox-counter" class="hint gallery-lightbox-counter"></span>
-          <span class="hint gallery-lightbox-shortcuts">Shortcuts: &larr; &rarr; arrows, P params, C compare, [ ] snap, R re-use, F fullscreen, Esc close</span>
+          <span class="hint gallery-lightbox-shortcuts">Shortcuts: &larr; &rarr; arrows, P params, C compare, [ ] snap, R re-use, K actions, ? help, F fullscreen, Esc close</span>
           <span id="gallery-lightbox-fullscreen-status" class="gallery-lightbox-fullscreen-status-badge" hidden aria-live="polite" aria-label="Fullscreen mode active">
             <span id="gallery-lightbox-fullscreen-status-text">&#x2326; Press F to exit</span>
             <button id="gallery-lightbox-fullscreen-status-dismiss" class="gallery-lightbox-fullscreen-status-dismiss" type="button" aria-label="Dismiss fullscreen status badge" title="Dismiss fullscreen status badge" hidden>&times;</button>
@@ -892,18 +892,18 @@
         <div id="gallery-lightbox-meta" class="gallery-lightbox-meta" hidden aria-label="Generation parameters">
           <div id="gallery-lightbox-meta-chips" class="gallery-lightbox-meta-chips"></div>
            <div id="gallery-lightbox-stats" class="gallery-lightbox-stats" hidden aria-label="Generation statistics"></div>
-          <div class="gallery-lightbox-meta-actions">
-            <button id="gallery-lightbox-reuse" class="btn btn-secondary btn-xs" type="button" aria-keyshortcuts="R">&#8617; Re-use settings</button>
-            <input id="gallery-lightbox-tag-input" class="gallery-lightbox-tag-input" type="text" maxlength="40" placeholder="Add tag" aria-label="Add tag to this image" />
-            <button id="gallery-lightbox-add-tag-btn" class="btn btn-ghost btn-xs" type="button">Add tag</button>
-            <button id="gallery-lightbox-meta-shortcuts" class="btn btn-ghost btn-xs gallery-lightbox-meta-shortcuts" type="button" aria-label="Show lightbox keyboard shortcuts" title="Show lightbox keyboard shortcuts">Keys: R re-use, P params, Esc close, [ ] compare</button>
+          <div id="gallery-lightbox-meta-actions" class="gallery-lightbox-meta-actions" role="group" aria-label="Lightbox metadata actions" aria-keyshortcuts="K ArrowLeft ArrowRight Home End">
+            <button id="gallery-lightbox-reuse" class="btn btn-secondary btn-xs" type="button" aria-keyshortcuts="R ArrowLeft ArrowRight Home End" title="Re-use generation settings (R). Action row shortcuts: ArrowLeft/ArrowRight move focus, Home/End jump.">&#8617; Re-use settings</button>
+            <input id="gallery-lightbox-tag-input" class="gallery-lightbox-tag-input" type="text" maxlength="40" placeholder="Add tag" aria-label="Add tag to this image. Press Enter to add. Action row shortcuts: ArrowLeft/ArrowRight move focus, Home/End jump." aria-keyshortcuts="Enter ArrowLeft ArrowRight Home End" title="Type a tag and press Enter to add. Action row shortcuts: ArrowLeft/ArrowRight move focus, Home/End jump." />
+            <button id="gallery-lightbox-add-tag-btn" class="btn btn-ghost btn-xs" type="button" aria-keyshortcuts="Enter Space ArrowLeft ArrowRight Home End" title="Add typed tag (Enter or Space). Action row shortcuts: ArrowLeft/ArrowRight move focus, Home/End jump.">Add tag</button>
+            <button id="gallery-lightbox-meta-shortcuts" class="btn btn-ghost btn-xs gallery-lightbox-meta-shortcuts" type="button" aria-label="Show lightbox keyboard shortcuts (? / F1). Action row shortcuts: ArrowLeft/ArrowRight move focus, Home/End jump." aria-keyshortcuts="? F1 K ArrowLeft ArrowRight Home End" title="Show lightbox keyboard shortcuts (? / F1). Action row shortcuts: ArrowLeft/ArrowRight move focus, Home/End jump.">Keys: ? help + K focus</button>
           </div>
           <div id="gallery-lightbox-tags" class="gallery-lightbox-tags" aria-live="polite"></div>
         </div>
       </div>
     </div>
 
-    <div id="gallery-context-menu" class="gallery-context-menu" hidden role="menu" aria-label="Gallery actions">
+    <div id="gallery-context-menu" class="gallery-context-menu" hidden role="menu" aria-label="Gallery actions" aria-describedby="gallery-context-shortcuts gallery-context-jump-hint">
       <button type="button" role="menuitem" data-gallery-action="open-location" aria-keyshortcuts="O" title="Open image location (O)">Open image location</button>
       <button type="button" role="menuitem" data-gallery-action="delete-image" aria-keyshortcuts="Delete D" title="Delete image (Delete or D)">Delete image</button>
       <div class="gallery-context-divider" role="separator" aria-hidden="true"></div>
@@ -911,7 +911,8 @@
       <button type="button" role="menuitem" data-gallery-action="export-png" aria-keyshortcuts="2" title="Export PNG (2)">Export PNG</button>
       <button type="button" role="menuitem" data-gallery-action="export-jpeg" aria-keyshortcuts="3" title="Export JPEG (3)">Export JPEG</button>
       <button type="button" role="menuitem" data-gallery-action="export-webp" aria-keyshortcuts="4" title="Export WebP (4)">Export WebP</button>
-      <p class="gallery-context-shortcuts" aria-hidden="true">Shortcuts: O open, Del delete, 1-4 export, arrows/tab + PgUp/PgDn navigate, letters jump, ?/F1 help</p>
+      <p id="gallery-context-shortcuts" class="gallery-context-shortcuts" aria-hidden="true">Shortcuts: O open, Del delete, 1-4 export, arrows/tab + PgUp/PgDn navigate, letters jump (Backspace edits, Ctrl+Backspace clear), Esc clear/close, ?/F1 help</p>
+      <p id="gallery-context-jump-hint" class="gallery-context-jump-hint" role="status" aria-live="polite" hidden></p>
     </div>
   </div>
 
