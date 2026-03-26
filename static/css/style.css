@@ -36,7 +36,8 @@
   --radius-lg: 0.75rem;
   --shadow-sm: 0 1px 3px rgba(5, 19, 42, 0.08);
   --shadow-md: 0 4px 14px rgba(5, 19, 42, 0.12);
-  --transition: 150ms ease;
+  --transition: 200ms cubic-bezier(0.25, 0.8, 0.25, 1);
+  --spring: 400ms cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
 [data-theme="dark"] {
@@ -465,7 +466,7 @@ textarea {
 }
 
 .lora-compat-mode-hint.is-flux {
-  color: color-mix(in srgb, var(--clr-text) 84%, #ff934d);
+  color: color-mix(in srgb, var(--clr-text) 84%, var(--clr-caution));
 }
 
 .lora-compat-mode-hint.is-sd {
@@ -526,9 +527,9 @@ textarea {
 }
 
 .flux-variant-chip.is-dev {
-  color: color-mix(in srgb, var(--clr-text) 84%, #ff934d);
-  border-color: color-mix(in srgb, var(--clr-border) 35%, #ff934d);
-  background: color-mix(in srgb, var(--clr-surface) 68%, #ff934d);
+  color: color-mix(in srgb, var(--clr-text) 84%, var(--clr-caution));
+  border-color: color-mix(in srgb, var(--clr-border) 35%, var(--clr-caution));
+  background: color-mix(in srgb, var(--clr-surface) 68%, var(--clr-caution));
 }
 
 .flux-variant-chip.is-schnell {
@@ -576,15 +577,15 @@ textarea {
 }
 
 .flux-comp-pill.is-found {
-  color: color-mix(in srgb, var(--clr-text) 84%, #4caf50);
-  border-color: color-mix(in srgb, var(--clr-border) 35%, #4caf50);
-  background: color-mix(in srgb, var(--clr-surface) 68%, #4caf50);
+  color: color-mix(in srgb, var(--clr-text) 84%, var(--clr-accent-pos));
+  border-color: color-mix(in srgb, var(--clr-border) 35%, var(--clr-accent-pos));
+  background: color-mix(in srgb, var(--clr-surface) 68%, var(--clr-accent-pos));
 }
 
 .flux-comp-pill.is-missing {
-  color: color-mix(in srgb, var(--clr-text) 84%, #e05252);
-  border-color: color-mix(in srgb, var(--clr-border) 35%, #e05252);
-  background: color-mix(in srgb, var(--clr-surface) 68%, #e05252);
+  color: color-mix(in srgb, var(--clr-text) 84%, var(--clr-accent-neg));
+  border-color: color-mix(in srgb, var(--clr-border) 35%, var(--clr-accent-neg));
+  background: color-mix(in srgb, var(--clr-surface) 68%, var(--clr-accent-neg));
 }
 
 .flux-comp-pill.is-loading {
@@ -684,9 +685,9 @@ textarea {
 }
 
 .recommendation-expiry-tag.is-active {
-  color: color-mix(in srgb, var(--clr-text) 84%, #ff934d);
-  border-color: color-mix(in srgb, var(--clr-border) 35%, #ff934d);
-  background: color-mix(in srgb, var(--clr-surface) 70%, #ff934d);
+  color: color-mix(in srgb, var(--clr-text) 84%, var(--clr-caution));
+  border-color: color-mix(in srgb, var(--clr-border) 35%, var(--clr-caution));
+  background: color-mix(in srgb, var(--clr-surface) 70%, var(--clr-caution));
 }
 
 .model-recent-list {
@@ -2102,7 +2103,7 @@ textarea {
 }
 
 .lora-row-family-chip.is-flux {
-  color: color-mix(in srgb, var(--clr-text) 84%, #ff934d);
+  color: color-mix(in srgb, var(--clr-text) 84%, var(--clr-caution));
 }
 
 .lora-row-family-chip.is-sdxl {
@@ -3301,7 +3302,7 @@ textarea {
   background: rgba(0, 0, 0, 0.45);
   border: none;
   border-radius: 4px;
-  color: #ccc;
+  color: var(--clr-border);
   font-size: 1rem;
   line-height: 1;
   padding: 3px 6px;
@@ -4936,4 +4937,65 @@ body.gallery-lightbox-open {
   background: var(--bg-body);
   display: flex;
   justify-content: flex-end;
+}
+
+/* --------------------------------------------------------------------------
+   UI Optimization Overrides (Beta Polish)
+   -------------------------------------------------------------------------- */
+.glass-panel {
+  background: color-mix(in srgb, var(--clr-surface) 80%, transparent) !important;
+  backdrop-filter: blur(16px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(180%) !important;
+  border-radius: var(--radius-lg) !important;
+  border: 1px solid color-mix(in srgb, var(--clr-border) 60%, transparent) !important;
+  box-shadow: var(--shadow-md) !important;
+}
+
+.glass-backdrop {
+  background: rgba(0, 0, 0, 0.4) !important;
+  backdrop-filter: blur(4px) !important;
+  -webkit-backdrop-filter: blur(4px) !important;
+}
+
+.preset-edit-modal-panel, 
+.hardware-monitor-overlay,
+.cmd-palette-panel {
+  border-radius: var(--radius-lg);
+}
+
+.cmd-palette-modal {
+  animation: modal-pop var(--spring) forwards;
+}
+
+@keyframes modal-pop {
+  0% { transform: translateY(10vh) scale(0.95); opacity: 0; }
+  100% { transform: translateY(-10vh) scale(1); opacity: 1; }
+}
+
+.mb-card {
+  transition: transform var(--transition), box-shadow var(--transition), border-color var(--transition) !important;
+}
+
+.mb-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.btn {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.btn:hover {
+  transform: translateY(-1px);
+}
+
+.bulk-action-bar {
+  transition: transform var(--spring) !important;
+}
+
+@media (min-width: 1200px) {
+  .bulk-action-bar-content {
+    max-width: 1200px;
+    margin: 0 auto;
+  }
 }
